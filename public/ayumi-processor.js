@@ -48,6 +48,17 @@ class AyumiProcessor extends AudioWorkletProcessor {
 		this.channelWaveformWriteIndex = 0;
 		this.waveformPostCounter = 0;
 		this.waveformPostInterval = 6;
+		this.timerCounter = [0, 0, 0];
+		this.timerPeriod = [0, 0, 0];
+		this.timerOutput = [0, 0, 0];
+		this.timerEnabled = [false, false, false];
+		this.timerUpdate = [false, false, false];
+		this.channelVol = [0, 0, 0];
+		this.envelopeShape = 0;
+		this.timerFrequency = this.aymFrequency; // not to be confused with timerPeriod
+		this.timerDivide = true; // false if using atari ST scheme
+		this.prescalers = [1, 4, 10, 16, 50, 64, 100, 200];
+		this.timerScheme = 'simple';
 	}
 
 	async handleMessage(event) {
@@ -96,6 +107,12 @@ class AyumiProcessor extends AudioWorkletProcessor {
 			case 'update_int_frequency':
 				this.handleUpdateIntFrequency(data);
 				break;
+			case 'update_timer_frequency':
+				this.handleUpdateTimerFrequency(data);
+				break;
+			case 'update_timer_scheme':
+				this.handleUpdateTimerScheme(data);
+				break;
 			case 'update_chip_variant':
 				this.handleUpdateChipVariant(data);
 				break;
@@ -108,15 +125,15 @@ class AyumiProcessor extends AudioWorkletProcessor {
 			case 'change_pattern_during_playback':
 				this.handleChangePatternDuringPlayback(data);
 				break;
-		case 'preview_row':
-			this.handlePreviewRow(data);
-			break;
-		case 'stop_preview':
-			this.handleStopPreview(data.channel);
-			break;
-		case 'set_virtual_channel_config':
-			this.handleSetVirtualChannelConfig(data);
-			break;
+			case 'preview_row':
+				this.handlePreviewRow(data);
+				break;
+			case 'stop_preview':
+				this.handleStopPreview(data.channel);
+				break;
+			case 'set_virtual_channel_config':
+				this.handleSetVirtualChannelConfig(data);
+				break;
 		}
 	}
 
@@ -134,6 +151,9 @@ class AyumiProcessor extends AudioWorkletProcessor {
 			this.aymFrequency = this.state.aymFrequency ?? DEFAULT_AYM_FREQUENCY;
 			const isYM = this.state.isYM ?? 0;
 			wasmModule.ayumi_configure(ayumiPtr, isYM, this.aymFrequency, sampleRate);
+			if (this.timerFrequency === this.aymFrequency || this.timerFrequency === 0) {
+				this.timerFrequency = this.aymFrequency;
+			}
 
 			this.applyPanSettings(wasmModule, ayumiPtr);
 
@@ -397,7 +417,12 @@ class AyumiProcessor extends AudioWorkletProcessor {
 			this.state.setSpeed(speed);
 		}
 
-		if (catchUpSegments?.length && this.patternProcessor && this.audioDriver && this.ayumiEngine) {
+		if (
+			catchUpSegments?.length &&
+			this.patternProcessor &&
+			this.audioDriver &&
+			this.ayumiEngine
+		) {
 			for (const segment of catchUpSegments) {
 				if (segment.pattern?.channels?.length) {
 					this._ensureChannelCapacity(segment.pattern.channels.length);
@@ -437,13 +462,19 @@ class AyumiProcessor extends AudioWorkletProcessor {
 
 	_applyRegisterStateToEngine() {
 		if (!this.ayumiEngine) return;
+		let newState;
 		if (this.virtualChannelMixer.hasVirtualChannels()) {
 			const hwState = this.virtualChannelMixer.merge(this.registerState, this.state);
-			this.ayumiEngine.applyRegisterState(hwState);
-			this.registerState.forceEnvelopeShapeWrite = false;
+			newState = hwState;
+			newState.forceEnvelopeShapeWrite = false;
 		} else {
-			this.ayumiEngine.applyRegisterState(this.registerState);
+			newState = this.registerState;
 		}
+		for (let i = 0; i < Math.min(3, newState.channelCount); i++) {
+			this.channelVol[i] = newState.channels[i].volume;
+			this.envelopeShape = newState.envelopeShape;
+		}
+		this.ayumiEngine.applyRegisterState(newState);
 	}
 
 	_applyVirtualChannelResize() {
@@ -542,6 +573,82 @@ class AyumiProcessor extends AudioWorkletProcessor {
 		this.handleStopPreview();
 	}
 
+	calculateAtariPeriod(period, clock) {
+		if (period === 0) return 0;
+
+		const clockRatio = clock / (this.aymFrequency / 8);
+
+		let idx;
+		if (period < (256 * 4) / clockRatio) idx = 1;
+		else if (period < (256 * 10) / clockRatio) idx = 2;
+		else if (period < (256 * 16) / clockRatio) idx = 3;
+		else if (period < (256 * 50) / clockRatio) idx = 4;
+		else if (period < (256 * 64) / clockRatio) idx = 5;
+		else if (period < (256 * 100) / clockRatio) idx = 6;
+		else idx = 7;
+
+		const dr = (period * clockRatio) / this.prescalers[idx];
+		const data = dr + 0.5 >= 256 ? 0 : Math.floor(dr + 0.5);
+		console.log(period, clock, data, idx, this.prescalers[idx], data * this.prescalers[idx]);
+		return data * this.prescalers[idx];
+	}
+
+	handleTimerPeriod() {
+		const clockRatio = this.timerFrequency / this.aymFrequency;
+		for (let c = 0; c < 3; c++) {
+			this.timerEnabled[c] = this.state.channelTimerEnabled[c];
+			if (!this.timerEnabled[c]) continue;
+			let periodVal;
+			if (this.timerScheme === 'Simple')
+				periodVal = this.registerState.channels[c].tone * clockRatio + 1;
+			else if (this.timerScheme === 'Atari')
+				periodVal = this.calculateAtariPeriod(
+					this.registerState.channels[c].tone,
+					this.timerFrequency
+				);
+			this.timerPeriod[c] = periodVal;
+		}
+	}
+
+	handleTimerCount() {
+		// timer //
+		for (let c = 0; c < 3; c++) {
+			if (this.timerDivide) this.timerCounter[c] += this.timerFrequency / 8 / sampleRate;
+			else this.timerCounter[c] += this.timerFrequency / sampleRate;
+			if (this.timerCounter[c] >= this.timerPeriod[c]) {
+				this.timerCounter[c] -= this.timerPeriod[c];
+				this.timerOutput[c] ^= 1;
+				this.timerUpdate[c] = true;
+			}
+		}
+		// timer //
+	}
+
+	handleTimerEvent() {
+		for (let c = 0; c < 3; c++) {
+			let outVal = this.timerOutput[c] ? this.channelVol[c] & 0x0f : 0;
+			if (!this.timerEnabled[c]) outVal = this.channelVol[c];
+			if (!(this.channelVol[c] & 0x10))
+				this.state.wasmModule.ayumi_set_volume(this.state.ayumiPtr, c, outVal);
+			if (this.channelVol[c] & 0x10 && this.timerUpdate[c])
+				this.state.wasmModule.ayumi_set_envelope_shape(
+					this.state.ayumiPtr,
+					this.envelopeShape
+				);
+			this.timerUpdate[c] = false;
+		}
+	}
+
+	handleUpdateTimerFrequency({ timerFrequency }) {
+		if (timerFrequency > 0) this.timerFrequency = timerFrequency;
+		else this.timerFrequency = this.aymFrequency;
+	}
+
+	handleUpdateTimerScheme({ timerScheme }) {
+		this.timerScheme = timerScheme;
+		this.timerDivide = timerScheme !== 'Atari';
+	}
+
 	handlePreviewRow({ pattern, rowIndex, instrument }) {
 		if (!this.paused || !this.initialized || !this.state.wasmModule) {
 			return;
@@ -617,16 +724,19 @@ class AyumiProcessor extends AudioWorkletProcessor {
 			for (let i = 0; i < numSamples; i++) {
 				this.state.tickAccumulator += this.state.tickStep;
 
-			if (this.previewActiveChannels.size > 0) {
-				this.previewTickSampleCounter++;
-				if (this.previewTickSampleCounter >= this.state.samplesPerTick) {
-					this.previewTickSampleCounter = 0;
-					this.patternProcessor.processTables();
-					if (this.state.channelInstruments) {
-						this.audioDriver.processInstruments(this.state, this.registerState);
+				this.handleTimerCount();
+
+				if (this.previewActiveChannels.size > 0) {
+					this.previewTickSampleCounter++;
+					if (this.previewTickSampleCounter >= this.state.samplesPerTick) {
+						this.previewTickSampleCounter = 0;
+						this.patternProcessor.processTables();
+						if (this.state.channelInstruments) {
+							this.audioDriver.processInstruments(this.state, this.registerState);
+						}
 					}
-				}
-				this._applyRegisterStateToEngine();
+					this.handleTimerPeriod();
+					this._applyRegisterStateToEngine();
 				} else if (
 					this.state.currentPattern &&
 					this.state.currentPattern.length > 0 &&
@@ -655,15 +765,15 @@ class AyumiProcessor extends AudioWorkletProcessor {
 							});
 						}
 
-					if (this.state.currentPattern.channels) {
-						this._ensureChannelCapacity(this.state.currentPattern.channels.length);
-					}
-					this.patternProcessor.parsePatternRow(
-						this.state.currentPattern,
-						this.state.currentRow,
-						this.registerState
-					);
-					this.patternProcessor.processSpeedTable();
+						if (this.state.currentPattern.channels) {
+							this._ensureChannelCapacity(this.state.currentPattern.channels.length);
+						}
+						this.patternProcessor.parsePatternRow(
+							this.state.currentPattern,
+							this.state.currentRow,
+							this.registerState
+						);
+						this.patternProcessor.processSpeedTable();
 
 						const now = currentTime * 1000;
 						if (now - this.lastPositionUpdateTime >= this.positionUpdateThrottleMs) {
@@ -692,12 +802,13 @@ class AyumiProcessor extends AudioWorkletProcessor {
 					this.audioDriver.processInstruments(this.state, this.registerState);
 					this.patternProcessor.processVibrato();
 					this.patternProcessor.processSlides();
+					this.handleTimerPeriod();
 
-				this.enforceMuteState();
+					this.enforceMuteState();
 
-				this._applyRegisterStateToEngine();
+					this._applyRegisterStateToEngine();
 
-				const needsPatternChange = this.state.advancePosition();
+					const needsPatternChange = this.state.advancePosition();
 					if (needsPatternChange) {
 						this.nextPatternRequested = false;
 						if (
@@ -706,7 +817,9 @@ class AyumiProcessor extends AudioWorkletProcessor {
 								this.state.currentPatternOrderIndex
 						) {
 							if (this.pendingNextPattern.pattern.channels) {
-								this._ensureChannelCapacity(this.pendingNextPattern.pattern.channels.length);
+								this._ensureChannelCapacity(
+									this.pendingNextPattern.pattern.channels.length
+								);
 							}
 							this.state.setPattern(
 								this.pendingNextPattern.pattern,
@@ -732,6 +845,7 @@ class AyumiProcessor extends AudioWorkletProcessor {
 
 					this.state.tickAccumulator -= 1.0;
 				}
+				this.handleTimerEvent();
 
 				this.ayumiEngine.process();
 				this.ayumiEngine.removeDC();

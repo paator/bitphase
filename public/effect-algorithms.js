@@ -10,6 +10,7 @@ class EffectAlgorithms {
 	static SPEED = 'S'.charCodeAt(0);
 	static AUTO_ENVELOPE = 'E'.charCodeAt(0);
 	static DETUNE = 'D'.charCodeAt(0);
+	static TIMER = 7;
 
 	static isSlideGroupEffect(effectType) {
 		return (
@@ -283,6 +284,15 @@ class EffectAlgorithms {
 			return -depth + Math.floor(((phase - threeQuarterCycle) / quarterCycle) * depth);
 		}
 	}
+
+	static initTimer(parameter) {
+		const timerEnable = parameter;
+		return {
+			timerEnable
+		};
+	}
+
+	static processTimer(timerEnable, delay) {}
 }
 
 export default EffectAlgorithms;

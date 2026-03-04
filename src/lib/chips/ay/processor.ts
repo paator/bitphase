@@ -62,6 +62,8 @@ type WorkletCommand =
 	| { type: 'init_instruments'; instruments: Instrument[] }
 	| { type: 'update_ay_frequency'; aymFrequency: number }
 	| { type: 'update_int_frequency'; intFrequency: number }
+	| { type: 'update_timer_frequency'; timerFrequency: number }
+	| { type: 'update_timer_scheme'; timerScheme: string }
 	| { type: 'update_chip_variant'; chipVariant: string }
 	| { type: 'update_stereo_layout'; stereoLayout: string }
 	| { type: 'set_channel_mute'; channelIndex: number; muted: boolean }
@@ -114,6 +116,22 @@ export class AYProcessor
 			chipSettings.subscribe('interruptFrequency', (value) => {
 				if (typeof value === 'number') {
 					this.sendUpdateIntFrequency(value);
+				}
+			})
+		);
+
+		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('timerFrequency', (value) => {
+				if (typeof value === 'number') {
+					this.sendUpdateTimerFrequency(value);
+				}
+			})
+		);
+
+		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('timerScheme', (value) => {
+				if (typeof value === 'string') {
+					this.sendUpdateTimerScheme(value);
 				}
 			})
 		);
@@ -290,6 +308,14 @@ export class AYProcessor
 		this.sendCommand({ type: 'update_int_frequency', intFrequency });
 	}
 
+	sendUpdateTimerFrequency(timerFrequency: number): void {
+		this.sendCommand({ type: 'update_timer_frequency', timerFrequency });
+	}
+
+	sendUpdateTimerScheme(timerScheme: string): void {
+		this.sendCommand({ type: 'update_timer_scheme', timerScheme });
+	}
+
 	sendUpdateChipVariant(chipVariant: string): void {
 		this.sendCommand({ type: 'update_chip_variant', chipVariant });
 	}
@@ -313,6 +339,12 @@ export class AYProcessor
 				break;
 			case 'interruptFrequency':
 				this.sendUpdateIntFrequency(value as number);
+				break;
+			case 'timerFrequency':
+				this.sendUpdateTimerFrequency(value as number);
+				break;
+			case 'timerScheme':
+				this.sendUpdateTimerScheme(value as string);
 				break;
 			case 'chipVariant':
 				this.sendUpdateChipVariant(value as string);

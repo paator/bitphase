@@ -37,7 +37,8 @@ const CHANNEL_ARRAY_SPECS = [
 	['channelEffectTablePositions', 0],
 	['channelEffectTableCounters', 0],
 	['channelEffectTableDelays', 1],
-	['channelEffectTypes', 0]
+	['channelEffectTypes', 0],
+	['channelTimerEnabled', false]
 ];
 
 class TrackerState {

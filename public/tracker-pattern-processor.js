@@ -253,6 +253,9 @@ class TrackerPatternProcessor {
 			case EffectAlgorithms.ORNAMENT_POSITION:
 				this._initChannelOrnamentPosition(channelIndex, effect);
 				break;
+			case EffectAlgorithms.TIMER:
+				this._initChannelTimer(channelIndex, effect);
+				break;
 		}
 	}
 
@@ -262,6 +265,10 @@ class TrackerPatternProcessor {
 		if (effect.effect !== EffectAlgorithms.SPEED) return;
 		const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
 		this._initSpeed(effect, hasTableIndex);
+	}
+
+	_initChannelTimer(channelIndex, effect) {
+		this.state.channelTimerEnabled[channelIndex] = effect.parameter;
 	}
 
 	_initChannelArpeggio(channelIndex, effect, hasTableIndex) {
@@ -534,6 +541,9 @@ class TrackerPatternProcessor {
 			case EffectAlgorithms.DETUNE:
 				this.state.channelDetune[channelIndex] = (param & 0xff) - 0x80;
 				break;
+			case EffectAlgorithms.TIMER:
+				this.state.channelTimerEnabled[channelIndex] = param > 0;
+				break;
 		}
 	}
 
@@ -597,8 +607,8 @@ class TrackerPatternProcessor {
 					tableIndex >= 0 &&
 					this.state.channelEffectTypes[channelIndex] === EffectAlgorithms.ARPEGGIO;
 
-			let result;
-			let semitoneOffset;
+				let result;
+				let semitoneOffset;
 
 				if (isArpeggioTable) {
 					const table = this.state.getTable(tableIndex);

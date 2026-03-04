@@ -146,6 +146,31 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			notifyAudioService: true
 		},
 		{
+			key: 'timerFrequency',
+			label: 'Timer Frequency',
+			type: 'select',
+			options: [
+				{ label: 'Same as chip frequency', value: 0 },
+				{ label: 'Atari ST (2.4576 MHz)', value: 2457600 }
+			],
+			defaultValue: 0,
+			group: 'chip',
+			notifyAudioService: true,
+			startNewRow: true
+		},
+		{
+			key: 'timerScheme',
+			label: 'Timer Scheme',
+			type: 'toggle',
+			options: [
+				{ label: 'Simple', value: 'Simple' },
+				{ label: 'Atari', value: 'Atari' }
+			],
+			defaultValue: 'Simple',
+			group: 'chip',
+			notifyAudioService: true
+		},
+		{
 			key: 'tuningTableIndex',
 			label: 'Tuning table',
 			type: 'select',
