@@ -2,8 +2,10 @@ import type { Pattern } from '../../models/song';
 import type { EditingContext, FieldInfo } from './editing/editing-context';
 import { PatternFieldDetection } from './editing/pattern-field-detection';
 import { PatternNoteInput } from './editing/pattern-note-input';
+import { PatternEnvelopeNoteInput } from './editing/pattern-envelope-note-input';
 import { PatternFieldInput } from './editing/pattern-field-input';
 import { PatternDeleteHandler } from './editing/pattern-delete-handler';
+import { editorStateStore } from '../../stores/editor-state.svelte';
 
 export type { EditingContext, FieldInfo } from './editing/editing-context';
 
@@ -39,5 +41,26 @@ export class PatternEditingService {
 			default:
 				return null;
 		}
+	}
+
+	static handleMidiNote(
+		context: EditingContext,
+		midiNote: number
+	): { updatedPattern: Pattern; shouldMoveNext: boolean } | null {
+		const fieldInfo = this.getFieldAtCursor(context);
+		if (!fieldInfo) {
+			return null;
+		}
+		if (fieldInfo.fieldType === 'note') {
+			return PatternNoteInput.handleMidiNoteInput(context, fieldInfo, midiNote);
+		}
+		if (
+			fieldInfo.fieldKey === 'envelopeValue' &&
+			context.tuningTable &&
+			editorStateStore.envelopeAsNote
+		) {
+			return PatternEnvelopeNoteInput.handleMidiNoteInput(context, fieldInfo, midiNote);
+		}
+		return null;
 	}
 }

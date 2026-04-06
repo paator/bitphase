@@ -26,6 +26,15 @@ export const settingsItems: SettingsItem[] = [
 		category: 'general'
 	},
 	{
+		label: 'MIDI device',
+		description: 'Which MIDI keyboard to use for note input',
+		type: 'select',
+		defaultValue: '',
+		setting: 'midiInputDeviceId',
+		category: 'keyboard',
+		options: []
+	},
+	{
 		label: 'Show Preview Playground',
 		description: 'Display the preview playground in the right panel',
 		type: 'toggle',

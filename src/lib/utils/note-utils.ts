@@ -1,5 +1,47 @@
 import { NoteName } from '../models/song';
 
+const MIDI_PITCH_TO_NOTE_NAME: NoteName[] = [
+	NoteName.C,
+	NoteName.CSharp,
+	NoteName.D,
+	NoteName.DSharp,
+	NoteName.E,
+	NoteName.F,
+	NoteName.FSharp,
+	NoteName.G,
+	NoteName.GSharp,
+	NoteName.A,
+	NoteName.ASharp,
+	NoteName.B
+];
+
+const TRACKER_OCTAVE_MIN = 0;
+const TRACKER_OCTAVE_MAX = 8;
+
+export function midiNoteToNoteNameAndOctave(
+	midiNote: number
+): { noteName: NoteName; octave: number } | null {
+	if (midiNote < 0 || midiNote > 127) {
+		return null;
+	}
+	const pitchClass = midiNote % 12;
+	const octave = Math.floor(midiNote / 12) - 1;
+	const clampedOctave = Math.max(
+		TRACKER_OCTAVE_MIN,
+		Math.min(TRACKER_OCTAVE_MAX, octave)
+	);
+	return {
+		noteName: MIDI_PITCH_TO_NOTE_NAME[pitchClass],
+		octave: clampedOctave
+	};
+}
+
+export function midiNoteToNoteString(midiNote: number): string | null {
+	const parsed = midiNoteToNoteNameAndOctave(midiNote);
+	if (!parsed) return null;
+	return formatNoteFromEnum(parsed.noteName, parsed.octave);
+}
+
 export function formatNoteFromEnum(noteName: NoteName, octave: number): string {
 	const notes = [
 		'---',

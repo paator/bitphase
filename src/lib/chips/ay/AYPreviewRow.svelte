@@ -5,9 +5,15 @@
 	import type { PreviewNoteSupport } from '../base/processor';
 	import type { AudioService } from '../../services/audio/audio-service';
 	import { getContext } from 'svelte';
-	import { parseNoteFromString, formatNoteFromEnum } from '../../utils/note-utils';
+	import {
+		parseNoteFromString,
+		formatNoteFromEnum,
+		midiNoteToNoteString
+	} from '../../utils/note-utils';
 	import { PatternNoteInput } from '../../services/pattern/editing/pattern-note-input';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
+	import { settingsStore } from '../../stores/settings.svelte';
+	import { midiService } from '../../services/midi/midi-service';
 	import { instrumentIdToNumber } from '../../utils/instrument-id';
 	import { playbackStore } from '../../stores/playback.svelte';
 	import { projectStore } from '../../stores/project.svelte';
@@ -54,12 +60,15 @@
 
 	const envelopeAsNote = $derived(editorStateStore.envelopeAsNote);
 	const canEnvelopeAsNote = $derived(envelopeAsNote && tuningTable.length > 0);
+	const envelopeHexValue = $derived((envelopePeriod >>> 0).toString(16).toUpperCase().padStart(4, '0'));
 	const envelopeDisplayValue = $derived(
 		canEnvelopeAsNote
 			? (envelopePeriodToNoteString(envelopePeriod, tuningTable) ??
 					(envelopePeriod >>> 0).toString(16).toUpperCase().padStart(4, '0'))
 			: (envelopePeriod >>> 0).toString(16).toUpperCase().padStart(4, '0')
 	);
+	let envelopeHexInput = $state('0000');
+	let envelopeHexFocused = $state(false);
 
 	const previewProcessors = $derived(
 		containerContext.audioService.chipProcessors.filter(
@@ -179,6 +188,42 @@
 		return () => window.removeEventListener('keyup', onWindowKeyUp);
 	});
 
+	$effect(() => {
+		if (!settingsStore.midiInputDeviceId || isDisabled || !midiService.isSupported()) return;
+		const remove = midiService.addNoteListener((midiNote: number, velocity: number) => {
+			const noteFocused = noteInputEl && document.activeElement === noteInputEl;
+			const envelopeFocused =
+				canEnvelopeAsNote &&
+				envelopeInputEl &&
+				document.activeElement === envelopeInputEl;
+			if (noteFocused) {
+				if (velocity > 0) {
+					if (activeNotes.length >= maxPoly) return;
+					if (activeNotes.some((n) => n.key === `midi-${midiNote}`)) return;
+					const noteStr = midiNoteToNoteString(midiNote);
+					if (!noteStr) return;
+					activeNotes = [...activeNotes, { key: `midi-${midiNote}`, note: noteStr }];
+				} else {
+					const nextNotes = activeNotes.filter((n) => n.key !== `midi-${midiNote}`);
+					if (nextNotes.length === 0 && activeNotes.length > 0) {
+						lastPlayedNotes = activeNotes.map((n) => n.note);
+					}
+					activeNotes = nextNotes;
+				}
+			} else if (envelopeFocused && velocity > 0) {
+				const noteStr = midiNoteToNoteString(midiNote);
+				if (!noteStr) return;
+				const period = noteStringToEnvelopePeriod(
+					noteStr,
+					tuningTable,
+					editorStateStore.octave
+				);
+				envelopePeriod = Math.max(0, Math.min(0xffff, period));
+			}
+		});
+		return remove;
+	});
+
 	function togglePreviewPlaying() {
 		if (isDisabled || lastPlayedNotes.length === 0) return;
 		isPreviewPlaying = !isPreviewPlaying;
@@ -277,6 +322,7 @@
 
 	function clampEnvelopePeriod() {
 		envelopePeriod = Math.max(0, Math.min(0xffff, envelopePeriod));
+		envelopeHexInput = envelopeHexValue;
 	}
 
 	function handleEnvelopeNoteKeyDown(event: KeyboardEvent) {
@@ -297,11 +343,7 @@
 			const octave = editorStateStore.octave;
 			noteStr = formatNoteFromEnum(letterNote, octave);
 		}
-		const period = noteStringToEnvelopePeriod(
-			noteStr,
-			tuningTable,
-			editorStateStore.octave
-		);
+		const period = noteStringToEnvelopePeriod(noteStr, tuningTable, editorStateStore.octave);
 		envelopePeriod = Math.max(0, Math.min(0xffff, period));
 	}
 
@@ -324,6 +366,16 @@
 		const c = table.slice(-1).toUpperCase();
 		if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')) table = c;
 		else table = '';
+	}
+
+	function ensureMidiAccess() {
+		if (
+			settingsStore.midiInputDeviceId &&
+			midiService.isSupported() &&
+			!midiService.hasAccess()
+		) {
+			midiService.requestAccess();
+		}
 	}
 
 	function clampVolume() {
@@ -363,148 +415,158 @@
 		<span>Preview playground</span>
 	</div>
 	<div class="flex flex-wrap items-end gap-3 font-mono text-xs">
-	<div class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Inst</span>
-		<div
-			class="flex h-7 w-8 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase"
-			title="Current instrument (select in Instruments panel)">
-			{instrumentId}
-		</div>
-	</div>
-	<label class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Envelope</span>
-		{#if canEnvelopeAsNote}
+		<div class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Inst</span>
 			<div
-				bind:this={envelopeInputEl}
-				class="flex h-7 w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
+				class="flex h-7 w-8 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase"
+				title="Current instrument (select in Instruments panel)">
+				{instrumentId}
+			</div>
+		</div>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Envelope</span>
+			{#if canEnvelopeAsNote}
+				<div
+					bind:this={envelopeInputEl}
+					class="flex h-7 w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
+						? 'pointer-events-none cursor-not-allowed opacity-50'
+						: ''}"
+					role="textbox"
+					tabindex={isDisabled ? -1 : 0}
+					aria-label="Envelope as note (keyboard: piano keys or letters)"
+					title="Envelope as note. Piano: Z–P, Q–I; A = OFF; letters = note with current octave."
+					onmousedown={ensureMidiAccess}
+					onclick={() => envelopeInputEl?.focus()}
+					onkeydown={handleEnvelopeNoteKeyDown}>
+					{envelopePeriod === 0 ? '—' : envelopeDisplayValue}
+				</div>
+			{:else}
+				<input
+					type="text"
+					class="h-7 w-14 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase disabled:cursor-not-allowed disabled:opacity-50"
+					maxlength={4}
+					placeholder="0000"
+					disabled={isDisabled}
+					value={envelopeHexFocused ? envelopeHexInput : envelopeHexValue}
+					onfocus={() => {
+						envelopeHexFocused = true;
+						envelopeHexInput = envelopeHexValue;
+					}}
+					onblur={() => {
+						envelopeHexFocused = false;
+						envelopePeriod = parseHex4(envelopeHexInput);
+						clampEnvelopePeriod();
+					}}
+					oninput={(e) => {
+						const s = (e.currentTarget.value || '')
+							.replace(/[^0-9a-fA-F]/gi, '')
+							.slice(0, 4)
+							.toUpperCase();
+						envelopeHexInput = s;
+						envelopePeriod = parseHex4(s);
+					}} />
+			{/if}
+		</label>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Shape</span>
+			<input
+				type="text"
+				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+				maxlength={1}
+				placeholder="0"
+				disabled={isDisabled}
+				bind:value={envelopeShape}
+				onblur={clampEnvelopeShape}
+				oninput={(e) => {
+					envelopeShape = (e.currentTarget.value || '')
+						.replace(/[^0-9a-fA-F]/gi, '')
+						.slice(0, 1)
+						.toUpperCase();
+				}} />
+		</label>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Noise</span>
+			<input
+				type="text"
+				class="h-7 w-10 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+				maxlength={2}
+				placeholder="00"
+				disabled={isDisabled}
+				bind:value={noiseValue}
+				onblur={clampNoiseValue}
+				oninput={(e) => {
+					noiseValue = (e.currentTarget.value || '')
+						.replace(/[^0-9a-fA-F]/gi, '')
+						.slice(0, 2)
+						.toUpperCase();
+				}} />
+		</label>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Table</span>
+			<input
+				type="text"
+				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+				maxlength={1}
+				placeholder="0"
+				disabled={isDisabled}
+				bind:value={table}
+				onblur={clampTable}
+				oninput={(e) => {
+					const v = (e.currentTarget.value || '').toUpperCase().slice(-1);
+					table = (v >= '0' && v <= '9') || (v >= 'A' && v <= 'Z') ? v : '';
+				}} />
+		</label>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Volume</span>
+			<input
+				type="text"
+				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+				maxlength={1}
+				placeholder="F"
+				disabled={isDisabled}
+				bind:value={volume}
+				onblur={clampVolume}
+				oninput={(e) => {
+					const v = (e.currentTarget.value || '')
+						.replace(/[^0-9a-fA-F]/gi, '')
+						.slice(0, 1)
+						.toUpperCase();
+					if (v) {
+						const n = parseInt(v, 16);
+						volume = n >= 1 && n <= 15 ? v : volume;
+					} else {
+						volume = '';
+					}
+				}} />
+		</label>
+		<div class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Note</span>
+			<div
+				bind:this={noteInputEl}
+				class="flex h-7 max-w-[10rem] min-w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
 					? 'pointer-events-none cursor-not-allowed opacity-50'
 					: ''}"
 				role="textbox"
 				tabindex={isDisabled ? -1 : 0}
-				aria-label="Envelope as note (keyboard: piano keys or letters)"
-				title="Envelope as note. Piano: Z–P, Q–I; A = OFF; letters = note with current octave."
-				onclick={() => envelopeInputEl?.focus()}
-				onkeydown={handleEnvelopeNoteKeyDown}>
-				{envelopePeriod === 0 ? '—' : envelopeDisplayValue}
+				aria-label="Note (keyboard: piano keys)"
+				aria-disabled={isDisabled}
+				title={`Click to focus, then use keyboard. Polyphony: ${maxPoly} notes (3 per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))} = toggle play.`}
+				onmousedown={ensureMidiAccess}
+				onclick={() => noteInputEl?.focus()}
+				onkeydown={handleNoteKeyDown}
+				onkeyup={handleNoteKeyUp}
+				onblur={() => {
+					if (activeNotes.length > 0) {
+						lastPlayedNotes = activeNotes.map((n) => n.note);
+					}
+					activeNotes = [];
+				}}>
+				{activeNotes.length > 0
+					? activeNotes.map((n) => n.note).join(' ')
+					: lastPlayedNotes.length > 0
+						? lastPlayedNotes.join(' ')
+						: '—'}
 			</div>
-		{:else}
-			<input
-				type="text"
-				class="h-7 w-14 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase disabled:cursor-not-allowed disabled:opacity-50"
-				maxlength={4}
-				placeholder="0000"
-				disabled={isDisabled}
-				value={envelopeDisplayValue}
-				onblur={clampEnvelopePeriod}
-				oninput={(e) => {
-					const s = (e.currentTarget.value || '')
-						.replace(/[^0-9a-fA-F]/gi, '')
-						.slice(0, 4)
-						.toUpperCase();
-					const n = parseInt(s || '0', 16);
-					envelopePeriod = isNaN(n) ? 0 : Math.max(0, Math.min(0xffff, n));
-				}} />
-		{/if}
-	</label>
-	<label class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Shape</span>
-		<input
-			type="text"
-			class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
-			maxlength={1}
-			placeholder="0"
-			disabled={isDisabled}
-			bind:value={envelopeShape}
-			onblur={clampEnvelopeShape}
-			oninput={(e) => {
-				envelopeShape = (e.currentTarget.value || '')
-					.replace(/[^0-9a-fA-F]/gi, '')
-					.slice(0, 1)
-					.toUpperCase();
-			}} />
-	</label>
-	<label class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Noise</span>
-		<input
-			type="text"
-			class="h-7 w-10 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
-			maxlength={2}
-			placeholder="00"
-			disabled={isDisabled}
-			bind:value={noiseValue}
-			onblur={clampNoiseValue}
-			oninput={(e) => {
-				noiseValue = (e.currentTarget.value || '')
-					.replace(/[^0-9a-fA-F]/gi, '')
-					.slice(0, 2)
-					.toUpperCase();
-			}} />
-	</label>
-	<label class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Table</span>
-		<input
-			type="text"
-			class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
-			maxlength={1}
-			placeholder="0"
-			disabled={isDisabled}
-			bind:value={table}
-			onblur={clampTable}
-			oninput={(e) => {
-				const v = (e.currentTarget.value || '').toUpperCase().slice(-1);
-				table = (v >= '0' && v <= '9') || (v >= 'A' && v <= 'Z') ? v : '';
-			}} />
-	</label>
-	<label class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Volume</span>
-		<input
-			type="text"
-			class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
-			maxlength={1}
-			placeholder="F"
-			disabled={isDisabled}
-			bind:value={volume}
-			onblur={clampVolume}
-			oninput={(e) => {
-				const v = (e.currentTarget.value || '')
-					.replace(/[^0-9a-fA-F]/gi, '')
-					.slice(0, 1)
-					.toUpperCase();
-				if (v) {
-					const n = parseInt(v, 16);
-					volume = n >= 1 && n <= 15 ? v : volume;
-				} else {
-					volume = '';
-				}
-			}} />
-	</label>
-	<div class="flex flex-col gap-0.5">
-		<span class="text-[var(--color-app-text-muted)]">Note</span>
-		<div
-			bind:this={noteInputEl}
-			class="flex h-7 max-w-[10rem] min-w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
-				? 'pointer-events-none cursor-not-allowed opacity-50'
-				: ''}"
-			role="textbox"
-			tabindex={isDisabled ? -1 : 0}
-			aria-label="Note (keyboard: piano keys)"
-			aria-disabled={isDisabled}
-			title={`Click to focus, then use keyboard. Polyphony: ${maxPoly} notes (3 per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))} = toggle play.`}
-			onclick={() => noteInputEl?.focus()}
-			onkeydown={handleNoteKeyDown}
-			onkeyup={handleNoteKeyUp}
-			onblur={() => {
-				if (activeNotes.length > 0) {
-					lastPlayedNotes = activeNotes.map((n) => n.note);
-				}
-				activeNotes = [];
-			}}>
-			{activeNotes.length > 0
-				? activeNotes.map((n) => n.note).join(' ')
-				: lastPlayedNotes.length > 0
-					? lastPlayedNotes.join(' ')
-					: '—'}
 		</div>
-	</div>
 	</div>
 </div>

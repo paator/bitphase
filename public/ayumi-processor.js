@@ -203,7 +203,7 @@ class AyumiProcessor extends AudioWorkletProcessor {
 	}
 
 	handleUpdateOrder(data) {
-		this.state.setPatternOrder(data.order);
+		this.state.setPatternOrder(data.order, data.loopPointId);
 	}
 
 	handleSetPatternData(data) {
@@ -756,9 +756,7 @@ class AyumiProcessor extends AudioWorkletProcessor {
 							this.state.patternOrder.length > 0;
 						if (shouldPrefetch) {
 							this.nextPatternRequested = true;
-							const nextIndex =
-								(this.state.currentPatternOrderIndex + 1) %
-								this.state.patternOrder.length;
+							const nextIndex = this.state.getNextPatternOrderIndex();
 							this.port.postMessage({
 								type: 'request_pattern',
 								patternOrderIndex: nextIndex

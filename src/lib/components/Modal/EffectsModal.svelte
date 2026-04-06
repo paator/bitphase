@@ -66,8 +66,8 @@
 		},
 		{
 			code: '1',
-			name: 'Slide Up',
-			description: 'Gradually increases the pitch of the note.',
+			name: 'Slide Down',
+			description: 'Gradually decreases the pitch of the note.',
 			format: '1XYZ',
 			formatWithTable: '1XTY',
 			delay: 'X - delay between slide steps (0-F)',
@@ -75,12 +75,12 @@
 				'where Y is table id (0-9, A-Z). Will replace slide step size with table values proceding each tick.',
 			parameter: 'YZ - slide step size in hex (00-FF)',
 			example:
-				'1130 - Slide up with delay 1, step size 30. You can use "." for delay (0) and then slide will work only for 1 tick'
+				'1130 - Slide down with delay 1, step size 30. You can use "." for delay (0) and then slide will work only for 1 tick'
 		},
 		{
 			code: '2',
-			name: 'Slide Down',
-			description: 'Gradually decreases the pitch of the note.',
+			name: 'Slide Up',
+			description: 'Gradually increases the pitch of the note.',
 			format: '2XYZ',
 			formatWithTable: '2XTY',
 			delay: 'X - delay between slide steps (0-F)',
@@ -88,7 +88,7 @@
 				'where Y is table id (0-9, A-Z). Will replace slide step size with table values proceding each tick.',
 			parameter: 'YZ - slide step size in hex (00-FF)',
 			example:
-				'2150 - Slide down with delay 0, step size 50. You can use "." for delay (0) and then slide will work only for 1 tick'
+				'2150 - Slide up with delay 0, step size 50. You can use "." for delay (0) and then slide will work only for 1 tick'
 		},
 		{
 			code: 'P',

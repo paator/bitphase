@@ -98,8 +98,19 @@ class AYAudioDriver {
 			} else {
 				this._processNote(state, channelIndex, row, registerState);
 				this._processInstrument(state, channelIndex, row);
+				this._applySamplePosition(state, channelIndex, row);
 				this._processEnvelope(state, channelIndex, row, patternRow, registerState);
 			}
+		}
+	}
+
+	_applySamplePosition(state, channelIndex, row) {
+		const effect = row.effects?.[0];
+		if (
+			effect?.effect === EffectAlgorithms.SAMPLE_POSITION &&
+			state.instrumentPositions
+		) {
+			state.instrumentPositions[channelIndex] = effect.parameter & 0xff;
 		}
 	}
 
@@ -445,6 +456,8 @@ class AYAudioDriver {
 		for (let channelIndex = 0; channelIndex < state.channelInstruments.length; channelIndex++) {
 			const isMuted = state.channelMuted[channelIndex];
 			const isSoundEnabled = state.channelSoundEnabled[channelIndex];
+			const onOffHalted =
+				state.channelOnOffCounter[channelIndex] > 0 && !state.channelSoundEnabled[channelIndex];
 
 			if (isMuted) {
 				registerState.channels[channelIndex].volume = 0;
@@ -501,12 +514,14 @@ class AYAudioDriver {
 				this.channelMixerState[channelIndex].tone = false;
 				this.channelMixerState[channelIndex].noise = false;
 				this.channelMixerState[channelIndex].envelope = false;
-				state.instrumentPositions[channelIndex]++;
-				if (state.instrumentPositions[channelIndex] >= effectiveRowsLength) {
-					if (effectiveLoop > 0 && effectiveLoop < effectiveRowsLength) {
-						state.instrumentPositions[channelIndex] = effectiveLoop;
-					} else {
-						state.instrumentPositions[channelIndex] = 0;
+				if (!onOffHalted) {
+					state.instrumentPositions[channelIndex]++;
+					if (state.instrumentPositions[channelIndex] >= effectiveRowsLength) {
+						if (effectiveLoop > 0 && effectiveLoop < effectiveRowsLength) {
+							state.instrumentPositions[channelIndex] = effectiveLoop;
+						} else {
+							state.instrumentPositions[channelIndex] = 0;
+						}
 					}
 				}
 				continue;
@@ -514,12 +529,14 @@ class AYAudioDriver {
 
 			const effectiveTone = this.getEffectiveTone(state, channelIndex);
 			if (effectiveTone === 0) {
-				state.instrumentPositions[channelIndex]++;
-				if (state.instrumentPositions[channelIndex] >= effectiveRowsLength) {
-					if (effectiveLoop > 0 && effectiveLoop < effectiveRowsLength) {
-						state.instrumentPositions[channelIndex] = effectiveLoop;
-					} else {
-						state.instrumentPositions[channelIndex] = 0;
+				if (!onOffHalted) {
+					state.instrumentPositions[channelIndex]++;
+					if (state.instrumentPositions[channelIndex] >= effectiveRowsLength) {
+						if (effectiveLoop > 0 && effectiveLoop < effectiveRowsLength) {
+							state.instrumentPositions[channelIndex] = effectiveLoop;
+						} else {
+							state.instrumentPositions[channelIndex] = 0;
+						}
 					}
 				}
 				continue;
@@ -622,12 +639,14 @@ class AYAudioDriver {
 				registerState.channels[channelIndex].volume = finalVolume;
 			}
 
-			state.instrumentPositions[channelIndex]++;
-			if (state.instrumentPositions[channelIndex] >= effectiveRowsLength) {
-				if (effectiveLoop > 0 && effectiveLoop < effectiveRowsLength) {
-					state.instrumentPositions[channelIndex] = effectiveLoop;
-				} else {
-					state.instrumentPositions[channelIndex] = 0;
+			if (!onOffHalted) {
+				state.instrumentPositions[channelIndex]++;
+				if (state.instrumentPositions[channelIndex] >= effectiveRowsLength) {
+					if (effectiveLoop > 0 && effectiveLoop < effectiveRowsLength) {
+						state.instrumentPositions[channelIndex] = effectiveLoop;
+					} else {
+						state.instrumentPositions[channelIndex] = 0;
+					}
 				}
 			}
 		}

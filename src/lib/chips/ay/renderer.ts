@@ -1,6 +1,6 @@
 import type { Project } from '../../models/project';
 import type { Pattern } from '../../models/song';
-import type { ChipRenderer } from '../base/renderer';
+import type { ChipRenderer, RenderOptions } from '../base/renderer';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
@@ -118,7 +118,7 @@ export class AYChipRenderer implements ChipRenderer {
 		state.setTuningTable(song.tuningTable);
 		state.setInstruments(project.instruments);
 		state.setTables(project.tables);
-		state.setPatternOrder(project.patternOrder || [0]);
+		state.setPatternOrder(project.patternOrder || [0], project.loopPointId || 0);
 		state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
 		state.updateSamplesPerTick(SAMPLE_RATE);
 	}
@@ -172,6 +172,7 @@ export class AYChipRenderer implements ChipRenderer {
 		song: any,
 		totalRows: number,
 		patterns: Pattern[],
+		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels?: boolean
 	): Promise<Float32Array[]> {
@@ -181,7 +182,8 @@ export class AYChipRenderer implements ChipRenderer {
 			? Array.from({ length: TONE_CHANNELS }, () => [])
 			: [];
 		let totalSamples = 0;
-		const maxSamples = SAMPLE_RATE * 300;
+		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
+		let completedLoops = 0;
 
 		let lastProgressUpdate = 0;
 		const progressUpdateInterval = SAMPLE_RATE * 0.1;
@@ -234,13 +236,15 @@ export class AYChipRenderer implements ChipRenderer {
 					ayumiEngine.applyRegisterState(registerState);
 				}
 
-				const isLastPattern =
-					state.currentPatternOrderIndex >= state.patternOrder.length - 1;
+				const isLastPattern = state.currentPatternOrderIndex >= state.patternOrder.length - 1;
 				const isLastRow = state.currentRow >= state.currentPattern.length - 1;
 				const isLastTick = state.currentTick >= state.currentSpeed - 1;
 
 				if (isLastPattern && isLastRow && isLastTick) {
-					break;
+					completedLoops++;
+					if (completedLoops >= loopCount) {
+						break;
+					}
 				}
 
 				const needsPatternChange = state.advancePosition();
@@ -288,7 +292,7 @@ export class AYChipRenderer implements ChipRenderer {
 		project: Project,
 		songIndex: number,
 		onProgress?: (progress: number, message: string) => void,
-		options?: { separateChannels?: boolean }
+		options?: RenderOptions
 	): Promise<Float32Array[]> {
 		const song = project.songs[songIndex];
 		if (!song || song.patterns.length === 0) {
@@ -296,6 +300,13 @@ export class AYChipRenderer implements ChipRenderer {
 		}
 
 		const separateChannels = options?.separateChannels ?? false;
+		const loopCount = Math.max(1, options?.loopCount ?? 1);
+		const patternOrder = project.patternOrder || [0];
+		const requestedStartOrderIndex = options?.startPatternOrderIndex ?? 0;
+		const startOrderIndex =
+			requestedStartOrderIndex >= 0 && requestedStartOrderIndex < patternOrder.length
+				? requestedStartOrderIndex
+				: 0;
 
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
 		const { getPanSettingsForLayout } =
@@ -332,7 +343,6 @@ export class AYChipRenderer implements ChipRenderer {
 			postMessage: () => {}
 		});
 
-		const patternOrder = project.patternOrder || [0];
 		const patterns = this.getPatterns(song, patternOrder);
 
 		if (patterns.length === 0) {
@@ -340,11 +350,19 @@ export class AYChipRenderer implements ChipRenderer {
 			throw new Error('No patterns found');
 		}
 
-		state.currentPattern = patterns[0];
-		state.currentPatternOrderIndex = 0;
+		state.currentPattern = patterns[startOrderIndex];
+		state.currentPatternOrderIndex = startOrderIndex;
 
 		onProgress?.(50, 'Initializing renderer...');
-		const totalRows = this.calculateTotalRows(song, patternOrder);
+		const firstPassRows = this.calculateTotalRows(song, patternOrder);
+		const validLoopPointId =
+			project.loopPointId >= 0 && project.loopPointId < patternOrder.length
+				? project.loopPointId
+				: 0;
+		const loopOrderSegment = patternOrder.slice(validLoopPointId);
+		const loopSegmentRows = this.calculateTotalRows(song, loopOrderSegment);
+		const totalRows =
+			loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
 
 		try {
 			const channels = await this.renderAudioLoop(
@@ -359,6 +377,7 @@ export class AYChipRenderer implements ChipRenderer {
 				song,
 				totalRows,
 				patterns,
+				loopCount,
 				onProgress,
 				separateChannels
 			);

@@ -48,6 +48,7 @@ class TrackerState {
 
 		this.patternOrder = [];
 		this.currentPatternOrderIndex = 0;
+		this.loopPointId = 0;
 
 		this.intFrequency = DEFAULT_SONG_HZ;
 		this.samplesPerTick = 0;
@@ -115,8 +116,32 @@ class TrackerState {
 		this.currentSpeed = speed;
 	}
 
-	setPatternOrder(order) {
+	setPatternOrder(order, loopPointId = this.loopPointId) {
 		this.patternOrder = order;
+		this.setLoopPointId(loopPointId);
+	}
+
+	setLoopPointId(loopPointId) {
+		this.loopPointId = Number.isInteger(loopPointId) ? loopPointId : 0;
+	}
+
+	getLoopPointIndex() {
+		const orderLength = this.patternOrder.length;
+		if (orderLength <= 0) return 0;
+		if (this.loopPointId >= 0 && this.loopPointId < orderLength) {
+			return this.loopPointId;
+		}
+		return 0;
+	}
+
+	getNextPatternOrderIndex(currentPatternOrderIndex = this.currentPatternOrderIndex) {
+		const orderLength = this.patternOrder.length;
+		if (orderLength <= 0) return 0;
+		const nextPatternOrderIndex = currentPatternOrderIndex + 1;
+		if (nextPatternOrderIndex < orderLength) {
+			return nextPatternOrderIndex;
+		}
+		return this.getLoopPointIndex();
 	}
 
 	setTables(tables) {
@@ -150,7 +175,7 @@ class TrackerState {
 				this.currentRow = 0;
 				this.currentPatternOrderIndex++;
 				if (this.currentPatternOrderIndex >= this.patternOrder.length) {
-					this.currentPatternOrderIndex = 0;
+					this.currentPatternOrderIndex = this.getLoopPointIndex();
 				}
 				return true;
 			}

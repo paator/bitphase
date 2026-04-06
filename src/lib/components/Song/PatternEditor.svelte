@@ -77,6 +77,7 @@
 	import type { UserScript } from '../../services/user-scripts/types';
 	import { PatternTemplateParser } from '../../services/pattern/editing/pattern-template-parsing';
 	import { ContextMenu } from '../Menu';
+	import type { MenuItem } from '../Menu/types';
 	import { editMenuItems } from '../../config/app-menu';
 	import {
 		ACTION_PLAY_FROM_ROW,
@@ -93,10 +94,13 @@
 	import {
 		getVirtualChannelGroups,
 		getHardwareChannelIndex,
-		computeEffectiveChannelLabels
+		computeEffectiveChannelLabels,
+		getTotalVirtualChannelCount
 	} from '../../models/virtual-channels';
 	import { VirtualChannelService } from '../../services/pattern/virtual-channel-service';
 	import { AYProcessor } from '../../chips/ay/processor';
+	import { midiService } from '../../services/midi/midi-service';
+	import type { EditingContext, FieldInfo } from '../../services/pattern/editing/editing-context';
 
 	let {
 		songIndex,
@@ -1361,6 +1365,17 @@
 			},
 			onSwapChannelLeft: swapChannelLeft,
 			onSwapChannelRight: swapChannelRight,
+			onToggleSolo: () => {
+				const chipIdx = getChipIndex();
+				if (chipIdx < 0) return;
+				const channelIndex = getChannelIndexAtCursor();
+				if (channelIndex < 0) return;
+				if (isPlayingSolo()) {
+					executeUnmuteAll();
+				} else {
+					executePlaySolo(chipIdx, channelIndex);
+				}
+			},
 			selectionStartRow,
 			selectionStartColumn,
 			selectionEndRow,
@@ -1384,6 +1399,108 @@
 			keybindingsStore.getShortcut(ACTION_PLAY_FROM_ROW)
 		);
 		return fromEvent === shortcut;
+	}
+
+	function buildEditingContext(): {
+		context: EditingContext;
+		fieldInfoBeforeEdit: FieldInfo | null;
+	} | null {
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const pattern = findOrCreatePattern(patternId);
+		const rowString = getPatternRowData(pattern, selectedRow);
+		const cellPositions = getCellPositions(rowString, selectedRow);
+		const segments = textParser ? textParser.parseRowString(rowString, selectedRow) : undefined;
+		const context: EditingContext = {
+			pattern,
+			selectedRow,
+			selectedColumn,
+			cellPositions,
+			segments,
+			converter,
+			formatter,
+			schema,
+			tuningTable
+		};
+		const fieldInfoBeforeEdit = PatternEditingService.getFieldAtCursor(context);
+		return { context, fieldInfoBeforeEdit };
+	}
+
+	function applyEditingResult(
+		editingResult: { updatedPattern: Pattern; shouldMoveNext: boolean },
+		fieldInfoBeforeEdit: FieldInfo | null,
+		context: EditingContext,
+		previewKey?: string
+	): void {
+		let finalPattern = editingResult.updatedPattern;
+
+		if (
+			autoEnvStore.enabled &&
+			fieldInfoBeforeEdit &&
+			fieldInfoBeforeEdit.channelIndex >= 0 &&
+			(fieldInfoBeforeEdit.fieldType === 'note' ||
+				fieldInfoBeforeEdit.fieldKey === 'envelopeShape')
+		) {
+			const autoEnvPattern = AutoEnvService.applyAutoEnvelope(
+				finalPattern,
+				selectedRow,
+				fieldInfoBeforeEdit.channelIndex,
+				tuningTable,
+				autoEnvStore.currentRatio
+			);
+			if (autoEnvPattern) {
+				finalPattern = autoEnvPattern;
+			}
+		}
+
+		recordPatternEdit(context.pattern, finalPattern);
+		updatePatternInArray(finalPattern);
+
+		if (editingResult.shouldMoveNext) {
+			moveColumn(1);
+		}
+
+		const shouldPreview =
+			fieldInfoBeforeEdit &&
+			(fieldInfoBeforeEdit.channelIndex >= 0 ||
+				fieldInfoBeforeEdit.fieldKey === 'envelopeValue');
+		const previewChannel =
+			fieldInfoBeforeEdit?.fieldKey === 'envelopeValue'
+				? 0
+				: (fieldInfoBeforeEdit?.channelIndex ?? -1);
+		if (
+			previewKey !== undefined &&
+			!playbackStore.isPlaying &&
+			shouldPreview &&
+			previewChannel >= 0 &&
+			chipProcessor &&
+			'playPreviewRow' in chipProcessor &&
+			!pressedKeyChannels.has(previewKey)
+		) {
+			services.audioService.setPreviewActiveForChips(songIndex);
+			const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
+			const isNoteField =
+				fieldInfoBeforeEdit.fieldType === 'note' ||
+				fieldInfoBeforeEdit.fieldKey === 'envelopeValue';
+			const previewChannelResult = previewService.playFromContext(
+				processor,
+				editingResult.updatedPattern,
+				previewChannel,
+				selectedRow,
+				schema,
+				isNoteField
+			);
+			if (previewChannelResult !== undefined) {
+				pressedKeyChannels.set(previewKey, previewChannelResult);
+			}
+		}
+
+		const step = editorStateStore.step;
+		if (step > 0) {
+			moveRow(step);
+		}
+
+		clearAllCaches();
+		draw();
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -1410,116 +1527,56 @@
 			selection.removeAllRanges();
 		}
 
-		const patternId = patternOrder[currentPatternOrderIndex];
-		const pattern = findOrCreatePattern(patternId);
+		const built = buildEditingContext();
+		if (!built) return;
 
-		const rowString = getPatternRowData(pattern, selectedRow);
-		const cellPositions = getCellPositions(rowString, selectedRow);
-		const segments = textParser ? textParser.parseRowString(rowString, selectedRow) : undefined;
-
-		const fieldInfoBeforeEdit = PatternEditingService.getFieldAtCursor({
-			pattern,
-			selectedRow,
-			selectedColumn,
-			cellPositions,
-			segments,
-			converter,
-			formatter,
-			schema,
-			tuningTable
-		});
-
-		const editingResult = PatternEditingService.handleKeyInput(
-			{
-				pattern,
-				selectedRow,
-				selectedColumn,
-				cellPositions,
-				segments,
-				converter,
-				formatter,
-				schema,
-				tuningTable
-			},
-			event.key
-		);
+		const editingResult = PatternEditingService.handleKeyInput(built.context, event.key);
 
 		if (editingResult) {
 			event.preventDefault();
-
-			let finalPattern = editingResult.updatedPattern;
-
-			if (
-				autoEnvStore.enabled &&
-				fieldInfoBeforeEdit &&
-				fieldInfoBeforeEdit.channelIndex >= 0 &&
-				(fieldInfoBeforeEdit.fieldType === 'note' ||
-					fieldInfoBeforeEdit.fieldKey === 'envelopeShape')
-			) {
-				const autoEnvPattern = AutoEnvService.applyAutoEnvelope(
-					finalPattern,
-					selectedRow,
-					fieldInfoBeforeEdit.channelIndex,
-					tuningTable,
-					autoEnvStore.currentRatio
-				);
-				if (autoEnvPattern) {
-					finalPattern = autoEnvPattern;
-				}
-			}
-
-			recordPatternEdit(pattern, finalPattern);
-			updatePatternInArray(finalPattern);
-
-			if (editingResult.shouldMoveNext) {
-				moveColumn(1);
-			}
-
-			const shouldPreview =
-				fieldInfoBeforeEdit &&
-				(fieldInfoBeforeEdit.channelIndex >= 0 ||
-					fieldInfoBeforeEdit.fieldKey === 'envelopeValue');
-			const previewChannel =
-				fieldInfoBeforeEdit?.fieldKey === 'envelopeValue'
-					? 0
-					: (fieldInfoBeforeEdit?.channelIndex ?? -1);
-			if (
-				!playbackStore.isPlaying &&
-				shouldPreview &&
-				previewChannel >= 0 &&
-				chipProcessor &&
-				'playPreviewRow' in chipProcessor &&
-				!pressedKeyChannels.has(event.key)
-			) {
-				services.audioService.setPreviewActiveForChips(songIndex);
-				const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
-				const isNoteField =
-					fieldInfoBeforeEdit.fieldType === 'note' ||
-					fieldInfoBeforeEdit.fieldKey === 'envelopeValue';
-				const previewChannelResult = previewService.playFromContext(
-					processor,
-					editingResult.updatedPattern,
-					previewChannel,
-					selectedRow,
-					schema,
-					isNoteField
-				);
-				if (previewChannelResult !== undefined) {
-					pressedKeyChannels.set(event.key, previewChannelResult);
-				}
-			}
-
-			const step = editorStateStore.step;
-			if (step > 0) {
-				moveRow(step);
-			}
-
-			clearAllCaches();
-			draw();
+			applyEditingResult(
+				editingResult,
+				built.fieldInfoBeforeEdit,
+				built.context,
+				event.key
+			);
 		} else if (event.key.length === 1) {
 			event.preventDefault();
 		}
 	}
+
+	$effect(() => {
+		const enabled = !!settingsStore.midiInputDeviceId;
+		if (!enabled) return;
+		const remove = midiService.addNoteListener((midiNote: number, velocity: number) => {
+			if (!canvas || document.activeElement !== canvas) return;
+			if (velocity === 0) {
+				const previewKey = `midi-${midiNote}`;
+				const channel = pressedKeyChannels.get(previewKey);
+				if (channel !== undefined) {
+					if (chipProcessor && 'stopPreviewNote' in chipProcessor) {
+						const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
+						previewService.stopNote(processor, channel === -1 ? undefined : channel);
+					}
+					services.audioService.setPreviewActiveForChips(null);
+					pressedKeyChannels.delete(previewKey);
+				}
+				return;
+			}
+			const built = buildEditingContext();
+			if (!built) return;
+			const result = PatternEditingService.handleMidiNote(built.context, midiNote);
+			if (result) {
+				applyEditingResult(
+					result,
+					built.fieldInfoBeforeEdit,
+					built.context,
+					`midi-${midiNote}`
+				);
+			}
+		});
+		return remove;
+	});
 
 	function handleKeyUp(event: KeyboardEvent) {
 		if (isPlayFromRowShortcut(event) && isEnterKeyHeld) {
@@ -1653,6 +1710,14 @@
 	function handleCanvasMouseDown(event: MouseEvent): void {
 		if (!canvas || !currentPattern || !renderer || !textParser) return;
 		if (event.button === 2) return;
+
+		if (
+			settingsStore.midiInputDeviceId &&
+			midiService.isSupported() &&
+			!midiService.hasAccess()
+		) {
+			midiService.requestAccess();
+		}
 
 		canvas.focus();
 		const selection = window.getSelection();
@@ -1926,19 +1991,98 @@
 		refreshAfterVirtualChannelChange();
 	}
 
+	function getChannelIndexAtCursor(): number {
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const pattern = findOrCreatePattern(patternId);
+		if (!pattern) return -1;
+		const rowString = getPatternRowData(pattern, selectedRow);
+		const cellPositions = getCellPositions(rowString, selectedRow);
+		const segments = textParser ? textParser.parseRowString(rowString, selectedRow) : undefined;
+		const fieldInfo = PatternFieldDetection.detectFieldAtCursor({
+			pattern,
+			selectedRow,
+			selectedColumn,
+			cellPositions,
+			segments,
+			converter,
+			formatter,
+			schema
+		});
+		if (!fieldInfo) return -1;
+		if (fieldInfo.channelIndex < 0) return 0;
+		return fieldInfo.channelIndex;
+	}
+
+	function isPlayingSolo(): boolean {
+		let unmutedCount = 0;
+		const chipProcessors = services.audioService.chipProcessors;
+		for (let chipIdx = 0; chipIdx < chipProcessors.length; chipIdx++) {
+			const chipSong = projectStore.songs[chipIdx];
+			const chipSchema = chipProcessors[chipIdx].chip.schema;
+			const hwLabels = chipSchema.channelLabels ?? ['A', 'B', 'C'];
+			const totalChannels = getTotalVirtualChannelCount(
+				hwLabels.length,
+				chipSong?.virtualChannelMap ?? {}
+			);
+			for (let ch = 0; ch < totalChannels; ch++) {
+				if (!channelMuteStore.isChannelMuted(chipIdx, ch)) unmutedCount++;
+			}
+		}
+		return unmutedCount === 1;
+	}
+
+	function executePlaySolo(clickedChipIndex: number, soloChannel: number): void {
+		const chipProcessors = services.audioService.chipProcessors;
+		chipProcessors.forEach((processor, chipIdx) => {
+			const chipSong = projectStore.songs[chipIdx];
+			const chipSchema = processor.chip.schema;
+			const hwLabels = chipSchema.channelLabels ?? ['A', 'B', 'C'];
+			const totalChannels = getTotalVirtualChannelCount(
+				hwLabels.length,
+				chipSong?.virtualChannelMap ?? {}
+			);
+			for (let ch = 0; ch < totalChannels; ch++) {
+				const muted = chipIdx === clickedChipIndex ? ch !== soloChannel : true;
+				channelMuteStore.setChannelMuted(chipIdx, ch, muted);
+				processor.updateParameter(`channelMute_${ch}`, muted);
+			}
+		});
+		draw();
+	}
+
+	function executeUnmuteAll(): void {
+		const chipProcessors = services.audioService.chipProcessors;
+		chipProcessors.forEach((processor, chipIdx) => {
+			const chipSong = projectStore.songs[chipIdx];
+			const chipSchema = processor.chip.schema;
+			const hwLabels = chipSchema.channelLabels ?? ['A', 'B', 'C'];
+			const totalChannels = getTotalVirtualChannelCount(
+				hwLabels.length,
+				chipSong?.virtualChannelMap ?? {}
+			);
+			for (let ch = 0; ch < totalChannels; ch++) {
+				channelMuteStore.setChannelMuted(chipIdx, ch, false);
+				processor.updateParameter(`channelMute_${ch}`, false);
+			}
+		});
+		draw();
+	}
+
 	function handleChannelContextMenuAction(data: { action: string }): void {
 		closeChannelContextMenu();
-		if (playbackStore.isPlaying) return;
 		const song = projectStore.songs[songIndex];
 		if (!song) return;
 
 		const hwIndex = channelContextMenuHwIndex;
+		const isPlaying = playbackStore.isPlaying;
 
 		if (data.action === 'add_virtual_channel') {
+			if (isPlaying) return;
 			applyVirtualChannelChange(
 				VirtualChannelService.addVirtualChannel(song, hwIndex, patterns)
 			);
 		} else if (data.action === 'remove_virtual_channel') {
+			if (isPlaying) return;
 			const result = VirtualChannelService.removeVirtualChannel(
 				song,
 				hwIndex,
@@ -1948,10 +2092,14 @@
 			if (result) {
 				applyVirtualChannelChange(result);
 			}
+		} else if (data.action === 'play_solo') {
+			executePlaySolo(getChipIndex(), channelContextMenuVirtualIndex);
+		} else if (data.action === 'unmute_all') {
+			executeUnmuteAll();
 		}
 	}
 
-	function getChannelContextMenuItems(): import('../../components/Menu/types').MenuItem[] {
+	function getChannelContextMenuItems(): MenuItem[] {
 		const song = projectStore.songs[songIndex];
 		const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
 		const hwIndex = channelContextMenuHwIndex;
@@ -1964,18 +2112,29 @@
 		const clickedLabel = effectiveLabels[channelContextMenuVirtualIndex] ?? hwLabel;
 		const isPlaying = playbackStore.isPlaying;
 
-		return [
+		const items: MenuItem[] = [
+			{
+				label: 'Play solo',
+				action: 'play_solo'
+			},
+			{
+				label: 'Unmute all',
+				action: 'unmute_all'
+			},
 			{
 				label: `Add virtual channel to ${hwLabel}`,
 				action: 'add_virtual_channel',
 				disabled: isPlaying
-			},
-			{
-				label: `Remove virtual channel ${clickedLabel}`,
-				action: 'remove_virtual_channel',
-				disabled: currentCount <= 1 || isPlaying
 			}
 		];
+		if (currentCount > 1) {
+			items.push({
+				label: `Remove virtual channel ${clickedLabel}`,
+				action: 'remove_virtual_channel',
+				disabled: isPlaying
+			});
+		}
+		return items;
 	}
 
 	function sendVirtualChannelConfigToProcessor(): void {
@@ -2653,8 +2812,6 @@
 	let playbackRafId: number | null = null;
 	let playbackStartTime = 0;
 	let lastPatternOrderIndexFromPlayback = currentPatternOrderIndex;
-	let userJustChangedPattern = false;
-	const USER_PATTERN_CHANGE_GRACE_MS = 800;
 
 	$effect(() => {
 		if (
@@ -2662,7 +2819,6 @@
 			services.audioService.playing
 		) {
 			const indexToApply = currentPatternOrderIndex;
-			userJustChangedPattern = true;
 			pendingPlaybackPosition = null;
 			playbackStartTime = performance.now();
 			if (playbackRafId !== null) {
@@ -2670,43 +2826,11 @@
 				playbackRafId = null;
 			}
 			selectedRow = 0;
-			const timeoutId = window.setTimeout(() => {
-				userJustChangedPattern = false;
-			}, USER_PATTERN_CHANGE_GRACE_MS);
-			if (isPlaybackMaster) {
-				if (initAllChips) {
-					initAllChips();
-					requestAnimationFrame(() => {
-						requestAnimationFrame(() => {
-							services.audioService.chipProcessors.forEach((processor, index) => {
-								const speed = getSpeedForChip ? getSpeedForChip(index) : undefined;
-								if (processor.changePatternDuringPlayback) {
-									processor.changePatternDuringPlayback(
-										0,
-										indexToApply,
-										undefined,
-										speed
-									);
-								} else {
-									processor.playFromRow(0, indexToApply, speed);
-								}
-							});
-						});
-					});
-				} else {
-					const pattern = findOrCreatePattern(patternOrder[indexToApply]);
-					services.audioService.chipProcessors.forEach((processor, index) => {
-						const speed = getSpeedForChip ? getSpeedForChip(index) : undefined;
-						if (processor.changePatternDuringPlayback) {
-							processor.changePatternDuringPlayback(0, indexToApply, pattern, speed);
-						} else {
-							processor.playFromRow(0, indexToApply, speed);
-						}
-					});
-				}
-			}
 			lastPatternOrderIndexFromPlayback = indexToApply;
-			return () => clearTimeout(timeoutId);
+			if (isPlaybackMaster) {
+				services.audioService.stop();
+				togglePlayback();
+			}
 		}
 	});
 
@@ -2747,13 +2871,6 @@
 					if (pending.timestamp < playbackStartTime) {
 						return;
 					}
-					if (
-						userJustChangedPattern &&
-						pending.orderIndex !== undefined &&
-						pending.orderIndex !== currentPatternOrderIndex
-					) {
-						return;
-					}
 
 					if (settingsStore.debugMode) {
 						const orderIdx =
@@ -2777,9 +2894,6 @@
 					) {
 						currentPatternOrderIndex = pending.orderIndex;
 						lastPatternOrderIndexFromPlayback = pending.orderIndex;
-					}
-					if (pending.orderIndex === currentPatternOrderIndex) {
-						userJustChangedPattern = false;
 					}
 				});
 			}

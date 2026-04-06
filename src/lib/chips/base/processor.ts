@@ -17,7 +17,7 @@ export interface ChipProcessor {
 		startPattern: Pattern
 	): void;
 	stop(): void;
-	updateOrder(order: number[]): void;
+	updateOrder(order: number[], loopPointId: number): void;
 	sendInitPattern(pattern: Pattern, patternOrderIndex: number): void;
 	sendRequestedPattern(pattern: Pattern, patternOrderIndex: number): void;
 	sendInitTables(tables: Table[]): void;

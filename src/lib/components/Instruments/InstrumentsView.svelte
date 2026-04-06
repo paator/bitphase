@@ -33,6 +33,7 @@
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
+	import { createPersistedResizableListHeight } from '../../utils/persisted-resizable-list-height.svelte';
 	import {
 		ITEM_ROW_HEIGHT,
 		ITEM_BUTTON_BAR_HEIGHT,
@@ -55,10 +56,17 @@
 	let instruments = $derived(projectStore.instruments);
 	const songs = $derived(projectStore.songs);
 
+	const instrumentListResize = createPersistedResizableListHeight({
+		storageKey: 'instrumentListHeight',
+		min: MIN_ITEM_LIST_HEIGHT,
+		max: MAX_ITEM_LIST_HEIGHT,
+		defaultHeight: DEFAULT_ITEM_LIST_HEIGHT
+	});
+
 	const instrumentGridRows = $derived.by(() =>
 		computeGridRows(
 			instruments?.length ?? 0,
-			instrumentListHeight,
+			instrumentListResize.listHeight,
 			ITEM_ROW_HEIGHT,
 			ITEM_BUTTON_BAR_HEIGHT
 		)
@@ -66,63 +74,8 @@
 
 	let asHex = $state(false);
 	let selectedInstrumentIndex = $state(0);
-	let instrumentEditorRef: any = $state(null);
 	let selectedInstrumentRowIndices = $state<number[]>([]);
 	let instrumentListScrollRef: HTMLDivElement | null = $state(null);
-	let instrumentsContainerRef: HTMLDivElement | null = $state(null);
-
-	const INSTRUMENT_LIST_HEIGHT_KEY = 'instrumentListHeight';
-
-	let instrumentListHeight = $state(
-		Math.min(
-			MAX_ITEM_LIST_HEIGHT,
-			Math.max(
-				MIN_ITEM_LIST_HEIGHT,
-				parseInt(localStorage.getItem(INSTRUMENT_LIST_HEIGHT_KEY) ?? '', 10) ||
-					DEFAULT_ITEM_LIST_HEIGHT
-			)
-		)
-	);
-
-	let isResizingInstrumentList = $state(false);
-	let resizeStartY = $state(0);
-	let resizeStartHeight = $state(0);
-
-	function beginInstrumentListResize(e: MouseEvent) {
-		e.preventDefault();
-		isResizingInstrumentList = true;
-		resizeStartY = e.clientY;
-		resizeStartHeight = instrumentListHeight;
-	}
-
-	function handleInstrumentListResizeMove(e: MouseEvent) {
-		if (!isResizingInstrumentList) return;
-		const deltaY = e.clientY - resizeStartY;
-		const newHeight = Math.max(
-			MIN_ITEM_LIST_HEIGHT,
-			Math.min(MAX_ITEM_LIST_HEIGHT, resizeStartHeight + deltaY)
-		);
-		instrumentListHeight = newHeight;
-		localStorage.setItem(INSTRUMENT_LIST_HEIGHT_KEY, String(newHeight));
-	}
-
-	function endInstrumentListResize() {
-		isResizingInstrumentList = false;
-	}
-
-	$effect(() => {
-		if (!isResizingInstrumentList) return;
-		document.body.style.cursor = 'ns-resize';
-		document.body.style.userSelect = 'none';
-		window.addEventListener('mousemove', handleInstrumentListResizeMove);
-		window.addEventListener('mouseup', endInstrumentListResize);
-		return () => {
-			document.body.style.cursor = '';
-			document.body.style.userSelect = '';
-			window.removeEventListener('mousemove', handleInstrumentListResizeMove);
-			window.removeEventListener('mouseup', endInstrumentListResize);
-		};
-	});
 
 	$effect(() => {
 		if (editorStateStore.selectInstrumentRequest) return;
@@ -183,8 +136,9 @@
 	function sortInstrumentsAndSyncSelection(selectedId?: string): void {
 		const sorted = [...instruments].sort(compareInstrumentIds);
 		const needsSort = sorted.some((inst, i) => inst !== instruments[i]);
-		if (!needsSort) return;
-		projectStore.instruments = sorted;
+		if (needsSort) {
+			projectStore.instruments = sorted;
+		}
 		if (selectedId !== undefined) {
 			const newIndex = sorted.findIndex((inst) => inst.id === selectedId);
 			if (newIndex >= 0) selectedInstrumentIndex = newIndex;
@@ -225,6 +179,7 @@
 		const newInstrument = new InstrumentModel(newId, [], 0, `Instrument ${newId}`);
 		projectStore.instruments = [...instruments, newInstrument];
 		sortInstrumentsAndSyncSelection(newId);
+		editorStateStore.setCurrentInstrument(newId);
 		services.audioService.updateInstruments(projectStore.instruments);
 		await tick();
 		instrumentListScrollRef
@@ -258,7 +213,8 @@
 
 		projectStore.instruments = [...instruments, copy];
 		sortInstrumentsAndSyncSelection(newId);
-		services.audioService.updateInstruments(instruments);
+		editorStateStore.setCurrentInstrument(newId);
+		services.audioService.updateInstruments(projectStore.instruments);
 		await tick();
 		instrumentListScrollRef
 			?.querySelector(`[data-instrument-index="${selectedInstrumentIndex}"]`)
@@ -436,8 +392,7 @@
 		{#snippet children()}
 			<div
 				class="flex shrink-0 flex-col border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
-				style="height: {instrumentListHeight}px"
-				bind:this={instrumentsContainerRef}>
+				style="height: {instrumentListResize.listHeight}px">
 				<div
 					class="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden"
 					bind:this={instrumentListScrollRef}>
@@ -572,14 +527,14 @@
 			</div>
 
 			<div
-				class="flex shrink-0 cursor-ns-resize items-center justify-center border-y border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] py-1 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)] {isResizingInstrumentList
+				class="flex shrink-0 cursor-ns-resize items-center justify-center border-y border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] py-1 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)] {instrumentListResize.isResizing
 					? 'bg-[var(--color-app-surface-hover)]'
 					: ''}"
 				role="button"
 				tabindex="0"
 				aria-label="Drag to resize instrument list"
 				title="Drag to resize instrument list"
-				onmousedown={beginInstrumentListResize}>
+				onmousedown={instrumentListResize.beginResize}>
 				<IconCarbonArrowsVertical class="h-3 w-3" />
 			</div>
 
@@ -587,7 +542,6 @@
 				{#if instruments && instruments[selectedInstrumentIndex]}
 					{#key instruments[selectedInstrumentIndex].id}
 						<InstrumentEditor
-							bind:this={instrumentEditorRef}
 							instrument={instruments[selectedInstrumentIndex]}
 							{asHex}
 							{isExpanded}

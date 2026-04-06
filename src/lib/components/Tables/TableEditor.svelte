@@ -20,6 +20,7 @@
 		ACTION_TRANSPOSE_OCTAVE_UP,
 		ACTION_TRANSPOSE_OCTAVE_DOWN
 	} from '../../config/keybindings';
+	import { isEditableElement } from '../../utils/shortcut-input-exclusion';
 	import { settingsStore } from '../../stores/settings.svelte';
 
 	let {
@@ -167,6 +168,8 @@
 	function handleOffsetKeyDown(index: number, event: KeyboardEvent) {
 		const key = event.key;
 
+		if (event.ctrlKey || event.metaKey || event.altKey) return;
+
 		if (key === 'ArrowDown') {
 			event.preventDefault();
 			const nextIndex = index + 1;
@@ -245,12 +248,7 @@
 	function handleRowSelect(index: number, event: MouseEvent) {
 		event.preventDefault();
 		event.stopPropagation();
-		const result = computeSelectionFromClick(
-			index,
-			event,
-			selectedRowIndices,
-			selectionAnchor
-		);
+		const result = computeSelectionFromClick(index, event, selectedRowIndices, selectionAnchor);
 		selectedRowIndices = result.indices;
 		selectionAnchor = result.anchor;
 		editorContainerRef?.focus();
@@ -355,10 +353,7 @@
 
 		function handleClickOutside(event: MouseEvent) {
 			const target = event.target as Node;
-			if (
-				selectedRowIndices.length > 0 &&
-				!containerEl!.contains(target)
-			) {
+			if (selectedRowIndices.length > 0 && !containerEl!.contains(target)) {
 				selectedRowIndices = [];
 				selectionAnchor = null;
 			}
@@ -388,6 +383,7 @@
 
 		function handleKeyDown(event: KeyboardEvent) {
 			if (selectedRowIndices.length === 0) return;
+			if (isEditableElement(event.target)) return;
 			const shortcut = ShortcutString.fromEvent(event);
 			const action = keybindingsStore.getActionForShortcut(shortcut);
 			const delta =
@@ -397,7 +393,10 @@
 			if (action === ACTION_INCREMENT_VALUE || action === ACTION_TRANSPOSE_OCTAVE_UP) {
 				event.preventDefault();
 				incrementSelectedRows(delta);
-			} else if (action === ACTION_DECREMENT_VALUE || action === ACTION_TRANSPOSE_OCTAVE_DOWN) {
+			} else if (
+				action === ACTION_DECREMENT_VALUE ||
+				action === ACTION_TRANSPOSE_OCTAVE_DOWN
+			) {
 				event.preventDefault();
 				incrementSelectedRows(-delta);
 			}
@@ -408,13 +407,21 @@
 	});
 </script>
 
-{#snippet valueCell(mode: 'pitch' | 'shift', index: number, value: number, isSelected: boolean, rowSelected: boolean)}
+{#snippet valueCell(
+	mode: 'pitch' | 'shift',
+	index: number,
+	value: number,
+	isSelected: boolean,
+	rowSelected: boolean
+)}
 	<td
-		class={`group h-8 w-6 min-w-6 cursor-pointer border border-[var(--color-app-border)] text-center text-[0.7rem] leading-none ${isSelected
-			? 'bg-[var(--color-app-surface-active)]'
-			: rowSelected
-				? ROW_SELECTION_STYLES.cell
-				: 'bg-[var(--color-app-surface)] hover:bg-[var(--color-app-surface-secondary)]'}`}
+		class={`group h-8 w-6 min-w-6 cursor-pointer border border-[var(--color-app-border)] text-center text-[0.7rem] leading-none ${
+			isSelected
+				? 'bg-[var(--color-app-surface-active)]'
+				: rowSelected
+					? ROW_SELECTION_STYLES.cell
+					: 'bg-[var(--color-app-surface)] hover:bg-[var(--color-app-surface-secondary)]'
+		}`}
 		tabindex="0"
 		title={String(value)}
 		onmousedown={() => beginDrag(mode, index, value)}
@@ -449,7 +456,8 @@
 					style="left: calc({loopColumnRef.offsetLeft}px + 1rem); margin-top: calc({rowTop}px + 2rem * {loopRow}); height: calc(2rem * {rows.length -
 						loopRow});">
 					<div class="relative h-full">
-						<div class="absolute top-0 left-0 h-full w-0.5 border-l-2 border-[var(--color-app-primary)]">
+						<div
+							class="absolute top-0 left-0 h-full w-0.5 border-l-2 border-[var(--color-app-primary)]">
 						</div>
 						<div
 							class="absolute top-0 left-0 h-2 w-2 border-t-2 border-l-2 border-[var(--color-app-primary)]">
@@ -480,8 +488,9 @@
 							<th></th>
 							<th></th>
 							{#each PITCH_VALUES as p}
-								<th class="w-6 min-w-6 bg-[var(--color-app-surface-secondary)] text-center" title={String(p)}
-								></th>
+								<th
+									class="w-6 min-w-6 bg-[var(--color-app-surface-secondary)] text-center"
+									title={String(p)}></th>
 							{/each}
 						</tr>
 					{/if}
@@ -542,7 +551,13 @@
 							</td>
 							{#if showOffsetGrid}
 								{#each PITCH_VALUES as p}
-									{@render valueCell('pitch', index, p, p === pitches[index], selected)}
+									{@render valueCell(
+										'pitch',
+										index,
+										p,
+										p === pitches[index],
+										selected
+									)}
 								{/each}
 							{/if}
 						</tr>
@@ -578,7 +593,9 @@
 						{/if}
 					</tr>
 					<tr>
-						<td colspan={showOffsetGrid ? 29 : 4} class="border-t border-[var(--color-app-border)] p-0">
+						<td
+							colspan={showOffsetGrid ? 29 : 4}
+							class="border-t border-[var(--color-app-border)] p-0">
 							<RowResizeHandle
 								rowCount={rows.length}
 								onRowCountChange={setRowCount}
@@ -591,7 +608,8 @@
 		</div>
 
 		{#if showOctaveGrid}
-			<table class="row-editor-table table-fixed border-collapse bg-[var(--color-app-surface)] font-mono text-xs select-none">
+			<table
+				class="row-editor-table table-fixed border-collapse bg-[var(--color-app-surface)] font-mono text-xs select-none">
 				<thead>
 					<tr>
 						<th class="px-2 py-1.5">row</th>
@@ -600,8 +618,9 @@
 					<tr>
 						<th></th>
 						{#each SHIFT_VALUES as s}
-							<th class="w-6 min-w-6 bg-[var(--color-app-surface-secondary)] text-center" title={String(s)}
-							></th>
+							<th
+								class="w-6 min-w-6 bg-[var(--color-app-surface-secondary)] text-center"
+								title={String(s)}></th>
 						{/each}
 					</tr>
 				</thead>
@@ -615,7 +634,13 @@
 								sizeClass="px-2 py-1.5"
 								onmousedown={(e) => handleRowSelect(index, e)} />
 							{#each SHIFT_VALUES as s}
-								{@render valueCell('shift', index, s, s === shifts[index], selected)}
+								{@render valueCell(
+									'shift',
+									index,
+									s,
+									s === shifts[index],
+									selected
+								)}
 							{/each}
 						</tr>
 					{/each}

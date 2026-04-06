@@ -283,5 +283,47 @@ describe('playback pipeline', () => {
 			expect(state.currentRow).toBe(0);
 			expect(state.currentPatternOrderIndex).toBe(1);
 		});
+
+		it('tick loop wraps to loop marker at song end', () => {
+			const state = new AyumiState();
+			state.setTuningTable([1000]);
+			state.setInstruments([
+				{ id: '01', rows: [{ tone: true, volume: 15, noise: false, envelope: false }], loop: 0 }
+			]);
+			state.setPatternOrder([0, 1, 2], 1);
+			state.currentSpeed = 1;
+			state.currentTick = 0;
+			state.currentRow = 0;
+			state.channelInstruments = [-1, -1, -1];
+			state.channelMuted = [false, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.envelopeEffectTable = -1;
+
+			const pattern = makePattern([
+				[
+					{ note: { name: 0, octave: 0 }, effects: [null] },
+					{ note: { name: 0, octave: 0 }, effects: [null] },
+					{ note: { name: 0, octave: 0 }, effects: [null] }
+				],
+				[
+					{ note: { name: 0, octave: 0 }, effects: [null] },
+					{ note: { name: 0, octave: 0 }, effects: [null] },
+					{ note: { name: 0, octave: 0 }, effects: [null] }
+				]
+			]);
+			state.setPattern(pattern, 2);
+
+			const registerState = new AYChipRegisterState();
+			const driver = new AYAudioDriver();
+			const processor = new TrackerPatternProcessor(state, driver, { postMessage: vi.fn() });
+
+			runOneTick(state, pattern, processor, driver, registerState);
+			expect(state.currentRow).toBe(1);
+			expect(state.currentTick).toBe(0);
+
+			runOneTick(state, pattern, processor, driver, registerState);
+			expect(state.currentRow).toBe(0);
+			expect(state.currentPatternOrderIndex).toBe(1);
+		});
 	});
 });

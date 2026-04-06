@@ -311,4 +311,61 @@ describe('PatternNoteInput', () => {
 			});
 		});
 	});
+
+	describe('handleMidiNoteInput', () => {
+		it('should return null when field is global', () => {
+			const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+			const context = createMockContext(pattern);
+			const fieldInfo: FieldInfo = {
+				...createFieldInfo(DEFAULT_CHANNEL_INDEX),
+				isGlobal: true
+			};
+
+			const result = PatternNoteInput.handleMidiNoteInput(context, fieldInfo, 60);
+
+			expect(result).toBeNull();
+		});
+
+		it('should return null when channel index is invalid', () => {
+			const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+			const context = createMockContext(pattern);
+			const fieldInfo = createFieldInfo(-1);
+
+			const result = PatternNoteInput.handleMidiNoteInput(context, fieldInfo, 60);
+
+			expect(result).toBeNull();
+		});
+
+		it('should return null for invalid midi note', () => {
+			const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+			const context = createMockContext(pattern);
+			const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+			expect(PatternNoteInput.handleMidiNoteInput(context, fieldInfo, -1)).toBeNull();
+			expect(PatternNoteInput.handleMidiNoteInput(context, fieldInfo, 128)).toBeNull();
+		});
+
+		it('should map MIDI 60 to C-4 and call updateFieldValue', () => {
+			const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+			const context = createMockContext(pattern);
+			const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+			const result = PatternNoteInput.handleMidiNoteInput(context, fieldInfo, 60);
+
+			expect(result).not.toBeNull();
+			expect(result?.shouldMoveNext).toBe(false);
+			expect(mockUpdateFieldValue).toHaveBeenCalledWith(context, fieldInfo, 'C-4');
+		});
+
+		it('should map MIDI 69 to A-4', () => {
+			const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+			const context = createMockContext(pattern);
+			const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+			const result = PatternNoteInput.handleMidiNoteInput(context, fieldInfo, 69);
+
+			expect(result).not.toBeNull();
+			expect(mockUpdateFieldValue).toHaveBeenCalledWith(context, fieldInfo, 'A-4');
+		});
+	});
 });

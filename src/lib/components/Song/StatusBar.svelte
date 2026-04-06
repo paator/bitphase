@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Pattern } from '../../models/song';
 	import type { Chip } from '../../chips/types';
+	import type { Table } from '../../models/project';
 	import { playbackStore } from '../../stores/playback.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 
@@ -20,6 +21,7 @@
 
 	const patternOrder = $derived(projectStore.patternOrder);
 	const patterns = $derived(projectStore.patterns[songIndex] ?? []);
+	const tables = $derived(projectStore.tables ?? []);
 	const speed = $derived(projectStore.songs[songIndex]?.initialSpeed ?? 3);
 	const interruptFrequency = $derived(projectStore.songs[songIndex]?.interruptFrequency ?? 50);
 	const pattern = $derived(
@@ -27,6 +29,27 @@
 	);
 
 	const schema = chip.schema;
+
+	function getTableById(tables: Table[], id: number): Table | undefined {
+		return tables.find((t) => t.id === id);
+	}
+
+	function advanceSpeedTablePosition(position: number, table: Table): number {
+		let next = position + 1;
+		if (next >= table.rows.length) {
+			next =
+				table.loop >= 0 && table.loop < table.rows.length ? table.loop : 0;
+		}
+		return next;
+	}
+
+	function getFirstNonZeroSpeedTablePosition(table: Table): number {
+		let position = 0;
+		while (position < table.rows.length && (table.rows[position] ?? 0) <= 0) {
+			position++;
+		}
+		return position >= table.rows.length ? 0 : position;
+	}
 
 	const helpMessage = $derived.by(() => {
 		if (!pattern || selectedRow < 0 || selectedRow >= pattern.length || !selectedFieldKey) {
@@ -87,17 +110,83 @@
 		return '';
 	});
 
+	function getRowSpeedWithTables(
+		pattern: Pattern,
+		rowIdx: number,
+		currentSpeed: number,
+		speedTableId: number,
+		speedTablePosition: number,
+		tables: Table[]
+	): { speed: number; nextTableId: number; nextTablePosition: number } {
+		const SPEED_EFFECT_TYPE = 'S'.charCodeAt(0);
+		let effect: { parameter: number; tableIndex?: number } | null = null;
+
+		for (const channel of pattern.channels) {
+			const row = channel.rows[rowIdx];
+			if (!row?.effects?.[0] || row.effects[0].effect !== SPEED_EFFECT_TYPE) continue;
+			effect = row.effects[0];
+		}
+
+		if (effect?.tableIndex !== undefined && effect.tableIndex >= 0) {
+			const table = getTableById(tables, effect.tableIndex);
+			if (!table?.rows?.length) {
+				return {
+					speed: currentSpeed,
+					nextTableId: -1,
+					nextTablePosition: 0
+				};
+			}
+			const position = getFirstNonZeroSpeedTablePosition(table);
+			const speedValue = table.rows[position] ?? 0;
+			const nextPosition = advanceSpeedTablePosition(position, table);
+			return {
+				speed: speedValue > 0 ? speedValue : currentSpeed,
+				nextTableId: effect.tableIndex,
+				nextTablePosition: nextPosition
+			};
+		}
+
+		if (effect && effect.parameter > 0) {
+			return {
+				speed: effect.parameter,
+				nextTableId: -1,
+				nextTablePosition: 0
+			};
+		}
+
+		if (speedTableId >= 0) {
+			const table = getTableById(tables, speedTableId);
+			if (table?.rows?.length) {
+				const speedValue = table.rows[speedTablePosition] ?? 0;
+				const nextPosition = advanceSpeedTablePosition(speedTablePosition, table);
+				return {
+					speed: speedValue > 0 ? speedValue : currentSpeed,
+					nextTableId: speedTableId,
+					nextTablePosition: nextPosition
+				};
+			}
+		}
+
+		return {
+			speed: currentSpeed,
+			nextTableId: speedTableId,
+			nextTablePosition: speedTablePosition
+		};
+	}
+
 	function calculateTimeToPosition(
 		patternOrder: number[],
 		patterns: Pattern[],
+		tables: Table[],
 		targetPatternOrderIndex: number,
 		targetRow: number,
 		initialSpeed: number,
 		interruptFrequency: number
 	): number {
 		let totalTime = 0;
-		const SPEED_EFFECT_TYPE = 'S'.charCodeAt(0);
 		let currentSpeed = initialSpeed;
+		let speedTableId = -1;
+		let speedTablePosition = 0;
 
 		for (let orderIdx = 0; orderIdx <= targetPatternOrderIndex; orderIdx++) {
 			if (orderIdx >= patternOrder.length) break;
@@ -109,14 +198,17 @@
 			const maxRow = orderIdx === targetPatternOrderIndex ? targetRow : pattern.length - 1;
 
 			for (let rowIdx = 0; rowIdx <= maxRow; rowIdx++) {
-				for (const channel of pattern.channels) {
-					const row = channel.rows[rowIdx];
-					if (!row?.effects?.[0] || row.effects[0].effect !== SPEED_EFFECT_TYPE) continue;
-					const speedValue = row.effects[0].parameter;
-					if (speedValue > 0) {
-						currentSpeed = speedValue;
-					}
-				}
+				const result = getRowSpeedWithTables(
+					pattern,
+					rowIdx,
+					currentSpeed,
+					speedTableId,
+					speedTablePosition,
+					tables
+				);
+				currentSpeed = result.speed;
+				speedTableId = result.nextTableId;
+				speedTablePosition = result.nextTablePosition;
 
 				const rowDuration = currentSpeed / interruptFrequency;
 				totalTime += rowDuration;
@@ -134,6 +226,7 @@
 		return calculateTimeToPosition(
 			patternOrder,
 			patterns,
+			tables,
 			currentPatternOrderIndex,
 			selectedRow,
 			speed,
@@ -158,72 +251,42 @@
 		return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 	}
 
-	function getRowSpeed(pattern: Pattern, rowIdx: number, currentSpeed: number): number {
-		const SPEED_EFFECT_TYPE = 'S'.charCodeAt(0);
-		let rowSpeed = currentSpeed;
-
-		for (const channel of pattern.channels) {
-			const row = channel.rows[rowIdx];
-			if (!row?.effects?.[0] || row.effects[0].effect !== SPEED_EFFECT_TYPE) continue;
-			const speedValue = row.effects[0].parameter;
-			if (speedValue > 0) {
-				rowSpeed = speedValue;
-			}
-		}
-
-		return rowSpeed;
-	}
-
 	function calculateSampleCounter(
 		patternOrder: number[],
 		patterns: Pattern[],
+		tables: Table[],
 		targetPatternOrderIndex: number,
 		targetRow: number,
 		initialSpeed: number
 	): number {
 		let totalSamples = 0;
 		let currentSpeed = initialSpeed;
+		let speedTableId = -1;
+		let speedTablePosition = 0;
 
-		for (let orderIdx = 0; orderIdx < targetPatternOrderIndex; orderIdx++) {
+		for (let orderIdx = 0; orderIdx <= targetPatternOrderIndex; orderIdx++) {
 			if (orderIdx >= patternOrder.length) break;
 
 			const patternId = patternOrder[orderIdx];
 			const pattern = patterns.find((p) => p.id === patternId);
 			if (!pattern) continue;
 
-			for (let rowIdx = 0; rowIdx < pattern.length; rowIdx++) {
-				const rowSpeed = getRowSpeed(pattern, rowIdx, currentSpeed);
-				currentSpeed = rowSpeed;
-				totalSamples += rowSpeed;
-			}
-		}
+			const maxRow =
+				orderIdx === targetPatternOrderIndex ? targetRow : pattern.length - 1;
 
-		if (targetPatternOrderIndex < patternOrder.length && targetRow >= 0) {
-			const patternId = patternOrder[targetPatternOrderIndex];
-			const pattern = patterns.find((p) => p.id === patternId);
-			if (pattern) {
-				if (targetPatternOrderIndex > 0) {
-					const prevPatternId = patternOrder[targetPatternOrderIndex - 1];
-					const prevPattern = patterns.find((p) => p.id === prevPatternId);
-					if (prevPattern) {
-						let prevPatternSpeed = currentSpeed;
-						for (let prevRowIdx = 0; prevRowIdx < prevPattern.length; prevRowIdx++) {
-							prevPatternSpeed = getRowSpeed(
-								prevPattern,
-								prevRowIdx,
-								prevPatternSpeed
-							);
-						}
-						totalSamples += prevPatternSpeed;
-						currentSpeed = prevPatternSpeed;
-					}
-				}
-
-				for (let rowIdx = 0; rowIdx < targetRow; rowIdx++) {
-					const rowSpeed = getRowSpeed(pattern, rowIdx, currentSpeed);
-					currentSpeed = rowSpeed;
-					totalSamples += rowSpeed;
-				}
+			for (let rowIdx = 0; rowIdx <= maxRow; rowIdx++) {
+				const result = getRowSpeedWithTables(
+					pattern,
+					rowIdx,
+					currentSpeed,
+					speedTableId,
+					speedTablePosition,
+					tables
+				);
+				currentSpeed = result.speed;
+				speedTableId = result.nextTableId;
+				speedTablePosition = result.nextTablePosition;
+				totalSamples += result.speed;
 			}
 		}
 
@@ -238,6 +301,7 @@
 		return calculateSampleCounter(
 			patternOrder,
 			patterns,
+			tables,
 			currentPatternOrderIndex,
 			selectedRow,
 			speed
@@ -259,6 +323,7 @@
 		return calculateSampleCounter(
 			patternOrder,
 			patterns,
+			tables,
 			lastPatternIndex,
 			lastPattern.length - 1,
 			speed
@@ -281,6 +346,7 @@
 		return calculateTimeToPosition(
 			patternOrder,
 			patterns,
+			tables,
 			lastPatternIndex,
 			lastPattern.length - 1,
 			speed,

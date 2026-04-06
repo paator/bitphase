@@ -1,6 +1,7 @@
 import type { Project } from '../../models/project';
 import { downloadFile, sanitizeFilename } from '../../utils/file-download';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
+import JSZip from 'jszip';
 
 const DEFAULT_SPEED = 6;
 const TONE_CHANNELS = 3;
@@ -99,6 +100,17 @@ function encodePSG(registerFrames: number[][]): ArrayBuffer {
 }
 
 class PsgExportService {
+	private getAYSongIndices(project: Project): number[] {
+		const aySongIndices: number[] = [];
+		for (let i = 0; i < project.songs.length; i++) {
+			const song = project.songs[i];
+			if (song && (!song.chipType || song.chipType === 'ay')) {
+				aySongIndices.push(i);
+			}
+		}
+		return aySongIndices;
+	}
+
 	private getPatterns(song: any, patternOrder: number[]): any[] {
 		const patterns: any[] = [];
 		for (const patternId of patternOrder) {
@@ -336,6 +348,56 @@ class PsgExportService {
 		};
 
 		try {
+			const filename = project.name || 'export';
+			const sanitizedFilename = sanitizeFilename(filename);
+			const aySongIndices = this.getAYSongIndices(project);
+
+			if (aySongIndices.length > 1) {
+				const zip = new JSZip();
+				for (let i = 0; i < aySongIndices.length; i++) {
+					if (abortSignal?.aborted) {
+						throw new Error('Export cancelled');
+					}
+					const currentSongIndex = aySongIndices[i]!;
+					const startProgress = 10 + (i / aySongIndices.length) * 80;
+					onProgress?.(
+						startProgress,
+						`Generating PSG ${i + 1}/${aySongIndices.length}...`
+					);
+					const songBuffer = await this.runCaptureWithModules(
+						project,
+						currentSongIndex,
+						modules,
+						(progressValue, messageValue) => {
+							const mappedProgress =
+								startProgress + (progressValue / 100) * (80 / aySongIndices.length);
+							onProgress?.(
+								mappedProgress,
+								`PSG ${i + 1}/${aySongIndices.length}: ${messageValue}`
+							);
+						},
+						abortSignal
+					);
+					zip.file(`${sanitizedFilename}_ay${i + 1}.psg`, songBuffer);
+				}
+
+				if (abortSignal?.aborted) {
+					throw new Error('Export cancelled');
+				}
+
+				onProgress?.(95, 'Creating ZIP archive...');
+				const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+				if (abortSignal?.aborted) {
+					throw new Error('Export cancelled');
+				}
+
+				onProgress?.(99, 'Downloading...');
+				downloadFile(zipBlob, `${sanitizedFilename}.zip`);
+				onProgress?.(100, 'Complete!');
+				return;
+			}
+
 			onProgress?.(50, 'Initializing capture...');
 			const psgBuffer = await this.runCaptureWithModules(
 				project,
@@ -357,10 +419,7 @@ class PsgExportService {
 			}
 
 			onProgress?.(99, 'Downloading...');
-			const filename = project.name || 'export';
-			const sanitizedFilename = sanitizeFilename(filename);
 			downloadFile(blob, `${sanitizedFilename}.psg`);
-
 			onProgress?.(100, 'Complete!');
 		} catch (error) {
 			throw error;

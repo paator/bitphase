@@ -53,7 +53,7 @@ type WorkletCommand =
 	| { type: 'play_from_row'; row: number; patternOrderIndex?: number; speed?: number | null }
 	| PlayFromPositionCommand
 	| { type: 'stop' }
-	| { type: 'update_order'; order: number[] }
+	| { type: 'update_order'; order: number[]; loopPointId: number }
 	| { type: 'init_pattern'; pattern: Pattern; patternOrderIndex: number }
 	| { type: 'init_tuning_table'; tuningTable: number[] }
 	| { type: 'init_speed'; speed: number }
@@ -245,8 +245,8 @@ export class AYProcessor
 		this.sendCommand({ type: 'stop' });
 	}
 
-	updateOrder(order: number[]): void {
-		this.sendCommand({ type: 'update_order', order: Array.from(order) });
+	updateOrder(order: number[], loopPointId: number): void {
+		this.sendCommand({ type: 'update_order', order: Array.from(order), loopPointId });
 	}
 
 	sendInitPattern(pattern: Pattern, patternOrderIndex: number): void {

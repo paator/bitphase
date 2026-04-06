@@ -1,5 +1,5 @@
 import { NoteName } from '../../../models/song';
-import { formatNoteFromEnum, parseNoteFromString } from '../../../utils/note-utils';
+import { formatNoteFromEnum, midiNoteToNoteString } from '../../../utils/note-utils';
 import type { EditingContext, FieldInfo } from './editing-context';
 import type { Pattern } from '../../../models/song';
 import { PatternValueUpdates } from './pattern-value-updates';
@@ -70,9 +70,7 @@ export class PatternNoteInput {
 		const keyboardNote = this.mapKeyboardKeyToNote(key);
 		if (keyboardNote) {
 			const noteStr = formatNoteFromEnum(keyboardNote.noteName, keyboardNote.octave);
-			let updatedPattern = PatternValueUpdates.updateFieldValue(context, fieldInfo, noteStr);
-			updatedPattern = this.autoEnterInstrument(context, fieldInfo, updatedPattern);
-			return { updatedPattern, shouldMoveNext: false };
+			return this.applyNoteToField(context, fieldInfo, noteStr);
 		}
 
 		if (this.isPianoKey(key)) {
@@ -88,12 +86,33 @@ export class PatternNoteInput {
 		if (this.LETTER_NOTE_MAP[upperKey]) {
 			const currentOctave = editorStateStore.octave;
 			const noteStr = formatNoteFromEnum(this.LETTER_NOTE_MAP[upperKey], currentOctave);
-			let updatedPattern = PatternValueUpdates.updateFieldValue(context, fieldInfo, noteStr);
-			updatedPattern = this.autoEnterInstrument(context, fieldInfo, updatedPattern);
-			return { updatedPattern, shouldMoveNext: false };
+			return this.applyNoteToField(context, fieldInfo, noteStr);
 		}
 
 		return null;
+	}
+
+	static handleMidiNoteInput(
+		context: EditingContext,
+		fieldInfo: FieldInfo,
+		midiNote: number
+	): { updatedPattern: Pattern; shouldMoveNext: boolean } | null {
+		if (fieldInfo.isGlobal || fieldInfo.channelIndex < 0) {
+			return null;
+		}
+		const noteStr = midiNoteToNoteString(midiNote);
+		if (!noteStr) return null;
+		return this.applyNoteToField(context, fieldInfo, noteStr);
+	}
+
+	private static applyNoteToField(
+		context: EditingContext,
+		fieldInfo: FieldInfo,
+		noteStr: string
+	): { updatedPattern: Pattern; shouldMoveNext: boolean } {
+		let updatedPattern = PatternValueUpdates.updateFieldValue(context, fieldInfo, noteStr);
+		updatedPattern = this.autoEnterInstrument(context, fieldInfo, updatedPattern);
+		return { updatedPattern, shouldMoveNext: false };
 	}
 
 	private static autoEnterInstrument(

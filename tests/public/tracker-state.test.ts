@@ -111,6 +111,12 @@ describe('TrackerState', () => {
 			state.setPatternOrder([0, 1, 0]);
 			expect(state.patternOrder).toEqual([0, 1, 0]);
 		});
+
+		it('sets loopPointId when provided', () => {
+			const state = new TrackerState();
+			state.setPatternOrder([0, 1, 2], 2);
+			expect(state.loopPointId).toBe(2);
+		});
 	});
 
 	describe('setTables', () => {
@@ -179,12 +185,26 @@ describe('TrackerState', () => {
 			expect(wrapped).toBe(true);
 		});
 
-		it('when pattern order reaches end, wraps to 0', () => {
+		it('when pattern order reaches end, wraps to loopPointId', () => {
 			const state = new TrackerState();
 			state.currentSpeed = 1;
 			state.currentPattern = { length: 2, channels: [] };
-			state.patternOrder = [0];
-			state.currentPatternOrderIndex = 0;
+			state.patternOrder = [0, 1, 2];
+			state.loopPointId = 1;
+			state.currentPatternOrderIndex = 2;
+			state.currentRow = 1;
+			state.currentTick = 1;
+			state.advancePosition();
+			expect(state.currentPatternOrderIndex).toBe(1);
+		});
+
+		it('falls back to 0 when loopPointId is invalid', () => {
+			const state = new TrackerState();
+			state.currentSpeed = 1;
+			state.currentPattern = { length: 2, channels: [] };
+			state.patternOrder = [0, 1, 2];
+			state.loopPointId = 99;
+			state.currentPatternOrderIndex = 2;
 			state.currentRow = 1;
 			state.currentTick = 1;
 			state.advancePosition();

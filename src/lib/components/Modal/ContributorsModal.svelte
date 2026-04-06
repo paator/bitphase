@@ -13,7 +13,7 @@
 		'Testers: phase-mod, Abyxus',
 		'Ayumi emulator by Peter Sovietov',
 		'Bitphase logo by Grongy',
-		'Special thanks to Otomata Labs, Megus, Jammer, Tygrys, spkr, e!ghtbm, Tomarkus, arabek, MmcM, nq, KK, AceMan, MaV, Jakim, LiSU, Volutar, MameXLIII',
+		'Special thanks to Otomata Labs, Megus, Jammer, Tygrys, spkr, e!ghtbm, Tomarkus, arabek, RuGrantez, MmcM, nq, KK, AceMan, MaV, Jakim, LiSU, Volutar, MameXLIII',
 		"and everyone else I've forgot to mention",
 		'Thank you for using Bitphase'
 	];
@@ -264,8 +264,7 @@
 			const charWidths = chars.map((c) => ctxRef.measureText(c).width);
 			const textWidthMain = charWidths.reduce((a, b) => a + b, 0);
 			const scrollCycleMain = textWidthMain + w;
-			const scrollOffsetMain =
-				((t / 1000) * SCROLLER_SPEED * PIXEL_SCALE) % scrollCycleMain;
+			const scrollOffsetMain = ((t / 1000) * SCROLLER_SPEED * PIXEL_SCALE) % scrollCycleMain;
 			const baseYMain = h - 14 * PIXEL_SCALE;
 			const phase = (t / 1000) * SCROLLER_WAVE_SPEED;
 			const amplitudeMain = SCROLLER_AMPLITUDE * PIXEL_SCALE;

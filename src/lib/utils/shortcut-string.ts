@@ -69,6 +69,7 @@ export class ShortcutString {
 
 	private static readonly KEY_DISPLAY_NAMES: Record<string, string> = {
 		' ': 'Space',
+		CapsLock: 'Caps Lock',
 		LMB: 'LMB',
 		MMB: 'MMB',
 		RMB: 'RMB'

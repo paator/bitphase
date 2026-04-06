@@ -26,6 +26,7 @@ export interface PatternCell {
 	index: number;
 	isDragging?: boolean;
 	orderIndexColor?: string;
+	isLoopMarker?: boolean;
 }
 
 const CONTRAST_DARK = '#1a1a1a';
@@ -85,6 +86,7 @@ export class PatternOrderRenderer extends BaseCanvasRenderer {
 		}
 
 		this.drawCellBackground(cell, cellY);
+		this.drawCellLoopMarkerAccent(cell, cellY);
 		this.drawCellText(cell, isEmpty);
 		this.drawCellEditingIndicator(cell, cellY);
 		this.drawCellSelectionIndicator(cell);
@@ -222,6 +224,15 @@ export class PatternOrderRenderer extends BaseCanvasRenderer {
 		this.restore();
 		this.setTextAlign('center');
 		this.setTextBaseline('middle');
+	}
+
+	private drawCellLoopMarkerAccent(cell: PatternCell, cellY: number): void {
+		if (!cell.isLoopMarker) return;
+
+		const markerColor = cell.orderIndexColor
+			? getContrastingTextColor(cell.orderIndexColor)
+			: this.orderColors.orderText;
+		this.fillRect(this.padding + 1, cellY + 1, 3, this.cellHeight - 2, markerColor);
 	}
 
 	drawScrollIndicators(hasMoreAbove: boolean, hasMoreBelow: boolean): void {

@@ -31,6 +31,7 @@
 		ACTION_OCTAVE_DOWN,
 		GLOBAL_ACTION_IDS
 	} from './lib/config/keybindings';
+	import { isEditableElement } from './lib/utils/shortcut-input-exclusion';
 	import { autobackupService } from './lib/services/backup/autobackup-service';
 	import { runAppBootstrap } from './lib/app-bootstrap';
 	import { createMenuActionHandler } from './lib/services/app/menu-action-handler';
@@ -237,13 +238,7 @@
 
 	function handleGlobalKeyDown(event: KeyboardEvent) {
 		if (event.defaultPrevented) return;
-		const target = event.target as HTMLElement;
-		if (
-			target?.closest?.('input, textarea') ||
-			target?.getAttribute?.('contenteditable') === 'true'
-		) {
-			return;
-		}
+		if (isEditableElement(event.target)) return;
 		const shortcut = ShortcutString.fromEvent(event);
 		const action = keybindingsStore.getActionForShortcut(shortcut);
 		if (action !== null && GLOBAL_ACTION_IDS.has(action)) {

@@ -48,6 +48,11 @@ class TrackerPatternProcessor {
 				continue;
 			}
 
+			const onOffHalted =
+				this.state.channelOnOffCounter[channelIndex] > 0 &&
+				!this.state.channelSoundEnabled[channelIndex];
+			if (onOffHalted) continue;
+
 			const table = this.state.getTable(tableIndex);
 			if (!table || !table.rows || table.rows.length === 0) {
 				this.state.channelCurrentNotes[channelIndex] = baseNote;

@@ -2,6 +2,8 @@ import type { Project } from '../../models/project';
 
 export interface RenderOptions {
 	separateChannels?: boolean;
+	startPatternOrderIndex?: number;
+	loopCount?: number;
 }
 
 export interface ChipRenderer {

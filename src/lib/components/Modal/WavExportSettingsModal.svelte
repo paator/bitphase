@@ -29,8 +29,10 @@
 		artist: project.author || ''
 	});
 
+	let repeatCount = $state(Math.max(0, settings.loops - 1));
+
 	function handleExport() {
-		resolve?.(settings);
+		resolve?.({ ...settings, loops: repeatCount + 1 });
 	}
 
 	function handleCancel() {
@@ -55,9 +57,9 @@
 
 		<FormField
 			id="loops"
-			label="Number of Loops"
-			description="How many times the song should loop in the exported file">
-			<RangeInput bind:value={settings.loops} min={1} max={10} step={1} />
+			label="Loop Repeats"
+			description="Additional repeats after first play (0 = no repeat)">
+			<RangeInput bind:value={repeatCount} min={0} max={9} step={1} />
 		</FormField>
 
 		<FormField
@@ -69,7 +71,7 @@
 				bind:value={settings.channelMode}
 				class="w-full cursor-pointer rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-2 py-1.5 text-xs text-[var(--color-app-text-primary)] focus:border-[var(--color-app-primary)] focus:outline-none"
 			>
-				{#each channelModeOptions as opt}
+				{#each channelModeOptions as opt (opt.value)}
 					<option value={opt.value}>{opt.label}</option>
 				{/each}
 			</select>

@@ -29,6 +29,7 @@
 	import { projectStore } from '../../stores/project.svelte';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
+	import { createPersistedResizableListHeight } from '../../utils/persisted-resizable-list-height.svelte';
 	import {
 		ITEM_ROW_HEIGHT,
 		ITEM_BUTTON_BAR_HEIGHT,
@@ -49,72 +50,25 @@
 	let tables = $derived(projectStore.tables);
 	const songs = $derived(projectStore.songs);
 
+	const tableListResize = createPersistedResizableListHeight({
+		storageKey: 'tableListHeight',
+		min: MIN_ITEM_LIST_HEIGHT,
+		max: MAX_ITEM_LIST_HEIGHT,
+		defaultHeight: DEFAULT_ITEM_LIST_HEIGHT
+	});
+
 	const tableGridRows = $derived.by(() =>
 		computeGridRows(
 			tables?.length ?? 0,
-			tableListHeight,
+			tableListResize.listHeight,
 			ITEM_ROW_HEIGHT,
 			ITEM_BUTTON_BAR_HEIGHT
 		)
 	);
 
-	const TABLE_LIST_HEIGHT_KEY = 'tableListHeight';
-
-	let tableListHeight = $state(
-		Math.min(
-			MAX_ITEM_LIST_HEIGHT,
-			Math.max(
-				MIN_ITEM_LIST_HEIGHT,
-				parseInt(localStorage.getItem(TABLE_LIST_HEIGHT_KEY) ?? '', 10) ||
-					DEFAULT_ITEM_LIST_HEIGHT
-			)
-		)
-	);
-
-	let isResizingTableList = $state(false);
-	let resizeStartY = $state(0);
-	let resizeStartHeight = $state(0);
-
-	function beginTableListResize(e: MouseEvent) {
-		e.preventDefault();
-		isResizingTableList = true;
-		resizeStartY = e.clientY;
-		resizeStartHeight = tableListHeight;
-	}
-
-	function handleTableListResizeMove(e: MouseEvent) {
-		if (!isResizingTableList) return;
-		const deltaY = e.clientY - resizeStartY;
-		const newHeight = Math.max(
-			MIN_ITEM_LIST_HEIGHT,
-			Math.min(MAX_ITEM_LIST_HEIGHT, resizeStartHeight + deltaY)
-		);
-		tableListHeight = newHeight;
-		localStorage.setItem(TABLE_LIST_HEIGHT_KEY, String(newHeight));
-	}
-
-	function endTableListResize() {
-		isResizingTableList = false;
-	}
-
-	$effect(() => {
-		if (!isResizingTableList) return;
-		document.body.style.cursor = 'ns-resize';
-		document.body.style.userSelect = 'none';
-		window.addEventListener('mousemove', handleTableListResizeMove);
-		window.addEventListener('mouseup', endTableListResize);
-		return () => {
-			document.body.style.cursor = '';
-			document.body.style.userSelect = '';
-			window.removeEventListener('mousemove', handleTableListResizeMove);
-			window.removeEventListener('mouseup', endTableListResize);
-		};
-	});
-
 	let asHex = $state(false);
 	let selectedTableIndex = $state(0);
 	let selectedTableRowIndices = $state<number[]>([]);
-	let tableEditor: TableEditor | null = $state(null);
 	let tableListScrollRef: HTMLDivElement | null = $state(null);
 
 	function compareTableIds(a: Table, b: Table): number {
@@ -124,8 +78,9 @@
 	function sortTablesAndSyncSelection(selectedId?: number): void {
 		const sorted = [...tables].sort(compareTableIds);
 		const needsSort = sorted.some((t, i) => t !== tables[i]);
-		if (!needsSort) return;
-		projectStore.tables = sorted;
+		if (needsSort) {
+			projectStore.tables = sorted;
+		}
 		if (selectedId !== undefined) {
 			const newIndex = sorted.findIndex((t) => t.id === selectedId);
 			if (newIndex >= 0) selectedTableIndex = newIndex;
@@ -172,6 +127,7 @@
 		);
 		projectStore.tables = [...tables, newTable];
 		sortTablesAndSyncSelection(newId);
+		editorStateStore.setCurrentTable(newId);
 		services.audioService.updateTables(projectStore.tables);
 		await tick();
 		tableListScrollRef
@@ -197,7 +153,8 @@
 		const copy = new TableModel(newId, [...table.rows], table.loop, table.name + ' (Copy)');
 		projectStore.tables = [...tables, copy];
 		sortTablesAndSyncSelection(newId);
-		services.audioService.updateTables(tables);
+		editorStateStore.setCurrentTable(newId);
+		services.audioService.updateTables(projectStore.tables);
 		await tick();
 		tableListScrollRef
 			?.querySelector(`[data-table-index="${selectedTableIndex}"]`)
@@ -354,7 +311,7 @@
 		{#snippet children()}
 			<div
 				class="flex shrink-0 flex-col border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
-				style="height: {tableListHeight}px">
+				style="height: {tableListResize.listHeight}px">
 				<div
 					class="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden"
 					bind:this={tableListScrollRef}>
@@ -481,14 +438,14 @@
 			</div>
 
 			<div
-				class="flex shrink-0 cursor-ns-resize items-center justify-center border-y border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] py-1 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)] {isResizingTableList
+				class="flex shrink-0 cursor-ns-resize items-center justify-center border-y border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] py-1 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)] {tableListResize.isResizing
 					? 'bg-[var(--color-app-surface-hover)]'
 					: ''}"
 				role="button"
 				tabindex="0"
 				aria-label="Drag to resize table list"
 				title="Drag to resize table list"
-				onmousedown={beginTableListResize}>
+				onmousedown={tableListResize.beginResize}>
 				<IconCarbonArrowsVertical class="h-3 w-3" />
 			</div>
 
@@ -496,7 +453,6 @@
 				{#if tables[selectedTableIndex]}
 					{#key tables[selectedTableIndex].id}
 						<TableEditor
-							bind:this={tableEditor}
 							table={tables[selectedTableIndex]}
 							{asHex}
 							{isExpanded}

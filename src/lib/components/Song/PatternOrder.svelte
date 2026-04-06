@@ -39,6 +39,7 @@
 
 	const patternOrder = $derived(projectStore.patternOrder);
 	const patternOrderColors = $derived(projectStore.patternOrderColors);
+	const loopPointId = $derived(projectStore.loopPointId);
 
 	const patternsRecord = $derived.by(() => {
 		const record: Record<number, Pattern> = {};
@@ -69,6 +70,7 @@
 
 	let lastDrawnOrderIndex = -1;
 	let lastPatternOrderLength = -1;
+	let lastLoopPointId = -1;
 	let lastHoveredIndex: number | null = null;
 	let lastCanvasHeight = -1;
 	let needsSetup = true;
@@ -82,6 +84,7 @@
 			needsSetup = false;
 			lastDrawnOrderIndex = currentPatternOrderIndex;
 			lastPatternOrderLength = patternOrder.length;
+			lastLoopPointId = loopPointId;
 			lastCanvasHeight = canvasHeight;
 			draw();
 			return;
@@ -92,7 +95,8 @@
 		const orderChanged =
 			currentPatternOrderIndex !== lastDrawnOrderIndex ||
 			patternOrder.length !== lastPatternOrderLength ||
-			sizeChanged;
+			sizeChanged ||
+			loopPointId !== lastLoopPointId;
 
 		if (sizeChanged) {
 			setupCanvas();
@@ -101,6 +105,7 @@
 		if (orderChanged || colorsChanged) {
 			lastDrawnOrderIndex = currentPatternOrderIndex;
 			lastPatternOrderLength = patternOrder.length;
+			lastLoopPointId = loopPointId;
 			lastCanvasHeight = canvasHeight;
 			draw();
 			lastHoveredIndex = hoveredIndex;
@@ -187,6 +192,36 @@
 		projectStore.patternOrderColors = next;
 	}
 
+	function adjustLoopPointAfterRemove(removedIndex: number, newLength: number): void {
+		const lp = projectStore.loopPointId;
+		if (lp < removedIndex) return;
+		if (lp > removedIndex) {
+			projectStore.loopPointId = lp - 1;
+			return;
+		}
+		projectStore.loopPointId = Math.min(removedIndex, Math.max(0, newLength - 1));
+	}
+
+	function adjustLoopPointAfterAdd(insertedIndex: number): void {
+		if (projectStore.loopPointId >= insertedIndex) {
+			projectStore.loopPointId++;
+		}
+	}
+
+	function adjustLoopPointAfterMove(fromIndex: number, toIndex: number): void {
+		if (fromIndex === toIndex) return;
+		const lp = projectStore.loopPointId;
+		if (lp === fromIndex) {
+			projectStore.loopPointId = toIndex;
+			return;
+		}
+		if (fromIndex < toIndex) {
+			if (lp > fromIndex && lp <= toIndex) projectStore.loopPointId = lp - 1;
+		} else if (lp >= toIndex && lp < fromIndex) {
+			projectStore.loopPointId = lp + 1;
+		}
+	}
+
 	function getVisibleRange() {
 		const visibleCount = Math.floor(canvasHeight / CELL_HEIGHT);
 		const halfVisible = Math.floor(visibleCount / 2);
@@ -232,7 +267,8 @@
 				editingValue: editingPatternValue,
 				index: i,
 				isDragging: isDraggingThis,
-				orderIndexColor: patternOrderColors[i]
+				orderIndexColor: patternOrderColors[i],
+				isLoopMarker: i === loopPointId
 			});
 		}
 
@@ -332,6 +368,7 @@
 			);
 			projectStore.patternOrder = result.newPatternOrder;
 			moveColor(draggedIndex, dropTargetIndex);
+			adjustLoopPointAfterMove(draggedIndex, dropTargetIndex);
 
 			if (currentPatternOrderIndex === draggedIndex) {
 				currentPatternOrderIndex = dropTargetIndex;
@@ -391,11 +428,12 @@
 			} else if (key >= '0' && key <= '9') {
 				if (editingPatternValue.length < 2) {
 					editingPatternValue += key;
+					applyPatternEditValue(editingPatternValue);
 					if (editingPatternValue.length === 2) {
-						finishPatternEdit();
-					} else {
-						draw();
+						editingPatternIndex = null;
+						editingPatternValue = '';
 					}
+					draw();
 				}
 			} else if (key === 'Backspace') {
 				editingPatternValue = editingPatternValue.slice(0, -1);
@@ -413,30 +451,34 @@
 		}
 	}
 
+	function applyPatternEditValue(value: string): void {
+		if (editingPatternIndex === null || value === '') return;
+
+		const displayedValue = value.padStart(2, '0');
+		const newId = parseInt(displayedValue);
+
+		const result = PatternService.setPatternIdInOrderMultiChip(
+			projectStore.patterns,
+			patternOrder,
+			editingPatternIndex,
+			newId,
+			(songIndex) => projectStore.songs[songIndex]?.getSchema(),
+			(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels()
+		);
+
+		if (result) {
+			result.newPatternsPerSong.forEach((newPatterns, songIndex) => {
+				projectStore.updatePatterns(songIndex, newPatterns);
+			});
+			projectStore.patternOrder = result.newPatternOrder;
+			onPatternOrderEdited?.();
+		}
+	}
+
 	function finishPatternEdit(): void {
 		if (editingPatternIndex === null) return;
 
-		if (editingPatternValue !== '') {
-			const displayedValue = editingPatternValue.padStart(2, '0');
-			const newId = parseInt(displayedValue);
-
-			const result = PatternService.setPatternIdInOrderMultiChip(
-				projectStore.patterns,
-				patternOrder,
-				editingPatternIndex,
-				newId,
-				(songIndex) => projectStore.songs[songIndex]?.getSchema(),
-				(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels()
-			);
-
-			if (result) {
-				result.newPatternsPerSong.forEach((newPatterns, songIndex) => {
-					projectStore.updatePatterns(songIndex, newPatterns);
-				});
-				projectStore.patternOrder = result.newPatternOrder;
-				onPatternOrderEdited?.();
-			}
-		}
+		applyPatternEditValue(editingPatternValue);
 
 		editingPatternIndex = null;
 		editingPatternValue = '';
@@ -592,6 +634,7 @@
 		});
 		projectStore.patternOrder = result.newPatternOrder;
 		shiftColorsAfterAdd(result.insertIndex);
+		adjustLoopPointAfterAdd(result.insertIndex);
 		currentPatternOrderIndex = result.insertIndex;
 		selectedRow = 0;
 		onPatternSelect?.(result.insertIndex);
@@ -604,6 +647,7 @@
 
 		projectStore.patternOrder = result.newPatternOrder;
 		shiftColorsAfterRemove(index);
+		adjustLoopPointAfterRemove(index, result.newPatternOrder.length);
 
 		currentPatternOrderIndex = PatternService.calculateAdjustedIndex(
 			currentPatternOrderIndex,
@@ -631,6 +675,7 @@
 		});
 		projectStore.patternOrder = result.newPatternOrder;
 		shiftColorsAfterAdd(result.insertIndex);
+		adjustLoopPointAfterAdd(result.insertIndex);
 		currentPatternOrderIndex = result.insertIndex;
 		selectedRow = 0;
 		onPatternSelect?.(result.insertIndex);
@@ -705,6 +750,18 @@
 		const index = contextMenuPatternIndex;
 		closeContextMenu();
 
+		if (data.action === 'loop-set') {
+			projectStore.loopPointId = index;
+			draw();
+			return;
+		}
+
+		if (data.action === 'loop-clear') {
+			projectStore.loopPointId = 0;
+			draw();
+			return;
+		}
+
 		if (data.action === 'color-clear') {
 			const next = { ...patternOrderColors };
 			delete next[index];
@@ -746,7 +803,15 @@
 	}
 
 	const contextMenuItems = $derived.by((): MenuItem[] => {
+		const hideLoopMenuItem = contextMenuPatternIndex === 0 && loopPointId === 0;
+		const loopMenuItem: MenuItem | null =
+			hideLoopMenuItem
+				? null
+				: contextMenuPatternIndex !== null && contextMenuPatternIndex === loopPointId
+					? { label: 'Clear loop marker', type: 'normal', action: 'loop-clear' }
+					: { label: 'Set loop marker', type: 'normal', action: 'loop-set' };
 		const base: MenuItem[] = [
+			...(loopMenuItem ? [loopMenuItem] : []),
 			{ label: 'Make Unique', type: 'normal', action: 'make-unique' },
 			{ label: 'Delete', type: 'normal', action: 'delete', disabled: () => !canRemove },
 			{ label: 'Add', type: 'normal', action: 'add' },

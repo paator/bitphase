@@ -33,6 +33,7 @@ export const ACTION_END_COLUMN = 'end-column';
 export const ACTION_OCTAVE_UP = 'octave-up';
 export const ACTION_OCTAVE_DOWN = 'octave-down';
 export const ACTION_SELECT_INSTRUMENT_OR_TABLE_IN_EDITOR = 'select-instrument-or-table-in-editor';
+export const ACTION_PLAY_SOLO = 'play-solo';
 
 export interface BindableAction {
 	id: string;
@@ -103,7 +104,8 @@ export const BINDABLE_ACTIONS: BindableAction[] = [
 		id: ACTION_SELECT_INSTRUMENT_OR_TABLE_IN_EDITOR,
 		label: 'Select instrument or table in editor',
 		defaultShortcut: 'Mod+LMB'
-	}
+	},
+	{ id: ACTION_PLAY_SOLO, label: 'Play solo / Unmute all', defaultShortcut: 'F8' }
 ];
 
 export const GLOBAL_ACTION_IDS = new Set([

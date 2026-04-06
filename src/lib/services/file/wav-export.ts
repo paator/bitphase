@@ -260,42 +260,18 @@ class WavExportService {
 
 		onProgress?.(progressStart + 5, `Rendering song ${songIndex + 1}/${totalSongs}...`);
 
-		const loopedChannels: Float32Array[][] = [];
-
-		for (let loop = 0; loop < loops; loop++) {
-			const channels = await renderer.render(
-				project,
-				songIndex,
-				(progress, message) => {
-					const loopProgress = loop / loops + progress / 100 / loops;
-					const mappedProgress =
-						progressStart + 5 + loopProgress * (progressEnd - progressStart - 5);
-					const loopInfo = loops > 1 ? ` (loop ${loop + 1}/${loops})` : '';
-					onProgress?.(mappedProgress, `Song ${songIndex + 1}/${totalSongs}${loopInfo}: ${message}`);
-				},
-				{ separateChannels: separateChannels ?? false }
-			);
-			loopedChannels.push(channels);
-		}
-
-		const totalLength = loopedChannels.reduce(
-			(sum, channels) => sum + channels[0].length,
-			0
-		);
-		const numChannels = loopedChannels[0].length;
-		const result: Float32Array[] = [];
-
-		for (let ch = 0; ch < numChannels; ch++) {
-			const combined = new Float32Array(totalLength);
-			let offset = 0;
-			for (const channels of loopedChannels) {
-				combined.set(channels[ch], offset);
-				offset += channels[ch].length;
+		return renderer.render(
+			project,
+			songIndex,
+			(progress, message) => {
+				const mappedProgress = progressStart + 5 + (progress / 100) * (progressEnd - progressStart - 5);
+				onProgress?.(mappedProgress, `Song ${songIndex + 1}/${totalSongs}: ${message}`);
+			},
+			{
+				separateChannels: separateChannels ?? false,
+				loopCount: loops
 			}
-			result.push(combined);
-		}
-
-		return result;
+		);
 	}
 
 	private async buildSeparateChannels(

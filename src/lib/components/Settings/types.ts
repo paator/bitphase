@@ -2,6 +2,7 @@ export interface Settings {
 	volume: number;
 	envelopeAsNote: boolean;
 	autoEnterInstrument: boolean;
+	midiInputDeviceId: string;
 	patternEditorFontSize: number;
 	patternEditorFontFamily: string;
 	uiFontFamily: string;

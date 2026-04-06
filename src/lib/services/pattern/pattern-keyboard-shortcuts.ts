@@ -23,6 +23,7 @@ import {
 	ACTION_CYCLE_CHANNEL,
 	ACTION_SWAP_CHANNEL_LEFT,
 	ACTION_SWAP_CHANNEL_RIGHT,
+	ACTION_PLAY_SOLO,
 	ACTION_PAGE_UP,
 	ACTION_PAGE_DOWN,
 	ACTION_HOME,
@@ -69,6 +70,7 @@ export interface PatternKeyboardShortcutsContext {
 	) => void;
 	onSwapChannelLeft: () => void;
 	onSwapChannelRight: () => void;
+	onToggleSolo?: () => void;
 	selectionStartRow: number | null;
 	selectionStartColumn: number | null;
 	selectionEndRow: number | null;
@@ -177,6 +179,9 @@ function dispatchCommandAction(
 			if (!ctx.isPlaying) {
 				ctx.onSwapChannelRight();
 			}
+			return true;
+		case ACTION_PLAY_SOLO:
+			ctx.onToggleSolo?.();
 			return true;
 		case ACTION_PAGE_UP:
 			if (!ctx.isPlaying) {

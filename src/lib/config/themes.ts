@@ -156,7 +156,7 @@ export const BUILTIN_THEMES: Theme[] = [
 			patternEnvelope: '#0f380f',
 			patternNoise: '#0f380f',
 			patternSelected: '#306230',
-			patternCellSelected: '#306230',
+			patternCellSelected: '#8bac0f',
 			patternRowNum: '#0f380f',
 			patternAlternate: '#8bac0f',
 			patternAlternateEmpty: '#8bac0f',

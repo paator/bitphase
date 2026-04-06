@@ -28,10 +28,7 @@ async function loadDemoProject(btpFilename: string) {
 	return FileImportService.reconstructFromJsonAsync(text);
 }
 
-async function assertPSGMatchesReference(
-	btpFilename: string,
-	psgFilename: string
-): Promise<void> {
+async function assertPSGMatchesReference(btpFilename: string, psgFilename: string): Promise<void> {
 	const project = await loadDemoProject(btpFilename);
 	const generated = await generatePSGBuffer(project, 0, {
 		modules: psgProcessorModules
@@ -52,5 +49,9 @@ describe('PSG playback regression', () => {
 
 	it('frozen_over: dynamically generated PSG matches reference dump', async () => {
 		await assertPSGMatchesReference('frozen_over.btp', 'frozen_over.psg');
+	});
+
+	it('man: dynamically generated PSG matches reference dump', async () => {
+		await assertPSGMatchesReference('man.btp', 'man.psg');
 	});
 });

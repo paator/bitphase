@@ -22,6 +22,7 @@ export class AudioService {
 	public chipSettings: ChipSettings = new ChipSettings();
 	private _masterGainNode: GainNode | null = null;
 	private _playPatternRestoreOrder: number[] | null = null;
+	private _playPatternRestoreLoopPointId = 0;
 	private _playPatternId: number | null = null;
 
 	//for example 1x FM chip processor, 2x AY chip processors for TSFM track
@@ -158,20 +159,22 @@ export class AudioService {
 		});
 
 		if (this._playPatternRestoreOrder) {
-			this.updateOrder(this._playPatternRestoreOrder);
+			this.updateOrder(this._playPatternRestoreOrder, this._playPatternRestoreLoopPointId);
 			this._playPatternRestoreOrder = null;
+			this._playPatternRestoreLoopPointId = 0;
 			this._playPatternId = null;
 		}
 	}
 
-	updateOrder(order: number[]) {
+	updateOrder(order: number[], loopPointId: number) {
 		this.chipProcessors.forEach((chipProcessor) => {
-			chipProcessor.updateOrder(order);
+			chipProcessor.updateOrder(order, loopPointId);
 		});
 	}
 
-	setPlayPatternRestoreOrder(order: number[], patternId: number) {
+	setPlayPatternRestoreOrder(order: number[], patternId: number, loopPointId: number) {
 		this._playPatternRestoreOrder = order;
+		this._playPatternRestoreLoopPointId = loopPointId;
 		this._playPatternId = patternId;
 	}
 

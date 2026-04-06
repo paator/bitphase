@@ -295,6 +295,14 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				return;
 			}
 
+			if (data.action === 'export-psg-zip') {
+				await ctx.open(ProgressModal, {
+					project: ctx.getCurrentProject(),
+					exportType: 'psg'
+				});
+				return;
+			}
+
 			if (data.action === 'export-sndh') {
 				await ctx.open(ProgressModal, {
 					project: ctx.getCurrentProject(),
