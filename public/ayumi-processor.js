@@ -627,7 +627,10 @@ class AyumiProcessor extends AudioWorkletProcessor {
 	handleTimerEvent() {
 		for (let c = 0; c < 3; c++) {
 			let outVal = this.timerOutput[c] ? this.channelVol[c] & 0x0f : 0;
-			if (!this.timerEnabled[c]) outVal = this.channelVol[c];
+			if (!this.timerEnabled[c]) {
+				outVal = this.channelVol[c];
+				continue;
+			}
 			if (!(this.channelVol[c] & 0x10))
 				this.state.wasmModule.ayumi_set_volume(this.state.ayumiPtr, c, outVal);
 			if (this.channelVol[c] & 0x10 && this.timerUpdate[c])
