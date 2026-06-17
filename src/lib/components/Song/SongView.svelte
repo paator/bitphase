@@ -37,6 +37,7 @@
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { isEditableElement } from '../../utils/shortcut-input-exclusion';
 	import { ACTION_REDO, ACTION_TOGGLE_PLAYBACK, ACTION_UNDO } from '../../config/keybindings';
+	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
 
 	let {
 		chipProcessors,
@@ -134,7 +135,6 @@
 	const blurredContentClass = $derived(
 		isRightPanelExpanded ? 'pointer-events-none opacity-50' : ''
 	);
-	const firstChipProcessor = $derived(chipProcessors[0]);
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
 
 	const services: { audioService: AudioService } = getContext('container');
@@ -345,7 +345,9 @@
 				withTuningTables.sendInitTuningTable(song.tuningTable);
 			}
 			if ('sendInitInstruments' in chipProcessor && withInstruments.sendInitInstruments) {
-				withInstruments.sendInitInstruments(projectStore.instruments);
+				withInstruments.sendInitInstruments(
+					filterInstrumentsForChip(projectStore.instruments, chipProcessor.chip.type)
+				);
 			}
 		});
 
@@ -662,10 +664,10 @@
 						{#if tabId === 'tables'}
 							<TablesView bind:isExpanded={isRightPanelExpanded} />
 						{:else if tabId === 'instruments'}
-							{#if firstChipProcessor}
+							{#if activeChipProcessor}
 								<InstrumentsView
 									bind:isExpanded={isRightPanelExpanded}
-									chip={firstChipProcessor.chip} />
+									chip={activeChipProcessor.chip} />
 							{/if}
 						{:else if tabId === 'details'}
 							<DetailsView

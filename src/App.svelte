@@ -132,10 +132,7 @@
 
 			const backup = await autobackupService.getAutobackup();
 			if (backup) {
-				container.audioService.clearChipProcessors();
-				for (const _ of backup.songs) {
-					await container.audioService.addChipProcessor(AY_CHIP);
-				}
+				await projectService.restoreChipProcessorsForSongs(backup.songs);
 				syncChipProcessors();
 				ProjectService.ensureChipSettingsConsistency(backup.songs);
 				projectStore.applyProject(backup);

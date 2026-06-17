@@ -10,6 +10,7 @@ import type { CatchUpSegment } from './play-from-position';
 import { channelMuteStore } from '../../stores/channel-mute.svelte';
 import { waveformStore } from '../../stores/waveform.svelte';
 import { playbackToneDebugStore } from '../../stores/playback-tone-debug.svelte';
+import { filterInstrumentsForChip } from '../instrument/instrument-filter';
 
 import type { Pattern } from '../../models/song';
 
@@ -313,8 +314,9 @@ export class AudioService {
 	updateInstruments(instruments: import('../../models/song').Instrument[]) {
 		this.chipProcessors.forEach((chipProcessor) => {
 			if ('sendInitInstruments' in chipProcessor) {
+				const chipInstruments = filterInstrumentsForChip(instruments, chipProcessor.chip.type);
 				(chipProcessor as { sendInitInstruments: (i: typeof instruments) => void }).sendInitInstruments(
-					instruments
+					chipInstruments
 				);
 			}
 		});

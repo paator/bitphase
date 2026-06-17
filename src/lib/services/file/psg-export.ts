@@ -11,6 +11,7 @@ import {
 	TONE_CHANNELS,
 	type SongCaptureFrame
 } from './ay-export-utils';
+import { filterInstrumentsForChip } from '../instrument/instrument-filter';
 
 const DEFAULT_SPEED = 6;
 
@@ -242,7 +243,7 @@ class PsgExportService {
 
 		const state = new AyumiState(totalChannelCount);
 		state.setTuningTable(song.tuningTable);
-		state.setInstruments(project.instruments);
+		state.setInstruments(filterInstrumentsForChip(project.instruments, song.chipType ?? 'ay'));
 		state.setTables(project.tables);
 		state.setPatternOrder(project.patternOrder || [0]);
 		state.setSpeed(song.initialSpeed || DEFAULT_SPEED);

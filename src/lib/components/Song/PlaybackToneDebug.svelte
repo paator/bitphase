@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
 	import type { ChipProcessor } from '../../chips/base/processor';
-	import { formatToneFrequencyHz } from '../../chips/ay/tone-frequency';
-	import {
-		AY_REGISTER_COUNT,
-		DEFAULT_AY_REGISTERS
-	} from '../../services/file/ay-export-utils';
-	import { AY_REGISTER_NAMES, formatTimerFrequencyHz } from '../../services/file/tmr-parser';
+	import type {
+		ChipPlaybackDebugSpec,
+		PlaybackDebugMetricIcon,
+		PlaybackDebugMetricSpec
+	} from '../../chips/base/playback-debug';
 	import { playbackToneDebugStore } from '../../stores/playback-tone-debug.svelte';
+	import type { ChipPlaybackHzState } from '../../stores/playback-tone-debug.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import IconCarbonActivity from '~icons/carbon/activity';
 	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
@@ -17,57 +17,32 @@
 
 	type ChannelColumn = {
 		label: string;
-		toneHz: number | null;
-		sidHz: number | null;
-		syncHz: number | null;
+		channelIndex: number;
 	};
 
-	type MetricRow = {
-		key: string;
-		label: string;
-		accentClass: string;
-		icon: Component<{ class?: string }>;
-		readHz: (column: ChannelColumn) => number | null;
-		formatHz: (hz: number | null) => string;
+	type ChipDebugSection = {
+		chipIndex: number;
+		chipName: string;
+		showChipName: boolean;
+		debugSpec: ChipPlaybackDebugSpec;
+		columns: ChannelColumn[];
+		playbackHz: ChipPlaybackHzState | undefined;
 	};
 
-	type ChipRegisterRow = {
-		chipLabel: string | null;
-		registers: readonly number[];
+	const metricIcons: Record<PlaybackDebugMetricIcon, Component<{ class?: string }>> = {
+		tone: IconCarbonMusic,
+		sid: IconCarbonChartWinLoss,
+		sync: IconCarbonActivity
 	};
 
-	const metrics: MetricRow[] = [
-		{
-			key: 'tone',
-			label: 'Tone',
-			icon: IconCarbonMusic,
-			accentClass: 'text-[var(--color-pattern-note)]',
-			readHz: (column) => column.toneHz,
-			formatHz: formatToneFrequencyHz
-		},
-		{
-			key: 'sid',
-			label: 'SID/PWM',
-			icon: IconCarbonChartWinLoss,
-			accentClass: 'text-[var(--color-pattern-instrument)]',
-			readHz: (column) => column.sidHz,
-			formatHz: (hz) => (hz === null || hz <= 0 ? '—' : formatTimerFrequencyHz(hz))
-		},
-		{
-			key: 'sync',
-			label: 'Syncbuzzer',
-			icon: IconCarbonActivity,
-			accentClass: 'text-[var(--color-pattern-envelope)]',
-			readHz: (column) => column.syncHz,
-			formatHz: (hz) => (hz === null || hz <= 0 ? '—' : formatTimerFrequencyHz(hz))
-		}
-	];
-
-	const columns = $derived.by((): ChannelColumn[] => {
+	const chipSections = $derived.by((): ChipDebugSection[] => {
 		const multiSong = projectStore.songs.length > 1;
-		const result: ChannelColumn[] = [];
+		const sections: ChipDebugSection[] = [];
 
-		chipProcessors.forEach((_processor, chipIndex) => {
+		chipProcessors.forEach((processor, chipIndex) => {
+			const debugSpec = processor.chip.playbackDebug;
+			if (!debugSpec) return;
+
 			const song = projectStore.songs[chipIndex];
 			if (!song) return;
 
@@ -80,33 +55,26 @@
 				playbackHz?.syncbuzzerTimerHz.length ?? 0
 			);
 
+			const columns: ChannelColumn[] = [];
 			for (let channelIndex = 0; channelIndex < count; channelIndex++) {
 				const baseLabel = labels[channelIndex] ?? String(channelIndex + 1);
-				result.push({
+				columns.push({
 					label: multiSong ? `${chipIndex + 1}${baseLabel}` : baseLabel,
-					toneHz: playbackHz?.toneHz[channelIndex] ?? null,
-					sidHz: playbackHz?.sidTimerHz[channelIndex] ?? null,
-					syncHz: playbackHz?.syncbuzzerTimerHz[channelIndex] ?? null
+					channelIndex
 				});
 			}
+
+			sections.push({
+				chipIndex,
+				chipName: processor.chip.name,
+				showChipName: multiSong,
+				debugSpec,
+				columns,
+				playbackHz
+			});
 		});
 
-		return result;
-	});
-
-	const chipRegisterRows = $derived.by((): ChipRegisterRow[] => {
-		const multiSong = projectStore.songs.length > 1;
-
-		return chipProcessors.map((_processor, chipIndex) => {
-			const stored = playbackToneDebugStore.allChipPlaybackHz[chipIndex]?.registers;
-			const registers =
-				stored?.length === AY_REGISTER_COUNT ? stored : DEFAULT_AY_REGISTERS;
-
-			return {
-				chipLabel: multiSong ? `${chipIndex + 1}` : null,
-				registers
-			};
-		});
+		return sections;
 	});
 
 	function hzCellClass(hz: number | null, accentClass: string): string {
@@ -119,68 +87,95 @@
 	function formatRegisterByte(value: number): string {
 		return (value & 0xff).toString(16).toUpperCase().padStart(2, '0');
 	}
+
+	function readMetricHz(
+		metric: PlaybackDebugMetricSpec,
+		playbackHz: ChipPlaybackHzState | undefined,
+		channelIndex: number
+	): number | null {
+		return metric.readHz(playbackHz, channelIndex);
+	}
 </script>
 
-{#if chipProcessors.length > 0}
+{#if chipSections.length > 0}
 	<div class="shrink-0 px-2 pb-1 pt-0.5">
 		<div
 			class="overflow-hidden rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]">
 			<div class="overflow-x-auto px-1.5 py-1 font-sans text-[11px] leading-tight">
-				{#if columns.length > 0}
+				{#each chipSections as section (section.chipIndex)}
 					<div
-						class="grid min-w-max gap-x-0.5 gap-y-0"
-						style="grid-template-columns: 6.25rem repeat({columns.length}, minmax(3.25rem, 1fr));">
-						<div></div>
-						{#each columns as column (column.label)}
-							<div
-								class="truncate px-0.5 text-center font-semibold text-[var(--color-pattern-note)]">
-								{column.label}
-							</div>
-						{/each}
-
-						{#each metrics as metric (metric.key)}
-							<div class="flex items-center gap-0.5 px-0.5 text-[var(--color-app-text-muted)]">
-								<metric.icon class="h-3 w-3 shrink-0 {metric.accentClass}" />
-								<span class="whitespace-nowrap">{metric.label}</span>
-							</div>
-							{#each columns as column (metric.key + column.label)}
-								{@const hz = metric.readHz(column)}
-								<div class="px-0.5 text-center {hzCellClass(hz, metric.accentClass)}">
-									{metric.formatHz(hz)}
-								</div>
-							{/each}
-						{/each}
-					</div>
-				{/if}
-
-				{#each chipRegisterRows as row, rowIndex (row.chipLabel ?? rowIndex)}
-					<div
-						class="min-w-max {columns.length > 0 || rowIndex > 0
+						class={section.chipIndex > 0
 							? 'mt-1 border-t border-[var(--color-app-border)]/60 pt-1'
-							: ''}">
-						<div
-							class="grid gap-x-0.5 gap-y-0"
-							style="grid-template-columns: {row.chipLabel ? '1.25rem ' : ''}repeat({AY_REGISTER_COUNT}, minmax(1.625rem, 1fr));">
-							{#if row.chipLabel}
-								<div class="row-span-2 self-center px-0.5 text-[var(--color-app-text-muted)]">
-									{row.chipLabel}
-								</div>
-							{/if}
-							{#each Array.from({ length: AY_REGISTER_COUNT }, (_, regIndex) => regIndex) as regIndex (regIndex)}
+							: ''}>
+						{#if section.showChipName}
+							<div
+								class="mb-0.5 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-app-text-muted)]">
+								{section.chipName}
+							</div>
+						{/if}
+
+						{#if section.columns.length > 0}
+							<div
+								class="grid min-w-max gap-x-0.5 gap-y-0"
+								style="grid-template-columns: 6.25rem repeat({section.columns.length}, minmax(3.25rem, 1fr));">
+								<div></div>
+								{#each section.columns as column (column.label)}
+									<div
+										class="truncate px-0.5 text-center font-semibold text-[var(--color-pattern-note)]">
+										{column.label}
+									</div>
+								{/each}
+
+								{#each section.debugSpec.metrics as metric (metric.key)}
+									{@const MetricIcon = metricIcons[metric.icon]}
+									<div
+										class="flex items-center gap-0.5 px-0.5 text-[var(--color-app-text-muted)]">
+										<MetricIcon class="h-3 w-3 shrink-0 {metric.accentClass}" />
+										<span class="whitespace-nowrap">{metric.label}</span>
+									</div>
+									{#each section.columns as column (metric.key + column.label)}
+										{@const hz = readMetricHz(
+											metric,
+											section.playbackHz,
+											column.channelIndex
+										)}
+										<div class="px-0.5 text-center {hzCellClass(hz, metric.accentClass)}">
+											{metric.formatHz(hz)}
+										</div>
+									{/each}
+								{/each}
+							</div>
+						{/if}
+
+						{#if section.debugSpec.registers}
+							{@const registerSpec = section.debugSpec.registers}
+							{@const registers = registerSpec.normalizeRegisters(
+								section.playbackHz?.registers
+							)}
+							<div
+								class={section.columns.length > 0
+									? 'mt-1 border-t border-[var(--color-app-border)]/40 pt-1'
+									: ''}>
 								<div
-									class="px-0.5 text-center text-[var(--color-app-text-muted)]"
-									title={AY_REGISTER_NAMES[regIndex]}>
-									{regIndex}
+									class="grid gap-x-0.5 gap-y-0"
+									style="grid-template-columns: repeat({registerSpec.count}, minmax(1.625rem, 1fr));">
+									{#each Array.from({ length: registerSpec.count }, (_, regIndex) => regIndex) as regIndex (regIndex)}
+										<div
+											class="px-0.5 text-center text-[var(--color-app-text-muted)]"
+											title={registerSpec.names[regIndex]}>
+											{regIndex}
+										</div>
+									{/each}
+									{#each Array.from({ length: registerSpec.count }, (_, regIndex) => regIndex) as regIndex (regIndex + 'v')}
+										<div
+											class="px-0.5 text-center tabular-nums text-[var(--color-pattern-effect)]"
+											title={registerSpec.names[regIndex]}>
+											{formatRegisterByte(registers[regIndex] ?? 0)}
+										</div>
+									{/each}
 								</div>
-							{/each}
-							{#each Array.from({ length: AY_REGISTER_COUNT }, (_, regIndex) => regIndex) as regIndex (regIndex + 'v')}
-								<div
-									class="px-0.5 text-center tabular-nums text-[var(--color-pattern-effect)]"
-									title={AY_REGISTER_NAMES[regIndex]}>
-									{formatRegisterByte(row.registers[regIndex] ?? 0)}
-								</div>
-							{/each}
-						</div>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>

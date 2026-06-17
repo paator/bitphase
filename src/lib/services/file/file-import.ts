@@ -191,7 +191,13 @@ function reconstructInstrument(data: any): Instrument {
 		const numId = data.id ?? 1;
 		id = numId.toString(36).toUpperCase().padStart(2, '0');
 	}
-	const instrument = new Instrument(id, [], data.loop ?? 0, data.name ?? '');
+	const instrument = new Instrument(
+		id,
+		[],
+		data.loop ?? 0,
+		data.name ?? '',
+		typeof data.chipType === 'string' ? data.chipType : 'ay'
+	);
 	if (data.rows) {
 		instrument.rows = data.rows.map((rowData: any) => reconstructInstrumentRow(rowData));
 	}

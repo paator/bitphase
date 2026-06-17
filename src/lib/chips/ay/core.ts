@@ -4,6 +4,8 @@ import { AYFormatter } from './formatter';
 import { AYChipRenderer } from './renderer';
 import { AY_CHIP_SCHEMA } from './schema';
 import { AYUMI_AUDIO_SLOT_KIND } from './audio-slot-kind';
+import { AY_PLAYBACK_DEBUG } from './playback-debug';
+import { copyAyInstrumentFields } from './instrument';
 import type { Chip } from '../types';
 
 export const AY_CHIP: Chip = {
@@ -17,7 +19,9 @@ export const AY_CHIP: Chip = {
 	createFormatter: () => new AYFormatter(),
 	createRenderer: (loader, binding) => new AYChipRenderer(loader, binding),
 	instrumentEditor: undefined,
-	previewRow: undefined
+	previewRow: undefined,
+	playbackDebug: AY_PLAYBACK_DEBUG,
+	copyInstrumentFields: copyAyInstrumentFields
 };
 
 export const CHIP = AY_CHIP;

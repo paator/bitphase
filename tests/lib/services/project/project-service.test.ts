@@ -140,4 +140,24 @@ describe('ProjectService', () => {
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledWith(mockChip);
 		});
 	});
+
+	describe('restoreChipProcessorsForSongs', () => {
+		it('clears processors and adds one per song using chipType', async () => {
+			await projectService.restoreChipProcessorsForSongs([
+				{ chipType: 'ay' },
+				{ chipType: 'nes' }
+			]);
+
+			expect(mockAudioService.clearChipProcessors).toHaveBeenCalledOnce();
+			expect(mockAudioService.addChipProcessor).toHaveBeenCalledTimes(2);
+		});
+
+		it('falls back to AY when chipType is missing', async () => {
+			const { AY_CHIP } = await import('../../../../src/lib/chips/ay');
+
+			await projectService.restoreChipProcessorsForSongs([{}]);
+
+			expect(mockAudioService.addChipProcessor).toHaveBeenCalledWith(AY_CHIP);
+		});
+	});
 });

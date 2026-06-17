@@ -5,6 +5,7 @@ import type { AudioService } from '../audio/audio-service';
 import { applySchemaDefaults, type ChipSchema } from '../../chips/base/schema';
 import { normalizeChipSettingsRecord } from '../../chips/base/chip-settings';
 import { getChipByType } from '../../chips/registry';
+import { AY_CHIP } from '../../chips/ay';
 
 export class ProjectService {
 	constructor(private audioService: AudioService) {}
@@ -33,6 +34,14 @@ export class ProjectService {
 		this.syncFromPeerSongs(newSong, existingSongs, chip.schema);
 		await this.audioService.addChipProcessor(chip);
 		return newSong;
+	}
+
+	async restoreChipProcessorsForSongs(songs: { chipType?: string }[]): Promise<void> {
+		this.audioService.clearChipProcessors();
+		for (const song of songs) {
+			const chip = song.chipType ? getChipByType(song.chipType) : null;
+			await this.audioService.addChipProcessor(chip ?? AY_CHIP);
+		}
 	}
 
 	private syncFromPeerSongs(targetSong: Song, existingSongs: Song[], schema: ChipSchema): void {

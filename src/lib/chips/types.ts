@@ -5,6 +5,9 @@ import type { PatternFormatter } from './base/formatter-interface';
 import type { ChipRenderer, ChipRendererBinding } from './base/renderer';
 import type { ResourceLoader } from './base/resource-loader';
 import type { Component } from 'svelte';
+import type { ChipPlaybackDebugSpec } from './base/playback-debug';
+
+import type { Instrument } from '../../models/song';
 
 export interface Chip {
 	type: string;
@@ -18,4 +21,6 @@ export interface Chip {
 	createRenderer: (loader?: ResourceLoader, binding?: ChipRendererBinding) => ChipRenderer;
 	instrumentEditor?: Component<any>;
 	previewRow?: Component<any>;
+	playbackDebug?: ChipPlaybackDebugSpec;
+	copyInstrumentFields?: (source: Instrument, target: Instrument) => void;
 }

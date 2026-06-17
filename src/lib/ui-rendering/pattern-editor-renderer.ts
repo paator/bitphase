@@ -99,7 +99,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		} else {
 			for (let i = 0; i < data.channelLabels.length && i < channelPositions.length; i++) {
 				this.drawSingleChannelLabel(
-					`Channel ${data.channelLabels[i]}`,
+					this.formatChannelHeaderLabel(data.channelLabels[i]),
 					i,
 					channelPositions,
 					separatorMargin,
@@ -130,7 +130,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				const idx = indices[0];
 				if (idx < channelPositions.length) {
 					this.drawSingleChannelLabel(
-						`Channel ${group.hardwareLabel}`,
+						this.formatChannelHeaderLabel(group.hardwareLabel),
 						idx,
 						channelPositions,
 						separatorMargin,
@@ -185,6 +185,13 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			this.ctx.strokeRect(groupX, buttonY, groupWidth, buttonHeight);
 			this.restore();
 		}
+	}
+
+	private formatChannelHeaderLabel(label: string): string {
+		if (label.includes(' ') || label.length > 2) {
+			return label;
+		}
+		return `Channel ${label}`;
 	}
 
 	private drawSingleChannelLabel(

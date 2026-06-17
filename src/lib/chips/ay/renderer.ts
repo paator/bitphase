@@ -12,6 +12,7 @@ import { AYUMI_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
+import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
 import {
 	AYUMI_STRUCT_SIZE,
 	AYUMI_STRUCT_LEFT_OFFSET,
@@ -195,7 +196,7 @@ export class AYChipRenderer implements ChipRenderer {
 		state.setWasmModule(wasm, ayumiPtr, wasmBuffer);
 		state.setAymFrequency(chipFrequency);
 		state.setTuningTable(song.tuningTable);
-		state.setInstruments(project.instruments);
+		state.setInstruments(filterInstrumentsForChip(project.instruments, song.chipType ?? 'ay'));
 		state.setTables(project.tables);
 		if (ownsSharedPlaybackTimeline) {
 			state.setIntFrequency(interruptFrequency, SAMPLE_RATE);

@@ -80,6 +80,7 @@
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { projectStore } from '../../stores/project.svelte';
+	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
 	import {
 		computeStateHorizon,
 		buildCatchUpSegmentsToHorizon
@@ -137,7 +138,7 @@
 	const patternOrder = $derived(projectStore.patternOrder);
 	const tuningTable = $derived(projectStore.songs[songIndex]?.tuningTable ?? []);
 	const speed = $derived(projectStore.songs[songIndex]?.initialSpeed ?? 3);
-	const instruments = $derived(projectStore.instruments);
+	const instruments = $derived(filterInstrumentsForChip(projectStore.instruments, chip.type));
 	const tables = $derived(projectStore.tables);
 
 	function updatePatterns(newPatterns: Pattern[]): void {

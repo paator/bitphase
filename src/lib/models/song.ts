@@ -45,12 +45,20 @@ class Note {
 
 class Instrument {
 	id: string;
+	chipType: string;
 	rows: InstrumentRow[] = [];
 	loop: number = 0;
 	name: string = '';
 
-	constructor(id: string, rows: InstrumentRow[], loop: number = 0, name: string = '') {
+	constructor(
+		id: string,
+		rows: InstrumentRow[],
+		loop: number = 0,
+		name: string = '',
+		chipType: string = 'ay'
+	) {
 		this.id = id;
+		this.chipType = chipType;
 		this.rows = rows;
 		this.loop = loop;
 		this.name = name || `Instrument ${id}`;

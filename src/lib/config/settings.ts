@@ -44,7 +44,7 @@ export const settingsItems: SettingsItem[] = [
 	},
 	{
 		label: 'Debug Mode',
-		description: 'Show playback debug panel (frequencies and AY/YM registers) and log each playback row in the console',
+		description: 'Show playback debug panel and log each playback row in the console',
 		type: 'toggle',
 		defaultValue: false,
 		setting: 'debugMode',
