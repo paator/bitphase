@@ -7,7 +7,7 @@ import type { ResourceLoader } from './base/resource-loader';
 import type { Component } from 'svelte';
 import type { ChipPlaybackDebugSpec } from './base/playback-debug';
 
-import type { Instrument } from '../../models/song';
+import type { Instrument } from '../models/song';
 
 export interface Chip {
 	type: string;

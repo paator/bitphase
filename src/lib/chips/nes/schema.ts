@@ -1,6 +1,33 @@
 import type { ChipSchema } from '../base/schema';
 
-export const NES_NTSC_CPU_FREQUENCY = 1_789_772;
+export const NES_NTSC_CPU_FREQUENCY = 1_789_773;
+export const NES_PAL_CPU_FREQUENCY = 1_662_607;
+export const NES_DENDY_CPU_FREQUENCY = 1_773_448;
+
+export type NesSystem = 'NTSC' | 'PAL' | 'Dendy';
+export type NesApuTimingType = 'NTSC' | 'PAL';
+
+export const NES_SYSTEM_CONFIG: Record<
+	NesSystem,
+	{ frequency: number; apuTimingType: NesApuTimingType }
+> = {
+	NTSC: { frequency: NES_NTSC_CPU_FREQUENCY, apuTimingType: 'NTSC' },
+	PAL: { frequency: NES_PAL_CPU_FREQUENCY, apuTimingType: 'PAL' },
+	Dendy: { frequency: NES_DENDY_CPU_FREQUENCY, apuTimingType: 'NTSC' }
+};
+
+export function resolveNesSystem(value: unknown): NesSystem {
+	if (value === 'PAL' || value === 'Dendy') return value;
+	return 'NTSC';
+}
+
+export function resolveNesCpuFrequency(system: unknown): number {
+	return NES_SYSTEM_CONFIG[resolveNesSystem(system)].frequency;
+}
+
+export function resolveNesApuTimingType(system: unknown): NesApuTimingType {
+	return NES_SYSTEM_CONFIG[resolveNesSystem(system)].apuTimingType;
+}
 
 export const NES_DEFAULT_TUNING_TABLE = Array.from({ length: 88 }, (_, index) =>
 	Math.max(1, 2034 - index * 8)
@@ -65,10 +92,32 @@ export const NES_CHIP_SCHEMA: ChipSchema = {
 			type: 'toggle',
 			options: [
 				{ label: 'NTSC', value: 'NTSC' },
-				{ label: 'PAL', value: 'PAL' }
+				{ label: 'PAL', value: 'PAL' },
+				{ label: 'Dendy', value: 'Dendy' }
 			],
 			defaultValue: 'NTSC',
-			group: 'chip'
+			group: 'chip',
+			notifyAudioService: true,
+			computedHint: (value) => {
+				const frequency = resolveNesCpuFrequency(value);
+				const mhz = (frequency / 1_000_000).toFixed(4);
+				const apuTimingType = resolveNesApuTimingType(value);
+				return `${mhz} MHz · ${apuTimingType} type`;
+			}
 		}
-	]
+	],
+	applySettingSideEffects(key, value) {
+		if (key === 'chipVariant') {
+			return [{ key: 'chipFrequency', value: resolveNesCpuFrequency(value) }];
+		}
+		return [];
+	},
+	normalizeSettings(record) {
+		const system = resolveNesSystem(record.chipVariant);
+		return {
+			...record,
+			chipVariant: system,
+			chipFrequency: resolveNesCpuFrequency(system)
+		};
+	}
 };

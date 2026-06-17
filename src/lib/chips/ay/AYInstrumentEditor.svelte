@@ -1,8 +1,5 @@
 <script lang="ts">
 	import type { Instrument } from '../../models/song';
-	import IconCarbonTrashCan from '~icons/carbon/trash-can';
-	import IconCarbonDelete from '~icons/carbon/delete';
-	import IconCarbonAdd from '~icons/carbon/add';
 	import IconCarbonVolumeUp from '~icons/carbon/volume-up';
 	import IconCarbonArrowsVertical from '~icons/carbon/arrows-vertical';
 	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
@@ -10,15 +7,30 @@
 	import IconCarbonWaveform from '~icons/carbon/waveform';
 	import IconCarbonActivity from '~icons/carbon/activity';
 	import IconCarbonRepeat from '~icons/carbon/repeat';
-	import Input from '../../components/Input/Input.svelte';
 	import PillTabs, { type PillTab } from '../../components/PillTabs/PillTabs.svelte';
-	import SelectableRowNumberCell from '../../components/RowEditorTable/SelectableRowNumberCell.svelte';
 	import {
-		ROW_SELECTION_STYLES,
-		computeSelectionFromClick,
-		filterValidSelection,
-		isRowSelected as checkRowSelected
-	} from '../../utils/row-selection';
+		BooleanPaintableCell,
+		BooleanPaintDrag,
+		createLoopMarkerMeasure,
+		createRowEditorSelection,
+		LoopMarkerOverlay,
+		NamedRowEditorSync,
+		PaintableValueGridCell,
+		ROW_EDITOR_MAX_ROWS,
+		RowEditorActionsCell,
+		RowEditorAddRowButton,
+		RowEditorLoopCell,
+		RowEditorNameField,
+		SelectableRowNumberCell,
+		ValuePaintDrag
+	} from '../../components/RowEditorTable';
+	import { ROW_SELECTION_STYLES } from '../../utils/row-selection';
+	import {
+		formatRowEditorNumber,
+		focusRowEditorInputInRow,
+		parseRowEditorNumericText,
+		shouldBlockRowEditorNumericKey
+	} from '../../utils/row-editor-numeric';
 	import { compactTableInputClass } from '../../utils/compact-table-input';
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { ShortcutString } from '../../utils/shortcut-string';
@@ -56,7 +68,6 @@
 		selectedRowIndices?: number[];
 	} = $props();
 
-	let selectionAnchor = $state<number | null>(null);
 	let activeTab = $state<InstrumentTab>('mixer');
 
 	const extendedInstrument = $derived(instrument as Instrument & Partial<AyInstrumentFields>);
@@ -109,7 +120,7 @@
 		envelopeAccumulation: false
 	};
 
-	const MAX_ROWS = 512;
+	type AyMixerRow = typeof EMPTY_ROW;
 	type BooleanInstrumentField =
 		| 'tone'
 		| 'noise'
@@ -118,60 +129,15 @@
 		| 'toneAccumulation'
 		| 'noiseAccumulation'
 		| 'envelopeAccumulation';
-	type InstrumentUpdate = Partial<Instrument & AyInstrumentFields>;
 
-	let isDragging = $state(false);
-	let dragType: 'volume' | BooleanInstrumentField | null = $state(null);
-	let dragValue: boolean | null = $state(null);
-
-	function formatNum(value: number): string {
-		if (asHex) {
-			const sign = value < 0 ? '-' : '';
-			return sign + Math.abs(value).toString(16).toUpperCase();
-		}
-		return String(value);
+	function createDefaultMixerRow() {
+		return { ...EMPTY_ROW };
 	}
 
-	function beginDragVolume(index: number, value: number) {
-		isDragging = true;
-		dragType = 'volume';
-		updateRow(index, 'volume', value);
-	}
+	const booleanDrag = new BooleanPaintDrag();
+	const volumeDrag = new ValuePaintDrag<number>();
 
-	function dragOverVolume(index: number, value: number) {
-		if (isDragging && dragType === 'volume') {
-			updateRow(index, 'volume', value);
-		}
-	}
-
-	function beginDragBoolean(index: number, field: BooleanInstrumentField) {
-		isDragging = true;
-		dragType = field;
-		const currentValue = rows[index][field];
-		dragValue = !currentValue;
-		updateBooleanRow(index, field, dragValue);
-	}
-
-	function dragOverBoolean(index: number, field: BooleanInstrumentField) {
-		if (isDragging && dragValue !== null) {
-			updateBooleanRow(index, field, dragValue);
-		}
-	}
-
-	function isRowSelected(index: number): boolean {
-		return checkRowSelected(index, selectedRowIndices);
-	}
-
-	function handleRowSelect(index: number, event: MouseEvent) {
-		event.preventDefault();
-		event.stopPropagation();
-		const result = computeSelectionFromClick(index, event, selectedRowIndices, selectionAnchor);
-		selectedRowIndices = result.indices;
-		selectionAnchor = result.anchor;
-		editorContainerRef?.focus();
-	}
-
-	function ensureNonEmptyRows(rowsArray: any[]): any[] {
+	function ensureNonEmptyRows(rowsArray: AyMixerRow[]): AyMixerRow[] {
 		return rowsArray.length === 0
 			? [
 					{
@@ -194,30 +160,55 @@
 			: rowsArray;
 	}
 
-	let rows = $state(ensureNonEmptyRows([...instrument.rows]));
-	let loopRow = $state(instrument.loop);
-	let name = $state(instrument.name);
 	let tableRef: HTMLTableElement | null = $state(null);
-	let loopMarkerStyle = $state<{ left: number; top: number; height: number } | null>(null);
 	let editorContainerRef: HTMLDivElement | null = $state(null);
-	let lastInstrumentId = $state(instrument.id);
-	let lastSyncedName = $state(instrument.name);
-	let lastSyncedRows = $state([...instrument.rows]);
-	let lastSyncedLoop = $state(instrument.loop);
 
-	function updateInstrument(updates: InstrumentUpdate) {
-		onInstrumentChange({ ...instrument, ...updates });
-	}
+	const selection = createRowEditorSelection({
+		getSelectedIndices: () => selectedRowIndices,
+		setSelectedIndices: (indices) => {
+			selectedRowIndices = indices;
+		},
+		getRowCount: () =>
+			activeTab === 'timer'
+				? timerEffects.fields.timerRows.length
+				: mixerSync.rows.length,
+		focusContainer: () => editorContainerRef?.focus()
+	});
 
-	function updateRow(index: number, field: string, value: any) {
-		if (rows[index][field] === value) return;
-		rows[index] = { ...rows[index], [field]: value };
-		rows = [...rows];
-		updateInstrument({ rows });
+	const mixerSync = new NamedRowEditorSync<AyMixerRow>({
+		getSource: () => instrument,
+		normalizeRows: (rows) => ensureNonEmptyRows(rows as AyMixerRow[]),
+		onUpdate: (updates) => onInstrumentChange({ ...instrument, ...updates }),
+		onSourceIdChange: () => {
+			selectedRowIndices = [];
+			selection.clearSelection();
+		}
+	});
+
+	const displayRowCount = $derived(
+		activeTab === 'timer' ? timerEffects.fields.timerRows.length : mixerSync.rows.length
+	);
+
+	const activeLoopRow = $derived(
+		activeTab === 'timer' ? timerEffects.fields.timerLoop : mixerSync.loopRow
+	);
+
+	const loopMarker = createLoopMarkerMeasure(
+		() => tableRef,
+		() => activeLoopRow,
+		() => displayRowCount,
+		() => `${isExpanded}-${activeTab}`
+	);
+
+	function updateRow(index: number, field: string, value: unknown) {
+		if (mixerSync.rows[index][field as keyof AyMixerRow] === value) return;
+		const nextRows = [...mixerSync.rows];
+		nextRows[index] = { ...nextRows[index], [field]: value };
+		mixerSync.applyRowChange(nextRows);
 	}
 
 	function updateBooleanRow(index: number, field: BooleanInstrumentField, value: boolean) {
-		if (Boolean(rows[index][field]) === value) return;
+		if (Boolean(mixerSync.rows[index][field]) === value) return;
 		updateRow(index, field, value);
 	}
 
@@ -230,103 +221,43 @@
 
 	function incrementSelectedRows(delta: number) {
 		if (selectedRowIndices.length === 0) return;
+		const nextRows = [...mixerSync.rows];
 		for (const index of selectedRowIndices) {
-			let updated = { ...rows[index] };
+			let updated = { ...nextRows[index] };
 			for (const { key, min, max } of NUMERIC_FIELDS) {
 				const current = key === 'envelopeAdd' ? (updated.envelopeAdd ?? 0) : updated[key];
 				const next = Math.max(min, Math.min(max, current + delta));
 				updated = { ...updated, [key]: next };
 			}
-			rows[index] = updated;
+			nextRows[index] = updated;
 		}
-		rows = [...rows];
-		updateInstrument({ rows });
+		mixerSync.applyRowChange(nextRows);
 	}
 
 	function cycleAmplitudeSlide(index: number) {
-		const row = rows[index];
+		const row = mixerSync.rows[index];
+		const nextRows = [...mixerSync.rows];
 		if (!row.amplitudeSliding) {
-			rows[index] = { ...row, amplitudeSliding: true, amplitudeSlideUp: true };
+			nextRows[index] = { ...row, amplitudeSliding: true, amplitudeSlideUp: true };
 		} else if (row.amplitudeSlideUp) {
-			rows[index] = { ...row, amplitudeSlideUp: false };
+			nextRows[index] = { ...row, amplitudeSlideUp: false };
 		} else {
-			rows[index] = { ...row, amplitudeSliding: false, amplitudeSlideUp: false };
+			nextRows[index] = { ...row, amplitudeSliding: false, amplitudeSlideUp: false };
 		}
-		rows = [...rows];
-		updateInstrument({ rows });
+		mixerSync.applyRowChange(nextRows);
 	}
 
 	function updateNumericField(index: number, field: string, event: Event) {
 		const inputEl = event.target as HTMLInputElement;
-		let text = inputEl.value.trim();
-		const allowedPattern = asHex ? /[^0-9a-fA-F-]/g : /[^0-9-]/g;
-		text = text.replace(/\+/g, '').replace(allowedPattern, '');
-
-		if (field === 'volume') {
-			if (asHex) {
-				if (text.length > 1) {
-					text = text.substring(0, 1);
-				}
-			} else {
-				const num = parseInt(text, 10);
-				if (!isNaN(num) && num > 15) {
-					text = '15';
-				}
-			}
-		}
-
-		if (text !== inputEl.value) inputEl.value = text;
-
-		let parsed: number | null = null;
-		if (asHex) {
-			let sign = 1;
-			let temp = text;
-			if (temp.startsWith('-')) {
-				sign = -1;
-				temp = temp.substring(1);
-			}
-			if (/^[0-9a-fA-F]+$/.test(temp)) {
-				parsed = sign * parseInt(temp, 16);
-			}
-		} else {
-			if (/^-?\d+$/.test(text)) {
-				parsed = parseInt(text, 10);
-			}
-		}
-
+		const limits =
+			field === 'volume' ? { min: 0, max: 15, maxDigits: asHex ? 1 : undefined } : undefined;
+		const parsed = parseRowEditorNumericText(inputEl.value, asHex, limits);
 		if (parsed !== null) {
-			if (field === 'volume') {
-				parsed = Math.max(0, Math.min(15, parsed));
+			const normalized = formatRowEditorNumber(parsed, asHex);
+			if (inputEl.value !== normalized) {
+				inputEl.value = normalized;
 			}
 			updateRow(index, field, parsed);
-		}
-	}
-
-	function focusInputInRow(row: HTMLTableRowElement | null, currentInput?: HTMLInputElement) {
-		if (!row) return;
-
-		let input: HTMLInputElement | null = null;
-
-		if (currentInput) {
-			const currentCell = currentInput.closest('td');
-			if (currentCell) {
-				const cellIndex = Array.from(currentCell.parentElement?.children || []).indexOf(
-					currentCell
-				);
-				const targetCell = row.children[cellIndex] as HTMLTableCellElement | undefined;
-				if (targetCell) {
-					input = targetCell.querySelector('input[type="text"]');
-				}
-			}
-		}
-
-		if (!input) {
-			input = row.querySelector('input[type="text"]');
-		}
-
-		if (input) {
-			input.focus();
-			input.select();
 		}
 	}
 
@@ -339,17 +270,17 @@
 		if (key === 'ArrowDown') {
 			event.preventDefault();
 			const nextIndex = index + 1;
-			if (nextIndex < rows.length) {
+			if (nextIndex < mixerSync.rows.length) {
 				const currentRow = inputEl.closest('tr');
-				focusInputInRow(
+				focusRowEditorInputInRow(
 					currentRow?.nextElementSibling as HTMLTableRowElement | null,
 					inputEl
 				);
-			} else if (nextIndex === rows.length) {
-				addRow();
+			} else if (nextIndex === mixerSync.rows.length) {
+				mixerSync.addRow(createDefaultMixerRow);
 				setTimeout(() => {
 					const currentRow = inputEl.closest('tr');
-					focusInputInRow(
+					focusRowEditorInputInRow(
 						currentRow?.nextElementSibling as HTMLTableRowElement | null,
 						inputEl
 					);
@@ -363,7 +294,7 @@
 			const prevIndex = index - 1;
 			if (prevIndex >= 0) {
 				const currentRow = inputEl.closest('tr');
-				focusInputInRow(
+				focusRowEditorInputInRow(
 					currentRow?.previousElementSibling as HTMLTableRowElement | null,
 					inputEl
 				);
@@ -371,30 +302,16 @@
 			return;
 		}
 
-		if (key.length > 1) return;
-		const pattern = asHex ? /^[0-9a-fA-F-]$/ : /^[0-9-]$/;
-		if (!pattern.test(key)) event.preventDefault();
+		if (shouldBlockRowEditorNumericKey(key, asHex)) {
+			event.preventDefault();
+		}
 	}
-
-	function updateArraysAfterRowChange(newRows: any[]) {
-		rows = newRows;
-		if (loopRow >= rows.length) loopRow = rows.length - 1;
-		updateInstrument({ rows, loop: loopRow });
-	}
-
-	const displayRowCount = $derived(
-		activeTab === 'timer' ? timerEffects.fields.timerRows.length : rows.length
-	);
-
-	const activeLoopRow = $derived(
-		activeTab === 'timer' ? timerEffects.fields.timerLoop : loopRow
-	);
 
 	function setActiveLoop(index: number): void {
 		if (activeTab === 'timer') {
 			timerEffects.setTimerLoop(index);
 		} else {
-			setLoop(index);
+			mixerSync.setLoop(index);
 		}
 	}
 
@@ -402,7 +319,7 @@
 		if (activeTab === 'timer') {
 			timerEffects.addTimerRow();
 		} else {
-			addRow();
+			mixerSync.addRow(createDefaultMixerRow);
 		}
 	}
 
@@ -410,7 +327,7 @@
 		if (activeTab === 'timer') {
 			timerEffects.setTimerRowCount(targetCount);
 		} else {
-			setRowCount(targetCount);
+			mixerSync.setRowCount(targetCount, createDefaultMixerRow, ROW_EDITOR_MAX_ROWS);
 		}
 	}
 
@@ -418,7 +335,7 @@
 		if (activeTab === 'timer') {
 			timerEffects.removeTimerRow(index);
 		} else {
-			removeRow(index);
+			mixerSync.removeRow(index);
 		}
 	}
 
@@ -426,7 +343,7 @@
 		if (activeTab === 'timer') {
 			timerEffects.removeTimerRowsFromBottom(index);
 		} else {
-			removeRowsFromBottom(index);
+			mixerSync.removeRowsFromBottom(index);
 		}
 	}
 
@@ -460,39 +377,6 @@
 		tableRef?.releasePointerCapture(event.pointerId);
 	}
 
-	function addRow() {
-		updateArraysAfterRowChange([...rows, { ...EMPTY_ROW }]);
-	}
-
-	function setRowCount(targetCount: number) {
-		const count = Math.max(1, Math.min(MAX_ROWS, targetCount));
-		if (count === rows.length) return;
-		if (count > rows.length) {
-			const toAdd = count - rows.length;
-			const newRows = [...rows, ...Array.from({ length: toAdd }, () => ({ ...EMPTY_ROW }))];
-			updateArraysAfterRowChange(newRows);
-		} else {
-			updateArraysAfterRowChange(rows.slice(0, count));
-		}
-	}
-
-	function removeRow(index: number) {
-		if (rows.length === 1) return;
-		updateArraysAfterRowChange(rows.filter((_, i) => i !== index));
-	}
-
-	function removeRowsFromBottom(index: number) {
-		if (rows.length === 1) return;
-		const rowsToKeep = index + 1;
-		if (rowsToKeep >= rows.length) return;
-		updateArraysAfterRowChange(rows.slice(0, rowsToKeep));
-	}
-
-	function setLoop(index: number) {
-		loopRow = index;
-		updateInstrument({ loop: loopRow });
-	}
-
 	const timerTableLayoutKey = $derived(
 		activeTab === 'timer'
 			? timerEffects.fields.timerRows
@@ -501,116 +385,18 @@
 			: ''
 	);
 
-	$effect(() => {
-		const table = tableRef;
-		const container = table?.parentElement;
-		const currentLoopRow = activeLoopRow;
-		const rowCount = displayRowCount;
-		void isExpanded;
-		void activeTab;
-		void timerTableLayoutKey;
-		void timerEffects.waveformEditorRowIndex;
-
-		if (!table || !container || currentLoopRow < 0 || currentLoopRow >= rowCount) {
-			loopMarkerStyle = null;
-			return;
-		}
-
-		const measureLoopMarker = () => {
-			if (!tableRef || !container) {
-				loopMarkerStyle = null;
-				return;
-			}
-
-			const tbody = tableRef.querySelector('tbody');
-			const loopCell = tbody?.querySelector(
-				`tr:nth-child(${currentLoopRow + 1}) > td:nth-of-type(3)`
-			) as HTMLTableCellElement | null;
-			const lastRow = tbody?.querySelector(
-				`tr:nth-child(${rowCount})`
-			) as HTMLTableRowElement | null;
-			if (!loopCell || !lastRow) {
-				loopMarkerStyle = null;
-				return;
-			}
-
-			const containerRect = container.getBoundingClientRect();
-			const loopRect = loopCell.getBoundingClientRect();
-			const lastRowRect = lastRow.getBoundingClientRect();
-
-			loopMarkerStyle = {
-				left: loopRect.left - containerRect.left + loopRect.width / 2,
-				top: loopRect.top - containerRect.top,
-				height: lastRowRect.bottom - loopRect.top
-			};
-		};
-
-		measureLoopMarker();
-		const observer = new ResizeObserver(measureLoopMarker);
-		observer.observe(table);
-		observer.observe(container);
-		return () => observer.disconnect();
-	});
-
 	export function addRowExternal() {
-		addRow();
+		mixerSync.addRow(createDefaultMixerRow);
 	}
 
 	export function removeLastRowExternal() {
-		removeRow(rows.length - 1);
-	}
-
-	function syncFromInstrument() {
-		rows = ensureNonEmptyRows([...instrument.rows]);
-		loopRow = instrument.loop;
-		name = instrument.name;
-		lastSyncedRows = [...instrument.rows];
-		lastSyncedLoop = instrument.loop;
-		lastSyncedName = instrument.name;
+		mixerSync.removeRow(mixerSync.rows.length - 1);
 	}
 
 	$effect(() => {
-		if (instrument.id !== lastInstrumentId) {
-			lastInstrumentId = instrument.id;
-			syncFromInstrument();
-			selectedRowIndices = [];
-			selectionAnchor = null;
-		} else {
-			const rowsChanged =
-				instrument.rows.length !== lastSyncedRows.length ||
-				instrument.rows.some((row, i) => row !== lastSyncedRows[i]);
-			const loopChanged = instrument.loop !== lastSyncedLoop;
-			const nameChanged = instrument.name !== lastSyncedName;
-
-			if (rowsChanged || loopChanged) {
-				rows = ensureNonEmptyRows([...instrument.rows]);
-				loopRow = instrument.loop;
-				lastSyncedRows = [...instrument.rows];
-				lastSyncedLoop = instrument.loop;
-			}
-
-			if (nameChanged) {
-				name = instrument.name;
-				lastSyncedName = instrument.name;
-			}
-		}
-	});
-
-	$effect(() => {
-		if (name !== lastSyncedName) {
-			updateInstrument({ name });
-		}
-	});
-
-	$effect(() => {
-		rows = ensureNonEmptyRows(rows);
-	});
-
-	$effect(() => {
-		const validIndices = filterValidSelection(selectedRowIndices, displayRowCount);
-		if (validIndices.length !== selectedRowIndices.length) {
-			selectedRowIndices = validIndices;
-		}
+		void timerTableLayoutKey;
+		void timerEffects.waveformEditorRowIndex;
+		void loopMarker.style;
 	});
 
 	$effect(() => {
@@ -625,12 +411,7 @@
 	});
 
 	$effect(() => {
-		const stop = () => {
-			isDragging = false;
-			dragType = null;
-			dragValue = null;
-			timerEffects.stopDrag();
-		};
+		const stop = () => timerEffects.stopDrag();
 		window.addEventListener('mouseup', stop);
 		return () => window.removeEventListener('mouseup', stop);
 	});
@@ -642,8 +423,7 @@
 		function handleClickOutside(event: MouseEvent) {
 			const target = event.target as Node;
 			if (selectedRowIndices.length > 0 && !containerEl!.contains(target)) {
-				selectedRowIndices = [];
-				selectionAnchor = null;
+				selection.clearSelection();
 			}
 		}
 
@@ -652,8 +432,7 @@
 			if (!relatedTarget) return;
 			if (containerEl!.contains(relatedTarget)) return;
 			if (selectedRowIndices.length > 0) {
-				selectedRowIndices = [];
-				selectionAnchor = null;
+				selection.clearSelection();
 			}
 		}
 
@@ -695,37 +474,11 @@
 	});
 </script>
 
-{#snippet volumeCell(index: number, value: number, isSelected: boolean, rowSelected: boolean)}
-	<td
-		class={`group h-8 w-6 min-w-6 cursor-pointer border border-[var(--color-app-border)] text-center text-[0.7rem] leading-none ${
-			isSelected
-				? 'bg-[var(--color-app-surface-active)]'
-				: rowSelected
-					? ROW_SELECTION_STYLES.cell
-					: 'bg-[var(--color-app-surface)] hover:bg-[var(--color-app-surface-secondary)]'
-		}`}
-		tabindex="-1"
-		title={String(value)}
-		onmousedown={() => beginDragVolume(index, value)}
-		onmouseover={() => dragOverVolume(index, value)}
-		onfocus={() => dragOverVolume(index, value)}>
-		{#if isSelected}
-			{formatNum(value)}
-		{:else}
-			<span class="text-[var(--color-app-text-tertiary)] opacity-0 group-hover:opacity-100"
-				>{formatNum(value)}</span>
-		{/if}
-	</td>
-{/snippet}
-
 <div
 	class="w-full max-w-full min-w-0 overflow-x-auto outline-none focus:outline-none"
 	bind:this={editorContainerRef}
 	tabindex="-1">
-	<div class="mt-2 ml-2 flex items-center gap-2">
-		<span class="w-10 shrink-0 text-xs text-[var(--color-app-text-muted)]">Name:</span>
-		<Input class="w-48 text-xs" bind:value={name} />
-	</div>
+	<RowEditorNameField bind:name={mixerSync.name} />
 
 	<PillTabs
 		bind:activeTabId={activeTab}
@@ -764,23 +517,7 @@
 					class="relative flex flex-col {activeTab === 'timer'
 						? 'w-full min-w-0'
 						: ''}">
-					{#if loopMarkerStyle}
-						<div
-							class="pointer-events-none absolute z-0 -translate-x-1/2"
-							style="left: {loopMarkerStyle.left}px; top: {loopMarkerStyle.top}px; height: {loopMarkerStyle.height}px;">
-							<div class="relative h-full">
-								<div
-									class="absolute top-0 left-0 h-full w-0.5 border-l-2 border-[var(--color-app-primary)]">
-								</div>
-								<div
-									class="absolute top-0 left-0 h-2 w-2 border-t-2 border-l-2 border-[var(--color-app-primary)]">
-								</div>
-								<div
-									class="absolute bottom-0 left-0 h-2 w-2 border-b-2 border-l-2 border-[var(--color-app-primary)]">
-								</div>
-							</div>
-						</div>
-					{/if}
+					<LoopMarkerOverlay style={loopMarker.style} />
 					<table
 						bind:this={tableRef}
 						onpointermove={handleTimerEffectPointerMove}
@@ -953,8 +690,8 @@
 							{/if}
 						</thead>
 						<tbody>
-							{#each activeTab === 'timer' ? timerEffects.timerRows : rows as _, index (index)}
-								{@const selected = isRowSelected(index)}
+							{#each activeTab === 'timer' ? timerEffects.timerRows : mixerSync.rows as _, index (index)}
+								{@const selected = selection.isRowSelected(index)}
 								<tr
 									class="{isExpanded ? 'h-8' : 'h-7'} {selected
 										? ROW_SELECTION_STYLES.row
@@ -965,119 +702,74 @@
 										sizeClass={isExpanded
 											? 'w-14 min-w-14 px-2 py-1.5'
 											: 'w-8 min-w-8 px-1 py-1 text-[0.65rem]'}
-										onmousedown={(e) => handleRowSelect(index, e)} />
-									<td
-										class="overflow-hidden border border-[var(--color-app-border)] {selected
-											? ROW_SELECTION_STYLES.cell
-											: 'bg-[var(--color-app-surface-secondary)]'} {isExpanded
-											? 'w-12 min-w-12 px-1'
-											: 'w-10 min-w-10 px-0.5'}">
-										<div
-											class="flex min-w-0 items-center justify-center {isExpanded
-												? 'gap-0.5'
-												: 'gap-0'}">
-											<button
-												class="flex shrink-0 cursor-pointer items-center justify-center rounded p-0.5 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-pattern-note-off)]"
-												onclick={(e) => {
-													e.stopPropagation();
-													removeDisplayRow(index);
-												}}
-												title="Remove this row">
-												<IconCarbonTrashCan
-													class={isExpanded
-														? 'h-3.5 w-3.5'
-														: 'h-3 w-3'} />
-											</button>
-											{#if index < displayRowCount - 1}
-												<button
-													class="flex shrink-0 cursor-pointer items-center justify-center rounded p-0.5 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-pattern-note-off)]"
-													onclick={(e) => {
-														e.stopPropagation();
-														removeDisplayRowsFromBottom(index);
-													}}
-													title="Remove all rows from bottom up to this one">
-													<IconCarbonDelete
-														class={isExpanded
-															? 'h-3.5 w-3.5'
-															: 'h-3 w-3'} />
-												</button>
-											{/if}
-										</div>
-									</td>
-									<td
-										class="{isExpanded
-											? 'w-6 min-w-6 cursor-pointer px-1.5 text-center text-sm'
-											: 'w-4 min-w-4 cursor-pointer px-0.5 text-center text-[0.65rem]'} {selected
-											? ROW_SELECTION_STYLES.cell
-											: ''}"
-										onclick={() => setActiveLoop(index)}>
-									</td>
+										onmousedown={(e) => selection.handleRowSelect(index, e)} />
+									<RowEditorActionsCell
+										{index}
+										rowCount={displayRowCount}
+										{selected}
+										{isExpanded}
+										onRemove={() => removeDisplayRow(index)}
+										onRemoveFromBottom={() => removeDisplayRowsFromBottom(index)} />
+									<RowEditorLoopCell
+										{selected}
+										{isExpanded}
+										onSelect={() => setActiveLoop(index)} />
 									{#if activeTab === 'mixer'}
-										{@const row = rows[index]}
-										<!-- Tone -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'w-8 min-w-8 px-0.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: row.tone
-													? 'instrument-cell-boolean-on'
-													: 'bg-[var(--color-app-surface)] text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
-											onmousedown={() => beginDragBoolean(index, 'tone')}
-											onmouseover={() => dragOverBoolean(index, 'tone')}
-											onfocus={() => dragOverBoolean(index, 'tone')}>
-											{row.tone ? '✓' : ''}
-										</td>
-										<!-- Noise -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'w-8 min-w-8 px-0.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: row.noise
-													? 'instrument-cell-boolean-on'
-													: 'bg-[var(--color-app-surface)] text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
-											onmousedown={() => beginDragBoolean(index, 'noise')}
-											onmouseover={() => dragOverBoolean(index, 'noise')}
-											onfocus={() => dragOverBoolean(index, 'noise')}>
-											{row.noise ? '✓' : ''}
-										</td>
-										<!-- Envelope -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'w-8 min-w-8 px-0.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: row.envelope
-													? 'instrument-cell-boolean-on'
-													: 'bg-[var(--color-app-surface)] text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
-											onmousedown={() => beginDragBoolean(index, 'envelope')}
-											onmouseover={() => dragOverBoolean(index, 'envelope')}
-											onfocus={() => dragOverBoolean(index, 'envelope')}>
-											{row.envelope ? '✓' : ''}
-										</td>
-										<!-- Retrigger envelope -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'w-8 min-w-8 px-0.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: (row.retriggerEnvelope ?? false)
-													? 'instrument-cell-boolean-on'
-													: 'bg-[var(--color-app-surface)] text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
+										{@const row = mixerSync.rows[index]}
+										<BooleanPaintableCell
+											active={row.tone}
+											{selected}
+											{isExpanded}
+											widthClass={isExpanded ? 'w-8 min-w-8' : 'w-8 min-w-8'}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.tone,
+													(value) => updateBooleanRow(index, 'tone', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'tone', value))} />
+										<BooleanPaintableCell
+											active={row.noise}
+											{selected}
+											{isExpanded}
+											widthClass={isExpanded ? 'w-8 min-w-8' : 'w-8 min-w-8'}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.noise,
+													(value) => updateBooleanRow(index, 'noise', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'noise', value))} />
+										<BooleanPaintableCell
+											active={row.envelope}
+											{selected}
+											{isExpanded}
+											widthClass={isExpanded ? 'w-8 min-w-8' : 'w-8 min-w-8'}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.envelope,
+													(value) => updateBooleanRow(index, 'envelope', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'envelope', value))} />
+										<BooleanPaintableCell
+											active={row.retriggerEnvelope ?? false}
+											{selected}
+											{isExpanded}
 											title="Retrigger envelope when this row is played"
-											onmousedown={() =>
-												beginDragBoolean(index, 'retriggerEnvelope')}
-											onmouseover={() =>
-												dragOverBoolean(index, 'retriggerEnvelope')}
-											onfocus={() =>
-												dragOverBoolean(index, 'retriggerEnvelope')}>
-											{(row.retriggerEnvelope ?? false) ? '✓' : ''}
-										</td>
+											widthClass={isExpanded ? 'w-8 min-w-8' : 'w-8 min-w-8'}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.retriggerEnvelope ?? false,
+													(value) =>
+														updateBooleanRow(index, 'retriggerEnvelope', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'retriggerEnvelope', value))} />
 										<!-- ToneAdd -->
 										<td
 											class={isExpanded
@@ -1086,33 +778,29 @@
 											<input
 												type="text"
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatNum(row.toneAdd)}
+												value={formatRowEditorNumber(row.toneAdd, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
 												onfocus={(e) =>
 													(e.target as HTMLInputElement).select()}
 												oninput={(e) =>
 													updateNumericField(index, 'toneAdd', e)} />
 										</td>
-										<!-- Tone Accumulation -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'px-1.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: row.toneAccumulation
-													? 'bg-[var(--color-app-primary)]/30'
-													: 'bg-[var(--color-app-surface)]'} {row.toneAccumulation
-												? 'text-[var(--color-app-primary)]'
-												: 'text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
-											onmousedown={() =>
-												beginDragBoolean(index, 'toneAccumulation')}
-											onmouseover={() =>
-												dragOverBoolean(index, 'toneAccumulation')}
-											onfocus={() =>
-												dragOverBoolean(index, 'toneAccumulation')}>
-											{row.toneAccumulation ? '↑' : ''}
-										</td>
+										<BooleanPaintableCell
+											active={row.toneAccumulation}
+											{selected}
+											{isExpanded}
+											variant="accent"
+											display="↑"
+											widthClass={isExpanded ? 'w-8 min-w-8' : ''}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.toneAccumulation,
+													(value) =>
+														updateBooleanRow(index, 'toneAccumulation', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'toneAccumulation', value))} />
 										<!-- NoiseAdd -->
 										<td
 											class={isExpanded
@@ -1121,33 +809,29 @@
 											<input
 												type="text"
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatNum(row.noiseAdd)}
+												value={formatRowEditorNumber(row.noiseAdd, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
 												onfocus={(e) =>
 													(e.target as HTMLInputElement).select()}
 												oninput={(e) =>
 													updateNumericField(index, 'noiseAdd', e)} />
 										</td>
-										<!-- Noise Accumulation -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'px-1.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: row.noiseAccumulation
-													? 'bg-[var(--color-app-primary)]/30'
-													: 'bg-[var(--color-app-surface)]'} {row.noiseAccumulation
-												? 'text-[var(--color-app-primary)]'
-												: 'text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
-											onmousedown={() =>
-												beginDragBoolean(index, 'noiseAccumulation')}
-											onmouseover={() =>
-												dragOverBoolean(index, 'noiseAccumulation')}
-											onfocus={() =>
-												dragOverBoolean(index, 'noiseAccumulation')}>
-											{row.noiseAccumulation ? '↑' : ''}
-										</td>
+										<BooleanPaintableCell
+											active={row.noiseAccumulation}
+											{selected}
+											{isExpanded}
+											variant="accent"
+											display="↑"
+											widthClass={isExpanded ? 'w-8 min-w-8' : ''}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.noiseAccumulation,
+													(value) =>
+														updateBooleanRow(index, 'noiseAccumulation', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'noiseAccumulation', value))} />
 										<!-- EnvelopeAdd -->
 										<td
 											class={isExpanded
@@ -1156,33 +840,29 @@
 											<input
 												type="text"
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatNum(row.envelopeAdd ?? 0)}
+												value={formatRowEditorNumber(row.envelopeAdd ?? 0, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
 												onfocus={(e) =>
 													(e.target as HTMLInputElement).select()}
 												oninput={(e) =>
 													updateNumericField(index, 'envelopeAdd', e)} />
 										</td>
-										<!-- Envelope Accumulation -->
-										<td
-											class="{isExpanded
-												? 'w-8 min-w-8 px-1'
-												: 'px-1.5'} cursor-pointer border border-[var(--color-app-border)] text-center {selected
-												? ROW_SELECTION_STYLES.cell
-												: row.envelopeAccumulation
-													? 'bg-[var(--color-app-primary)]/30'
-													: 'bg-[var(--color-app-surface)]'} {row.envelopeAccumulation
-												? 'text-[var(--color-app-primary)]'
-												: 'text-[var(--color-app-text-muted)]'}"
-											tabindex="-1"
-											onmousedown={() =>
-												beginDragBoolean(index, 'envelopeAccumulation')}
-											onmouseover={() =>
-												dragOverBoolean(index, 'envelopeAccumulation')}
-											onfocus={() =>
-												dragOverBoolean(index, 'envelopeAccumulation')}>
-											{row.envelopeAccumulation ? '↑' : ''}
-										</td>
+										<BooleanPaintableCell
+											active={row.envelopeAccumulation}
+											{selected}
+											{isExpanded}
+											variant="accent"
+											display="↑"
+											widthClass={isExpanded ? 'w-8 min-w-8' : ''}
+											onPaintBegin={() =>
+												booleanDrag.begin(
+													() => row.envelopeAccumulation,
+													(value) =>
+														updateBooleanRow(index, 'envelopeAccumulation', value)
+												)}
+											onPaintOver={() =>
+												booleanDrag.dragOver((value) =>
+													updateBooleanRow(index, 'envelopeAccumulation', value))} />
 										<!-- Volume -->
 										<td
 											class={isExpanded
@@ -1191,7 +871,7 @@
 											<input
 												type="text"
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatNum(row.volume)}
+												value={formatRowEditorNumber(row.volume, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
 												onfocus={(e) =>
 													(e.target as HTMLInputElement).select()}
@@ -1240,15 +920,7 @@
 							{/if}
 							<tr>
 								<td colspan={tableColSpan} class="px-2 py-1">
-									<div class="flex items-center justify-center">
-										<button
-											class="flex cursor-pointer items-center justify-center rounded p-0.5 text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-pattern-table)]"
-											onclick={addDisplayRow}
-											title="Add new row">
-											<IconCarbonAdd class="mr-1 h-3.5 w-3.5" />
-											<span class="mr-1 text-xs">Add new row</span>
-										</button>
-									</div>
+									<RowEditorAddRowButton onAdd={addDisplayRow} />
 								</td>
 							</tr>
 							<tr>
@@ -1259,7 +931,7 @@
 										rowCount={displayRowCount}
 										onRowCountChange={setDisplayRowCount}
 										rowHeightPx={isExpanded ? 32 : 28}
-										maxRows={MAX_ROWS} />
+										maxRows={ROW_EDITOR_MAX_ROWS} />
 								</td>
 							</tr>
 						</tfoot>
@@ -1276,7 +948,7 @@
 									<th
 										class="w-6 min-w-6 bg-[var(--color-app-surface-secondary)] text-center"
 										title={String(v)}>
-										{formatNum(v)}
+										{formatRowEditorNumber(v, asHex)}
 									</th>
 								{/each}
 							</tr>
@@ -1288,8 +960,8 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each rows as row, index}
-								{@const selected = isRowSelected(index)}
+							{#each mixerSync.rows as row, index}
+								{@const selected = selection.isRowSelected(index)}
 								<tr class="h-8 {selected ? ROW_SELECTION_STYLES.row : ''}">
 									<td
 										class="border border-[var(--color-app-border)] px-2 text-right {selected
@@ -1297,7 +969,18 @@
 											: 'bg-[var(--color-app-surface-secondary)]'}"
 										>{index}</td>
 									{#each VOLUME_VALUES as v}
-										{@render volumeCell(index, v, v === row.volume, selected)}
+										<PaintableValueGridCell
+											{index}
+											value={v}
+											currentValue={row.volume}
+											{selected}
+											formatValue={(value) => formatRowEditorNumber(value, asHex)}
+											onPaintBegin={(_, value) =>
+												volumeDrag.begin(value, (paintValue) =>
+													updateRow(index, 'volume', paintValue))}
+											onPaintOver={(_, value) =>
+												volumeDrag.dragOverWithValue(value, (paintValue) =>
+													updateRow(index, 'volume', paintValue))} />
 									{/each}
 								</tr>
 							{/each}

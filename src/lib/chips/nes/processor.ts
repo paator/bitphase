@@ -103,6 +103,7 @@ export class NESProcessor
 	sendInitInstruments(instruments: Instrument[]): void {
 		const sanitized = instruments.map((instrument) => ({
 			id: instrument.id,
+			chipType: instrument.chipType,
 			rows: Array.from(instrument.rows).map((row) => ({ ...row })),
 			loop: instrument.loop,
 			name: instrument.name

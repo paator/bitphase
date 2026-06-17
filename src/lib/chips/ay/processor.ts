@@ -44,6 +44,7 @@ export function sanitizeInstrumentForWorklet(instrument: Instrument): WorkletIns
 			: undefined;
 	return {
 		id: instrument.id,
+		chipType: instrument.chipType,
 		rows: Array.from(instrument.rows).map((row) => ({ ...row })),
 		loop: instrument.loop,
 		name: instrument.name,
