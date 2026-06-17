@@ -484,16 +484,16 @@ void nes_dmc_Reset (nes_dmc_t* s)
   s->noise = 1;
   s->noise_tap = (1<<1);
 
-  if (s->option[NES_DMC_OPT_RANDOMIZE_NOISE])
-  {
-      s->noise |= rand();
-      s->counter[1] = -(rand() & 511);
-  }
-  if (s->option[NES_DMC_OPT_RANDOMIZE_TRI])
-  {
-      s->tphase = rand() & 31;
-      s->counter[0] = -(rand() & 2047);
-  }
+  // if (s->option[NES_DMC_OPT_RANDOMIZE_NOISE])
+  // {
+  //     s->noise |= rand();
+  //     s->counter[1] = -(rand() & 511);
+  // }
+  // if (s->option[NES_DMC_OPT_RANDOMIZE_TRI])
+  // {
+  //     s->tphase = rand() & 31;
+  //     s->counter[0] = -(rand() & 2047);
+  // }
 }
 
 void nes_dmc_SetMemory_Read (nes_dmc_t* s, read_func * r)
