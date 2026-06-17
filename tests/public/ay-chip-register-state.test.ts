@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import AYChipRegisterState from '../../public/ay-chip-register-state.js';
+import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 
 describe('AYChipRegisterState', () => {
 	describe('constructor', () => {

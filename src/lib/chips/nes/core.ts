@@ -10,7 +10,7 @@ import type { Chip } from '../types';
 export const NES_CHIP: Chip = {
 	type: 'nes',
 	name: '2A03 / 2A07',
-	wasmUrl: 'nes_apu.wasm',
+	wasmUrl: 'nes/nes_apu.wasm',
 	audioSlotKind: NES_AUDIO_SLOT_KIND,
 	processorMap: (chip) => new NESProcessor(chip),
 	schema: NES_CHIP_SCHEMA,

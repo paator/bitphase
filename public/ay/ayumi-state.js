@@ -1,5 +1,5 @@
 import { DEFAULT_AYM_FREQUENCY } from './ayumi-constants.js';
-import TrackerState from './tracker-state.js';
+import TrackerState from '../tracker/tracker-state.js';
 
 const AY_CHANNEL_ARRAY_SPECS = [
 	['channelInstruments', -1],

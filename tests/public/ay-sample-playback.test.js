@@ -7,7 +7,7 @@ import {
 	resolveSamplePlaybackBounds,
 	resetChannelSamplePlayback,
 	resolveSamplePitchReferencePeriod
-} from '../../public/ay-sample-playback.js';
+} from '../../public/ay/ay-sample-playback.js';
 
 const DEFAULT_CLOCK_HZ = 1_773_400;
 const REFERENCE_PERIOD = resolveSamplePitchReferencePeriod(DEFAULT_CLOCK_HZ);

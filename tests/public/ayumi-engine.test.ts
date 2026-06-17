@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import AyumiEngine from '../../public/ayumi-engine.js';
-import AYChipRegisterState from '../../public/ay-chip-register-state.js';
+import AyumiEngine from '../../public/ay/ayumi-engine.js';
+import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 import {
 	TIMER_EFFECT_KIND_VOLUME,
 	TIMER_EFFECT_KIND_ENVELOPE_SHAPE,
@@ -15,7 +15,7 @@ import {
 	createVolumeTimerEffect,
 	createEnvelopeShapeTimerEffect,
 	createEnvelopePeriodTimerEffect
-} from '../../public/ay-timer-effect-constants.js';
+} from '../../public/ay/ay-timer-effect-constants.js';
 
 describe('AyumiEngine', () => {
 	let mockWasm: {

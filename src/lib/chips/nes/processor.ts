@@ -3,17 +3,37 @@ import type { Pattern, Instrument } from '../../models/song';
 import type { Table } from '../../models/project';
 import type {
 	MixerWorkletSlotProcessor,
+	SettingsSubscriber,
 	TuningTableSupport,
-	InstrumentSupport
+	InstrumentSupport,
+	PreviewNoteSupport
 } from '../base/processor';
+import type { ChipSettings } from '../../services/audio/chip-settings';
 import type { CatchUpSegment } from '../../services/audio/play-from-position';
 import { MixerWorkletBridge } from '../../services/audio/mixer-worklet-bridge';
+import { ensureNesInstrumentRows } from './instrument';
+
+function sanitizeInstrumentForWorklet(instrument: Instrument) {
+	return {
+		id: instrument.id,
+		chipType: instrument.chipType,
+		rows: ensureNesInstrumentRows(instrument.rows as Record<string, unknown>[]),
+		loop: instrument.loop,
+		name: instrument.name
+	};
+}
 
 export class NESProcessor
-	implements MixerWorkletSlotProcessor, TuningTableSupport, InstrumentSupport
+	implements
+		MixerWorkletSlotProcessor,
+		SettingsSubscriber,
+		TuningTableSupport,
+		InstrumentSupport,
+		PreviewNoteSupport
 {
 	chip: Chip;
 	private readonly bridge: MixerWorkletBridge;
+	private settingsUnsubscribers: (() => void)[] = [];
 
 	constructor(chip: Chip) {
 		this.chip = chip;
@@ -22,6 +42,31 @@ export class NESProcessor
 
 	bindChipIndex(index: number): void {
 		this.bridge.bindChipIndex(index);
+	}
+
+	subscribeToSettings(chipSettings: ChipSettings): void {
+		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('chipFrequency', (value) => {
+				if (typeof value === 'number') {
+					this.sendUpdateCpuFrequency(value);
+				}
+			})
+		);
+
+		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('chipVariant', (value) => {
+				if (typeof value === 'string') {
+					this.sendUpdateChipVariant(value);
+				}
+			})
+		);
+	}
+
+	unsubscribeFromSettings(): void {
+		for (const unsubscribe of this.settingsUnsubscribers) {
+			unsubscribe();
+		}
+		this.settingsUnsubscribers = [];
 	}
 
 	initialize(wasmBuffer: ArrayBuffer, audioNode: AudioWorkletNode): void {
@@ -36,6 +81,23 @@ export class NESProcessor
 
 	acceptWorkletPayload(data: unknown): void {
 		this.bridge.acceptWorkletPayload(data);
+	}
+
+	setWaveformCallback(callback: (channels: Float32Array[]) => void): void {
+		this.bridge.setWaveformCallback(callback);
+	}
+
+	setChannelToneHzCallback(
+		callback: (payload: {
+			frequencies: (number | null)[];
+			sidTimerHz: (number | null)[];
+			syncbuzzerTimerHz: (number | null)[];
+			timerPwmSweepPhase: (number | null)[];
+			channelInstrumentIndex: number[];
+			registers: number[];
+		}) => void
+	): void {
+		this.bridge.setChannelToneHzCallback(callback);
 	}
 
 	setCallbacks(
@@ -101,13 +163,9 @@ export class NESProcessor
 	}
 
 	sendInitInstruments(instruments: Instrument[]): void {
-		const sanitized = instruments.map((instrument) => ({
-			id: instrument.id,
-			chipType: instrument.chipType,
-			rows: Array.from(instrument.rows).map((row) => ({ ...row })),
-			loop: instrument.loop,
-			name: instrument.name
-		}));
+		const sanitized = instruments.map((instrument) =>
+			sanitizeInstrumentForWorklet(instrument)
+		);
 		this.bridge.sendCommand({ type: 'init_instruments', instruments: sanitized });
 	}
 
@@ -128,6 +186,28 @@ export class NESProcessor
 			pattern,
 			speed
 		});
+	}
+
+	playPreviewRow(pattern: Pattern, rowIndex: number, instrument?: Instrument): void {
+		const sanitized = instrument ? sanitizeInstrumentForWorklet(instrument) : undefined;
+		this.bridge.sendCommand({
+			type: 'preview_row',
+			pattern,
+			rowIndex,
+			instrument: sanitized
+		});
+	}
+
+	stopPreviewNote(channel?: number): void {
+		this.bridge.sendCommand({ type: 'stop_preview', channel });
+	}
+
+	sendUpdateCpuFrequency(cpuFrequency: number): void {
+		this.bridge.sendCommand({ type: 'update_cpu_frequency', cpuFrequency });
+	}
+
+	sendUpdateChipVariant(chipVariant: string): void {
+		this.bridge.sendCommand({ type: 'update_chip_variant', chipVariant });
 	}
 
 	updateParameter(parameter: string, value: unknown): void {

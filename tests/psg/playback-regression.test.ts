@@ -5,11 +5,11 @@ import fs from 'fs';
 import { gunzipSync } from 'zlib';
 import { generatePSGBuffer } from '@/lib/services/file/psg-export';
 import { FileImportService } from '@/lib/services/file/file-import';
-import AyumiState from '../../public/ayumi-state.js';
-import AYAudioDriver from '../../public/ay-audio-driver.js';
-import AYChipRegisterState from '../../public/ay-chip-register-state.js';
-import TrackerPatternProcessor from '../../public/tracker-pattern-processor.js';
-import VirtualChannelMixer from '../../public/virtual-channel-mixer.js';
+import AyumiState from '../../public/ay/ayumi-state.js';
+import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
+import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
+import TrackerPatternProcessor from '../../public/tracker/tracker-pattern-processor.js';
+import VirtualChannelMixer from '../../public/ay/virtual-channel-mixer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

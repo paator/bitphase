@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import TrackerState from '../../public/tracker-state.js';
+import TrackerState from '../../public/tracker/tracker-state.js';
 
 describe('TrackerState', () => {
 	describe('constructor', () => {

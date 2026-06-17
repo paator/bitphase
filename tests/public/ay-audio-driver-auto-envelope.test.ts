@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import AYAudioDriver from '../../public/ay-audio-driver.js';
-import AyumiState from '../../public/ayumi-state.js';
+import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
+import AyumiState from '../../public/ay/ayumi-state.js';
 
 describe('AYAudioDriver - Auto Envelope (EA)', () => {
 	let driver: InstanceType<typeof AYAudioDriver>;

@@ -16,7 +16,7 @@ import {
 } from './ay-timer-effect-constants.js';
 import AYAudioDriver from './ay-audio-driver.js';
 import AyumiEngine from './ayumi-engine.js';
-import TrackerPatternProcessor from './tracker-pattern-processor.js';
+import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
 import { Ay8910WorkletSlot } from './ay8910-worklet-slot.js';
 
 export class AyumiSlot extends Ay8910WorkletSlot {

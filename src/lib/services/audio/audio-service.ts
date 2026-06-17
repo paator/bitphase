@@ -15,7 +15,7 @@ import { filterInstrumentsForChip } from '../instrument/instrument-filter';
 import type { Pattern } from '../../models/song';
 
 const BITPHASE_AUDIO_PROCESSOR = 'bitphase-audio-processor';
-const BITPHASE_AUDIO_MODULE = `${BITPHASE_AUDIO_PROCESSOR}.js`;
+const BITPHASE_AUDIO_MODULE = 'audio/bitphase-audio-processor.js';
 
 export interface PlayFromRowOptions {
 	catchUpSegments?: CatchUpSegment[];

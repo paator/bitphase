@@ -1,7 +1,33 @@
 import AYChipRegisterState from './ay-chip-register-state.js';
-import EffectAlgorithms from './effect-algorithms.js';
-import { PT3VolumeTable } from './pt3-volume-table.js';
-import { normalizeAyInstrumentFields, getAySidBaseVolume, computeTimerEffectPeriod, computeTimerPwmPeriods, effectiveRowTimerWaveform, effectiveRowFmWaveform, effectiveRowFmWaveformLoop, effectiveRowEnvFmWaveform, effectiveRowEnvFmWaveformLoop, resolveAyFmOffsetMode, effectiveRowTimerWaveformLoop, effectiveRowTimerPwmDuty, effectiveRowTimerPwmSweep, effectiveRowTimerPwmSweepMin, rowSupportsSidTimerPwm, rowSupportsSyncbuzzerTimerPwm, rowSupportsFmTimerPwm, rowSupportsEnvFmTimerPwm, rowSupportsTimerPwm, rowUsesSyncbuzzerPwmDuty, resolveSyncbuzzerWaveform, isPatternEnvelopeShapeSet, advanceTimerPwmSweep, DEFAULT_AY_TIMER_PWM_DUTY } from './ay-instrument-utils.js';
+import EffectAlgorithms from '../tracker/effect-algorithms.js';
+import { PT3VolumeTable } from '../tracker/pt3-volume-table.js';
+import { advanceInstrumentRowPosition } from '../tracker/tracker-audio-utils.js';
+import {
+	normalizeAyInstrumentFields,
+	getAySidBaseVolume,
+	computeTimerEffectPeriod,
+	computeTimerPwmPeriods,
+	effectiveRowTimerWaveform,
+	effectiveRowFmWaveform,
+	effectiveRowFmWaveformLoop,
+	effectiveRowEnvFmWaveform,
+	effectiveRowEnvFmWaveformLoop,
+	resolveAyFmOffsetMode,
+	effectiveRowTimerWaveformLoop,
+	effectiveRowTimerPwmDuty,
+	effectiveRowTimerPwmSweep,
+	effectiveRowTimerPwmSweepMin,
+	rowSupportsSidTimerPwm,
+	rowSupportsSyncbuzzerTimerPwm,
+	rowSupportsFmTimerPwm,
+	rowSupportsEnvFmTimerPwm,
+	rowSupportsTimerPwm,
+	rowUsesSyncbuzzerPwmDuty,
+	resolveSyncbuzzerWaveform,
+	isPatternEnvelopeShapeSet,
+	advanceTimerPwmSweep,
+	DEFAULT_AY_TIMER_PWM_DUTY
+} from './ay-instrument-utils.js';
 import {
 	instrumentHasSample,
 	computeSampleSidPeriod,
@@ -22,15 +48,6 @@ import {
 	disableAllChannelTimerEffects,
 	disableTimerEffect
 } from './ay-timer-effect-constants.js';
-
-function advanceInstrumentRowPosition(position, rowsLength, loop) {
-	const length = rowsLength > 0 ? rowsLength : 1;
-	let next = position + 1;
-	if (next >= length) {
-		next = loop > 0 && loop < length ? loop : 0;
-	}
-	return next;
-}
 
 class AYAudioDriver {
 	constructor(channelCount = 3) {

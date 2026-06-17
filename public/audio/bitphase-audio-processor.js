@@ -1,4 +1,4 @@
-import SongTimeline from './song-timeline.js';
+import SongTimeline from '../tracker/song-timeline.js';
 import { createAudioSlot } from './audio-slot-registry.js';
 import './builtin-audio-slots.js';
 

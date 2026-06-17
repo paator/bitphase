@@ -57,7 +57,7 @@ export class AYChipRenderer implements ChipRenderer {
 		onProgress?: (progress: number, message: string) => void
 	): Promise<{ wasm: any; wasmBuffer: ArrayBuffer }> {
 		onProgress?.(0, 'Loading WASM module...');
-		const wasmBuffer = await this.loader.loadWasm('ayumi.wasm');
+		const wasmBuffer = await this.loader.loadWasm('ay/ayumi.wasm');
 
 		onProgress?.(10, 'Instantiating WASM...');
 		const result = await WebAssembly.instantiate(wasmBuffer, {
