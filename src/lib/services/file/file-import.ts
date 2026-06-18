@@ -15,6 +15,7 @@ import {
 } from '../../models/song';
 import { isValidInstrumentSampleByteLength } from '../../utils/audio-sample-decode';
 import { normalizeSamplePlaybackBounds } from '../../chips/ay/sample-region';
+import { normalizeNesInstrumentRow } from '../../chips/nes/instrument';
 import type { ChipSchema } from '../../chips/base/schema';
 import { computeEffectiveChannelLabels } from '../../models/virtual-channels';
 
@@ -199,7 +200,9 @@ function reconstructInstrument(data: any): Instrument {
 		typeof data.chipType === 'string' ? data.chipType : 'ay'
 	);
 	if (data.rows) {
-		instrument.rows = data.rows.map((rowData: any) => reconstructInstrumentRow(rowData));
+		instrument.rows = data.rows.map((rowData: any) =>
+			reconstructInstrumentRow(rowData, instrument.chipType)
+		);
 	}
 	if (data.timerRows) {
 		(
@@ -368,23 +371,30 @@ function reconstructInstrument(data: any): Instrument {
 	return instrument;
 }
 
-function reconstructInstrumentRow(data: any): InstrumentRow {
-	return new InstrumentRow({
-		tone: data.tone ?? false,
-		noise: data.noise ?? false,
-		envelope: data.envelope ?? false,
-		toneAdd: data.toneAdd ?? 0,
-		noiseAdd: data.noiseAdd ?? 0,
-		envelopeAdd: data.envelopeAdd ?? 0,
-		envelopeAccumulation: data.envelopeAccumulation ?? false,
-		volume: data.volume ?? 0,
-		loop: data.loop ?? false,
-		amplitudeSliding: data.amplitudeSliding ?? false,
-		amplitudeSlideUp: data.amplitudeSlideUp ?? false,
-		toneAccumulation: data.toneAccumulation ?? false,
-		noiseAccumulation: data.noiseAccumulation ?? false,
-		retriggerEnvelope: data.retriggerEnvelope ?? false
-	});
+function reconstructInstrumentRow(data: any, chipType?: string): InstrumentRow {
+	const rowData = data ?? {};
+	switch (chipType) {
+		case 'nes':
+			return new InstrumentRow(normalizeNesInstrumentRow(rowData));
+		case 'ay':
+		default:
+			return new InstrumentRow({
+				tone: rowData.tone ?? false,
+				noise: rowData.noise ?? false,
+				envelope: rowData.envelope ?? false,
+				toneAdd: rowData.toneAdd ?? 0,
+				noiseAdd: rowData.noiseAdd ?? 0,
+				envelopeAdd: rowData.envelopeAdd ?? 0,
+				envelopeAccumulation: rowData.envelopeAccumulation ?? false,
+				volume: rowData.volume ?? 0,
+				loop: rowData.loop ?? false,
+				amplitudeSliding: rowData.amplitudeSliding ?? false,
+				amplitudeSlideUp: rowData.amplitudeSlideUp ?? false,
+				toneAccumulation: rowData.toneAccumulation ?? false,
+				noiseAccumulation: rowData.noiseAccumulation ?? false,
+				retriggerEnvelope: rowData.retriggerEnvelope ?? false
+			});
+	}
 }
 
 export class FileImportService {

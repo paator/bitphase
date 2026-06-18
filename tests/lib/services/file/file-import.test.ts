@@ -57,4 +57,37 @@ describe('FileImportService', () => {
 		expect(fields.timerRows[0]?.fmWaveform).toEqual([0, 12, -4]);
 		expect(fields.timerRows[0]?.envFmWaveform).toEqual([0, -7, 24]);
 	});
+
+	it('preserves NES pulse width and retrigger when reconstructing instruments', async () => {
+		const json = JSON.stringify({
+			name: 'test',
+			songs: [],
+			instruments: [
+				{
+					id: '01',
+					chipType: 'nes',
+					name: 'Pulse',
+					loop: 0,
+					rows: [
+						{
+							pulseWidth: 1,
+							retrigger: true,
+							toneAdd: -2,
+							toneAccumulation: true
+						}
+					]
+				}
+			],
+			patterns: [],
+			tables: []
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+		const row = project.instruments[0]?.rows[0];
+
+		expect(row?.pulseWidth).toBe(1);
+		expect(row?.retrigger).toBe(true);
+		expect(row?.toneAdd).toBe(-2);
+		expect(row?.toneAccumulation).toBe(true);
+	});
 });
