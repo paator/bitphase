@@ -5,7 +5,7 @@ import {
 } from '../../chips/base/processor';
 import type { Chip } from '../../chips/types';
 import type { Table } from '../../models/project';
-import { ChipSettings } from './chip-settings';
+import { ChipSettingsRegistry } from './chip-settings';
 import type { CatchUpSegment } from './play-from-position';
 import { channelMuteStore } from '../../stores/channel-mute.svelte';
 import { waveformStore } from '../../stores/waveform.svelte';
@@ -28,7 +28,7 @@ export class AudioService {
 	private _audioContext: AudioContext | null = new AudioContext();
 	private _isPlaying = false;
 	private _previewChipIndices = new Set<number>();
-	public chipSettings: ChipSettings = new ChipSettings();
+	public chipSettings = new ChipSettingsRegistry();
 	private _masterGainNode: GainNode | null = null;
 	private _playPatternRestoreOrder: number[] | null = null;
 	private _playPatternRestoreLoopPointId = 0;
@@ -106,6 +106,7 @@ export class AudioService {
 				const wasmBuffer = await this._loadWasm(processor.chip.wasmUrl);
 				if (revision !== this._processorRevision || !this._mixerNode) return;
 				processor.initialize(wasmBuffer, this._mixerNode);
+				this.chipSettings.forChip(processor.chip.type).renotifyAll();
 			}
 		}
 	}
@@ -125,7 +126,7 @@ export class AudioService {
 
 		let unsubscribeSettings: (() => void) | undefined;
 		if (this.hasSettingsSubscription(processor)) {
-			processor.subscribeToSettings(this.chipSettings);
+			processor.subscribeToSettings(this.chipSettings.forChip(chip.type));
 			unsubscribeSettings = () => processor.unsubscribeFromSettings();
 		}
 
@@ -155,6 +156,7 @@ export class AudioService {
 
 		processor.bindChipIndex(chipIndex);
 		processor.initialize(wasmBuffer, this._mixerNode);
+		this.chipSettings.forChip(chip.type).renotifyAll();
 
 		const processorWithWaveform = processor as {
 			setWaveformCallback?: (cb: (channels: Float32Array[]) => void) => void;

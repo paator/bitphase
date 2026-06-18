@@ -201,7 +201,7 @@
 				.forEach((s) => {
 					const value = firstSong[s.key] ?? s.defaultValue;
 					if (value !== undefined) {
-						container.audioService.chipSettings.set(s.key, value);
+						container.audioService.chipSettings.forChip(chipType).set(s.key, value);
 					}
 				});
 		});

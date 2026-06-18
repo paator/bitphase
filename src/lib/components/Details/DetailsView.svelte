@@ -129,7 +129,14 @@
 			]
 		);
 		if (setting.notifyAudioService) {
-			services.audioService.chipSettings.set(key, value);
+			for (const group of chipsByType) {
+				const notifies = group.chip.schema.settings?.some(
+					(s) => s.key === key && s.notifyAudioService
+				);
+				if (notifies) {
+					services.audioService.chipSettings.forChip(group.type).set(key, normalized);
+				}
+			}
 		}
 	}
 
@@ -144,7 +151,7 @@
 		for (const s of songsOfType) {
 			s.tuningTable = table;
 		}
-		services.audioService.chipSettings.set('tuningTable', [...table]);
+		services.audioService.chipSettings.forChip(chipType).set('tuningTable', [...table]);
 	}
 
 	function getChipSettingValue(chipType: string, key: string): unknown {
@@ -188,7 +195,7 @@
 		const songsOfType = songs.filter((s) => s.chipType === chipType);
 		for (const [updateKey, updateValue] of Object.entries(updates)) {
 			const currentValue = getChipSettingValue(chipType, updateKey);
-			const audioValue = services.audioService.chipSettings.get(updateKey);
+			const audioValue = services.audioService.chipSettings.forChip(chipType).get(updateKey);
 			const updateSetting = chipSettings.find((s) => s.key === updateKey);
 			const needsSongUpdate = songsOfType.some(
 				(song) => (song as unknown as Record<string, unknown>)[updateKey] !== updateValue
@@ -211,7 +218,7 @@
 				for (const processor of processors) {
 					processor.updateParameter(updateKey, updateValue);
 				}
-				services.audioService.chipSettings.set(updateKey, updateValue);
+				services.audioService.chipSettings.forChip(chipType).set(updateKey, updateValue);
 			}
 		}
 	}
@@ -274,7 +281,7 @@
 			for (const processor of processors) {
 				processor.updateParameter(key, normalized);
 			}
-			services.audioService.chipSettings.set(key, normalized);
+			services.audioService.chipSettings.forChip(chipType).set(key, normalized);
 
 			if (chip) {
 				const context = buildChipContext(chipType, chipSettings);

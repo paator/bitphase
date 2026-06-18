@@ -111,6 +111,10 @@ class ProjectStore {
 	}
 
 	addSong(song: Song): void {
+		const projectInitialSpeed = this.settings.initialSpeed;
+		if (typeof projectInitialSpeed === 'number' && projectInitialSpeed >= 1) {
+			song.initialSpeed = projectInitialSpeed;
+		}
 		this.songs = [...this.songs, song];
 		this.patterns = [...this.patterns, song.patterns];
 	}

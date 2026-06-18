@@ -54,6 +54,28 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		}
 	}
 
+	_afterPlaybackPositionSet(rowIndex) {
+		this._primePatternRowForPlayback(rowIndex);
+	}
+
+	_primePatternRowForPlayback(rowIndex) {
+		if (!this._chipEngineReady()) {
+			return;
+		}
+		const pattern = this.state.currentPattern;
+		if (!pattern?.length || rowIndex < 0 || rowIndex >= pattern.length) {
+			return;
+		}
+		if (pattern.channels?.length) {
+			this._resizeForPatternChannels(pattern.channels.length);
+		}
+		this.patternProcessor.parsePatternRow(pattern, rowIndex, this.registerState);
+		this.patternProcessor.processSpeedTable();
+		this.enforceMuteState();
+		this._processTrackerTick();
+		this._applyRegisterStateToEngine();
+	}
+
 	_afterTransportStop() {
 		this.handleStopPreview();
 	}
@@ -148,6 +170,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 
 	handleInitSpeed({ speed }) {
 		if (!(speed > 0)) return;
+		if (this.chipIndex !== 0) return;
 		this.state.publishPlaybackSpeed(speed);
 	}
 

@@ -166,7 +166,6 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 				this.state.channelEnvelopeEnabled[ch] = false;
 			}
 		}
-		this._applyRegisterStateToEngine();
 	}
 
 	ensurePlaybackWorkers() {
@@ -194,6 +193,6 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 	}
 
 	canRender() {
-		return this.initialized && this.state.wasmModule && this.state.ayumiPtr;
+		return Boolean(this.initialized && this.state.wasmModule && this.state.ayumiPtr);
 	}
 }

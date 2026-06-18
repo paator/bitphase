@@ -56,7 +56,7 @@
 	let hoverStepIndex = $state<number | null>(null);
 
 	const chipVariant = $derived(
-		resolveAyChipVariant(containerContext.audioService.chipSettings.get('chipVariant'))
+		resolveAyChipVariant(containerContext.audioService.chipSettings.forChip('ay').get('chipVariant'))
 	);
 
 	const waveform = $derived(controller.rowTimerWaveform(rowIndex));

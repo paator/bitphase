@@ -52,7 +52,6 @@ export class TimelinePatternCoordinator {
 				pattern: data.pattern,
 				orderIndex: data.patternOrderIndex
 			};
-			this.nextPatternRequested = false;
 			return;
 		}
 

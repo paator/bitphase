@@ -97,7 +97,6 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 				this.audioDriver._silenceChannel(this.registerState, ch);
 			}
 		}
-		this._applyRegisterStateToEngine();
 	}
 
 	async handleMessage(payload) {
@@ -192,7 +191,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	}
 
 	canRender() {
-		return this.initialized && this.state.wasmModule && this.state.apuPtr;
+		return Boolean(this.initialized && this.state.wasmModule && this.state.apuPtr);
 	}
 
 	_collectPlaybackHz() {

@@ -139,6 +139,17 @@ describe('ProjectService', () => {
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledOnce();
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledWith(mockChip);
 		});
+
+		it('should inherit initialSpeed from an existing song', async () => {
+			const mockChip = createMockChip();
+			const existing = new Song(mockChip.schema);
+			existing.chipType = CHIP_TYPE_AY;
+			existing.initialSpeed = 12;
+
+			const song = await projectService.createNewSong(mockChip, [existing]);
+
+			expect(song.initialSpeed).toBe(12);
+		});
 	});
 
 	describe('restoreChipProcessorsForSongs', () => {

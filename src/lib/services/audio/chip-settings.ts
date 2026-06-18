@@ -42,4 +42,23 @@ export class ChipSettings {
 			this.set(key, value);
 		});
 	}
+
+	renotifyAll(): void {
+		for (const [key, value] of this.settings) {
+			this.notify(key, value);
+		}
+	}
+}
+
+export class ChipSettingsRegistry {
+	private readonly stores = new Map<string, ChipSettings>();
+
+	forChip(chipType: string): ChipSettings {
+		let store = this.stores.get(chipType);
+		if (!store) {
+			store = new ChipSettings();
+			this.stores.set(chipType, store);
+		}
+		return store;
+	}
 }

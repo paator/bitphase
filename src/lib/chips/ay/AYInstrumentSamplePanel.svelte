@@ -81,7 +81,7 @@
 	});
 
 	$effect(() => {
-		const chipSettings = containerContext.audioService.chipSettings;
+		const chipSettings = containerContext.audioService.chipSettings.forChip('ay');
 		return chipSettings.subscribe('chipVariant', (value) => {
 			chipVariant = resolveAyChipVariant(value);
 		});

@@ -324,9 +324,6 @@
 			const songPatterns = projectStore.patterns[index];
 			if (!song || !songPatterns) return;
 
-			const currentPattern = songPatterns.find((p) => p.id === patternId);
-			if (!currentPattern) return;
-
 			const withVirtual = chipProcessor as ChipProcessor & Partial<VirtualChannelSupport>;
 			if (withVirtual.sendVirtualChannelConfig) {
 				const hwLabels = chipProcessor.chip?.schema?.channelLabels ?? ['A', 'B', 'C'];
@@ -336,7 +333,6 @@
 				);
 			}
 
-			chipProcessor.sendInitPattern(currentPattern, patternOrderIndexForInit);
 			chipProcessor.sendInitTables(projectStore.tables);
 
 			const withTuningTables = chipProcessor as ChipProcessor & Partial<TuningTableSupport>;
@@ -349,6 +345,11 @@
 					filterInstrumentsForChip(projectStore.instruments, chipProcessor.chip.type)
 				);
 			}
+
+			const currentPattern = songPatterns.find((p) => p.id === patternId);
+			if (!currentPattern) return;
+
+			chipProcessor.sendInitPattern(currentPattern, patternOrderIndexForInit);
 		});
 
 		if (!playPattern) {

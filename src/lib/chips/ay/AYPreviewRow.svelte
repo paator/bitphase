@@ -124,7 +124,7 @@
 	$effect(() => {
 		return () => {
 			if (savedStereoLayout !== undefined) {
-				containerContext.audioService.chipSettings.set('stereoLayout', savedStereoLayout);
+				containerContext.audioService.chipSettings.forChip(chip.type).set('stereoLayout', savedStereoLayout);
 				savedStereoLayout = undefined;
 			}
 		};
@@ -134,7 +134,7 @@
 		const processors = previewProcessors as unknown as PreviewNoteSupport[];
 		if (processors.length === 0) return;
 		const hasNotes = effectiveNoteStrings.length > 0;
-		const chipSettings = containerContext.audioService.chipSettings;
+		const chipSettings = containerContext.audioService.chipSettings.forChip(chip.type);
 		if (!hasNotes) {
 			if (hadActiveNotes) {
 				hadActiveNotes = false;

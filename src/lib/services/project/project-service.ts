@@ -31,6 +31,9 @@ export class ProjectService {
 		newSong.chipType = chip.type;
 		applySchemaDefaults(newSong, chip.schema);
 		this.applyChipDefaults(newSong, chip.schema);
+		if (existingSongs.length > 0) {
+			newSong.initialSpeed = existingSongs[0].initialSpeed;
+		}
 		this.syncFromPeerSongs(newSong, existingSongs, chip.schema);
 		await this.audioService.addChipProcessor(chip);
 		return newSong;
