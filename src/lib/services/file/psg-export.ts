@@ -332,16 +332,16 @@ class PsgExportService {
 
 		onProgress?.(10, 'Loading processor modules...');
 		const baseUrl = import.meta.env.BASE_URL;
-		const { default: AyumiState } = await import(`${baseUrl}ayumi-state.js`);
+		const { default: AyumiState } = await import(`${baseUrl}ay/ayumi-state.js`);
 		const { default: TrackerPatternProcessor } = await import(
-			`${baseUrl}tracker-pattern-processor.js`
+			`${baseUrl}tracker/tracker-pattern-processor.js`
 		);
-		const { default: AYAudioDriver } = await import(`${baseUrl}ay-audio-driver.js`);
+		const { default: AYAudioDriver } = await import(`${baseUrl}ay/ay-audio-driver.js`);
 		const { default: AYChipRegisterState } = await import(
-			`${baseUrl}ay-chip-register-state.js`
+			`${baseUrl}ay/ay-chip-register-state.js`
 		);
 		const { default: VirtualChannelMixer } = await import(
-			`${baseUrl}virtual-channel-mixer.js`
+			`${baseUrl}ay/virtual-channel-mixer.js`
 		);
 
 		const modules: PsgExportModules = {
@@ -457,16 +457,16 @@ export async function captureSongRegisterFrames(
 		modules = options.modules;
 	} else {
 		const baseUrl = import.meta.env.BASE_URL;
-		const { default: AyumiState } = await import(`${baseUrl}ayumi-state.js`);
+		const { default: AyumiState } = await import(`${baseUrl}ay/ayumi-state.js`);
 		const { default: TrackerPatternProcessor } = await import(
-			`${baseUrl}tracker-pattern-processor.js`
+			`${baseUrl}tracker/tracker-pattern-processor.js`
 		);
-		const { default: AYAudioDriver } = await import(`${baseUrl}ay-audio-driver.js`);
+		const { default: AYAudioDriver } = await import(`${baseUrl}ay/ay-audio-driver.js`);
 		const { default: AYChipRegisterState } = await import(
-			`${baseUrl}ay-chip-register-state.js`
+			`${baseUrl}ay/ay-chip-register-state.js`
 		);
 		const { default: VirtualChannelMixer } = await import(
-			`${baseUrl}virtual-channel-mixer.js`
+			`${baseUrl}ay/virtual-channel-mixer.js`
 		);
 		modules = {
 			AyumiState,
