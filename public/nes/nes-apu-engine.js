@@ -14,7 +14,7 @@ const NOISE_BASE = 0x400c;
 const SQUARE_SWEEP_DISABLED = 0x08;
 
 function buildSquareVolumeReg(volume, duty) {
-	return (1 << 4) | (volume & 15) | ((duty & 3) << 6);
+	return (3 << 4) | (volume & 15) | ((duty & 3) << 6);
 }
 
 class NesApuEngine {
@@ -26,10 +26,11 @@ class NesApuEngine {
 		this.cpuFrequency = NES_NTSC_CPU_FREQUENCY;
 		this.isPal = false;
 		this.clockAccumulator = 0;
-		this.outputPtr = wasmModule.malloc(8);
+		this.outputPtr = wasmModule.malloc(16);
 		this.forceFullApply = false;
 		this._lastApu4015 = -1;
 		this._lastDmc4015 = -1;
+		this._lastOutput = { left: 0, right: 0 };
 	}
 
 	setCpuFrequency(frequency) {
@@ -61,10 +62,10 @@ class NesApuEngine {
 		const last = this.lastState.channels[channelIndex];
 		const base = SQUARE_BASE[channelIndex];
 		const volumeReg = buildSquareVolumeReg(channel.volume, channel.duty);
-		const periodLow = channel.period & 0xff;
-		const periodHigh = (NES_SQUARE_LENGTH_NIBBLE << 3) | ((channel.period >> 8) & 7);
-		const lastPeriodHigh =
-			(NES_SQUARE_LENGTH_NIBBLE << 3) | ((last.period >> 8) & 7);
+		const period = channel.period > 0 ? channel.period - 1 : 0;
+		const periodLow = period & 0xff;
+		const periodHigh = (NES_SQUARE_LENGTH_NIBBLE << 3) | ((period >> 8) & 7);
+		const lastPeriodHigh = (NES_SQUARE_LENGTH_NIBBLE << 3) | ((last.period >> 8) & 7);
 
 		if (forceApply || volumeReg !== buildSquareVolumeReg(last.volume, last.duty)) {
 			this.wasmModule.nes_apu_Write(this.apuPtr, base, volumeReg);
@@ -85,7 +86,7 @@ class NesApuEngine {
 			this.wasmModule.nes_apu_Write(this.apuPtr, base + 3, periodHigh);
 		}
 
-		last.period = channel.period;
+		last.period = period;
 		last.retrigger = channel.retrigger;
 	}
 
@@ -94,8 +95,7 @@ class NesApuEngine {
 		const linearReg = (1 << 7) | NES_TRIANGLE_LINEAR_RELOAD;
 		const periodLow = channel.period & 0xff;
 		const periodHigh = (NES_SQUARE_LENGTH_NIBBLE << 3) | ((channel.period >> 8) & 7);
-		const lastPeriodHigh =
-			(NES_SQUARE_LENGTH_NIBBLE << 3) | ((last.period >> 8) & 7);
+		const lastPeriodHigh = (NES_SQUARE_LENGTH_NIBBLE << 3) | ((last.period >> 8) & 7);
 
 		if (forceApply || linearReg !== ((1 << 7) | NES_TRIANGLE_LINEAR_RELOAD)) {
 			this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, linearReg);
@@ -125,7 +125,11 @@ class NesApuEngine {
 			last.noiseMode = channel.noiseMode;
 		}
 		if (forceApply || triggerChannel || channel.retrigger) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, NOISE_BASE + 3, NES_SQUARE_LENGTH_NIBBLE << 3);
+			this.wasmModule.nes_dmc_Write(
+				this.dmcPtr,
+				NOISE_BASE + 3,
+				NES_SQUARE_LENGTH_NIBBLE << 3
+			);
 			last.retrigger = channel.retrigger;
 		}
 	}
@@ -205,7 +209,7 @@ class NesApuEngine {
 		this.clockAccumulator += this.cpuFrequency / sampleRate;
 		const clocks = Math.floor(this.clockAccumulator);
 		if (clocks <= 0) {
-			return { left: 0, right: 0 };
+			return this._lastOutput;
 		}
 		this.clockAccumulator -= clocks;
 
@@ -215,11 +219,12 @@ class NesApuEngine {
 
 		const memory = this.wasmModule.memory.buffer;
 		this.wasmModule.nes_apu_Render(this.apuPtr, this.outputPtr);
-		this.wasmModule.nes_dmc_Render(this.dmcPtr, this.outputPtr + 4);
-		const samples = new Int32Array(memory, this.outputPtr, 2);
-		const left = (samples[0] + samples[1]) * NES_APU_OUTPUT_SCALE;
-		const right = left;
-		return { left, right };
+		this.wasmModule.nes_dmc_Render(this.dmcPtr, this.outputPtr + 8);
+		const samples = new Int32Array(memory, this.outputPtr, 4);
+		const left = (samples[0] + samples[2]) * NES_APU_OUTPUT_SCALE;
+		const right = (samples[1] + samples[3]) * NES_APU_OUTPUT_SCALE;
+		this._lastOutput = { left, right };
+		return this._lastOutput;
 	}
 
 	dispose() {

@@ -13,15 +13,16 @@ import { NES_CHANNEL_COUNT } from './nes-constants.js';
 const NES_NOISE_TABLE = [
 	6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12,
 	11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7,
-	6, 5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
-	0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+	6, 5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2,
+	1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15
+	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+	15, 15
 ];
 
 class NesAudioDriver {
@@ -85,7 +86,7 @@ class NesAudioDriver {
 	}
 
 	getEffectivePeriod(state, channelIndex) {
-		return getEffectiveTuningPeriod(state, channelIndex, 2047);
+		return getEffectiveTuningPeriod(state, channelIndex, 2048);
 	}
 
 	resolveNoisePeriod(state, channelIndex) {
@@ -102,9 +103,10 @@ class NesAudioDriver {
 
 	resolveInstrumentRow(state, channelIndex) {
 		const instrumentIndex = state.channelInstruments[channelIndex];
-		const instrument =
-			instrumentIndex >= 0 ? state.instruments[instrumentIndex] : null;
-		const rows = instrument ? ensureNesInstrumentRows(instrument.rows) : [createDefaultNesInstrumentRow()];
+		const instrument = instrumentIndex >= 0 ? state.instruments[instrumentIndex] : null;
+		const rows = instrument
+			? ensureNesInstrumentRows(instrument.rows)
+			: [createDefaultNesInstrumentRow()];
 		const loop = instrument?.loop ?? 0;
 		const rowIndex = state.instrumentPositions[channelIndex] % rows.length;
 		return {
@@ -122,7 +124,8 @@ class NesAudioDriver {
 			const isMuted = state.channelMuted[channelIndex];
 			const isSoundEnabled = state.channelSoundEnabled[channelIndex];
 			const onOffHalted =
-				state.channelOnOffCounter[channelIndex] > 0 && !state.channelSoundEnabled[channelIndex];
+				state.channelOnOffCounter[channelIndex] > 0 &&
+				!state.channelSoundEnabled[channelIndex];
 
 			if (isMuted || !isSoundEnabled) {
 				this._silenceChannel(registerState, channelIndex);
