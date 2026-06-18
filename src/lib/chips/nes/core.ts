@@ -16,7 +16,7 @@ export const NES_CHIP: Chip = {
 	schema: NES_CHIP_SCHEMA,
 	createConverter: () => new NESConverter(),
 	createFormatter: () => new NESFormatter(),
-	createRenderer: () => new NESChipRenderer(),
+	createRenderer: (loader, binding) => new NESChipRenderer(loader, binding),
 	instrumentEditor: undefined,
 	previewRow: undefined,
 	playbackDebug: NES_PLAYBACK_DEBUG

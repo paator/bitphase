@@ -115,24 +115,24 @@ export class AYChipRenderer implements ChipRenderer {
 		onProgress?.(20, 'Loading processor modules...');
 		const { default: AyumiState } = await this.loader.loadModule<{
 			default: new () => unknown;
-		}>('ayumi-state.js');
+		}>('ay/ayumi-state.js');
 		onProgress?.(30, 'Loading pattern processor...');
 		const { default: TrackerPatternProcessor } = await this.loader.loadModule<{
 			default: new (a: unknown, b: unknown, c: unknown) => unknown;
-		}>('tracker-pattern-processor.js');
+		}>('tracker/tracker-pattern-processor.js');
 		onProgress?.(40, 'Loading audio driver...');
 		const { default: AYAudioDriver } = await this.loader.loadModule<{
 			default: new () => unknown;
-		}>('ay-audio-driver.js');
+		}>('ay/ay-audio-driver.js');
 		const { default: AyumiEngine } = await this.loader.loadModule<{
 			default: new (a: unknown, b: unknown) => unknown;
-		}>('ayumi-engine.js');
+		}>('ay/ayumi-engine.js');
 		const { default: AYChipRegisterState } = await this.loader.loadModule<{
 			default: new () => unknown;
-		}>('ay-chip-register-state.js');
+		}>('ay/ay-chip-register-state.js');
 		const { default: VirtualChannelMixer } = await this.loader.loadModule<{
 			default: new () => unknown;
-		}>('virtual-channel-mixer.js');
+		}>('ay/virtual-channel-mixer.js');
 
 		return {
 			AyumiState,
@@ -564,7 +564,7 @@ export class AYChipRenderer implements ChipRenderer {
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
 		const { getPanSettingsForLayout } = await this.loader.loadModule<{
 			getPanSettingsForLayout: GetPanSettingsForLayout;
-		}>('ayumi-constants.js');
+		}>('ay/ayumi-constants.js');
 		const {
 			AyumiState,
 			TrackerPatternProcessor,
@@ -717,7 +717,7 @@ export class AYChipRenderer implements ChipRenderer {
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
 		const { getPanSettingsForLayout } = await this.loader.loadModule<{
 			getPanSettingsForLayout: GetPanSettingsForLayout;
-		}>('ayumi-constants.js');
+		}>('ay/ayumi-constants.js');
 		const ayumiPtr = this.initializeAyumi(wasm, song, getPanSettingsForLayout);
 		const {
 			AyumiState,
