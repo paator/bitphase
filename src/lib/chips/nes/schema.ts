@@ -1,8 +1,10 @@
 import type { ChipSchema } from '../base/schema';
+import { generate12TETTuningTable } from '../../models/pt3/tuning-tables';
 
 export const NES_NTSC_CPU_FREQUENCY = 1_789_773;
 export const NES_PAL_CPU_FREQUENCY = 1_662_607;
 export const NES_DENDY_CPU_FREQUENCY = 1_773_448;
+export const NES_MAX_TUNING_PERIOD = 2047;
 
 export type NesSystem = 'NTSC' | 'PAL' | 'Dendy';
 export type NesApuTimingType = 'NTSC' | 'PAL';
@@ -29,9 +31,11 @@ export function resolveNesApuTimingType(system: unknown): NesApuTimingType {
 	return NES_SYSTEM_CONFIG[resolveNesSystem(system)].apuTimingType;
 }
 
-export const NES_DEFAULT_TUNING_TABLE = Array.from({ length: 88 }, (_, index) =>
-	Math.max(1, 2034 - index * 8)
-);
+export function resolveNesTuningTable(cpuFrequencyHz: number, a4TuningHz: number): number[] {
+	return generate12TETTuningTable(cpuFrequencyHz, a4TuningHz, NES_MAX_TUNING_PERIOD);
+}
+
+export const NES_DEFAULT_TUNING_TABLE = resolveNesTuningTable(NES_NTSC_CPU_FREQUENCY, 440);
 
 export const NES_CHIP_SCHEMA: ChipSchema = {
 	chipType: 'nes',
@@ -104,8 +108,25 @@ export const NES_CHIP_SCHEMA: ChipSchema = {
 				const apuTimingType = resolveNesApuTimingType(value);
 				return `${mhz} MHz · ${apuTimingType} type`;
 			}
+		},
+		{
+			key: 'a4TuningHz',
+			label: 'A4 (Hz)',
+			type: 'number',
+			min: 220,
+			max: 880,
+			defaultValue: 440,
+			group: 'chip',
+			notifyAudioService: true,
+			startNewRow: true
 		}
 	],
+	resolveTuningTable(song) {
+		const cpuFreq = Number(song.chipFrequency ?? NES_NTSC_CPU_FREQUENCY);
+		const a4 = Math.min(880, Math.max(220, Number(song.a4TuningHz ?? 440)));
+		return resolveNesTuningTable(cpuFreq, a4);
+	},
+	tuningTableSettingKeys: ['a4TuningHz', 'chipFrequency'],
 	applySettingSideEffects(key, value) {
 		if (key === 'chipVariant') {
 			return [{ key: 'chipFrequency', value: resolveNesCpuFrequency(value) }];

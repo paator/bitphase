@@ -68,15 +68,19 @@ export const PT3TuneTables: number[][] = [
 const A4_NOTE_INDEX = 45;
 const TABLE_LENGTH = 96;
 const MIN_PERIOD = 1;
-const MAX_PERIOD = 4095;
+const DEFAULT_MAX_PERIOD = 4095;
 
-export function generate12TETTuningTable(chipFrequencyHz: number, a4Hz: number = 440): number[] {
+export function generate12TETTuningTable(
+	chipFrequencyHz: number,
+	a4Hz: number = 440,
+	maxPeriod: number = DEFAULT_MAX_PERIOD
+): number[] {
 	const result: number[] = [];
 	for (let i = 0; i < TABLE_LENGTH; i++) {
 		const freqHz = a4Hz * Math.pow(2, (i - A4_NOTE_INDEX) / 12);
 		const periodF = chipFrequencyHz / 16 / freqHz;
 		let period = Math.round(periodF);
-		if (period > MAX_PERIOD) period = MAX_PERIOD;
+		if (period > maxPeriod) period = maxPeriod;
 		if (period < MIN_PERIOD) period = MIN_PERIOD;
 		result.push(period);
 	}

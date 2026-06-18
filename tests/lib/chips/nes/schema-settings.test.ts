@@ -6,10 +6,12 @@ import {
 import {
 	NES_CHIP_SCHEMA,
 	NES_DENDY_CPU_FREQUENCY,
+	NES_MAX_TUNING_PERIOD,
 	NES_NTSC_CPU_FREQUENCY,
 	NES_PAL_CPU_FREQUENCY,
 	resolveNesApuTimingType,
-	resolveNesCpuFrequency
+	resolveNesCpuFrequency,
+	resolveNesTuningTable
 } from '@/lib/chips/nes/schema';
 
 describe('NES chip settings schema hooks', () => {
@@ -51,5 +53,27 @@ describe('NES chip settings schema hooks', () => {
 				chipVariant: 'Dendy'
 			})
 		).toEqual([{ key: 'chipFrequency', value: NES_DENDY_CPU_FREQUENCY }]);
+	});
+
+	it('builds a 12-TET tuning table from CPU frequency and A4', () => {
+		const table = resolveNesTuningTable(NES_NTSC_CPU_FREQUENCY, 440);
+		expect(table).toHaveLength(96);
+		expect(table.every((period) => period <= NES_MAX_TUNING_PERIOD)).toBe(true);
+		expect(table[45]).toBe(Math.round(NES_NTSC_CPU_FREQUENCY / 16 / 440));
+	});
+
+	it('regenerates tuning table when CPU frequency changes', () => {
+		const ntsc = resolveNesTuningTable(NES_NTSC_CPU_FREQUENCY, 440);
+		const pal = resolveNesTuningTable(NES_PAL_CPU_FREQUENCY, 440);
+		expect(ntsc[45]).not.toBe(pal[45]);
+	});
+
+	it('clamps A4 tuning Hz when resolving from song settings', () => {
+		const table = NES_CHIP_SCHEMA.resolveTuningTable!({
+			chipFrequency: NES_NTSC_CPU_FREQUENCY,
+			a4TuningHz: 1000
+		});
+		const expected = resolveNesTuningTable(NES_NTSC_CPU_FREQUENCY, 880);
+		expect(table[45]).toBe(expected[45]);
 	});
 });
