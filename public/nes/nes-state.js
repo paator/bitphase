@@ -14,7 +14,8 @@ const NES_CHANNEL_ARRAY_SPECS = [
 	['channelPatternVolumes', 15],
 	['channelMuted', false],
 	['channelSoundEnabled', false],
-	['channelKeyOn', false]
+	['channelKeyOn', false],
+	['channelToneAccumulator', 0]
 ];
 
 class NesState extends TrackerState {

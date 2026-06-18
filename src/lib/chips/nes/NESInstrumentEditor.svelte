@@ -26,6 +26,13 @@
 	} from '../../components/RowEditorTable';
 	import { ROW_SELECTION_STYLES } from '../../utils/row-selection';
 	import {
+		formatRowEditorNumber,
+		focusRowEditorInputInRow,
+		parseRowEditorNumericText,
+		shouldBlockRowEditorNumericKey
+	} from '../../utils/row-editor-numeric';
+	import { compactTableInputClass } from '../../utils/compact-table-input';
+	import {
 		createDefaultNesInstrumentRow,
 		cyclePulseWidth,
 		ensureNesInstrumentRows,
@@ -35,6 +42,7 @@
 
 	let {
 		instrument,
+		asHex = false,
 		isExpanded = false,
 		onInstrumentChange,
 		selectedRowIndices = $bindable([])
@@ -46,7 +54,7 @@
 		selectedRowIndices?: number[];
 	} = $props();
 
-	const TABLE_COLUMNS = 5;
+	const TABLE_COLUMNS = 7;
 	let tableRef: HTMLTableElement | null = $state(null);
 	let editorContainerRef: HTMLDivElement | null = $state(null);
 
@@ -91,6 +99,69 @@
 		nextRows[index] = next;
 		editorSync.applyRowChange(nextRows);
 	}
+
+	function updateBooleanRow(index: number, field: 'retrigger' | 'toneAccumulation', value: boolean) {
+		if (Boolean(editorSync.rows[index][field]) === value) return;
+		updateRow(index, { [field]: value });
+	}
+
+	function updateNumericField(index: number, field: 'toneAdd', event: Event) {
+		const inputEl = event.target as HTMLInputElement;
+		const parsed = parseRowEditorNumericText(inputEl.value, asHex);
+		if (parsed !== null) {
+			const normalized = formatRowEditorNumber(parsed, asHex);
+			if (inputEl.value !== normalized) {
+				inputEl.value = normalized;
+			}
+			updateRow(index, { [field]: parsed });
+		}
+	}
+
+	function handleNumericKeyDown(index: number, event: KeyboardEvent) {
+		const key = event.key;
+		const inputEl = event.target as HTMLInputElement;
+
+		if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+		if (key === 'ArrowDown') {
+			event.preventDefault();
+			const nextIndex = index + 1;
+			if (nextIndex < editorSync.rows.length) {
+				const currentRow = inputEl.closest('tr');
+				focusRowEditorInputInRow(
+					currentRow?.nextElementSibling as HTMLTableRowElement | null,
+					inputEl
+				);
+			} else if (nextIndex === editorSync.rows.length) {
+				editorSync.addRow(createDefaultNesInstrumentRow);
+				setTimeout(() => {
+					const currentRow = inputEl.closest('tr');
+					focusRowEditorInputInRow(
+						currentRow?.nextElementSibling as HTMLTableRowElement | null,
+						inputEl
+					);
+				}, 0);
+			}
+			return;
+		}
+
+		if (key === 'ArrowUp') {
+			event.preventDefault();
+			const prevIndex = index - 1;
+			if (prevIndex >= 0) {
+				const currentRow = inputEl.closest('tr');
+				focusRowEditorInputInRow(
+					currentRow?.previousElementSibling as HTMLTableRowElement | null,
+					inputEl
+				);
+			}
+			return;
+		}
+
+		if (shouldBlockRowEditorNumericKey(key, asHex)) {
+			event.preventDefault();
+		}
+	}
 </script>
 
 <RowEditorContainer bind:editorContainerRef>
@@ -114,6 +185,22 @@
 						label="duty"
 						{isExpanded}
 						class="w-10 min-w-10 px-1" />
+					<th
+						class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'}
+						title="Tone Offset">
+						<div class="flex items-center justify-center gap-0.5">
+							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<span>+</span>
+						</div>
+					</th>
+					<th
+						class={isExpanded ? 'w-8 min-w-8 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Tone Accumulation">
+						<div class="flex items-center justify-center gap-0.5">
+							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<span>↑</span>
+						</div>
+					</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -144,10 +231,10 @@
 							onPaintBegin={() =>
 								booleanDrag.begin(
 									() => row.retrigger,
-									(value) => updateRow(index, { retrigger: value })
+									(value) => updateBooleanRow(index, 'retrigger', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateRow(index, { retrigger: value }))} />
+								booleanDrag.dragOver((value) => updateBooleanRow(index, 'retrigger', value))} />
 						<CycleValueCell
 							label={NES_PULSE_WIDTH_LABELS[row.pulseWidth]}
 							labelClass="font-sans text-base leading-none"
@@ -156,6 +243,30 @@
 							title="Pulse width"
 							onclick={() =>
 								updateRow(index, { pulseWidth: cyclePulseWidth(row.pulseWidth) })} />
+						<td class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5'}>
+							<input
+								type="text"
+								class={compactTableInputClass({ selected, isExpanded })}
+								value={formatRowEditorNumber(row.toneAdd, asHex)}
+								onkeydown={(e) => handleNumericKeyDown(index, e)}
+								onfocus={(e) => (e.target as HTMLInputElement).select()}
+								oninput={(e) => updateNumericField(index, 'toneAdd', e)} />
+						</td>
+						<BooleanPaintableCell
+							active={row.toneAccumulation}
+							{selected}
+							{isExpanded}
+							variant="accent"
+							display="↑"
+							widthClass={isExpanded ? 'w-8 min-w-8' : ''}
+							onPaintBegin={() =>
+								booleanDrag.begin(
+									() => row.toneAccumulation,
+									(value) => updateBooleanRow(index, 'toneAccumulation', value)
+								)}
+							onPaintOver={() =>
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'toneAccumulation', value))} />
 					</tr>
 				{/each}
 			</tbody>

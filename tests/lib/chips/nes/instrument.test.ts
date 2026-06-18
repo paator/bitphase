@@ -8,13 +8,26 @@ import {
 
 describe('nes instrument', () => {
 	it('creates a default macro row with retrigger off', () => {
-		expect(createDefaultNesInstrumentRow()).toEqual({ pulseWidth: 2, retrigger: false });
+		expect(createDefaultNesInstrumentRow()).toEqual({
+			pulseWidth: 2,
+			retrigger: false,
+			toneAdd: 0,
+			toneAccumulation: false
+		});
 	});
 
 	it('normalizes partial rows and ensures at least one row', () => {
-		expect(normalizeNesInstrumentRow({ retrigger: 1, pulseWidth: 99 })).toEqual({
+		expect(normalizeNesInstrumentRow({ retrigger: 1, pulseWidth: 99, toneAdd: -2 })).toEqual({
 			pulseWidth: 2,
-			retrigger: true
+			retrigger: true,
+			toneAdd: -2,
+			toneAccumulation: false
+		});
+		expect(normalizeNesInstrumentRow({ toneAccumulation: true, toneAdd: 5000 })).toEqual({
+			pulseWidth: 2,
+			retrigger: false,
+			toneAdd: 4095,
+			toneAccumulation: true
 		});
 		expect(ensureNesInstrumentRows([])).toHaveLength(1);
 	});

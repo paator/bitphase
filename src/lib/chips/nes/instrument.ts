@@ -9,13 +9,24 @@ export const NES_PULSE_WIDTH_LABELS: Record<NesPulseWidth, string> = {
 	3: '¾'
 };
 
+const TONE_ADD_MIN = -4096;
+const TONE_ADD_MAX = 4095;
+
 export type NesInstrumentRow = {
 	pulseWidth: NesPulseWidth;
 	retrigger: boolean;
+	toneAdd: number;
+	toneAccumulation: boolean;
 };
 
 export function createDefaultNesInstrumentRow(): NesInstrumentRow {
-	return { pulseWidth: 2, retrigger: false };
+	return { pulseWidth: 2, retrigger: false, toneAdd: 0, toneAccumulation: false };
+}
+
+function normalizeToneAdd(value: unknown): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return 0;
+	return Math.max(TONE_ADD_MIN, Math.min(TONE_ADD_MAX, Math.round(parsed)));
 }
 
 export function normalizeNesInstrumentRow(row: Record<string, unknown>): NesInstrumentRow {
@@ -25,7 +36,9 @@ export function normalizeNesInstrumentRow(row: Record<string, unknown>): NesInst
 		: defaults.pulseWidth;
 	return {
 		pulseWidth,
-		retrigger: Boolean(row.retrigger)
+		retrigger: Boolean(row.retrigger),
+		toneAdd: normalizeToneAdd(row.toneAdd),
+		toneAccumulation: Boolean(row.toneAccumulation)
 	};
 }
 

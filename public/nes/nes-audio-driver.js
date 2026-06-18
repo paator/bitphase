@@ -56,6 +56,27 @@ class NesAudioDriver {
 		channel.volume = 0;
 	}
 
+	_resetToneAccumulator(state, channelIndex) {
+		if (state.channelToneAccumulator) {
+			state.channelToneAccumulator[channelIndex] = 0;
+		}
+	}
+
+	_applyToneOffset(state, channelIndex, instrumentRow, basePeriod) {
+		if (basePeriod <= 0) return 0;
+		let sampleTone = state.channelToneAccumulator[channelIndex] ?? 0;
+		if (instrumentRow.toneAdd !== 0) {
+			sampleTone += instrumentRow.toneAdd;
+		}
+		if (instrumentRow.toneAccumulation) {
+			state.channelToneAccumulator[channelIndex] = sampleTone;
+		}
+		const period = basePeriod + sampleTone;
+		if (period < 0) return 0;
+		if (period > 2047) return 2047;
+		return period;
+	}
+
 	_processNote(state, channelIndex, row) {
 		if (state.channelMuted[channelIndex]) return;
 
@@ -63,15 +84,20 @@ class NesAudioDriver {
 			state.channelSoundEnabled[channelIndex] = false;
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = false;
+			this._resetToneAccumulator(state, channelIndex);
 		} else if (row.note.name !== 0) {
 			state.channelSoundEnabled[channelIndex] = true;
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = true;
+			this._resetToneAccumulator(state, channelIndex);
 		}
 	}
 
 	_processInstrument(state, channelIndex, row) {
-		assignPatternRowInstrument(state, channelIndex, row);
+		const assignment = assignPatternRowInstrument(state, channelIndex, row);
+		if (assignment.changed) {
+			this._resetToneAccumulator(state, channelIndex);
+		}
 	}
 
 	calculateVolume(patternVolume, instrumentVolume) {
@@ -129,7 +155,11 @@ class NesAudioDriver {
 			const { row, rowsLength, loop } = this.resolveInstrumentRow(state, channelIndex);
 			const patternVolume = state.channelPatternVolumes[channelIndex] ?? 15;
 			const volume = this.calculateVolume(patternVolume, 15);
-			const period = this.getEffectivePeriod(state, channelIndex);
+			const basePeriod = this.getEffectivePeriod(state, channelIndex);
+			const period =
+				channelIndex <= 2
+					? this._applyToneOffset(state, channelIndex, row, basePeriod)
+					: basePeriod;
 			const keyOn = state.channelKeyOn[channelIndex];
 
 			if (channelIndex <= 1) {
