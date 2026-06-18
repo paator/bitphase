@@ -30,4 +30,5 @@ export interface MenuActionContext {
 	handleFileExport: (action: string, project: Project) => Promise<void>;
 	clearAutobackup: () => Promise<void>;
 	resetPatternEditor: () => void;
+	syncChipProcessors: () => void;
 }

@@ -604,6 +604,7 @@
 									</div>
 								{/snippet}
 								<div class="flex flex-1 flex-col overflow-hidden">
+									{#key `${i}-${chipProcessor.chip.type}`}
 									<PatternEditor
 										bind:this={patternEditors[i]}
 										songIndex={i}
@@ -625,6 +626,7 @@
 										{tuningTableVersion}
 										chip={chipProcessor.chip}
 										{chipProcessor} />
+									{/key}
 								</div>
 							</Card>
 						{/if}

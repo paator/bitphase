@@ -153,9 +153,9 @@
 
 	const services: { audioService: AudioService } = getContext('container');
 
-	const formatter = getFormatter(chip);
-	const converter = getConverter(chip);
-	const schema = chip.schema;
+	const formatter = $derived.by(() => getFormatter(chip));
+	const converter = $derived.by(() => getConverter(chip));
+	const schema = $derived(chip.schema);
 	const previewService = new PreviewService();
 	const pressedKeyChannels = new Map<string, number>();
 	let previewInitialized = false;
@@ -2738,19 +2738,38 @@
 	let lastChannelSeparatorWidth = -1;
 	let lastSelectionStyle: 'inverted' | 'filled' = 'inverted';
 	let lastChannelCount = -1;
+	let lastChipType = '';
 	let needsSetup = true;
+
+	function resetEditorSelectionState(): void {
+		selectedColumn = 0;
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		isSelecting = false;
+		mouseDownCell = null;
+	}
 
 	$effect(() => {
 		if (!canvas) return;
 
+		const chipType = chip.type;
 		const currentPatternLength = currentPattern?.length ?? -1;
 		const currentChannelCount = currentPattern?.channels?.length ?? -1;
 		const fontSizeChanged = fontSize !== lastFontSize;
 		const fontFamilyChanged = fontFamily !== lastFontFamily;
 		const channelSeparatorWidthChanged = channelSeparatorWidth !== lastChannelSeparatorWidth;
 		const selectionStyleChanged = selectionStyle !== lastSelectionStyle;
+		const chipTypeChanged = chipType !== lastChipType;
 
-		if (needsSetup || !ctx) {
+		if (chipTypeChanged) {
+			clearAllCaches();
+			resetEditorSelectionState();
+			needsSetup = true;
+		}
+
+		if (needsSetup || !ctx || chipTypeChanged) {
 			ctx = canvas.getContext('2d')!;
 			const ready = setupCanvas();
 			needsSetup = false;
@@ -2767,6 +2786,7 @@
 			lastChannelSeparatorWidth = channelSeparatorWidth;
 			lastSelectionStyle = selectionStyle;
 			lastChannelCount = currentChannelCount;
+			lastChipType = chipType;
 			requestAnimationFrame(() => {
 				if (ctx && canvas && !document.hidden) {
 					updateSize();

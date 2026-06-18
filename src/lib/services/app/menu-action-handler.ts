@@ -326,6 +326,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 					ctx.playbackStore.isPlaying = false;
 					ctx.container.audioService.stop();
 					await ctx.projectService.restoreChipProcessorsForSongs(project.songs);
+					ctx.syncChipProcessors();
 					ctx.applyProject(project);
 					ctx.resetPatternEditor();
 				}
@@ -337,6 +338,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				ctx.playbackStore.isPlaying = false;
 				ctx.container.audioService.stop();
 				await ctx.projectService.restoreChipProcessorsForSongs(importedProject.songs);
+				ctx.syncChipProcessors();
 				ctx.applyProject(importedProject);
 				ctx.resetPatternEditor();
 			}

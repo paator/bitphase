@@ -241,7 +241,8 @@
 			activeSongIndex = 0;
 			songView?.resetEditorState?.();
 			patternEditor?.resetToBeginning?.();
-		}
+		},
+		syncChipProcessors
 	};
 
 	const baseHandleMenuAction = createMenuActionHandler(menuActionContext);
