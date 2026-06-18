@@ -12,6 +12,8 @@ const SQUARE_BASE = [0x4000, 0x4004];
 const TRIANGLE_BASE = 0x4008;
 const NOISE_BASE = 0x400c;
 const SQUARE_SWEEP_DISABLED = 0x08;
+const NES_APU_4015_PULSE_MASK = 0x03;
+const NES_DMC_4015_TND_MASK = 0x0c;
 
 function buildSquareVolumeReg(volume, duty) {
 	return (3 << 4) | (volume & 15) | ((duty & 3) << 6);
@@ -134,75 +136,46 @@ class NesApuEngine {
 		}
 	}
 
-	_channelJustEnabled(mask, bit) {
-		return (this._lastApu4015 & bit) === 0 && (mask & bit) !== 0;
-	}
-
-	_dmcChannelJustEnabled(mask, bit) {
-		return (this._lastDmc4015 & bit) === 0 && (mask & bit) !== 0;
-	}
-
 	applyRegisterState(registerState) {
 		const forceApply = this.forceFullApply;
 		this.forceFullApply = false;
 
-		let apu4015 = 0;
-		let dmc4015 = 0;
-		const squareChannels = [];
-		let triangle = null;
-		let noise = null;
+		if (forceApply || NES_APU_4015_PULSE_MASK !== this._lastApu4015) {
+			this.wasmModule.nes_apu_Write(this.apuPtr, 0x4015, NES_APU_4015_PULSE_MASK);
+			this._lastApu4015 = NES_APU_4015_PULSE_MASK;
+		}
+		if (forceApply || NES_DMC_4015_TND_MASK !== this._lastDmc4015) {
+			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_DMC_4015_TND_MASK);
+			this._lastDmc4015 = NES_DMC_4015_TND_MASK;
+		}
 
 		for (let i = 0; i < 2; i++) {
 			const channel = registerState.channels[i];
 			const last = this.lastState.channels[i];
-			const isEnabled = channel.enabled && channel.period > 0 && channel.volume > 0;
-			if (isEnabled) {
-				apu4015 |= 1 << i;
-				squareChannels.push({ index: i, channel });
-			}
-			last.enabled = isEnabled;
+			const isActive = channel.enabled && channel.period > 0 && channel.volume > 0;
+			const triggerChannel =
+				forceApply || channel.retrigger || (isActive && !last.enabled);
+			this._writeSquare(i, channel, forceApply, triggerChannel);
+			last.enabled = isActive;
 		}
 
 		const triangleChannel = registerState.channels[2];
 		const triangleLast = this.lastState.channels[2];
-		const triangleEnabled = triangleChannel.enabled && triangleChannel.period > 0;
-		if (triangleEnabled) {
-			dmc4015 |= 4;
-			triangle = triangleChannel;
-		}
-		triangleLast.enabled = triangleEnabled;
+		const triangleActive = triangleChannel.enabled && triangleChannel.period > 0;
+		const triangleTrigger =
+			forceApply ||
+			triangleChannel.retrigger ||
+			(triangleActive && !triangleLast.enabled);
+		this._writeTriangle(triangleChannel, forceApply, triangleTrigger);
+		triangleLast.enabled = triangleActive;
 
 		const noiseChannel = registerState.channels[3];
 		const noiseLast = this.lastState.channels[3];
-		const noiseEnabled = noiseChannel.enabled && noiseChannel.volume > 0;
-		if (noiseEnabled) {
-			dmc4015 |= 8;
-			noise = noiseChannel;
-		}
-		noiseLast.enabled = noiseEnabled;
-
-		if (forceApply || apu4015 !== this._lastApu4015) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, 0x4015, apu4015);
-			this._lastApu4015 = apu4015;
-		}
-		if (forceApply || dmc4015 !== this._lastDmc4015) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, dmc4015);
-			this._lastDmc4015 = dmc4015;
-		}
-
-		for (const { index, channel } of squareChannels) {
-			const bit = 1 << index;
-			const triggerChannel = forceApply || this._channelJustEnabled(apu4015, bit);
-			this._writeSquare(index, channel, forceApply, triggerChannel);
-		}
-		if (triangle) {
-			const triggerChannel = forceApply || this._dmcChannelJustEnabled(dmc4015, 4);
-			this._writeTriangle(triangle, forceApply, triggerChannel);
-		}
-		if (noise) {
-			const triggerChannel = forceApply || this._dmcChannelJustEnabled(dmc4015, 8);
-			this._writeNoise(noise, forceApply, triggerChannel);
-		}
+		const noiseActive = noiseChannel.enabled && noiseChannel.volume > 0;
+		const noiseTrigger =
+			forceApply || noiseChannel.retrigger || (noiseActive && !noiseLast.enabled);
+		this._writeNoise(noiseChannel, forceApply, noiseTrigger);
+		noiseLast.enabled = noiseActive;
 	}
 
 	process(sampleRate) {

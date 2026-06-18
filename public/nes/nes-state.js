@@ -1,4 +1,10 @@
 import TrackerState from '../tracker/tracker-state.js';
+import {
+	buildInstrumentIdToIndex,
+	initChipChannelArrays,
+	resetChipChannelArrays,
+	resizeChipChannelArrays
+} from '../tracker/tracker-chip-state.js';
 import { NES_CHANNEL_COUNT, NES_NTSC_CPU_FREQUENCY } from './nes-constants.js';
 
 const NES_CHANNEL_ARRAY_SPECS = [
@@ -24,9 +30,7 @@ class NesState extends TrackerState {
 		this.instruments = [];
 		this.instrumentIdToIndex = new Map();
 
-		for (const [name, defaultVal] of NES_CHANNEL_ARRAY_SPECS) {
-			this[name] = Array(NES_CHANNEL_COUNT).fill(defaultVal);
-		}
+		initChipChannelArrays(this, NES_CHANNEL_COUNT, NES_CHANNEL_ARRAY_SPECS);
 	}
 
 	setWasmModule(wasmModule, apuPtr, dmcPtr, wasmBuffer) {
@@ -48,27 +52,17 @@ class NesState extends TrackerState {
 
 	setInstruments(instruments) {
 		this.instruments = instruments;
-		this.instrumentIdToIndex = new Map();
-		instruments.forEach((instrument, index) => {
-			if (instrument && instrument.id !== undefined) {
-				let numericId;
-				if (typeof instrument.id === 'string') {
-					numericId = parseInt(instrument.id, 36);
-				} else {
-					numericId = instrument.id;
-				}
-				this.instrumentIdToIndex.set(numericId, index);
-			}
-		});
+		this.instrumentIdToIndex = buildInstrumentIdToIndex(instruments);
 	}
 
 	resizeChannels(newCount) {
 		super.resizeChannels(newCount);
-		for (const [name, defaultVal] of NES_CHANNEL_ARRAY_SPECS) {
-			const arr = this[name];
-			while (arr.length < newCount) arr.push(defaultVal);
-			if (arr.length > newCount) arr.length = newCount;
-		}
+		resizeChipChannelArrays(this, newCount, NES_CHANNEL_ARRAY_SPECS);
+	}
+
+	reset(opts = {}) {
+		super.reset(opts);
+		resetChipChannelArrays(this, NES_CHANNEL_ARRAY_SPECS);
 	}
 }
 

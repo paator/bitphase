@@ -28,8 +28,6 @@ describe('NesApuEngine', () => {
 		const { engine } = createNesApuEngine(wasmModule);
 		const registerState = new NesChipRegisterState();
 
-		wasmModule.nes_apu_Write(engine.apuPtr, 0x4015, 0);
-
 		registerState.channels[0].enabled = true;
 		registerState.channels[0].period = 428;
 		registerState.channels[0].volume = 15;
@@ -70,11 +68,11 @@ describe('NesApuEngine', () => {
 		engine.applyRegisterState(registerState);
 
 		registerState.channels[0].enabled = false;
+		registerState.channels[0].volume = 0;
 		engine.applyRegisterState(registerState);
 
-		wasmModule.nes_apu_Write(engine.apuPtr, 0x4015, 0);
-
 		registerState.channels[0].enabled = true;
+		registerState.channels[0].volume = 15;
 		registerState.channels[0].retrigger = false;
 		engine.applyRegisterState(registerState);
 

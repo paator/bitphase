@@ -14,6 +14,7 @@ import {
 	TIMER_EFFECT_SLOT_SYNCBUZZER,
 	disableAllChannelTimerEffects
 } from './ay-timer-effect-constants.js';
+import { resetChipPlaybackOutput } from '../tracker/tracker-engine-transport.js';
 import AYAudioDriver from './ay-audio-driver.js';
 import AyumiEngine from './ayumi-engine.js';
 import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
@@ -175,14 +176,12 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 
 	_prepareOutputForPlay() {
 		this.fadeInSamples = Math.floor(sampleRate * this.fadeInDuration);
-		this.registerState.reset();
-		if (this.audioDriver) {
-			this.audioDriver.resetChannelMixerState();
-		}
-		if (this.ayumiEngine) {
-			this.ayumiEngine.reset();
-			this._applyRegisterStateToEngine();
-		}
+		resetChipPlaybackOutput({
+			registerState: this.registerState,
+			audioDriver: this.audioDriver,
+			chipEngine: this.ayumiEngine,
+			applyRegisterState: () => this._applyRegisterStateToEngine()
+		});
 	}
 
 	resetChannelWaveformCapture() {

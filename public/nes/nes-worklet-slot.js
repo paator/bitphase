@@ -5,6 +5,7 @@ import NesChipRegisterState from './nes-chip-register-state.js';
 import { NesWaveformCapture } from './nes-waveform-capture.js';
 import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
 import { TrackerWorkletSlot } from '../tracker/tracker-worklet-slot.js';
+import { resetChipPlaybackOutput } from '../tracker/tracker-engine-transport.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
 
 export class NesWorkletSlot extends TrackerWorkletSlot {
@@ -40,16 +41,22 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		return this._playbackWorkersReady() && this.apuEngine;
 	}
 
+	_prepareOutputForPlay() {
+		resetChipPlaybackOutput({
+			registerState: this.registerState,
+			audioDriver: this.audioDriver,
+			chipEngine: this.apuEngine,
+			applyRegisterState: () => this._applyRegisterStateToEngine()
+		});
+	}
+
 	_onTransportStop() {
-		this.registerState.reset();
-		this.resetChannelWaveformCapture();
-		if (this.audioDriver) {
-			this.audioDriver.resetChannelMixerState();
-		}
-		if (this.apuEngine) {
-			this.apuEngine.reset();
-		}
-		this._applyRegisterStateToEngine();
+		resetChipPlaybackOutput({
+			registerState: this.registerState,
+			audioDriver: this.audioDriver,
+			chipEngine: this.apuEngine,
+			applyRegisterState: () => this._applyRegisterStateToEngine()
+		});
 	}
 
 	_applyRegisterStateToEngine() {
@@ -177,7 +184,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	}
 
 	_resetEnginesForPreview() {
-		this.apuEngine?.reset();
+		resetChipPlaybackOutput({ chipEngine: this.apuEngine });
 	}
 
 	_silencePreviewChannel(channelIndex) {

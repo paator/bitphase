@@ -6,6 +6,7 @@ import AYChipRegisterState from './ay-chip-register-state.js';
 import VirtualChannelMixer from './virtual-channel-mixer.js';
 import { disableAllChannelTimerEffects, ensureChannelTimerEffects } from './ay-timer-effect-constants.js';
 import { TrackerWorkletSlot } from '../tracker/tracker-worklet-slot.js';
+import { resetChipPlaybackOutput } from '../tracker/tracker-engine-transport.js';
 
 export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 	constructor(port, chipIndex, sharedTimeline) {
@@ -43,14 +44,12 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 	}
 
 	_onTransportStop() {
-		this.registerState.reset();
-		if (this.audioDriver) {
-			this.audioDriver.resetChannelMixerState();
-		}
-		if (this.ayumiEngine) {
-			this.ayumiEngine.reset();
-		}
-		this._applyRegisterStateToEngine();
+		resetChipPlaybackOutput({
+			registerState: this.registerState,
+			audioDriver: this.audioDriver,
+			chipEngine: this.ayumiEngine,
+			applyRegisterState: () => this._applyRegisterStateToEngine()
+		});
 	}
 
 	_dispatchChipPortMessage(type, data) {
@@ -83,10 +82,12 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 			this.audioDriver.resizeChannels(totalChannels);
 		}
 		if (this.ayumiEngine) {
-			this.registerState.reset();
-			this.audioDriver?.resetChannelMixerState();
-			this.ayumiEngine.reset();
-			this._applyRegisterStateToEngine();
+			resetChipPlaybackOutput({
+				registerState: this.registerState,
+				audioDriver: this.audioDriver,
+				chipEngine: this.ayumiEngine,
+				applyRegisterState: () => this._applyRegisterStateToEngine()
+			});
 		}
 	}
 
@@ -182,12 +183,10 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 	}
 
 	_resetEnginesForPreview() {
-		if (this.audioDriver) {
-			this.audioDriver.resetChannelMixerState();
-		}
-		if (this.ayumiEngine) {
-			this.ayumiEngine.reset();
-		}
+		resetChipPlaybackOutput({
+			audioDriver: this.audioDriver,
+			chipEngine: this.ayumiEngine
+		});
 	}
 
 	_silencePreviewChannel(channelIndex) {

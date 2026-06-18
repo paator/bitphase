@@ -4,7 +4,11 @@ import {
 	getEffectiveTuningPeriod
 } from '../tracker/tracker-audio-utils.js';
 import {
-	createDefaultNesInstrumentRow,
+	assignPatternRowInstrument,
+	channelHasAssignedInstrument,
+	isChannelOnOffHalted
+} from '../tracker/tracker-instrument-channel.js';
+import {
 	ensureNesInstrumentRows,
 	normalizeNesInstrumentRow
 } from './nes-instrument-utils.js';
@@ -67,18 +71,7 @@ class NesAudioDriver {
 	}
 
 	_processInstrument(state, channelIndex, row) {
-		if (state.channelMuted[channelIndex]) return;
-		if (!state.channelInstruments || !state.instruments) return;
-
-		if (row.instrument > 0) {
-			const instrumentIndex = state.instrumentIdToIndex.get(row.instrument);
-			if (instrumentIndex !== undefined && state.instruments[instrumentIndex]) {
-				state.channelInstruments[channelIndex] = instrumentIndex;
-				state.instrumentPositions[channelIndex] = 0;
-			} else {
-				state.channelInstruments[channelIndex] = -1;
-			}
-		}
+		assignPatternRowInstrument(state, channelIndex, row);
 	}
 
 	calculateVolume(patternVolume, instrumentVolume) {
@@ -103,11 +96,9 @@ class NesAudioDriver {
 
 	resolveInstrumentRow(state, channelIndex) {
 		const instrumentIndex = state.channelInstruments[channelIndex];
-		const instrument = instrumentIndex >= 0 ? state.instruments[instrumentIndex] : null;
-		const rows = instrument
-			? ensureNesInstrumentRows(instrument.rows)
-			: [createDefaultNesInstrumentRow()];
-		const loop = instrument?.loop ?? 0;
+		const instrument = state.instruments[instrumentIndex];
+		const rows = ensureNesInstrumentRows(instrument.rows);
+		const loop = instrument.loop ?? 0;
 		const rowIndex = state.instrumentPositions[channelIndex] % rows.length;
 		return {
 			row: normalizeNesInstrumentRow(rows[rowIndex]),
@@ -123,11 +114,14 @@ class NesAudioDriver {
 
 			const isMuted = state.channelMuted[channelIndex];
 			const isSoundEnabled = state.channelSoundEnabled[channelIndex];
-			const onOffHalted =
-				state.channelOnOffCounter[channelIndex] > 0 &&
-				!state.channelSoundEnabled[channelIndex];
+			const onOffHalted = isChannelOnOffHalted(state, channelIndex);
 
 			if (isMuted || !isSoundEnabled) {
+				this._silenceChannel(registerState, channelIndex);
+				continue;
+			}
+
+			if (!channelHasAssignedInstrument(state, channelIndex)) {
 				this._silenceChannel(registerState, channelIndex);
 				continue;
 			}
