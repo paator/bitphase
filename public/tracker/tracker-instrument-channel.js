@@ -1,3 +1,5 @@
+import EffectAlgorithms from './effect-algorithms.js';
+
 export function getChannelInstrument(state, channelIndex) {
 	const instrumentIndex = state.channelInstruments?.[channelIndex] ?? -1;
 	if (instrumentIndex < 0) {
@@ -16,6 +18,21 @@ export function isChannelOnOffHalted(state, channelIndex) {
 	return (
 		state.channelOnOffCounter?.[channelIndex] > 0 && !state.channelSoundEnabled[channelIndex]
 	);
+}
+
+export function processChannelOnOffCounters(state, channelCount) {
+	for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+		if (state.channelOnOffCounter?.[channelIndex] > 0) {
+			const result = EffectAlgorithms.processOnOffCounter(
+				state.channelOnOffCounter[channelIndex],
+				state.channelOnDuration[channelIndex],
+				state.channelOffDuration[channelIndex],
+				state.channelSoundEnabled[channelIndex]
+			);
+			state.channelOnOffCounter[channelIndex] = result.counter;
+			state.channelSoundEnabled[channelIndex] = result.enabled;
+		}
+	}
 }
 
 export function assignPatternRowInstrument(state, channelIndex, row) {

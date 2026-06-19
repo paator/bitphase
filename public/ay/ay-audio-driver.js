@@ -6,7 +6,8 @@ import {
 	assignPatternRowInstrument,
 	channelHasAssignedInstrument,
 	getChannelInstrument,
-	isChannelOnOffHalted
+	isChannelOnOffHalted,
+	processChannelOnOffCounters
 } from '../tracker/tracker-instrument-channel.js';
 import {
 	normalizeAyInstrumentFields,
@@ -1210,18 +1211,7 @@ class AYAudioDriver {
 			);
 		}
 
-		for (let channelIndex = 0; channelIndex < state.channelInstruments.length; channelIndex++) {
-			if (state.channelOnOffCounter[channelIndex] > 0) {
-				const result = EffectAlgorithms.processOnOffCounter(
-					state.channelOnOffCounter[channelIndex],
-					state.channelOnDuration[channelIndex],
-					state.channelOffDuration[channelIndex],
-					state.channelSoundEnabled[channelIndex]
-				);
-				state.channelOnOffCounter[channelIndex] = result.counter;
-				state.channelSoundEnabled[channelIndex] = result.enabled;
-			}
-		}
+		processChannelOnOffCounters(state, state.channelInstruments.length);
 
 		this.processEnvelopeOnOff(state);
 

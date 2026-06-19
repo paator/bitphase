@@ -6,7 +6,8 @@ import {
 import {
 	assignPatternRowInstrument,
 	channelHasAssignedInstrument,
-	isChannelOnOffHalted
+	isChannelOnOffHalted,
+	processChannelOnOffCounters
 } from '../tracker/tracker-instrument-channel.js';
 import {
 	ensureNesInstrumentRows,
@@ -195,6 +196,8 @@ class NesAudioDriver {
 				);
 			}
 		}
+
+		processChannelOnOffCounters(state, NES_CHANNEL_COUNT);
 	}
 }
 
