@@ -196,7 +196,7 @@
 						icon={IconCarbonChartWinLoss}
 						label="duty"
 						{isExpanded}
-						class="w-10 min-w-10 px-1" />
+						class="w-12 min-w-12 px-1" />
 					<th
 						class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'}
 						title="Tone Offset">
@@ -283,7 +283,7 @@
 								booleanDrag.dragOver((value) => updateBooleanRow(index, 'retrigger', value))} />
 						<CycleValueCell
 							label={NES_PULSE_WIDTH_LABELS[row.pulseWidth]}
-							labelClass="font-sans text-base leading-none"
+							labelClass="font-sans text-[0.65rem] leading-none"
 							{selected}
 							{isExpanded}
 							title="Pulse width"

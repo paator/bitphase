@@ -3,10 +3,10 @@ export const NES_PULSE_WIDTHS = [0, 1, 2, 3] as const;
 export type NesPulseWidth = (typeof NES_PULSE_WIDTHS)[number];
 
 export const NES_PULSE_WIDTH_LABELS: Record<NesPulseWidth, string> = {
-	0: '⅛',
-	1: '¼',
-	2: '½',
-	3: '¾'
+	0: '12.5%',
+	1: '25%',
+	2: '50%',
+	3: '75%'
 };
 
 const TONE_ADD_MIN = -4096;

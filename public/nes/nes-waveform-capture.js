@@ -1,4 +1,4 @@
-const NES_WAVEFORM_SCALE = 0.5;
+const NES_WAVEFORM_SCALE = 1;
 const NES_SQUARE_NOISE_MAX = 15;
 const NES_DMC_MAX = 127;
 
