@@ -17,7 +17,10 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		this.patternProcessor = null;
 		this.apuEngine = null;
 		this.registerState = new NesChipRegisterState(NES_CHANNEL_COUNT);
-		this.channelWaveformBuf = Array.from({ length: NES_CHANNEL_COUNT }, () => new Float32Array(512));
+		this.channelWaveformBuf = Array.from(
+			{ length: NES_CHANNEL_COUNT },
+			() => new Float32Array(512)
+		);
 		this.channelWaveformWriteIndex = 0;
 		this.waveformPostCounter = 0;
 		this.waveformPostInterval = 6;

@@ -10,7 +10,9 @@ import {
 	processChannelOnOffCounters
 } from '../tracker/tracker-instrument-channel.js';
 import {
+	buildSquareSweepReg,
 	ensureNesInstrumentRows,
+	NES_SQUARE_SWEEP_DISABLED,
 	normalizeNesInstrumentRow
 } from './nes-instrument-utils.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
@@ -55,6 +57,9 @@ class NesAudioDriver {
 		channel.enabled = false;
 		channel.period = 0;
 		channel.volume = 0;
+		if (channelIndex <= 1) {
+			channel.sweepReg = NES_SQUARE_SWEEP_DISABLED;
+		}
 	}
 
 	_resetToneAccumulator(state, channelIndex) {
@@ -168,6 +173,7 @@ class NesAudioDriver {
 				channel.period = period;
 				channel.volume = volume;
 				channel.duty = row.pulseWidth;
+				channel.sweepReg = buildSquareSweepReg(row.sweep, row.sweepRate, row.sweepShift);
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 2) {

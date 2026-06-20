@@ -39,7 +39,7 @@ describe('NesApuEngine', () => {
 		expect(renderSquarePeak(engine)).toBeGreaterThan(0.01);
 	});
 
-	it('writes sweep disable for pulse channels', async () => {
+	it('writes sweep disable for pulse channels by default', async () => {
 		const wasmModule = await loadWasm();
 		const { engine } = createNesApuEngine(wasmModule);
 		const registerState = new NesChipRegisterState();
@@ -53,6 +53,23 @@ describe('NesApuEngine', () => {
 		engine.applyRegisterState(registerState);
 
 		expect(engine.lastState.channels[0].sweepReg).toBe(0x08);
+	});
+
+	it('writes enabled hardware sweep register for pulse channels', async () => {
+		const wasmModule = await loadWasm();
+		const { engine } = createNesApuEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+
+		registerState.channels[0].enabled = true;
+		registerState.channels[0].period = 428;
+		registerState.channels[0].volume = 15;
+		registerState.channels[0].duty = 2;
+		registerState.channels[0].sweepReg = 0x84;
+		registerState.channels[0].retrigger = true;
+
+		engine.applyRegisterState(registerState);
+
+		expect(engine.lastState.channels[0].sweepReg).toBe(0x84);
 	});
 
 	it('triggers pulse channel when re-enabled without an explicit retrigger flag', async () => {

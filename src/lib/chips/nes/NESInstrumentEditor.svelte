@@ -2,6 +2,7 @@
 	import type { Instrument } from '../../models/song';
 	import IconCarbonRepeat from '~icons/carbon/repeat';
 	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
+	import IconCarbonArrowsVertical from '~icons/carbon/arrows-vertical';
 	import {
 		BooleanPaintableCell,
 		BooleanPaintDrag,
@@ -54,7 +55,7 @@
 		selectedRowIndices?: number[];
 	} = $props();
 
-	const TABLE_COLUMNS = 7;
+	const TABLE_COLUMNS = 10;
 	let tableRef: HTMLTableElement | null = $state(null);
 	let editorContainerRef: HTMLDivElement | null = $state(null);
 
@@ -100,14 +101,23 @@
 		editorSync.applyRowChange(nextRows);
 	}
 
-	function updateBooleanRow(index: number, field: 'retrigger' | 'toneAccumulation', value: boolean) {
+	function updateBooleanRow(
+		index: number,
+		field: 'retrigger' | 'toneAccumulation' | 'sweep',
+		value: boolean
+	) {
 		if (Boolean(editorSync.rows[index][field]) === value) return;
 		updateRow(index, { [field]: value });
 	}
 
-	function updateNumericField(index: number, field: 'toneAdd', event: Event) {
+	function updateNumericField(
+		index: number,
+		field: 'toneAdd' | 'sweepRate' | 'sweepShift',
+		event: Event,
+		limits?: { min?: number; max?: number }
+	) {
 		const inputEl = event.target as HTMLInputElement;
-		const parsed = parseRowEditorNumericText(inputEl.value, asHex);
+		const parsed = parseRowEditorNumericText(inputEl.value, asHex, limits);
 		if (parsed !== null) {
 			const normalized = formatRowEditorNumber(parsed, asHex);
 			if (inputEl.value !== normalized) {
@@ -201,6 +211,22 @@
 							<span>↑</span>
 						</div>
 					</th>
+					<IconColumnHeader
+						title="Hardware sweep"
+						icon={IconCarbonArrowsVertical}
+						label="sw"
+						{isExpanded}
+						class="w-8 min-w-8 px-1" />
+					<th
+						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Hardware sweep rate (0–7)">
+						rate
+					</th>
+					<th
+						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Hardware sweep shift (−7–7)">
+						shift
+					</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -267,6 +293,37 @@
 							onPaintOver={() =>
 								booleanDrag.dragOver((value) =>
 									updateBooleanRow(index, 'toneAccumulation', value))} />
+						<BooleanPaintableCell
+							active={row.sweep}
+							{selected}
+							{isExpanded}
+							title="Hardware sweep"
+							onPaintBegin={() =>
+								booleanDrag.begin(
+									() => row.sweep,
+									(value) => updateBooleanRow(index, 'sweep', value)
+								)}
+							onPaintOver={() =>
+								booleanDrag.dragOver((value) => updateBooleanRow(index, 'sweep', value))} />
+						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
+							<input
+								type="text"
+								class={compactTableInputClass({ selected, isExpanded })}
+								value={formatRowEditorNumber(row.sweepRate, asHex)}
+								onkeydown={(e) => handleNumericKeyDown(index, e)}
+								onfocus={(e) => (e.target as HTMLInputElement).select()}
+								oninput={(e) => updateNumericField(index, 'sweepRate', e, { min: 0, max: 7 })} />
+						</td>
+						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
+							<input
+								type="text"
+								class={compactTableInputClass({ selected, isExpanded })}
+								value={formatRowEditorNumber(row.sweepShift, asHex)}
+								onkeydown={(e) => handleNumericKeyDown(index, e)}
+								onfocus={(e) => (e.target as HTMLInputElement).select()}
+								oninput={(e) =>
+									updateNumericField(index, 'sweepShift', e, { min: -7, max: 7 })} />
+						</td>
 					</tr>
 				{/each}
 			</tbody>

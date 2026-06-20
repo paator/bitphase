@@ -82,7 +82,8 @@ export class WorkletSlotBase {
 		const state = this._slotState();
 
 		if (patternOrderIndex !== undefined) {
-			const patternOrderChanged = state.timeline.currentPatternOrderIndex !== patternOrderIndex;
+			const patternOrderChanged =
+				state.timeline.currentPatternOrderIndex !== patternOrderIndex;
 			state.timeline.currentPatternOrderIndex = patternOrderIndex;
 
 			if (pattern) {
@@ -237,11 +238,7 @@ export class WorkletSlotBase {
 
 	shouldRunPlaybackAccumulation() {
 		const state = this._slotState();
-		return (
-			!this.paused &&
-			state.currentPattern &&
-			state.currentPattern.length > 0
-		);
+		return !this.paused && state.currentPattern && state.currentPattern.length > 0;
 	}
 
 	finishAudioBlockFlushTransport(numSamples, paused) {

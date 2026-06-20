@@ -11,7 +11,7 @@ import {
 const SQUARE_BASE = [0x4000, 0x4004];
 const TRIANGLE_BASE = 0x4008;
 const NOISE_BASE = 0x400c;
-const SQUARE_SWEEP_DISABLED = 0x08;
+import { NES_SQUARE_SWEEP_DISABLED } from './nes-instrument-utils.js';
 const NES_APU_4015_PULSE_MASK = 0x03;
 const NES_DMC_4015_TND_MASK = 0x0c;
 
@@ -75,16 +75,29 @@ class NesApuEngine {
 			last.duty = channel.duty;
 		}
 
-		if (forceApply || last.sweepReg !== SQUARE_SWEEP_DISABLED) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, base + 1, SQUARE_SWEEP_DISABLED);
-			last.sweepReg = SQUARE_SWEEP_DISABLED;
+		const sweepReg =
+			channel.sweepReg === undefined || channel.sweepReg < 0
+				? NES_SQUARE_SWEEP_DISABLED
+				: channel.sweepReg;
+		const sweepChanged = last.sweepReg !== sweepReg;
+		const sweepRetrigger =
+			triggerChannel && sweepReg !== NES_SQUARE_SWEEP_DISABLED;
+		if (forceApply || sweepChanged || sweepRetrigger) {
+			this.wasmModule.nes_apu_Write(this.apuPtr, base + 1, sweepReg);
+			last.sweepReg = sweepReg;
 		}
 
-		if (forceApply || periodLow !== (last.period & 0xff)) {
+		if (forceApply || periodLow !== (last.period & 0xff) || sweepChanged) {
 			this.wasmModule.nes_apu_Write(this.apuPtr, base + 2, periodLow);
 		}
 
-		if (forceApply || triggerChannel || channel.retrigger || periodHigh !== lastPeriodHigh) {
+		if (
+			forceApply ||
+			triggerChannel ||
+			channel.retrigger ||
+			periodHigh !== lastPeriodHigh ||
+			sweepChanged
+		) {
 			this.wasmModule.nes_apu_Write(this.apuPtr, base + 3, periodHigh);
 		}
 

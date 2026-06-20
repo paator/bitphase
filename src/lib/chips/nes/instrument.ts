@@ -11,22 +11,59 @@ export const NES_PULSE_WIDTH_LABELS: Record<NesPulseWidth, string> = {
 
 const TONE_ADD_MIN = -4096;
 const TONE_ADD_MAX = 4095;
+const SWEEP_RATE_MIN = 0;
+const SWEEP_RATE_MAX = 7;
+const SWEEP_SHIFT_MIN = -7;
+const SWEEP_SHIFT_MAX = 7;
+export const NES_SQUARE_SWEEP_DISABLED = 0x08;
 
 export type NesInstrumentRow = {
 	pulseWidth: NesPulseWidth;
 	retrigger: boolean;
 	toneAdd: number;
 	toneAccumulation: boolean;
+	sweep: boolean;
+	sweepRate: number;
+	sweepShift: number;
 };
 
 export function createDefaultNesInstrumentRow(): NesInstrumentRow {
-	return { pulseWidth: 2, retrigger: false, toneAdd: 0, toneAccumulation: false };
+	return {
+		pulseWidth: 2,
+		retrigger: false,
+		toneAdd: 0,
+		toneAccumulation: false,
+		sweep: false,
+		sweepRate: 0,
+		sweepShift: 0
+	};
 }
 
 function normalizeToneAdd(value: unknown): number {
 	const parsed = Number(value);
 	if (!Number.isFinite(parsed)) return 0;
 	return Math.max(TONE_ADD_MIN, Math.min(TONE_ADD_MAX, Math.round(parsed)));
+}
+
+function normalizeSweepRate(value: unknown): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return 0;
+	return Math.max(SWEEP_RATE_MIN, Math.min(SWEEP_RATE_MAX, Math.round(parsed)));
+}
+
+function normalizeSweepShift(value: unknown): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return 0;
+	return Math.max(SWEEP_SHIFT_MIN, Math.min(SWEEP_SHIFT_MAX, Math.round(parsed)));
+}
+
+export function buildSquareSweepReg(enabled: boolean, rate: number, shift: number): number {
+	if (!enabled || shift === 0) {
+		return NES_SQUARE_SWEEP_DISABLED;
+	}
+	const amount = Math.abs(shift);
+	const packed = ((rate & 7) << 4) | (amount & 7);
+	return shift < 0 ? 0x88 | packed : 0x80 | packed;
 }
 
 export function normalizeNesInstrumentRow(row: Record<string, unknown>): NesInstrumentRow {
@@ -38,7 +75,10 @@ export function normalizeNesInstrumentRow(row: Record<string, unknown>): NesInst
 		pulseWidth,
 		retrigger: Boolean(row.retrigger),
 		toneAdd: normalizeToneAdd(row.toneAdd),
-		toneAccumulation: Boolean(row.toneAccumulation)
+		toneAccumulation: Boolean(row.toneAccumulation),
+		sweep: Boolean(row.sweep),
+		sweepRate: normalizeSweepRate(row.sweepRate),
+		sweepShift: normalizeSweepShift(row.sweepShift)
 	};
 }
 
