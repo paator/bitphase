@@ -6,13 +6,10 @@ import {
 	buildSquareSweepReg,
 	buildTriangleLinearReg,
 	createDefaultNesInstrumentRow,
-	cycleNesEnvelopeMode,
 	cyclePulseWidth,
 	ensureNesInstrumentRows,
-	isNesSoundLengthEnabled,
 	isNesVolumeField,
 	NES_LENGTH_COUNTER_LENGTHS,
-	NES_REGISTER_UNCHANGED,
 	NES_SQUARE_SWEEP_DISABLED,
 	normalizeNesInstrumentRow,
 	resolveLengthCounterIndex,
@@ -20,12 +17,12 @@ import {
 } from '@/lib/chips/nes/instrument';
 
 describe('nes instrument', () => {
-	it('creates a default macro row with infinite envelope and retrigger off', () => {
+	it('creates a default macro row with constant volume and retrigger off', () => {
 		expect(createDefaultNesInstrumentRow()).toEqual({
 			pulseWidth: 2,
 			retrigger: false,
 			soundLength: 0,
-			envelopeMode: 'infinite',
+			envelope: false,
 			volumeOrRate: 15,
 			toneAdd: 0,
 			toneAccumulation: false,
@@ -42,14 +39,14 @@ describe('nes instrument', () => {
 				pulseWidth: 99,
 				toneAdd: -2,
 				soundLength: 999,
-				envelopeMode: 'bogus',
+				envelope: true,
 				volumeOrRate: 20
 			})
 		).toEqual({
 			pulseWidth: 2,
 			retrigger: true,
-			soundLength: 0,
-			envelopeMode: 'infinite',
+			soundLength: 511,
+			envelope: true,
 			volumeOrRate: 15,
 			toneAdd: -2,
 			toneAccumulation: false,
@@ -61,8 +58,8 @@ describe('nes instrument', () => {
 			pulseWidth: 2,
 			retrigger: false,
 			soundLength: 0,
-			envelopeMode: 'infinite',
-			volumeOrRate: 0,
+			envelope: false,
+			volumeOrRate: 15,
 			toneAdd: 4095,
 			toneAccumulation: true,
 			sweep: false,
@@ -74,14 +71,14 @@ describe('nes instrument', () => {
 				sweep: true,
 				sweepRate: 12,
 				sweepShift: -9,
-				envelopeMode: 'loop',
+				envelope: true,
 				volumeOrRate: 7
 			})
 		).toEqual({
 			pulseWidth: 2,
 			retrigger: false,
 			soundLength: 0,
-			envelopeMode: 'loop',
+			envelope: true,
 			volumeOrRate: 7,
 			toneAdd: 0,
 			toneAccumulation: false,
@@ -92,23 +89,10 @@ describe('nes instrument', () => {
 		expect(ensureNesInstrumentRows([])).toHaveLength(1);
 	});
 
-	it('forces sound length to zero in infinite envelope mode', () => {
-		expect(
-			normalizeNesInstrumentRow({
-				envelopeMode: 'infinite',
-				soundLength: 200
-			}).soundLength
-		).toBe(0);
-	});
-
-	it('cycles envelope modes and exposes length counter table', () => {
-		expect(cycleNesEnvelopeMode('infinite')).toBe('decay');
-		expect(cycleNesEnvelopeMode('unchanged')).toBe('infinite');
+	it('exposes length counter table and volume field helper', () => {
 		expect(NES_LENGTH_COUNTER_LENGTHS).toHaveLength(32);
-		expect(isNesSoundLengthEnabled('decay')).toBe(true);
-		expect(isNesSoundLengthEnabled('infinite')).toBe(false);
-		expect(isNesVolumeField('infinite')).toBe(true);
-		expect(isNesVolumeField('decay')).toBe(false);
+		expect(isNesVolumeField(false)).toBe(true);
+		expect(isNesVolumeField(true)).toBe(false);
 	});
 
 	it('cycles pulse width through duty options', () => {
@@ -123,21 +107,17 @@ describe('nes instrument', () => {
 		expect(buildSquareSweepReg(true, 7, -5)).toBe(0x88 | 0x75);
 	});
 
-	it('maps envelope modes and sound length to APU register bytes', () => {
-		expect(buildSquareEnvelopeVolumeReg(2, 'infinite', 15, 0)).toBe(0xbf);
-		expect(buildSquareEnvelopeVolumeReg(2, 'decay', 7, 40)).toBe(0x87);
-		expect(buildSquareEnvelopeVolumeReg(2, 'decay', 7, 0)).toBe(0xa7);
-		expect(buildSquareEnvelopeVolumeReg(2, 'loop', 4, 0)).toBe(0xa4);
-		expect(buildSquareEnvelopeVolumeReg(2, 'loop', 4, 40)).toBe(0x84);
-		expect(buildSquareEnvelopeVolumeReg(2, 'unchanged', 15, 0)).toBe(NES_REGISTER_UNCHANGED);
-		expect(buildNoiseEnvelopeVolumeReg('hold', 10, 40)).toBe(0x1a);
-		expect(buildLengthCounterNibble('infinite', 200)).toBe(NES_REGISTER_UNCHANGED);
-		expect(buildLengthCounterNibble('decay', 0)).toBe(NES_REGISTER_UNCHANGED);
-		expect(buildLengthCounterNibble('decay', 20)).toBe(resolveLengthCounterIndex(20));
-		expect(buildTriangleLinearReg('infinite', 0)).toBe(0xff);
-		expect(buildTriangleLinearReg('decay', 0)).toBe(0xff);
-		expect(buildTriangleLinearReg('decay', 64)).toBe(64);
-		expect(usesTriangleLinearCounter('decay', 64)).toBe(true);
-		expect(usesTriangleLinearCounter('decay', 200)).toBe(false);
+	it('maps envelope bool and sound length to APU register bytes', () => {
+		expect(buildSquareEnvelopeVolumeReg(2, false, 15, 0)).toBe(0xbf);
+		expect(buildSquareEnvelopeVolumeReg(2, true, 7, 40)).toBe(0x87);
+		expect(buildSquareEnvelopeVolumeReg(2, true, 7, 0)).toBe(0xa7);
+		expect(buildSquareEnvelopeVolumeReg(2, true, 4, 40)).toBe(0x84);
+		expect(buildNoiseEnvelopeVolumeReg(false, 10, 40)).toBe(0x1a);
+		expect(buildLengthCounterNibble(0)).toBe(-1);
+		expect(buildLengthCounterNibble(20)).toBe(resolveLengthCounterIndex(20));
+		expect(buildTriangleLinearReg(0)).toBe(0xff);
+		expect(buildTriangleLinearReg(64)).toBe(64);
+		expect(usesTriangleLinearCounter(64)).toBe(true);
+		expect(usesTriangleLinearCounter(200)).toBe(false);
 	});
 });

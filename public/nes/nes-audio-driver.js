@@ -89,7 +89,7 @@ class NesAudioDriver {
 	_applyEnvelopeAndLength(channel, channelIndex, row, patternVolume) {
 		const combinedVolume = this.calculateVolume(patternVolume, row.volumeOrRate);
 		const volumeNibble = resolveEnvelopeVolumeOrRate(
-			row.envelopeMode,
+			row.envelope,
 			patternVolume,
 			row.volumeOrRate,
 			combinedVolume
@@ -99,33 +99,33 @@ class NesAudioDriver {
 		if (channelIndex <= 1) {
 			channel.volumeReg = buildSquareEnvelopeVolumeReg(
 				row.pulseWidth,
-				row.envelopeMode,
+				row.envelope,
 				volumeNibble,
 				row.soundLength
 			);
 			channel.duty = row.pulseWidth;
-			channel.lengthNibble = buildLengthCounterNibble(row.envelopeMode, row.soundLength);
+			channel.lengthNibble = buildLengthCounterNibble(row.soundLength);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		} else if (channelIndex === 2) {
 			channel.volumeReg = NES_REGISTER_UNCHANGED;
-			channel.linearReg = buildTriangleLinearReg(row.envelopeMode, row.soundLength);
-			channel.lengthNibble = usesTriangleLinearCounter(row.envelopeMode, row.soundLength)
+			channel.linearReg = buildTriangleLinearReg(row.soundLength);
+			channel.lengthNibble = usesTriangleLinearCounter(row.soundLength)
 				? NES_REGISTER_UNCHANGED
-				: buildLengthCounterNibble(row.envelopeMode, row.soundLength);
+				: buildLengthCounterNibble(row.soundLength);
 			channel.duty = 0;
 		} else if (channelIndex === 3) {
 			channel.volumeReg = buildNoiseEnvelopeVolumeReg(
-				row.envelopeMode,
+				row.envelope,
 				volumeNibble,
 				row.soundLength
 			);
-			channel.lengthNibble = buildLengthCounterNibble(row.envelopeMode, row.soundLength);
+			channel.lengthNibble = buildLengthCounterNibble(row.soundLength);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		}
 	}
 
 	_isChannelAudible(row, patternVolume, combinedVolume) {
-		return isChannelAudible(row.envelopeMode, patternVolume, row.volumeOrRate, combinedVolume);
+		return isChannelAudible(row.envelope, patternVolume, row.volumeOrRate, combinedVolume);
 	}
 
 	_resetToneAccumulator(state, channelIndex) {

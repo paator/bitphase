@@ -17,18 +17,6 @@ const SWEEP_SHIFT_MIN = -7;
 const SWEEP_SHIFT_MAX = 7;
 export const NES_SQUARE_SWEEP_DISABLED = 0x08;
 
-export const NES_ENVELOPE_MODES = ['infinite', 'decay', 'loop', 'hold', 'unchanged'] as const;
-
-export type NesEnvelopeMode = (typeof NES_ENVELOPE_MODES)[number];
-
-export const NES_ENVELOPE_MODE_LABELS: Record<NesEnvelopeMode, string> = {
-	infinite: 'Infinite',
-	decay: 'Decay',
-	loop: 'Loop',
-	hold: 'Hold',
-	unchanged: 'Unchanged'
-};
-
 export const NES_LENGTH_COUNTER_LENGTHS = [
 	10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
 	192, 24, 72, 26, 16, 28, 32, 30
@@ -43,7 +31,7 @@ export type NesInstrumentRow = {
 	pulseWidth: NesPulseWidth;
 	retrigger: boolean;
 	soundLength: number;
-	envelopeMode: NesEnvelopeMode;
+	envelope: boolean;
 	volumeOrRate: number;
 	toneAdd: number;
 	toneAccumulation: boolean;
@@ -52,30 +40,8 @@ export type NesInstrumentRow = {
 	sweepShift: number;
 };
 
-export function isNesEnvelopeInfinite(mode: NesEnvelopeMode): boolean {
-	return mode === 'infinite';
-}
-
-export function isNesEnvelopeUnchanged(mode: NesEnvelopeMode): boolean {
-	return mode === 'unchanged';
-}
-
-export function isNesSoundLengthEnabled(mode: NesEnvelopeMode): boolean {
-	return !isNesEnvelopeInfinite(mode) && !isNesEnvelopeUnchanged(mode);
-}
-
-export function isNesVolumeOrRateEnabled(mode: NesEnvelopeMode): boolean {
-	return !isNesEnvelopeUnchanged(mode);
-}
-
-export function isNesVolumeField(mode: NesEnvelopeMode): boolean {
-	return mode === 'infinite';
-}
-
-export function cycleNesEnvelopeMode(current: NesEnvelopeMode): NesEnvelopeMode {
-	const index = NES_ENVELOPE_MODES.indexOf(current);
-	const nextIndex = index < 0 ? 0 : (index + 1) % NES_ENVELOPE_MODES.length;
-	return NES_ENVELOPE_MODES[nextIndex];
+export function isNesVolumeField(envelope: boolean): boolean {
+	return !envelope;
 }
 
 export function createDefaultNesInstrumentRow(): NesInstrumentRow {
@@ -83,7 +49,7 @@ export function createDefaultNesInstrumentRow(): NesInstrumentRow {
 		pulseWidth: 2,
 		retrigger: false,
 		soundLength: 0,
-		envelopeMode: 'infinite',
+		envelope: false,
 		volumeOrRate: 15,
 		toneAdd: 0,
 		toneAccumulation: false,
@@ -111,10 +77,8 @@ function normalizeSweepShift(value: unknown): number {
 	return Math.max(SWEEP_SHIFT_MIN, Math.min(SWEEP_SHIFT_MAX, Math.round(parsed)));
 }
 
-function normalizeEnvelopeMode(value: unknown): NesEnvelopeMode {
-	return NES_ENVELOPE_MODES.includes(value as NesEnvelopeMode)
-		? (value as NesEnvelopeMode)
-		: 'infinite';
+function normalizeEnvelope(value: unknown): boolean {
+	return Boolean(value);
 }
 
 function normalizeSoundLength(value: unknown): number {
@@ -160,69 +124,43 @@ function resolveEnvelopeLoopBit(soundLength: number): number {
 	return soundLength === 0 ? 1 << 5 : 0;
 }
 
+function resolveConstantVolumeBit(envelope: boolean): number {
+	return envelope ? 0 : 1 << 4;
+}
+
 export function buildSquareEnvelopeVolumeReg(
 	duty: NesPulseWidth,
-	envelopeMode: NesEnvelopeMode,
+	envelope: boolean,
 	volumeOrRate: number,
 	soundLength: number
 ): number {
-	if (envelopeMode === 'unchanged') return NES_REGISTER_UNCHANGED;
 	const volume = volumeOrRate & 15;
 	const dutyBits = (duty & 3) << 6;
-	const loopBit = resolveEnvelopeLoopBit(soundLength);
-	switch (envelopeMode) {
-		case 'infinite':
-			return dutyBits | loopBit | (1 << 4) | volume;
-		case 'decay':
-		case 'loop':
-			return dutyBits | loopBit | volume;
-		case 'hold':
-			return dutyBits | loopBit | (1 << 4) | volume;
-		default:
-			return dutyBits | loopBit | (1 << 4) | volume;
-	}
+	return (
+		dutyBits |
+		resolveEnvelopeLoopBit(soundLength) |
+		resolveConstantVolumeBit(envelope) |
+		volume
+	);
 }
 
 export function buildNoiseEnvelopeVolumeReg(
-	envelopeMode: NesEnvelopeMode,
+	envelope: boolean,
 	volumeOrRate: number,
 	soundLength: number
 ): number {
-	if (envelopeMode === 'unchanged') return NES_REGISTER_UNCHANGED;
 	const volume = volumeOrRate & 15;
-	const loopBit = resolveEnvelopeLoopBit(soundLength);
-	switch (envelopeMode) {
-		case 'infinite':
-			return loopBit | (1 << 4) | volume;
-		case 'decay':
-		case 'loop':
-			return loopBit | volume;
-		case 'hold':
-			return loopBit | (1 << 4) | volume;
-		default:
-			return loopBit | (1 << 4) | volume;
-	}
+	return resolveEnvelopeLoopBit(soundLength) | resolveConstantVolumeBit(envelope) | volume;
 }
 
-export function buildLengthCounterNibble(
-	envelopeMode: NesEnvelopeMode,
-	soundLength: number
-): number {
-	if (
-		envelopeMode === 'unchanged' ||
-		envelopeMode === 'infinite' ||
-		soundLength === 0
-	) {
+export function buildLengthCounterNibble(soundLength: number): number {
+	if (soundLength === 0) {
 		return NES_REGISTER_UNCHANGED;
 	}
 	return resolveLengthCounterIndex(soundLength) & 31;
 }
 
-export function buildTriangleLinearReg(
-	envelopeMode: NesEnvelopeMode,
-	soundLength: number
-): number {
-	if (envelopeMode === 'unchanged') return NES_REGISTER_UNCHANGED;
+export function buildTriangleLinearReg(soundLength: number): number {
 	if (soundLength === 0) {
 		return (1 << 7) | 0x7f;
 	}
@@ -232,13 +170,8 @@ export function buildTriangleLinearReg(
 	return 0x7f;
 }
 
-export function usesTriangleLinearCounter(
-	envelopeMode: NesEnvelopeMode,
-	soundLength: number
-): boolean {
-	return (
-		isNesSoundLengthEnabled(envelopeMode) && soundLength > 0 && soundLength < 128
-	);
+export function usesTriangleLinearCounter(soundLength: number): boolean {
+	return soundLength > 0 && soundLength < 128;
 }
 
 export function normalizeNesInstrumentRow(row: Record<string, unknown>): NesInstrumentRow {
@@ -246,21 +179,28 @@ export function normalizeNesInstrumentRow(row: Record<string, unknown>): NesInst
 	const pulseWidth = NES_PULSE_WIDTHS.includes(row.pulseWidth as NesPulseWidth)
 		? (row.pulseWidth as NesPulseWidth)
 		: defaults.pulseWidth;
-	const envelopeMode = normalizeEnvelopeMode(row.envelopeMode);
-	const soundLength = isNesEnvelopeInfinite(envelopeMode)
-		? 0
-		: normalizeSoundLength(row.soundLength);
 	return {
 		pulseWidth,
-		retrigger: Boolean(row.retrigger),
-		soundLength,
-		envelopeMode,
-		volumeOrRate: normalizeVolumeOrRate(row.volumeOrRate),
-		toneAdd: normalizeToneAdd(row.toneAdd),
-		toneAccumulation: Boolean(row.toneAccumulation),
-		sweep: Boolean(row.sweep),
-		sweepRate: normalizeSweepRate(row.sweepRate),
-		sweepShift: normalizeSweepShift(row.sweepShift)
+		retrigger: row.retrigger !== undefined ? Boolean(row.retrigger) : defaults.retrigger,
+		soundLength:
+			row.soundLength !== undefined
+				? normalizeSoundLength(row.soundLength)
+				: defaults.soundLength,
+		envelope: row.envelope !== undefined ? normalizeEnvelope(row.envelope) : defaults.envelope,
+		volumeOrRate:
+			row.volumeOrRate !== undefined
+				? normalizeVolumeOrRate(row.volumeOrRate)
+				: defaults.volumeOrRate,
+		toneAdd: row.toneAdd !== undefined ? normalizeToneAdd(row.toneAdd) : defaults.toneAdd,
+		toneAccumulation:
+			row.toneAccumulation !== undefined
+				? Boolean(row.toneAccumulation)
+				: defaults.toneAccumulation,
+		sweep: row.sweep !== undefined ? Boolean(row.sweep) : defaults.sweep,
+		sweepRate:
+			row.sweepRate !== undefined ? normalizeSweepRate(row.sweepRate) : defaults.sweepRate,
+		sweepShift:
+			row.sweepShift !== undefined ? normalizeSweepShift(row.sweepShift) : defaults.sweepShift
 	};
 }
 

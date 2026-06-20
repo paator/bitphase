@@ -20,7 +20,7 @@ function createEnvelopeState(rowOverrides = {}) {
 						pulseWidth: 2,
 						retrigger: false,
 						soundLength: 40,
-						envelopeMode: 'decay',
+						envelope: true,
 						volumeOrRate: 6,
 						toneAdd: 0,
 						toneAccumulation: false,
@@ -49,7 +49,7 @@ function createEnvelopeState(rowOverrides = {}) {
 }
 
 describe('NesAudioDriver envelope and length macro', () => {
-	it('writes decay envelope and length counter settings for pulse channels', () => {
+	it('writes envelope and length counter settings for pulse channels', () => {
 		const driver = new NesAudioDriver();
 		const registerState = new NesChipRegisterState();
 		const state = createEnvelopeState();
@@ -57,32 +57,31 @@ describe('NesAudioDriver envelope and length macro', () => {
 		driver.processInstruments(state, registerState);
 
 		expect(registerState.channels[0].volumeReg).toBe(
-			buildSquareEnvelopeVolumeReg(2, 'decay', 6, 40)
+			buildSquareEnvelopeVolumeReg(2, true, 6, 40)
 		);
-		expect(registerState.channels[0].lengthNibble).toBe(
-			buildLengthCounterNibble('decay', 40)
-		);
+		expect(registerState.channels[0].lengthNibble).toBe(buildLengthCounterNibble(40));
 	});
 
 	it('uses triangle linear counter for short sound lengths', () => {
 		const driver = new NesAudioDriver();
 		const registerState = new NesChipRegisterState();
-		const state = createEnvelopeState({ soundLength: 64, envelopeMode: 'hold' });
+		const state = createEnvelopeState({ soundLength: 64, envelope: false });
 
 		driver.processInstruments(state, registerState);
 
-		expect(registerState.channels[2].linearReg).toBe(buildTriangleLinearReg('hold', 64));
+		expect(registerState.channels[2].linearReg).toBe(buildTriangleLinearReg(64));
 		expect(registerState.channels[2].lengthNibble).toBe(NES_REGISTER_UNCHANGED);
 	});
 
-	it('skips envelope register updates in unchanged mode', () => {
+	it('writes constant volume register when envelope is off', () => {
 		const driver = new NesAudioDriver();
 		const registerState = new NesChipRegisterState();
-		const state = createEnvelopeState({ envelopeMode: 'unchanged' });
+		const state = createEnvelopeState({ envelope: false, volumeOrRate: 10, soundLength: 40 });
 
 		driver.processInstruments(state, registerState);
 
-		expect(registerState.channels[0].volumeReg).toBe(NES_REGISTER_UNCHANGED);
-		expect(registerState.channels[0].lengthNibble).toBe(NES_REGISTER_UNCHANGED);
+		expect(registerState.channels[0].volumeReg).toBe(
+			buildSquareEnvelopeVolumeReg(2, false, 10, 40)
+		);
 	});
 });

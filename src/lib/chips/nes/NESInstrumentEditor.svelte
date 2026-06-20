@@ -34,16 +34,11 @@
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
 	import { compactTableInputClass } from '../../utils/compact-table-input';
-	import NesEnvelopeModeCell from './NesEnvelopeModeCell.svelte';
 	import {
 		createDefaultNesInstrumentRow,
-		cycleNesEnvelopeMode,
 		cyclePulseWidth,
 		ensureNesInstrumentRows,
-		isNesEnvelopeInfinite,
-		isNesSoundLengthEnabled,
 		isNesVolumeField,
-		isNesVolumeOrRateEnabled,
 		NES_PULSE_WIDTH_LABELS,
 		type NesInstrumentRow
 	} from './instrument';
@@ -110,7 +105,7 @@
 
 	function updateBooleanRow(
 		index: number,
-		field: 'retrigger' | 'toneAccumulation' | 'sweep',
+		field: 'retrigger' | 'toneAccumulation' | 'sweep' | 'envelope',
 		value: boolean
 	) {
 		if (Boolean(editorSync.rows[index][field]) === value) return;
@@ -241,7 +236,7 @@
 					</th>
 					<th
 						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
-						title="Envelope mode">
+						title="Envelope (1) or constant volume (0)">
 						env
 					</th>
 					<th
@@ -352,50 +347,37 @@
 						<td class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 px-0.5'}>
 							<input
 								type="text"
-								class={compactTableInputClass({
-									selected,
-									isExpanded,
-									inactive: !isNesSoundLengthEnabled(row.envelopeMode)
-								})}
+								class={compactTableInputClass({ selected, isExpanded })}
 								value={formatRowEditorNumber(row.soundLength, asHex)}
-								disabled={!isNesSoundLengthEnabled(row.envelopeMode)}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
 								onfocus={(e) => (e.target as HTMLInputElement).select()}
 								oninput={(e) =>
 									updateNumericField(index, 'soundLength', e, { min: 0, max: 511 })} />
 						</td>
-						<NesEnvelopeModeCell
-							mode={row.envelopeMode}
+						<BooleanPaintableCell
+							active={row.envelope}
 							{selected}
 							{isExpanded}
-							onclick={() => {
-								const envelopeMode = cycleNesEnvelopeMode(row.envelopeMode);
-								updateRow(index, {
-									envelopeMode,
-									...(isNesEnvelopeInfinite(envelopeMode) ? { soundLength: 0 } : {})
-								});
-							}} />
+							title="Envelope (1) or constant volume (0)"
+							onPaintBegin={() =>
+								booleanDrag.begin(
+									() => row.envelope,
+									(value) => updateBooleanRow(index, 'envelope', value)
+								)}
+							onPaintOver={() =>
+								booleanDrag.dragOver((value) => updateBooleanRow(index, 'envelope', value))} />
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
-							{#if isNesVolumeOrRateEnabled(row.envelopeMode)}
-								<input
-									type="text"
-									class={compactTableInputClass({ selected, isExpanded })}
-									value={formatRowEditorNumber(row.volumeOrRate, asHex)}
-									title={isNesVolumeField(row.envelopeMode)
-										? 'Volume (0–15)'
-										: 'Envelope rate (0–15)'}
-									onkeydown={(e) => handleNumericKeyDown(index, e)}
-									onfocus={(e) => (e.target as HTMLInputElement).select()}
-									oninput={(e) =>
-										updateNumericField(index, 'volumeOrRate', e, { min: 0, max: 15 })} />
-							{:else}
-								<div
-									class="text-center text-[var(--color-app-text-tertiary)] {isExpanded
-										? 'text-xs'
-										: 'text-[0.65rem]'}">
-									—
-								</div>
-							{/if}
+							<input
+								type="text"
+								class={compactTableInputClass({ selected, isExpanded })}
+								value={formatRowEditorNumber(row.volumeOrRate, asHex)}
+								title={isNesVolumeField(row.envelope)
+									? 'Volume (0–15)'
+									: 'Envelope rate (0–15)'}
+								onkeydown={(e) => handleNumericKeyDown(index, e)}
+								onfocus={(e) => (e.target as HTMLInputElement).select()}
+								oninput={(e) =>
+									updateNumericField(index, 'volumeOrRate', e, { min: 0, max: 15 })} />
 						</td>
 					</tr>
 				{/each}
