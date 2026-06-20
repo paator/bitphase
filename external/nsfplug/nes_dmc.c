@@ -375,6 +375,13 @@ uint32_t nes_dmc_Render (nes_dmc_t* s, int32_t b[2])
   return 2;
 }
 
+int32_t nes_dmc_GetOut (nes_dmc_t* s, int channel)
+{
+  if (channel < 0 || channel > 2)
+    return 0;
+  return (int32_t)s->out[channel];
+}
+
 void nes_dmc_SetPal (nes_dmc_t* s, bool is_pal)
 {
     s->pal = (is_pal ? 1 : 0);

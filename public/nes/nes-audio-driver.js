@@ -10,10 +10,21 @@ import {
 	processChannelOnOffCounters
 } from '../tracker/tracker-instrument-channel.js';
 import {
+	buildLengthCounterNibble,
+	buildNoiseEnvelopeVolumeReg,
+	buildNoiseSilentVolumeReg,
+	buildSquareEnvelopeVolumeReg,
+	buildSquareSilentVolumeReg,
 	buildSquareSweepReg,
+	buildTriangleLinearReg,
+	buildTriangleSilentLinearReg,
 	ensureNesInstrumentRows,
+	isChannelAudible,
+	NES_REGISTER_UNCHANGED,
 	NES_SQUARE_SWEEP_DISABLED,
-	normalizeNesInstrumentRow
+	normalizeNesInstrumentRow,
+	resolveEnvelopeVolumeOrRate,
+	usesTriangleLinearCounter
 } from './nes-instrument-utils.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
 
@@ -57,9 +68,64 @@ class NesAudioDriver {
 		channel.enabled = false;
 		channel.period = 0;
 		channel.volume = 0;
+		channel.retrigger = false;
+		channel.lengthNibble = NES_REGISTER_UNCHANGED;
 		if (channelIndex <= 1) {
+			channel.volumeReg = buildSquareSilentVolumeReg(channel.duty);
+			channel.linearReg = NES_REGISTER_UNCHANGED;
 			channel.sweepReg = NES_SQUARE_SWEEP_DISABLED;
+		} else if (channelIndex === 2) {
+			channel.volumeReg = NES_REGISTER_UNCHANGED;
+			channel.linearReg = buildTriangleSilentLinearReg();
+		} else if (channelIndex === 3) {
+			channel.volumeReg = buildNoiseSilentVolumeReg();
+			channel.linearReg = NES_REGISTER_UNCHANGED;
+		} else {
+			channel.volumeReg = NES_REGISTER_UNCHANGED;
+			channel.linearReg = NES_REGISTER_UNCHANGED;
 		}
+	}
+
+	_applyEnvelopeAndLength(channel, channelIndex, row, patternVolume) {
+		const combinedVolume = this.calculateVolume(patternVolume, row.volumeOrRate);
+		const volumeNibble = resolveEnvelopeVolumeOrRate(
+			row.envelopeMode,
+			patternVolume,
+			row.volumeOrRate,
+			combinedVolume
+		);
+		channel.volume = combinedVolume;
+
+		if (channelIndex <= 1) {
+			channel.volumeReg = buildSquareEnvelopeVolumeReg(
+				row.pulseWidth,
+				row.envelopeMode,
+				volumeNibble,
+				row.soundLength
+			);
+			channel.duty = row.pulseWidth;
+			channel.lengthNibble = buildLengthCounterNibble(row.envelopeMode, row.soundLength);
+			channel.linearReg = NES_REGISTER_UNCHANGED;
+		} else if (channelIndex === 2) {
+			channel.volumeReg = NES_REGISTER_UNCHANGED;
+			channel.linearReg = buildTriangleLinearReg(row.envelopeMode, row.soundLength);
+			channel.lengthNibble = usesTriangleLinearCounter(row.envelopeMode, row.soundLength)
+				? NES_REGISTER_UNCHANGED
+				: buildLengthCounterNibble(row.envelopeMode, row.soundLength);
+			channel.duty = 0;
+		} else if (channelIndex === 3) {
+			channel.volumeReg = buildNoiseEnvelopeVolumeReg(
+				row.envelopeMode,
+				volumeNibble,
+				row.soundLength
+			);
+			channel.lengthNibble = buildLengthCounterNibble(row.envelopeMode, row.soundLength);
+			channel.linearReg = NES_REGISTER_UNCHANGED;
+		}
+	}
+
+	_isChannelAudible(row, patternVolume, combinedVolume) {
+		return isChannelAudible(row.envelopeMode, patternVolume, row.volumeOrRate, combinedVolume);
 	}
 
 	_resetToneAccumulator(state, channelIndex) {
@@ -160,7 +226,7 @@ class NesAudioDriver {
 
 			const { row, rowsLength, loop } = this.resolveInstrumentRow(state, channelIndex);
 			const patternVolume = state.channelPatternVolumes[channelIndex] ?? 15;
-			const volume = this.calculateVolume(patternVolume, 15);
+			const combinedVolume = this.calculateVolume(patternVolume, row.volumeOrRate);
 			const basePeriod = this.getEffectivePeriod(state, channelIndex);
 			const period =
 				channelIndex <= 2
@@ -168,24 +234,22 @@ class NesAudioDriver {
 					: basePeriod;
 			const keyOn = state.channelKeyOn[channelIndex];
 
+			this._applyEnvelopeAndLength(channel, channelIndex, row, patternVolume);
+			const audible = this._isChannelAudible(row, patternVolume, combinedVolume);
+
 			if (channelIndex <= 1) {
-				channel.enabled = period > 0 && volume > 0;
+				channel.enabled = period > 0 && audible;
 				channel.period = period;
-				channel.volume = volume;
-				channel.duty = row.pulseWidth;
 				channel.sweepReg = buildSquareSweepReg(row.sweep, row.sweepRate, row.sweepShift);
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 2) {
-				channel.enabled = period > 0;
+				channel.enabled = period > 0 && patternVolume > 0;
 				channel.period = period;
-				channel.volume = 15;
-				channel.duty = 0;
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 3) {
-				channel.enabled = volume > 0;
-				channel.volume = volume;
+				channel.enabled = audible;
 				channel.noisePeriod = this.resolveNoisePeriod(state, channelIndex);
 				channel.noiseMode = false;
 				channel.retrigger = row.retrigger || keyOn;

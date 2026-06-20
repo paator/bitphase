@@ -23,6 +23,16 @@ function renderSquarePeak(engine, sampleRate = 44100) {
 }
 
 describe('NesApuEngine', () => {
+	it('stays silent when no channels are active', async () => {
+		const wasmModule = await loadWasm();
+		const { engine } = createNesApuEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+
+		engine.applyRegisterState(registerState);
+
+		expect(renderSquarePeak(engine)).toBeLessThan(0.001);
+	});
+
 	it('plays square waves after channel enable and register writes', async () => {
 		const wasmModule = await loadWasm();
 		const { engine } = createNesApuEngine(wasmModule);

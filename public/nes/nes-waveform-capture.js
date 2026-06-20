@@ -1,8 +1,35 @@
+const NES_WAVEFORM_SCALE = 0.5;
+const NES_SQUARE_NOISE_MAX = 15;
+const NES_DMC_MAX = 127;
+
 const SQUARE_DUTY = [0.125, 0.25, 0.5, 0.75];
+
+export function normalizeNesChannelWaveformSample(channelIndex, rawOut) {
+	if (rawOut < 0) return 0;
+	const max =
+		channelIndex === 4 ? NES_DMC_MAX : channelIndex <= 3 ? NES_SQUARE_NOISE_MAX : 0;
+	if (!(max > 0)) return 0;
+	return (rawOut / max - 0.5) * NES_WAVEFORM_SCALE;
+}
 
 export class NesWaveformCapture {
 	constructor(channelCount) {
+		this.channelCount = channelCount;
 		this.phases = new Float64Array(channelCount);
+	}
+
+	readChannelOutputs(apuEngine) {
+		const outputs = new Float32Array(this.channelCount);
+		if (!apuEngine?.canReadChannelOutputs?.()) {
+			return null;
+		}
+		for (let ch = 0; ch < this.channelCount; ch++) {
+			outputs[ch] = normalizeNesChannelWaveformSample(
+				ch,
+				apuEngine.getChannelRawOut(ch)
+			);
+		}
+		return outputs;
 	}
 
 	reset() {

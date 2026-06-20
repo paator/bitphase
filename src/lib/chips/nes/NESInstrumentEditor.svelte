@@ -3,6 +3,7 @@
 	import IconCarbonRepeat from '~icons/carbon/repeat';
 	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
 	import IconCarbonArrowsVertical from '~icons/carbon/arrows-vertical';
+	import IconCarbonVolumeUp from '~icons/carbon/volume-up';
 	import {
 		BooleanPaintableCell,
 		BooleanPaintDrag,
@@ -33,10 +34,16 @@
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
 	import { compactTableInputClass } from '../../utils/compact-table-input';
+	import NesEnvelopeModeCell from './NesEnvelopeModeCell.svelte';
 	import {
 		createDefaultNesInstrumentRow,
+		cycleNesEnvelopeMode,
 		cyclePulseWidth,
 		ensureNesInstrumentRows,
+		isNesEnvelopeInfinite,
+		isNesSoundLengthEnabled,
+		isNesVolumeField,
+		isNesVolumeOrRateEnabled,
 		NES_PULSE_WIDTH_LABELS,
 		type NesInstrumentRow
 	} from './instrument';
@@ -55,7 +62,7 @@
 		selectedRowIndices?: number[];
 	} = $props();
 
-	const TABLE_COLUMNS = 10;
+	const TABLE_COLUMNS = 13;
 	let tableRef: HTMLTableElement | null = $state(null);
 	let editorContainerRef: HTMLDivElement | null = $state(null);
 
@@ -112,7 +119,7 @@
 
 	function updateNumericField(
 		index: number,
-		field: 'toneAdd' | 'sweepRate' | 'sweepShift',
+		field: 'toneAdd' | 'sweepRate' | 'sweepShift' | 'soundLength' | 'volumeOrRate',
 		event: Event,
 		limits?: { min?: number; max?: number }
 	) {
@@ -227,6 +234,24 @@
 						title="Hardware sweep shift (−7–7)">
 						shift
 					</th>
+					<th
+						class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Sound length (0–511, length counter setting)">
+						{isExpanded ? 'sound len' : 'len'}
+					</th>
+					<th
+						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Envelope mode">
+						env
+					</th>
+					<th
+						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Volume or envelope rate depending on mode">
+						<div class="flex items-center justify-center gap-0.5">
+							<IconCarbonVolumeUp class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<span>/rate</span>
+						</div>
+					</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -323,6 +348,54 @@
 								onfocus={(e) => (e.target as HTMLInputElement).select()}
 								oninput={(e) =>
 									updateNumericField(index, 'sweepShift', e, { min: -7, max: 7 })} />
+						</td>
+						<td class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 px-0.5'}>
+							<input
+								type="text"
+								class={compactTableInputClass({
+									selected,
+									isExpanded,
+									inactive: !isNesSoundLengthEnabled(row.envelopeMode)
+								})}
+								value={formatRowEditorNumber(row.soundLength, asHex)}
+								disabled={!isNesSoundLengthEnabled(row.envelopeMode)}
+								onkeydown={(e) => handleNumericKeyDown(index, e)}
+								onfocus={(e) => (e.target as HTMLInputElement).select()}
+								oninput={(e) =>
+									updateNumericField(index, 'soundLength', e, { min: 0, max: 511 })} />
+						</td>
+						<NesEnvelopeModeCell
+							mode={row.envelopeMode}
+							{selected}
+							{isExpanded}
+							onclick={() => {
+								const envelopeMode = cycleNesEnvelopeMode(row.envelopeMode);
+								updateRow(index, {
+									envelopeMode,
+									...(isNesEnvelopeInfinite(envelopeMode) ? { soundLength: 0 } : {})
+								});
+							}} />
+						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
+							{#if isNesVolumeOrRateEnabled(row.envelopeMode)}
+								<input
+									type="text"
+									class={compactTableInputClass({ selected, isExpanded })}
+									value={formatRowEditorNumber(row.volumeOrRate, asHex)}
+									title={isNesVolumeField(row.envelopeMode)
+										? 'Volume (0–15)'
+										: 'Envelope rate (0–15)'}
+									onkeydown={(e) => handleNumericKeyDown(index, e)}
+									onfocus={(e) => (e.target as HTMLInputElement).select()}
+									oninput={(e) =>
+										updateNumericField(index, 'volumeOrRate', e, { min: 0, max: 15 })} />
+							{:else}
+								<div
+									class="text-center text-[var(--color-app-text-tertiary)] {isExpanded
+										? 'text-xs'
+										: 'text-[0.65rem]'}">
+									—
+								</div>
+							{/if}
 						</td>
 					</tr>
 				{/each}

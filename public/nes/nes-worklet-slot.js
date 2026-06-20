@@ -64,6 +64,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 
 	_applyRegisterStateToEngine() {
 		if (!this.apuEngine) return;
+		this.enforceMuteState();
 		this.apuEngine.applyRegisterState(this.registerState);
 	}
 
@@ -228,13 +229,20 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 
 		const cpuFrequency = this.state.cpuFrequency;
 		const wi = this.channelWaveformWriteIndex;
+		const emulatorOutputs = this.waveformCapture.readChannelOutputs(this.apuEngine);
 		for (let ch = 0; ch < this.channelWaveformBuf.length; ch++) {
-			const sample = this.waveformCapture.sample(
-				ch,
-				this.registerState.channels[ch],
-				cpuFrequency,
-				sampleRate
-			);
+			const channel = this.registerState.channels[ch];
+			const sample =
+				emulatorOutputs != null
+					? channel?.enabled
+						? emulatorOutputs[ch]
+						: 0
+					: this.waveformCapture.sample(
+							ch,
+							channel,
+							cpuFrequency,
+							sampleRate
+						);
 			this.channelWaveformBuf[ch][(wi + sampleIndex) % 512] = sample;
 		}
 	}

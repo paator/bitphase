@@ -1,5 +1,5 @@
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
-import { NES_SQUARE_SWEEP_DISABLED } from './nes-instrument-utils.js';
+import { NES_REGISTER_UNCHANGED, NES_SQUARE_SWEEP_DISABLED } from './nes-instrument-utils.js';
 
 function createDefaultChannel() {
 	return {
@@ -10,7 +10,10 @@ function createDefaultChannel() {
 		retrigger: false,
 		sweepReg: NES_SQUARE_SWEEP_DISABLED,
 		noisePeriod: 0,
-		noiseMode: false
+		noiseMode: false,
+		volumeReg: NES_REGISTER_UNCHANGED,
+		lengthNibble: NES_REGISTER_UNCHANGED,
+		linearReg: NES_REGISTER_UNCHANGED
 	};
 }
 

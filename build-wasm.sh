@@ -30,7 +30,7 @@ emcc ${EMCC_ARGS} \
 emcc ${EMCC_ARGS} \
 	external/nsfplug/nes_apu.c external/nsfplug/nes_dmc.c \
     -o public/nes/nes_apu.wasm \
-    -s EXPORTED_FUNCTIONS='["_nes_apu_Init", "_nes_apu_Reset", "_nes_apu_Tick", "_nes_apu_Render", "_nes_apu_Write", "_nes_apu_SetMask", "_nes_apu_SetStereoMix", "_nes_dmc_Init", "_nes_dmc_Reset", "_nes_dmc_Tick", "_nes_dmc_Render", "_nes_dmc_Write", "_nes_dmc_SetMask", "_nes_dmc_SetStereoMix", "_nes_dmc_SetPal", "_nes_dmc_SetAPU", "_nes_dmc_SetMemory_Read", "_nes_dmc_TickFrameSequence", "_malloc", "_free"]'
+    -s EXPORTED_FUNCTIONS='["_nes_apu_Init", "_nes_apu_Reset", "_nes_apu_Tick", "_nes_apu_Render", "_nes_apu_Write", "_nes_apu_SetMask", "_nes_apu_SetStereoMix", "_nes_apu_GetOut", "_nes_dmc_Init", "_nes_dmc_Reset", "_nes_dmc_Tick", "_nes_dmc_Render", "_nes_dmc_Write", "_nes_dmc_SetMask", "_nes_dmc_SetStereoMix", "_nes_dmc_SetPal", "_nes_dmc_SetAPU", "_nes_dmc_SetMemory_Read", "_nes_dmc_TickFrameSequence", "_nes_dmc_GetOut", "_malloc", "_free"]'
 
 emcc ${EMCC_ARGS} \
 	external/nsfplug/nes_mmc5.c \
