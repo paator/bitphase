@@ -117,6 +117,9 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 			case 'update_chip_variant':
 				this.handleUpdateChipVariant(data);
 				break;
+			case 'update_int_frequency':
+				this.handleUpdateIntFrequency(data);
+				break;
 			default:
 				this.dispatchPortMessages(type, data);
 		}
@@ -165,6 +168,10 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	handleUpdateChipVariant({ chipVariant }) {
 		this.state.setChipVariant(chipVariant);
 		this.apuEngine?.setChipVariant(chipVariant);
+	}
+
+	handleUpdateIntFrequency({ intFrequency }) {
+		this.state.setIntFrequency(intFrequency, sampleRate);
 	}
 
 	handleSetChannelMute({ channelIndex, muted }) {

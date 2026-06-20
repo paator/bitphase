@@ -62,6 +62,14 @@ export class NESProcessor
 		);
 
 		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('interruptFrequency', (value) => {
+				if (typeof value === 'number') {
+					this.sendUpdateIntFrequency(value);
+				}
+			})
+		);
+
+		this.settingsUnsubscribers.push(
 			chipSettings.subscribe('tuningTable', (value) => {
 				if (Array.isArray(value) && value.length > 0) {
 					this.sendInitTuningTable(value as number[]);
@@ -218,12 +226,31 @@ export class NESProcessor
 		this.bridge.sendCommand({ type: 'update_chip_variant', chipVariant });
 	}
 
+	sendUpdateIntFrequency(intFrequency: number): void {
+		this.bridge.sendCommand({ type: 'update_int_frequency', intFrequency });
+	}
+
 	updateParameter(parameter: string, value: unknown): void {
 		if (parameter.startsWith('channelMute_')) {
 			const channelIndex = parseInt(parameter.replace('channelMute_', ''), 10);
 			if (!isNaN(channelIndex) && typeof value === 'boolean') {
 				this.bridge.sendCommand({ type: 'set_channel_mute', channelIndex, muted: value });
 			}
+			return;
+		}
+
+		switch (parameter) {
+			case 'chipFrequency':
+				this.sendUpdateCpuFrequency(value as number);
+				break;
+			case 'interruptFrequency':
+				this.sendUpdateIntFrequency(value as number);
+				break;
+			case 'chipVariant':
+				this.sendUpdateChipVariant(value as string);
+				break;
+			default:
+				break;
 		}
 	}
 

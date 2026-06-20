@@ -110,6 +110,18 @@ export const NES_CHIP_SCHEMA: ChipSchema = {
 			}
 		},
 		{
+			key: 'interruptFrequency',
+			label: 'Interrupt Frequency',
+			type: 'select',
+			options: [
+				{ label: 'PAL (50 Hz)', value: 50 },
+				{ label: 'NTSC (60 Hz)', value: 60 }
+			],
+			defaultValue: 50,
+			group: 'chip',
+			notifyAudioService: true
+		},
+		{
 			key: 'a4TuningHz',
 			label: 'A4 (Hz)',
 			type: 'number',

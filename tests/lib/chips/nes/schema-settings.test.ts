@@ -55,6 +55,14 @@ describe('NES chip settings schema hooks', () => {
 		).toEqual([{ key: 'chipFrequency', value: NES_DENDY_CPU_FREQUENCY }]);
 	});
 
+	it('exposes configurable interrupt frequency options like AY', () => {
+		const setting = NES_CHIP_SCHEMA.settings?.find((s) => s.key === 'interruptFrequency');
+		expect(setting).toBeDefined();
+		expect(setting?.defaultValue).toBe(50);
+		expect(setting?.notifyAudioService).toBe(true);
+		expect(setting?.options?.map((option) => option.value)).toEqual([50, 60]);
+	});
+
 	it('builds a 12-TET tuning table from CPU frequency and A4', () => {
 		const table = resolveNesTuningTable(NES_NTSC_CPU_FREQUENCY, 440);
 		expect(table).toHaveLength(96);
