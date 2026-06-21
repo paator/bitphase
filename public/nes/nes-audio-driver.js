@@ -28,20 +28,14 @@ import {
 } from './nes-instrument-utils.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
 
-const NES_NOISE_TABLE = [
-	6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12,
-	11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7,
-	6, 5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2,
-	1, 0, 11, 10, 9, 8, 7, 6, 5, 4, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	15, 15
-];
+const NES_NOISE_PERIOD_COUNT = 16;
+
+function resolveNesNoisePeriodFromSemitoneOffset(semitoneOffset) {
+	return (
+		((semitoneOffset % NES_NOISE_PERIOD_COUNT) + NES_NOISE_PERIOD_COUNT) %
+		NES_NOISE_PERIOD_COUNT
+	);
+}
 
 class NesAudioDriver {
 	resetChannelMixerState() {}
@@ -182,14 +176,11 @@ class NesAudioDriver {
 
 	resolveNoisePeriod(state, channelIndex) {
 		const noteIndex = state.channelCurrentNotes[channelIndex];
-		let ntPos = noteIndex - 60;
 		const toneSliding = state.channelToneSliding?.[channelIndex] || 0;
 		const vibratoSliding = state.channelVibratoSliding?.[channelIndex] || 0;
 		const detune = state.channelDetune?.[channelIndex] || 0;
-		ntPos += toneSliding + vibratoSliding + detune;
-		if (ntPos < 0) ntPos = 0;
-		if (ntPos >= NES_NOISE_TABLE.length) ntPos = NES_NOISE_TABLE.length - 1;
-		return NES_NOISE_TABLE[ntPos];
+		const semitoneOffset = noteIndex + toneSliding + vibratoSliding + detune;
+		return resolveNesNoisePeriodFromSemitoneOffset(semitoneOffset);
 	}
 
 	resolveInstrumentRow(state, channelIndex) {
@@ -272,3 +263,4 @@ class NesAudioDriver {
 }
 
 export default NesAudioDriver;
+export { resolveNesNoisePeriodFromSemitoneOffset };
