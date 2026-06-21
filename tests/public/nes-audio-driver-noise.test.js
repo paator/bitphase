@@ -5,22 +5,22 @@ import NesAudioDriver, {
 import NesChipRegisterState from '../../public/nes/nes-chip-register-state.js';
 
 describe('resolveNesNoisePeriodFromSemitoneOffset', () => {
-	it('maps C-1 to period 0 and each semitone increments by 1 through 15', () => {
-		expect(resolveNesNoisePeriodFromSemitoneOffset(0)).toBe(0);
-		expect(resolveNesNoisePeriodFromSemitoneOffset(1)).toBe(1);
-		expect(resolveNesNoisePeriodFromSemitoneOffset(14)).toBe(14);
-		expect(resolveNesNoisePeriodFromSemitoneOffset(15)).toBe(15);
+	it('maps C-1 to period 15 and each semitone decrements by 1 through 0', () => {
+		expect(resolveNesNoisePeriodFromSemitoneOffset(0)).toBe(15);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(1)).toBe(14);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(14)).toBe(1);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(15)).toBe(0);
 	});
 
-	it('loops back to 0 after period 15', () => {
-		expect(resolveNesNoisePeriodFromSemitoneOffset(16)).toBe(0);
-		expect(resolveNesNoisePeriodFromSemitoneOffset(17)).toBe(1);
-		expect(resolveNesNoisePeriodFromSemitoneOffset(32)).toBe(0);
+	it('loops back to 15 after period 0', () => {
+		expect(resolveNesNoisePeriodFromSemitoneOffset(16)).toBe(15);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(17)).toBe(14);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(32)).toBe(15);
 	});
 
 	it('wraps negative offsets', () => {
-		expect(resolveNesNoisePeriodFromSemitoneOffset(-1)).toBe(15);
-		expect(resolveNesNoisePeriodFromSemitoneOffset(-16)).toBe(0);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(-1)).toBe(0);
+		expect(resolveNesNoisePeriodFromSemitoneOffset(-16)).toBe(15);
 	});
 });
 
@@ -34,7 +34,7 @@ describe('NesAudioDriver noise period', () => {
 			channelDetune: [0, 0, 0, 0, 0]
 		};
 
-		expect(driver.resolveNoisePeriod(state, 3)).toBe(5);
+		expect(driver.resolveNoisePeriod(state, 3)).toBe(10);
 	});
 
 	it('writes mapped noise period to register state', () => {
@@ -79,6 +79,6 @@ describe('NesAudioDriver noise period', () => {
 
 		driver.processInstruments(state, registerState);
 
-		expect(registerState.channels[3].noisePeriod).toBe(0);
+		expect(registerState.channels[3].noisePeriod).toBe(15);
 	});
 });

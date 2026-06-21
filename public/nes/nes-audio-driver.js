@@ -31,10 +31,10 @@ import { NES_CHANNEL_COUNT } from './nes-constants.js';
 const NES_NOISE_PERIOD_COUNT = 16;
 
 function resolveNesNoisePeriodFromSemitoneOffset(semitoneOffset) {
-	return (
+	const wrapped =
 		((semitoneOffset % NES_NOISE_PERIOD_COUNT) + NES_NOISE_PERIOD_COUNT) %
-		NES_NOISE_PERIOD_COUNT
-	);
+		NES_NOISE_PERIOD_COUNT;
+	return NES_NOISE_PERIOD_COUNT - 1 - wrapped;
 }
 
 class NesAudioDriver {
