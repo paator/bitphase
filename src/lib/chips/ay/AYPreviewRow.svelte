@@ -28,6 +28,7 @@
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { ACTION_TOGGLE_PLAYBACK } from '../../config/keybindings';
 	import { isValidTableDisplayChar, tableDisplayCharToId } from '../../utils/table-id';
+	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
 
 	let {
 		chip,
@@ -124,7 +125,9 @@
 	$effect(() => {
 		return () => {
 			if (savedStereoLayout !== undefined) {
-				containerContext.audioService.chipSettings.forChip(chip.type).set('stereoLayout', savedStereoLayout);
+				containerContext.audioService.chipSettings
+					.forChip(chip.type)
+					.set('stereoLayout', savedStereoLayout);
 				savedStereoLayout = undefined;
 			}
 		};
@@ -158,10 +161,12 @@
 		if (chipIndices.length > 0) {
 			containerContext.audioService.setPreviewActiveForChips(chipIndices);
 		}
-		const normalizedId = (instrumentId || '01').toUpperCase().padStart(2, '0');
-		const currentInstrument = projectStore.instruments.find(
-			(i) => i.id.toUpperCase().padStart(2, '0') === normalizedId
-		);
+		const normalizedId = instrumentId.toUpperCase().padStart(2, '0');
+		const currentInstrument = instrumentId
+			? filterInstrumentsForChip(projectStore.instruments, chip.type).find(
+					(i) => i.id.toUpperCase().padStart(2, '0') === normalizedId
+				)
+			: undefined;
 		processors.forEach((proc, processorIndex) => {
 			const start = processorIndex * 3;
 			const channelNotes = [

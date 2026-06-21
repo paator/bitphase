@@ -120,9 +120,13 @@
 	});
 
 	$effect(() => {
-		const requestId = editorStateStore.selectInstrumentRequest;
-		if (!requestId) return;
-		const instrument = allInstruments.find((inst) => inst.id === requestId);
+		const request = editorStateStore.selectInstrumentRequest;
+		if (!request) return;
+		if (request.chipType) {
+			selectedChipType = request.chipType;
+			return;
+		}
+		const instrument = allInstruments.find((inst) => inst.id === request.instrumentId);
 		if (instrument) {
 			selectedChipType = resolveInstrumentChipType(instrument);
 		}
@@ -134,20 +138,26 @@
 		if (chipInstruments.length > 0 && chipInstruments[selectedInstrumentIndex]) {
 			const instrumentId = chipInstruments[selectedInstrumentIndex].id;
 			untrack(() => {
-				editorStateStore.setCurrentInstrument(instrumentId);
+				editorStateStore.setCurrentInstrumentForChip(
+					chipInstruments[selectedInstrumentIndex].chipType,
+					instrumentId
+				);
 			});
 		}
 	});
 
 	$effect(() => {
-		const targetId = editorStateStore.currentInstrument;
+		const targetId = chip ? editorStateStore.getCurrentInstrument(chip.type) : null;
 		const idx = chipInstruments.findIndex((inst) => inst.id === targetId);
 		if (idx >= 0 && idx !== selectedInstrumentIndex) {
 			selectedInstrumentIndex = idx;
 		} else if (idx < 0 && chipInstruments.length > 0) {
 			selectedInstrumentIndex = 0;
 			untrack(() => {
-				editorStateStore.setCurrentInstrument(chipInstruments[0].id);
+				editorStateStore.setCurrentInstrumentForChip(
+					chipInstruments[0].chipType,
+					chipInstruments[0].id
+				);
 			});
 		}
 		if (editorStateStore.selectInstrumentRequest) {
@@ -279,14 +289,20 @@
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
 		projectStore.instruments = [...allInstruments, newInstrument];
 		sortInstrumentsAndSyncSelection(newId);
-		editorStateStore.setCurrentInstrument(newId);
+		editorStateStore.setCurrentInstrumentForChip(chip.type, newId);
 		projectStore.recordHistory(
 			{
 				type: 'instrument.add',
 				label: `Add instrument ${newId}`,
 				affectedDomains: ['instruments']
 			},
-			[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+			[
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				)
+			]
 		);
 		services.audioService.updateInstruments(projectStore.instruments);
 		await tick();
@@ -310,7 +326,13 @@
 				label: `Remove instrument ${toRemove.id}`,
 				affectedDomains: ['instruments']
 			},
-			[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+			[
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				)
+			]
 		);
 		services.audioService.updateInstruments(projectStore.instruments);
 	}
@@ -335,14 +357,20 @@
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
 		projectStore.instruments = [...allInstruments, copy];
 		sortInstrumentsAndSyncSelection(newId);
-		editorStateStore.setCurrentInstrument(newId);
+		editorStateStore.setCurrentInstrumentForChip(chip.type, newId);
 		projectStore.recordHistory(
 			{
 				type: 'instrument.copy',
 				label: `Copy instrument ${instrument.id}`,
 				affectedDomains: ['instruments']
 			},
-			[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+			[
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				)
+			]
 		);
 		services.audioService.updateInstruments(projectStore.instruments);
 		await tick();
@@ -381,7 +409,11 @@
 				affectedDomains: ['instruments', 'patterns']
 			},
 			[
-				projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments),
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				),
 				projectStore.createSetDiff(['songs'], beforeSongs, projectStore.songs),
 				projectStore.createSetDiff(['patterns'], beforePatterns, projectStore.patterns)
 			]
@@ -524,7 +556,13 @@
 					label: `Apply preset to instrument ${currentId}`,
 					affectedDomains: ['instruments']
 				},
-				[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+				[
+					projectStore.createSetDiff(
+						['instruments'],
+						beforeInstruments,
+						projectStore.instruments
+					)
+				]
 			);
 		}
 		services.audioService.updateInstruments(projectStore.instruments);
@@ -615,7 +653,10 @@
 											<EditableIdField
 												bind:value={editingInstrumentIdValue}
 												error={editingInstrumentIdValue
-													? getInstrumentIdError(index, editingInstrumentIdValue)
+													? getInstrumentIdError(
+															index,
+															editingInstrumentIdValue
+														)
 													: null}
 												onCommit={finishEditingInstrumentId}
 												onCancel={cancelEditingInstrumentId}

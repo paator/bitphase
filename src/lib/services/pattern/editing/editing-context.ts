@@ -1,4 +1,5 @@
 import type { Pattern } from '../../../models/song';
+import type { Instrument } from '../../../models/song';
 import type { Chip } from '../../../chips/types';
 import type { PatternConverter } from '../../../chips/base/adapter';
 import type { PatternFormatter } from '../../../chips/base/formatter-interface';
@@ -13,6 +14,7 @@ export interface EditingContext {
 	converter: PatternConverter;
 	formatter: PatternFormatter;
 	schema: Chip['schema'];
+	instruments?: Instrument[];
 	tuningTable?: number[];
 }
 

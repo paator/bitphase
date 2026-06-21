@@ -136,6 +136,16 @@
 		isRightPanelExpanded ? 'pointer-events-none opacity-50' : ''
 	);
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
+	const previewInstrumentId = $derived.by(() => {
+		const chipType = activeChipProcessor?.chip.type;
+		if (!chipType) return '';
+		const chipInstruments = filterInstrumentsForChip(projectStore.instruments, chipType);
+		const selectedId = editorStateStore.getCurrentInstrument(chipType);
+		if (selectedId && chipInstruments.some((instrument) => instrument.id === selectedId)) {
+			return selectedId;
+		}
+		return chipInstruments[0]?.id ?? '';
+	});
 
 	const services: { audioService: AudioService } = getContext('container');
 
@@ -211,19 +221,23 @@
 		const el = rightPanelEl;
 		const handler = previewSpaceHandler;
 		if (!el) return;
-		return addScopedShortcutListener(el, previewPlaybackActionIds, (event, _action, container) => {
-			if (event.repeat) return;
-			if (handler) {
-				event.preventDefault();
-				event.stopPropagation();
-				const active = document.activeElement as HTMLElement | null;
-				if (active && active !== container) {
-					active.blur?.();
-					container.focus();
+		return addScopedShortcutListener(
+			el,
+			previewPlaybackActionIds,
+			(event, _action, container) => {
+				if (event.repeat) return;
+				if (handler) {
+					event.preventDefault();
+					event.stopPropagation();
+					const active = document.activeElement as HTMLElement | null;
+					if (active && active !== container) {
+						active.blur?.();
+						container.focus();
+					}
+					handler();
 				}
-				handler();
 			}
-		});
+		);
 	});
 
 	const SPEED_EFFECT_TYPE = 'S'.charCodeAt(0);
@@ -249,7 +263,11 @@
 			},
 			[
 				projectStore.createSetDiff(['patterns'], beforePatterns, projectStore.patterns),
-				projectStore.createSetDiff(['patternOrder'], beforePatternOrder, projectStore.patternOrder)
+				projectStore.createSetDiff(
+					['patternOrder'],
+					beforePatternOrder,
+					projectStore.patternOrder
+				)
 			]
 		);
 		if (index === sharedPatternOrderIndex) {
@@ -327,10 +345,7 @@
 			const withVirtual = chipProcessor as ChipProcessor & Partial<VirtualChannelSupport>;
 			if (withVirtual.sendVirtualChannelConfig) {
 				const hwLabels = chipProcessor.chip?.schema?.channelLabels ?? ['A', 'B', 'C'];
-				withVirtual.sendVirtualChannelConfig(
-					song.virtualChannelMap ?? {},
-					hwLabels.length
-				);
+				withVirtual.sendVirtualChannelConfig(song.virtualChannelMap ?? {}, hwLabels.length);
 			}
 
 			chipProcessor.sendInitTables(projectStore.tables);
@@ -361,10 +376,7 @@
 		projectStore.patternOrder;
 		projectStore.loopPointId;
 		if (services.audioService.getPlayPatternId() !== null) return;
-		services.audioService.updateOrder(
-			[...projectStore.patternOrder],
-			projectStore.loopPointId
-		);
+		services.audioService.updateOrder([...projectStore.patternOrder], projectStore.loopPointId);
 	});
 
 	function initAllChipsForPlayback() {
@@ -606,27 +618,30 @@
 								{/snippet}
 								<div class="flex flex-1 flex-col overflow-hidden">
 									{#key `${i}-${chipProcessor.chip.type}`}
-									<PatternEditor
-										bind:this={patternEditors[i]}
-										songIndex={i}
-										bind:currentPatternOrderIndex={sharedPatternOrderIndex}
-										bind:selectedRow={sharedSelectedRow}
-										isActive={activeEditorIndex === i}
-										isPlaybackMaster={i === 0}
-										onfocus={() => {
-											activeEditorIndex = i;
-											patternEditor = patternEditors[i];
-										}}
-										canFocusOnHover={() =>
-											!patternEditors.some((e) => e?.getCanvas?.() === document.activeElement)}
-										{onaction}
-										initAllChips={initAllChipsForPlayback}
-										{initAllChipsForPlayPattern}
-										{getSpeedForChip}
-										{getSpeedForPlayPattern}
-										{tuningTableVersion}
-										chip={chipProcessor.chip}
-										{chipProcessor} />
+										<PatternEditor
+											bind:this={patternEditors[i]}
+											songIndex={i}
+											bind:currentPatternOrderIndex={sharedPatternOrderIndex}
+											bind:selectedRow={sharedSelectedRow}
+											isActive={activeEditorIndex === i}
+											isPlaybackMaster={i === 0}
+											onfocus={() => {
+												activeEditorIndex = i;
+												patternEditor = patternEditors[i];
+											}}
+											canFocusOnHover={() =>
+												!patternEditors.some(
+													(e) =>
+														e?.getCanvas?.() === document.activeElement
+												)}
+											{onaction}
+											initAllChips={initAllChipsForPlayback}
+											{initAllChipsForPlayPattern}
+											{getSpeedForChip}
+											{getSpeedForPlayPattern}
+											{tuningTableVersion}
+											chip={chipProcessor.chip}
+											{chipProcessor} />
 									{/key}
 								</div>
 							</Card>
@@ -652,12 +667,14 @@
 			role="region"
 			aria-label="Instruments and tables"
 			tabindex={0}
-			class="relative z-10 flex h-full shrink-0 flex-col border-l border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] outline-none transition-all duration-300 focus:outline-none {isRightPanelExpanded
+			class="relative z-10 flex h-full shrink-0 flex-col border-l border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] transition-all duration-300 outline-none focus:outline-none {isRightPanelExpanded
 				? 'w-[1200px]'
 				: 'w-[32rem]'}"
 			onmousedown={(e: MouseEvent) => {
 				const target = e.target as HTMLElement;
-				if (!target.closest('input, textarea, button, select, [contenteditable="true"], a')) {
+				if (
+					!target.closest('input, textarea, button, select, [contenteditable="true"], a')
+				) {
 					rightPanelEl?.focus();
 				}
 			}}>
@@ -689,7 +706,7 @@
 						<div class="flex flex-col gap-2 bg-[var(--color-app-surface)] px-2 py-3">
 							<PreviewRow
 								chip={activeChipProcessor.chip}
-								instrumentId={editorStateStore.currentInstrument}
+								instrumentId={previewInstrumentId}
 								tuningTable={projectStore.songs[activeEditorIndex]?.tuningTable ??
 									[]} />
 						</div>

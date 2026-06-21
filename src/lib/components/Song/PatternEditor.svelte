@@ -1413,6 +1413,7 @@
 			converter,
 			formatter,
 			schema,
+			instruments,
 			tuningTable
 		};
 		const fieldInfoBeforeEdit = PatternEditingService.getFieldAtCursor(context);
@@ -1826,7 +1827,7 @@
 					: '';
 				const instrumentId = normalizeInstrumentId(instrumentValue);
 				if (isValidInstrumentId(instrumentId)) {
-					editorStateStore.requestSelectInstrument(instrumentId);
+					editorStateStore.requestSelectInstrument(instrumentId, schema.chipType);
 					event.preventDefault();
 					canvas.focus();
 					draw();
