@@ -667,11 +667,11 @@
 						{#if tabId === 'tables'}
 							<TablesView bind:isExpanded={isRightPanelExpanded} />
 						{:else if tabId === 'instruments'}
-							{#if activeChipProcessor}
-								<InstrumentsView
-									bind:isExpanded={isRightPanelExpanded}
-									chip={activeChipProcessor.chip} />
-							{/if}
+							<InstrumentsView
+								bind:isExpanded={isRightPanelExpanded}
+								{chipProcessors}
+								{activeEditorIndex}
+								syncChipType={activeChipProcessor?.chip.type} />
 						{:else if tabId === 'details'}
 							<DetailsView
 								{chipProcessors}

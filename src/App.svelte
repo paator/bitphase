@@ -219,6 +219,7 @@
 		removeSong: (index) => {
 			projectStore.removeSong(index);
 			container.audioService.removeChipProcessor(index);
+			container.audioService.updateInstruments(projectStore.instruments);
 			syncChipProcessors();
 		},
 		addSong: (song) => {

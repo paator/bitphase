@@ -1,5 +1,6 @@
 import type { Song, Instrument, Pattern } from '../models/song';
 import { Project, Table } from '../models/project';
+import { filterInstrumentsForActiveChipTypes } from '../services/instrument/instrument-filter';
 import { undoRedoStore } from './undo-redo.svelte';
 import type { ProjectDiff, ProjectHistoryEntry, ProjectHistoryMetadata } from '../models/history';
 import { HistoryClone } from '../services/history/history-clone';
@@ -108,6 +109,7 @@ class ProjectStore {
 	removeSong(index: number): void {
 		this.songs = this.songs.filter((_, i) => i !== index);
 		this.patterns = this.patterns.filter((_, i) => i !== index);
+		this.instruments = filterInstrumentsForActiveChipTypes(this.songs, this.instruments);
 	}
 
 	addSong(song: Song): void {

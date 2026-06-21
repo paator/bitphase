@@ -21,7 +21,9 @@
 	import EditableIdField from '../EditableIdField/EditableIdField.svelte';
 	import { getContext, tick, untrack } from 'svelte';
 	import type { AudioService } from '../../services/audio/audio-service';
-	import type { Chip } from '../../chips/types';
+	import type { ChipProcessor } from '../../chips/base/processor';
+	import { getChipByType } from '../../chips/registry';
+	import PillTabs, { type PillTab } from '../PillTabs/PillTabs.svelte';
 	import {
 		isValidInstrumentId,
 		normalizeInstrumentId,
@@ -30,7 +32,11 @@
 		MAX_INSTRUMENT_ID_NUM
 	} from '../../utils/instrument-id';
 	import { migrateInstrumentIdInSong } from '../../services/project/id-migration';
-	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
+	import {
+		filterInstrumentsForChip,
+		getOrderedProjectChipTypes,
+		resolveInstrumentChipType
+	} from '../../services/instrument/instrument-filter';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
@@ -48,14 +54,32 @@
 
 	let {
 		isExpanded = $bindable(false),
-		chip
+		chipProcessors,
+		syncChipType,
+		activeEditorIndex = 0
 	}: {
 		isExpanded: boolean;
-		chip: Chip;
+		chipProcessors: ChipProcessor[];
+		syncChipType?: string;
+		activeEditorIndex?: number;
 	} = $props();
 
 	let allInstruments = $derived(projectStore.instruments);
-	const chipInstruments = $derived(filterInstrumentsForChip(allInstruments, chip.type));
+	const chipTypeTabs = $derived.by((): PillTab[] => {
+		return getOrderedProjectChipTypes(chipProcessors).flatMap((chipType) => {
+			const chip = getChipByType(chipType);
+			return chip ? [{ id: chipType, label: chip.name }] : [];
+		});
+	});
+	let selectedChipType = $state('');
+	let lastSyncedEditorIndex = $state(-1);
+	const chip = $derived.by(() => {
+		const chipType = selectedChipType || chipTypeTabs[0]?.id || syncChipType || 'ay';
+		return getChipByType(chipType);
+	});
+	const chipInstruments = $derived(
+		chip ? filterInstrumentsForChip(allInstruments, chip.type) : []
+	);
 	const songs = $derived(projectStore.songs);
 
 	const instrumentListResize = createPersistedResizableListHeight({
@@ -80,7 +104,32 @@
 	let instrumentListScrollRef: HTMLDivElement | null = $state(null);
 
 	$effect(() => {
-		chip.type;
+		if (chipTypeTabs.length === 0) return;
+		if (!selectedChipType || !chipTypeTabs.some((tab) => tab.id === selectedChipType)) {
+			selectedChipType = syncChipType ?? chipTypeTabs[0].id;
+		}
+	});
+
+	$effect(() => {
+		const editorIndex = activeEditorIndex;
+		if (editorIndex === lastSyncedEditorIndex) return;
+		lastSyncedEditorIndex = editorIndex;
+		if (syncChipType) {
+			selectedChipType = syncChipType;
+		}
+	});
+
+	$effect(() => {
+		const requestId = editorStateStore.selectInstrumentRequest;
+		if (!requestId) return;
+		const instrument = allInstruments.find((inst) => inst.id === requestId);
+		if (instrument) {
+			selectedChipType = resolveInstrumentChipType(instrument);
+		}
+	});
+
+	$effect(() => {
+		chip?.type;
 		if (editorStateStore.selectInstrumentRequest) return;
 		if (chipInstruments.length > 0 && chipInstruments[selectedInstrumentIndex]) {
 			const instrumentId = chipInstruments[selectedInstrumentIndex].id;
@@ -117,7 +166,7 @@
 		});
 	});
 
-	const InstrumentEditor = $derived(chip.instrumentEditor);
+	const InstrumentEditor = $derived(chip?.instrumentEditor);
 
 	const hexIcon = $derived(asHex ? IconCarbonHexagonSolid : IconCarbonHexagonOutline);
 	const expandIcon = $derived(isExpanded ? IconCarbonMinimize : IconCarbonMaximize);
@@ -147,7 +196,7 @@
 		if (needsSort) {
 			projectStore.instruments = sorted;
 		}
-		if (selectedId !== undefined) {
+		if (selectedId !== undefined && chip) {
 			const filtered = filterInstrumentsForChip(projectStore.instruments, chip.type);
 			const newIndex = filtered.findIndex((inst) => inst.id === selectedId);
 			if (newIndex >= 0) selectedInstrumentIndex = newIndex;
@@ -225,6 +274,7 @@
 		const existingIds = allInstruments.map((inst) => inst.id);
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
+		if (!chip) return;
 		const newInstrument = new InstrumentModel(newId, [], 0, `Instrument ${newId}`, chip.type);
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
 		projectStore.instruments = [...allInstruments, newInstrument];
@@ -268,7 +318,7 @@
 	async function copyInstrument(copiedIndex: number): Promise<void> {
 		flushInstrumentUpdateHistory();
 		const instrument = chipInstruments[copiedIndex];
-		if (!instrument) return;
+		if (!instrument || !chip) return;
 		const existingIds = allInstruments.map((inst) => inst.id);
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
@@ -375,7 +425,7 @@
 
 	async function loadInstrument(): Promise<void> {
 		flushInstrumentUpdateHistory();
-		if (chipInstruments.length === 0) return;
+		if (!chip || chipInstruments.length === 0) return;
 		try {
 			const text = await pickFileAsText();
 			const parsed: unknown = JSON.parse(text);
@@ -436,7 +486,7 @@
 
 	async function openPresets(): Promise<void> {
 		flushInstrumentUpdateHistory();
-		if (chipInstruments.length === 0) return;
+		if (!chip || chipInstruments.length === 0) return;
 		const item = await open(PresetsModal, { presetType: 'instrument' });
 		if (
 			item == null ||
@@ -514,12 +564,18 @@
 
 <div class="flex h-full flex-col">
 	<Card
-		title="Instruments — {chip.name}"
+		title="Instruments"
 		icon={IconCarbonWaveform}
 		fullHeight={true}
 		class="flex flex-col"
 		actions={cardActions}>
 		{#snippet children()}
+			{#if chipTypeTabs.length > 1}
+				<div
+					class="shrink-0 border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] px-3 py-2">
+					<PillTabs bind:activeTabId={selectedChipType} tabs={chipTypeTabs} size="sm" />
+				</div>
+			{/if}
 			<div
 				class="flex shrink-0 flex-col border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
 				style="height: {instrumentListResize.listHeight}px">
@@ -622,7 +678,7 @@
 							onInstrumentChange={handleInstrumentChange}
 							bind:selectedRowIndices={selectedInstrumentRowIndices} />
 					{/key}
-				{:else if chipInstruments[selectedInstrumentIndex]}
+				{:else if chipInstruments[selectedInstrumentIndex] && chip}
 					<p class="text-sm text-[var(--color-app-text-muted)]">
 						Instrument editor for {chip.name} is not available yet.
 					</p>
