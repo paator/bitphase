@@ -16,15 +16,15 @@ export const NES_LENGTH_COUNTER_LENGTHS = [
 export const NES_REGISTER_UNCHANGED = -1;
 
 export function buildSquareSilentVolumeReg(duty = 2) {
-	return ((duty & 3) << 6) | (1 << 4);
+	return ((duty & 3) << 6) | (3 << 4);
 }
 
 export function buildNoiseSilentVolumeReg() {
-	return 1 << 4;
+	return 3 << 4;
 }
 
 export function buildTriangleSilentLinearReg() {
-	return (1 << 7) | 0x7f;
+	return 0;
 }
 
 const SOUND_LENGTH_MIN = 0;
@@ -118,10 +118,7 @@ export function buildSquareEnvelopeVolumeReg(duty, envelope, volumeOrRate, sound
 	const volume = volumeOrRate & 15;
 	const dutyBits = (duty & 3) << 6;
 	return (
-		dutyBits |
-		resolveEnvelopeLoopBit(soundLength) |
-		resolveConstantVolumeBit(envelope) |
-		volume
+		dutyBits | resolveEnvelopeLoopBit(soundLength) | resolveConstantVolumeBit(envelope) | volume
 	);
 }
 
@@ -167,12 +164,14 @@ export function isChannelAudible(envelope, patternVolume, volumeOrRate, combined
 	if (!envelope) {
 		return combinedVolume > 0;
 	}
-	return patternVolume > 0 && volumeOrRate > 0;
+	return patternVolume > 0;
 }
 
 export function normalizeNesInstrumentRow(row) {
 	const defaults = createDefaultNesInstrumentRow();
-	const pulseWidth = NES_PULSE_WIDTHS.includes(row?.pulseWidth) ? row.pulseWidth : defaults.pulseWidth;
+	const pulseWidth = NES_PULSE_WIDTHS.includes(row?.pulseWidth)
+		? row.pulseWidth
+		: defaults.pulseWidth;
 	return {
 		pulseWidth,
 		retrigger: row?.retrigger !== undefined ? Boolean(row.retrigger) : defaults.retrigger,
@@ -194,7 +193,9 @@ export function normalizeNesInstrumentRow(row) {
 		sweepRate:
 			row?.sweepRate !== undefined ? normalizeSweepRate(row.sweepRate) : defaults.sweepRate,
 		sweepShift:
-			row?.sweepShift !== undefined ? normalizeSweepShift(row.sweepShift) : defaults.sweepShift
+			row?.sweepShift !== undefined
+				? normalizeSweepShift(row.sweepShift)
+				: defaults.sweepShift
 	};
 }
 

@@ -235,7 +235,7 @@ class NesAudioDriver {
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 2) {
-				channel.enabled = period > 0 && patternVolume > 0;
+				channel.enabled = period > 0 && combinedVolume > 0;
 				channel.period = period;
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
