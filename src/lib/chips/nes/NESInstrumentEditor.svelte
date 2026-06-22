@@ -299,7 +299,7 @@
 							labelClass="font-sans text-[0.65rem] leading-none"
 							{selected}
 							{isExpanded}
-							title="Pulse width"
+							title="Pulse width / Noise type"
 							onclick={() =>
 								updateRow(index, {
 									pulseWidth: cyclePulseWidth(row.pulseWidth)

@@ -113,6 +113,7 @@ class NesAudioDriver {
 				volumeNibble,
 				row.soundLength
 			);
+			channel.noiseMode = row.pulseWidth > 0;
 			channel.lengthNibble = buildLengthCounterNibble(row.soundLength);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		}
@@ -242,7 +243,6 @@ class NesAudioDriver {
 			} else if (channelIndex === 3) {
 				channel.enabled = audible;
 				channel.noisePeriod = this.resolveNoisePeriod(state, channelIndex);
-				channel.noiseMode = false;
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else {
