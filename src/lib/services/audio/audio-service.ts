@@ -174,13 +174,17 @@ export class AudioService {
 			}) => void) => void;
 		};
 		processorWithWaveform.setWaveformCallback?.((channels: Float32Array[]) => {
-			const showWaveform = this._isPlaying || this._previewChipIndices.has(chipIndex);
-			if (showWaveform) waveformStore.setChannels(chipIndex, channels);
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showWaveform = this._isPlaying || this._previewChipIndices.has(idx);
+			if (showWaveform) waveformStore.setChannels(idx, channels);
 		});
 		processorWithWaveform.setChannelToneHzCallback?.((payload) => {
-			const showToneDebug = this._isPlaying || this._previewChipIndices.has(chipIndex);
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showToneDebug = this._isPlaying || this._previewChipIndices.has(idx);
 			if (showToneDebug) {
-				playbackToneDebugStore.setChipPlaybackHz(chipIndex, {
+				playbackToneDebugStore.setChipPlaybackHz(idx, {
 					toneHz: payload.frequencies,
 					sidTimerHz: payload.sidTimerHz,
 					syncbuzzerTimerHz: payload.syncbuzzerTimerHz,
@@ -191,10 +195,12 @@ export class AudioService {
 			}
 		});
 		processorWithWaveform.setTimerPwmSweepPhaseCallback?.((payload) => {
-			const showToneDebug = this._isPlaying || this._previewChipIndices.has(chipIndex);
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showToneDebug = this._isPlaying || this._previewChipIndices.has(idx);
 			if (showToneDebug) {
 				playbackToneDebugStore.updateChipTimerPwmSweepPhase(
-					chipIndex,
+					idx,
 					payload.timerPwmSweepPhase,
 					payload.channelInstrumentIndex
 				);
@@ -213,7 +219,10 @@ export class AudioService {
 		}
 		const arr = Array.isArray(indices) ? indices : [indices];
 		if (!this._isPlaying) {
-			waveformStore.clear();
+			const layout = this.chipProcessors.map(
+				(p) => p.chip.schema.channelLabels?.length ?? 3
+			);
+			waveformStore.prepareLayout(layout);
 			playbackToneDebugStore.clear();
 		}
 		this._previewChipIndices = new Set(arr);

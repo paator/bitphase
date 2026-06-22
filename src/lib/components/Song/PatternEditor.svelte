@@ -1464,7 +1464,10 @@
 			'playPreviewRow' in chipProcessor &&
 			!pressedKeyChannels.has(previewKey)
 		) {
-			services.audioService.setPreviewActiveForChips(songIndex);
+			const previewChipIndex = getChipIndex();
+			if (previewChipIndex >= 0) {
+				services.audioService.setPreviewActiveForChips(previewChipIndex);
+			}
 			const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
 			const isNoteField =
 				fieldInfoBeforeEdit.fieldType === 'note' ||
@@ -2683,7 +2686,10 @@
 				previewChannel >= 0 &&
 				(fieldInfo.channelIndex >= 0 || fieldInfo.fieldKey === 'envelopeValue');
 			if (shouldPreview && chipProcessor && 'playPreviewRow' in chipProcessor) {
-				services.audioService.setPreviewActiveForChips(songIndex);
+				const previewChipIndex = getChipIndex();
+				if (previewChipIndex >= 0) {
+					services.audioService.setPreviewActiveForChips(previewChipIndex);
+				}
 				const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
 				const isNoteField =
 					fieldInfo.fieldType === 'note' || fieldInfo.fieldKey === 'envelopeValue';
