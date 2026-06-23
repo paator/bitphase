@@ -113,6 +113,7 @@ class NesAudioDriver {
 				volumeNibble,
 				row.soundLength
 			);
+			channel.noiseMode = row.pulseWidth > 0;
 			channel.lengthNibble = buildLengthCounterNibble(row.soundLength);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		}
@@ -235,14 +236,13 @@ class NesAudioDriver {
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 2) {
-				channel.enabled = period > 0 && patternVolume > 0;
+				channel.enabled = period > 0 && combinedVolume > 0;
 				channel.period = period;
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 3) {
 				channel.enabled = audible;
 				channel.noisePeriod = this.resolveNoisePeriod(state, channelIndex);
-				channel.noiseMode = false;
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else {

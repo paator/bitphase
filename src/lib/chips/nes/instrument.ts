@@ -18,8 +18,8 @@ const SWEEP_SHIFT_MAX = 7;
 export const NES_SQUARE_SWEEP_DISABLED = 0x08;
 
 export const NES_LENGTH_COUNTER_LENGTHS = [
-	10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
-	192, 24, 72, 26, 16, 28, 32, 30
+	20, 508, 40, 4, 80, 8, 160, 12, 320, 16, 120, 20, 28, 24, 52, 28, 24, 32, 48, 36, 96, 40, 192,
+	44, 384, 48, 144, 52, 32, 56, 64, 60
 ] as const;
 
 const SOUND_LENGTH_MIN = 0;
@@ -137,10 +137,7 @@ export function buildSquareEnvelopeVolumeReg(
 	const volume = volumeOrRate & 15;
 	const dutyBits = (duty & 3) << 6;
 	return (
-		dutyBits |
-		resolveEnvelopeLoopBit(soundLength) |
-		resolveConstantVolumeBit(envelope) |
-		volume
+		dutyBits | resolveEnvelopeLoopBit(soundLength) | resolveConstantVolumeBit(envelope) | volume
 	);
 }
 

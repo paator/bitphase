@@ -93,7 +93,8 @@
 		const next = { ...current, ...patch };
 		if (
 			Object.keys(patch).every(
-				(key) => current[key as keyof NesInstrumentRow] === next[key as keyof NesInstrumentRow]
+				(key) =>
+					current[key as keyof NesInstrumentRow] === next[key as keyof NesInstrumentRow]
 			)
 		) {
 			return;
@@ -189,10 +190,15 @@
 				<tr>
 					<th class={expandedHeaderRowClass(isExpanded)}>row</th>
 					<th class={expandedHeaderActionsClass(isExpanded)}></th>
-					<th class={expandedHeaderLoopClass(isExpanded)}>{isExpanded ? 'loop' : 'lp'}</th>
-					<IconColumnHeader title="Retrigger" icon={IconCarbonRepeat} {isExpanded} class="w-8 min-w-8 px-1" />
+					<th class={expandedHeaderLoopClass(isExpanded)}
+						>{isExpanded ? 'loop' : 'lp'}</th>
 					<IconColumnHeader
-						title="Pulse width"
+						title="Retrigger"
+						icon={IconCarbonRepeat}
+						{isExpanded}
+						class="w-8 min-w-8 px-1" />
+					<IconColumnHeader
+						title="Pulse width / Noise type"
 						icon={IconCarbonChartWinLoss}
 						label="duty"
 						{isExpanded}
@@ -201,7 +207,8 @@
 						class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'}
 						title="Tone Offset">
 						<div class="flex items-center justify-center gap-0.5">
-							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<IconCarbonChartWinLoss
+								class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>+</span>
 						</div>
 					</th>
@@ -209,34 +216,35 @@
 						class={isExpanded ? 'w-8 min-w-8 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
 						title="Tone Accumulation">
 						<div class="flex items-center justify-center gap-0.5">
-							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<IconCarbonChartWinLoss
+								class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>↑</span>
 						</div>
 					</th>
 					<IconColumnHeader
-						title="Hardware sweep"
+						title="Hardware sweep, pulse channels only"
 						icon={IconCarbonArrowsVertical}
 						label="sw"
 						{isExpanded}
 						class="w-8 min-w-8 px-1" />
 					<th
 						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
-						title="Hardware sweep rate (0–7)">
+						title="Hardware sweep rate (0–7), pulse channels only">
 						rate
 					</th>
 					<th
 						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
-						title="Hardware sweep shift (−7–7)">
+						title="Hardware sweep shift (−7–7), pulse channels only">
 						shift
 					</th>
 					<th
 						class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
-						title="Sound length (0–511, length counter setting)">
+						title="Sound length (0–511, 0 is infinite and enables looping envelope)">
 						{isExpanded ? 'sound len' : 'len'}
 					</th>
 					<th
 						class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
-						title="Envelope (1) or constant volume (0)">
+						title="Envelope (1) or constant volume (0), pulse and noise channels only">
 						env
 					</th>
 					<th
@@ -252,7 +260,10 @@
 			<tbody>
 				{#each editorSync.rows as row, index (index)}
 					{@const selected = selection.isRowSelected(index)}
-					<tr class="{expandedRowHeightClass(isExpanded)} {selected ? ROW_SELECTION_STYLES.row : ''}">
+					<tr
+						class="{expandedRowHeightClass(isExpanded)} {selected
+							? ROW_SELECTION_STYLES.row
+							: ''}">
 						<SelectableRowNumberCell
 							{index}
 							{selected}
@@ -280,15 +291,19 @@
 									(value) => updateBooleanRow(index, 'retrigger', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateBooleanRow(index, 'retrigger', value))} />
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'retrigger', value)
+								)} />
 						<CycleValueCell
 							label={NES_PULSE_WIDTH_LABELS[row.pulseWidth]}
 							labelClass="font-sans text-[0.65rem] leading-none"
 							{selected}
 							{isExpanded}
-							title="Pulse width"
+							title="Pulse width / Noise type"
 							onclick={() =>
-								updateRow(index, { pulseWidth: cyclePulseWidth(row.pulseWidth) })} />
+								updateRow(index, {
+									pulseWidth: cyclePulseWidth(row.pulseWidth)
+								})} />
 						<td class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5'}>
 							<input
 								type="text"
@@ -312,7 +327,8 @@
 								)}
 							onPaintOver={() =>
 								booleanDrag.dragOver((value) =>
-									updateBooleanRow(index, 'toneAccumulation', value))} />
+									updateBooleanRow(index, 'toneAccumulation', value)
+								)} />
 						<BooleanPaintableCell
 							active={row.sweep}
 							{selected}
@@ -324,7 +340,9 @@
 									(value) => updateBooleanRow(index, 'sweep', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateBooleanRow(index, 'sweep', value))} />
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'sweep', value)
+								)} />
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
 							<input
 								type="text"
@@ -332,7 +350,11 @@
 								value={formatRowEditorNumber(row.sweepRate, asHex)}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
 								onfocus={(e) => (e.target as HTMLInputElement).select()}
-								oninput={(e) => updateNumericField(index, 'sweepRate', e, { min: 0, max: 7 })} />
+								oninput={(e) =>
+									updateNumericField(index, 'sweepRate', e, {
+										min: 0,
+										max: 7
+									})} />
 						</td>
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
 							<input
@@ -342,7 +364,10 @@
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
 								onfocus={(e) => (e.target as HTMLInputElement).select()}
 								oninput={(e) =>
-									updateNumericField(index, 'sweepShift', e, { min: -7, max: 7 })} />
+									updateNumericField(index, 'sweepShift', e, {
+										min: -7,
+										max: 7
+									})} />
 						</td>
 						<td class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 px-0.5'}>
 							<input
@@ -352,7 +377,10 @@
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
 								onfocus={(e) => (e.target as HTMLInputElement).select()}
 								oninput={(e) =>
-									updateNumericField(index, 'soundLength', e, { min: 0, max: 511 })} />
+									updateNumericField(index, 'soundLength', e, {
+										min: 0,
+										max: 511
+									})} />
 						</td>
 						<BooleanPaintableCell
 							active={row.envelope}
@@ -365,7 +393,9 @@
 									(value) => updateBooleanRow(index, 'envelope', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateBooleanRow(index, 'envelope', value))} />
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'envelope', value)
+								)} />
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
 							<input
 								type="text"
@@ -377,7 +407,10 @@
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
 								onfocus={(e) => (e.target as HTMLInputElement).select()}
 								oninput={(e) =>
-									updateNumericField(index, 'volumeOrRate', e, { min: 0, max: 15 })} />
+									updateNumericField(index, 'volumeOrRate', e, {
+										min: 0,
+										max: 15
+									})} />
 						</td>
 					</tr>
 				{/each}
@@ -389,7 +422,11 @@
 				rowHeightPx={isExpanded ? 32 : 28}
 				onAdd={() => editorSync.addRow(createDefaultNesInstrumentRow)}
 				onRowCountChange={(count) =>
-					editorSync.setRowCount(count, createDefaultNesInstrumentRow, ROW_EDITOR_MAX_ROWS)} />
+					editorSync.setRowCount(
+						count,
+						createDefaultNesInstrumentRow,
+						ROW_EDITOR_MAX_ROWS
+					)} />
 		</table>
 	</div>
 </RowEditorContainer>
