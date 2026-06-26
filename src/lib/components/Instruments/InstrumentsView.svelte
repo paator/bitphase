@@ -21,7 +21,9 @@
 	import EditableIdField from '../EditableIdField/EditableIdField.svelte';
 	import { getContext, tick, untrack } from 'svelte';
 	import type { AudioService } from '../../services/audio/audio-service';
-	import type { Chip } from '../../chips/types';
+	import type { ChipProcessor } from '../../chips/base/processor';
+	import { getChipByType } from '../../chips/registry';
+	import PillTabs, { type PillTab } from '../PillTabs/PillTabs.svelte';
 	import {
 		isValidInstrumentId,
 		normalizeInstrumentId,
@@ -30,7 +32,11 @@
 		MAX_INSTRUMENT_ID_NUM
 	} from '../../utils/instrument-id';
 	import { migrateInstrumentIdInSong } from '../../services/project/id-migration';
-	import { copyAyInstrumentFields, type AyInstrumentFields } from '../../chips/ay/instrument';
+	import {
+		filterInstrumentsForChip,
+		getOrderedProjectChipTypes,
+		resolveInstrumentChipType
+	} from '../../services/instrument/instrument-filter';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
@@ -48,13 +54,32 @@
 
 	let {
 		isExpanded = $bindable(false),
-		chip
+		chipProcessors,
+		syncChipType,
+		activeEditorIndex = 0
 	}: {
 		isExpanded: boolean;
-		chip: Chip;
+		chipProcessors: ChipProcessor[];
+		syncChipType?: string;
+		activeEditorIndex?: number;
 	} = $props();
 
-	let instruments = $derived(projectStore.instruments);
+	let allInstruments = $derived(projectStore.instruments);
+	const chipTypeTabs = $derived.by((): PillTab[] => {
+		return getOrderedProjectChipTypes(chipProcessors).flatMap((chipType) => {
+			const chip = getChipByType(chipType);
+			return chip ? [{ id: chipType, label: chip.name }] : [];
+		});
+	});
+	let selectedChipType = $state('');
+	let lastSyncedEditorIndex = $state(-1);
+	const chip = $derived.by(() => {
+		const chipType = selectedChipType || chipTypeTabs[0]?.id || syncChipType || 'ay';
+		return getChipByType(chipType);
+	});
+	const chipInstruments = $derived(
+		chip ? filterInstrumentsForChip(allInstruments, chip.type) : []
+	);
 	const songs = $derived(projectStore.songs);
 
 	const instrumentListResize = createPersistedResizableListHeight({
@@ -66,7 +91,7 @@
 
 	const instrumentGridRows = $derived.by(() =>
 		computeGridRows(
-			instruments?.length ?? 0,
+			chipInstruments?.length ?? 0,
 			instrumentListResize.listHeight,
 			ITEM_ROW_HEIGHT,
 			ITEM_BUTTON_BAR_HEIGHT
@@ -79,20 +104,61 @@
 	let instrumentListScrollRef: HTMLDivElement | null = $state(null);
 
 	$effect(() => {
+		if (chipTypeTabs.length === 0) return;
+		if (!selectedChipType || !chipTypeTabs.some((tab) => tab.id === selectedChipType)) {
+			selectedChipType = syncChipType ?? chipTypeTabs[0].id;
+		}
+	});
+
+	$effect(() => {
+		const editorIndex = activeEditorIndex;
+		if (editorIndex === lastSyncedEditorIndex) return;
+		lastSyncedEditorIndex = editorIndex;
+		if (syncChipType) {
+			selectedChipType = syncChipType;
+		}
+	});
+
+	$effect(() => {
+		const request = editorStateStore.selectInstrumentRequest;
+		if (!request) return;
+		if (request.chipType) {
+			selectedChipType = request.chipType;
+			return;
+		}
+		const instrument = allInstruments.find((inst) => inst.id === request.instrumentId);
+		if (instrument) {
+			selectedChipType = resolveInstrumentChipType(instrument);
+		}
+	});
+
+	$effect(() => {
+		chip?.type;
 		if (editorStateStore.selectInstrumentRequest) return;
-		if (instruments.length > 0 && instruments[selectedInstrumentIndex]) {
-			const instrumentId = instruments[selectedInstrumentIndex].id;
+		if (chipInstruments.length > 0 && chipInstruments[selectedInstrumentIndex]) {
+			const instrumentId = chipInstruments[selectedInstrumentIndex].id;
 			untrack(() => {
-				editorStateStore.setCurrentInstrument(instrumentId);
+				editorStateStore.setCurrentInstrumentForChip(
+					chipInstruments[selectedInstrumentIndex].chipType,
+					instrumentId
+				);
 			});
 		}
 	});
 
 	$effect(() => {
-		const targetId = editorStateStore.currentInstrument;
-		const idx = instruments.findIndex((inst) => inst.id === targetId);
+		const targetId = chip ? editorStateStore.getCurrentInstrument(chip.type) : null;
+		const idx = chipInstruments.findIndex((inst) => inst.id === targetId);
 		if (idx >= 0 && idx !== selectedInstrumentIndex) {
 			selectedInstrumentIndex = idx;
+		} else if (idx < 0 && chipInstruments.length > 0) {
+			selectedInstrumentIndex = 0;
+			untrack(() => {
+				editorStateStore.setCurrentInstrumentForChip(
+					chipInstruments[0].chipType,
+					chipInstruments[0].id
+				);
+			});
 		}
 		if (editorStateStore.selectInstrumentRequest) {
 			editorStateStore.clearSelectInstrumentRequest();
@@ -110,7 +176,7 @@
 		});
 	});
 
-	const InstrumentEditor = $derived(chip.instrumentEditor);
+	const InstrumentEditor = $derived(chip?.instrumentEditor);
 
 	const hexIcon = $derived(asHex ? IconCarbonHexagonSolid : IconCarbonHexagonOutline);
 	const expandIcon = $derived(isExpanded ? IconCarbonMinimize : IconCarbonMaximize);
@@ -135,13 +201,14 @@
 	}
 
 	function sortInstrumentsAndSyncSelection(selectedId?: string): void {
-		const sorted = [...instruments].sort(compareInstrumentIds);
-		const needsSort = sorted.some((inst, i) => inst !== instruments[i]);
+		const sorted = [...allInstruments].sort(compareInstrumentIds);
+		const needsSort = sorted.some((inst, i) => inst !== allInstruments[i]);
 		if (needsSort) {
 			projectStore.instruments = sorted;
 		}
-		if (selectedId !== undefined) {
-			const newIndex = sorted.findIndex((inst) => inst.id === selectedId);
+		if (selectedId !== undefined && chip) {
+			const filtered = filterInstrumentsForChip(projectStore.instruments, chip.type);
+			const newIndex = filtered.findIndex((inst) => inst.id === selectedId);
 			if (newIndex >= 0) selectedInstrumentIndex = newIndex;
 		}
 	}
@@ -201,10 +268,10 @@
 
 	function handleInstrumentChange(instrument: Instrument): void {
 		const id = instrument.id;
-		const idx = instruments.findIndex((inst) => inst.id === id);
+		const idx = allInstruments.findIndex((inst) => inst.id === id);
 		if (idx >= 0) {
 			const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-			const updated = [...instruments];
+			const updated = [...allInstruments];
 			updated[idx] = { ...instrument };
 			projectStore.instruments = updated;
 			scheduleInstrumentUpdateHistory(beforeInstruments, `Edit instrument ${id}`);
@@ -214,21 +281,28 @@
 
 	async function addInstrument(): Promise<void> {
 		flushInstrumentUpdateHistory();
-		const existingIds = instruments.map((inst) => inst.id);
+		const existingIds = allInstruments.map((inst) => inst.id);
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
-		const newInstrument = new InstrumentModel(newId, [], 0, `Instrument ${newId}`);
+		if (!chip) return;
+		const newInstrument = new InstrumentModel(newId, [], 0, `Instrument ${newId}`, chip.type);
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-		projectStore.instruments = [...instruments, newInstrument];
+		projectStore.instruments = [...allInstruments, newInstrument];
 		sortInstrumentsAndSyncSelection(newId);
-		editorStateStore.setCurrentInstrument(newId);
+		editorStateStore.setCurrentInstrumentForChip(chip.type, newId);
 		projectStore.recordHistory(
 			{
 				type: 'instrument.add',
 				label: `Add instrument ${newId}`,
 				affectedDomains: ['instruments']
 			},
-			[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+			[
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				)
+			]
 		);
 		services.audioService.updateInstruments(projectStore.instruments);
 		await tick();
@@ -239,12 +313,12 @@
 
 	function removeInstrument(index: number): void {
 		flushInstrumentUpdateHistory();
-		const toRemove = instruments[index];
-		if (!toRemove || instruments.length <= 1) return;
+		const toRemove = chipInstruments[index];
+		if (!toRemove || chipInstruments.length <= 1) return;
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-		projectStore.instruments = instruments.filter((inst) => inst.id !== toRemove.id);
-		if (selectedInstrumentIndex >= projectStore.instruments.length) {
-			selectedInstrumentIndex = Math.max(0, projectStore.instruments.length - 1);
+		projectStore.instruments = allInstruments.filter((inst) => inst.id !== toRemove.id);
+		if (selectedInstrumentIndex >= chipInstruments.length - 1) {
+			selectedInstrumentIndex = Math.max(0, chipInstruments.length - 2);
 		}
 		projectStore.recordHistory(
 			{
@@ -252,16 +326,22 @@
 				label: `Remove instrument ${toRemove.id}`,
 				affectedDomains: ['instruments']
 			},
-			[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+			[
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				)
+			]
 		);
 		services.audioService.updateInstruments(projectStore.instruments);
 	}
 
 	async function copyInstrument(copiedIndex: number): Promise<void> {
 		flushInstrumentUpdateHistory();
-		const instrument = instruments[copiedIndex];
-		if (!instrument) return;
-		const existingIds = instruments.map((inst) => inst.id);
+		const instrument = chipInstruments[copiedIndex];
+		if (!instrument || !chip) return;
+		const existingIds = allInstruments.map((inst) => inst.id);
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
 		const copiedRows = instrument.rows.map((r) => new InstrumentRow({ ...r }));
@@ -269,24 +349,28 @@
 			newId,
 			copiedRows,
 			instrument.loop,
-			instrument.name + ' (Copy)'
+			instrument.name + ' (Copy)',
+			chip.type
 		);
-		copyAyInstrumentFields(
-			instrument as Instrument & Partial<AyInstrumentFields>,
-			copy as Instrument & Partial<AyInstrumentFields>
-		);
+		chip.copyInstrumentFields?.(instrument, copy);
 
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-		projectStore.instruments = [...instruments, copy];
+		projectStore.instruments = [...allInstruments, copy];
 		sortInstrumentsAndSyncSelection(newId);
-		editorStateStore.setCurrentInstrument(newId);
+		editorStateStore.setCurrentInstrumentForChip(chip.type, newId);
 		projectStore.recordHistory(
 			{
 				type: 'instrument.copy',
 				label: `Copy instrument ${instrument.id}`,
 				affectedDomains: ['instruments']
 			},
-			[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+			[
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				)
+			]
 		);
 		services.audioService.updateInstruments(projectStore.instruments);
 		await tick();
@@ -301,8 +385,8 @@
 		if (!isValidInstrumentId(normalizedId) || !isInstrumentIdInRange(normalizedId)) {
 			return;
 		}
-		const oldId = instruments[index].id;
-		const existingIds = instruments.map((inst) => inst.id).filter((id) => id !== oldId);
+		const oldId = chipInstruments[index].id;
+		const existingIds = allInstruments.map((inst) => inst.id).filter((id) => id !== oldId);
 		if (existingIds.includes(normalizedId)) {
 			return;
 		}
@@ -312,8 +396,10 @@
 		for (const song of songs) {
 			migrateInstrumentIdInSong(song, oldId, normalizedId);
 		}
-		const updated = [...instruments];
-		updated[index] = { ...updated[index], id: normalizedId };
+		const globalIndex = allInstruments.findIndex((inst) => inst.id === oldId);
+		if (globalIndex < 0) return;
+		const updated = [...allInstruments];
+		updated[globalIndex] = { ...updated[globalIndex], id: normalizedId };
 		projectStore.instruments = updated;
 		sortInstrumentsAndSyncSelection(normalizedId);
 		projectStore.recordHistory(
@@ -323,12 +409,16 @@
 				affectedDomains: ['instruments', 'patterns']
 			},
 			[
-				projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments),
+				projectStore.createSetDiff(
+					['instruments'],
+					beforeInstruments,
+					projectStore.instruments
+				),
 				projectStore.createSetDiff(['songs'], beforeSongs, projectStore.songs),
 				projectStore.createSetDiff(['patterns'], beforePatterns, projectStore.patterns)
 			]
 		);
-		services.audioService.updateInstruments(instruments);
+		services.audioService.updateInstruments(projectStore.instruments);
 		requestPatternRedraw?.();
 	}
 
@@ -337,7 +427,7 @@
 
 	function startEditingInstrumentId(index: number): void {
 		editingInstrumentId = index;
-		editingInstrumentIdValue = instruments[index]?.id || '';
+		editingInstrumentIdValue = chipInstruments[index]?.id || '';
 	}
 
 	function finishEditingInstrumentId(): void {
@@ -354,10 +444,11 @@
 	}
 
 	function saveInstrument(): void {
-		if (instruments.length === 0) return;
-		const inst = instruments[selectedInstrumentIndex];
+		if (chipInstruments.length === 0) return;
+		const inst = chipInstruments[selectedInstrumentIndex];
 		if (!inst) return;
 		downloadJson(`instrument-${inst.id}.json`, {
+			chipType: inst.chipType,
 			name: inst.name,
 			loop: inst.loop,
 			rows: inst.rows.map((r) => ({ ...r }))
@@ -366,7 +457,7 @@
 
 	async function loadInstrument(): Promise<void> {
 		flushInstrumentUpdateHistory();
-		if (instruments.length === 0) return;
+		if (!chip || chipInstruments.length === 0) return;
 		try {
 			const text = await pickFileAsText();
 			const parsed: unknown = JSON.parse(text);
@@ -382,17 +473,18 @@
 			const rows = (o.rows as Record<string, unknown>[]).map((r) => new InstrumentRow(r));
 			const loop = typeof o.loop === 'number' ? o.loop : 0;
 			const name = o.name != null ? String(o.name) : '';
-			const currentId = instruments[selectedInstrumentIndex]?.id ?? '01';
+			const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
 			const replacement = new InstrumentModel(
 				currentId,
 				rows,
 				loop,
-				name || `Instrument ${currentId}`
+				name || `Instrument ${currentId}`,
+				chip.type
 			);
-			const idx = instruments.findIndex((inst) => inst.id === currentId);
+			const idx = allInstruments.findIndex((inst) => inst.id === currentId);
 			if (idx >= 0) {
 				const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-				const updated = [...instruments];
+				const updated = [...allInstruments];
 				updated[idx] = new InstrumentModel(
 					currentId,
 					replacement.rows.map((r) => new InstrumentRow({ ...r })),
@@ -426,7 +518,7 @@
 
 	async function openPresets(): Promise<void> {
 		flushInstrumentUpdateHistory();
-		if (instruments.length === 0) return;
+		if (!chip || chipInstruments.length === 0) return;
 		const item = await open(PresetsModal, { presetType: 'instrument' });
 		if (
 			item == null ||
@@ -439,17 +531,18 @@
 		const rows = (o.rows as Record<string, unknown>[]).map((r) => new InstrumentRow(r));
 		const loop = typeof o.loop === 'number' ? o.loop : 0;
 		const name = o.name != null ? String(o.name) : '';
-		const currentId = instruments[selectedInstrumentIndex]?.id ?? '01';
+		const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
 		const replacement = new InstrumentModel(
 			currentId,
 			rows,
 			loop,
-			name || `Instrument ${currentId}`
+			name || `Instrument ${currentId}`,
+			chip.type
 		);
-		const idx = instruments.findIndex((inst) => inst.id === currentId);
+		const idx = allInstruments.findIndex((inst) => inst.id === currentId);
 		if (idx >= 0) {
 			const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-			const updated = [...instruments];
+			const updated = [...allInstruments];
 			updated[idx] = new InstrumentModel(
 				currentId,
 				replacement.rows.map((r) => new InstrumentRow({ ...r })),
@@ -463,7 +556,13 @@
 					label: `Apply preset to instrument ${currentId}`,
 					affectedDomains: ['instruments']
 				},
-				[projectStore.createSetDiff(['instruments'], beforeInstruments, projectStore.instruments)]
+				[
+					projectStore.createSetDiff(
+						['instruments'],
+						beforeInstruments,
+						projectStore.instruments
+					)
+				]
 			);
 		}
 		services.audioService.updateInstruments(projectStore.instruments);
@@ -478,7 +577,10 @@
 		if (!isInstrumentIdInRange(normalizedId)) {
 			return 'ID must be between 01 and ZZ';
 		}
-		const existingIds = instruments.map((inst, i) => (i === index ? '' : inst.id));
+		const editingInstrument = chipInstruments[index];
+		const existingIds = allInstruments
+			.map((inst) => inst.id)
+			.filter((instId) => instId !== editingInstrument?.id);
 		if (existingIds.includes(normalizedId)) {
 			return 'This ID is already used';
 		}
@@ -486,15 +588,15 @@
 	}
 
 	$effect(() => {
-		const currentInstruments = instruments;
+		const currentInstruments = chipInstruments;
 		if (currentInstruments && selectedInstrumentIndex >= currentInstruments.length) {
 			selectedInstrumentIndex = 0;
 		}
 	});
 
 	$effect(() => {
-		if (!instruments || instruments.length === 0) return;
-		sortInstrumentsAndSyncSelection(instruments[selectedInstrumentIndex]?.id);
+		if (!chipInstruments || chipInstruments.length === 0) return;
+		sortInstrumentsAndSyncSelection(chipInstruments[selectedInstrumentIndex]?.id);
 	});
 </script>
 
@@ -506,6 +608,12 @@
 		class="flex flex-col"
 		actions={cardActions}>
 		{#snippet children()}
+			{#if chipTypeTabs.length > 1}
+				<div
+					class="shrink-0 border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] px-3 py-2">
+					<PillTabs bind:activeTabId={selectedChipType} tabs={chipTypeTabs} size="sm" />
+				</div>
+			{/if}
 			<div
 				class="flex shrink-0 flex-col border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
 				style="height: {instrumentListResize.listHeight}px">
@@ -517,7 +625,7 @@
 							class="flex min-w-max shrink-0 items-stretch border-b border-[var(--color-app-border)]"
 							style="height: {ITEM_ROW_HEIGHT}px">
 							{#each rowIndices as index}
-								{@const instrument = instruments[index]}
+								{@const instrument = chipInstruments[index]}
 								{#if instrument}
 									{@const isSelected = selectedInstrumentIndex === index}
 									<ItemGridCell
@@ -530,7 +638,7 @@
 										nameLabel={instrument.name}
 										copyTitle="Copy instrument"
 										removeTitle="Remove instrument"
-										showRemove={instruments.length > 1}
+										showRemove={chipInstruments.length > 1}
 										onSelect={() => (selectedInstrumentIndex = index)}
 										onDoubleClick={() => startEditingInstrumentId(index)}
 										onCopy={(e) => {
@@ -545,7 +653,10 @@
 											<EditableIdField
 												bind:value={editingInstrumentIdValue}
 												error={editingInstrumentIdValue
-													? getInstrumentIdError(index, editingInstrumentIdValue)
+													? getInstrumentIdError(
+															index,
+															editingInstrumentIdValue
+														)
 													: null}
 												onCommit={finishEditingInstrumentId}
 												onCancel={cancelEditingInstrumentId}
@@ -568,27 +679,27 @@
 						icon={IconCarbonAdd}
 						label="Add"
 						onclick={addInstrument}
-						disabled={instruments.length >= MAX_INSTRUMENT_ID_NUM}
-						title={instruments.length >= MAX_INSTRUMENT_ID_NUM
+						disabled={allInstruments.length >= MAX_INSTRUMENT_ID_NUM}
+						title={allInstruments.length >= MAX_INSTRUMENT_ID_NUM
 							? 'Maximum 1295 instruments (01–ZZ)'
 							: 'Add new instrument'} />
 					<ToolbarButton
 						icon={IconCarbonSave}
 						label="Save"
 						onclick={saveInstrument}
-						disabled={instruments.length === 0}
+						disabled={chipInstruments.length === 0}
 						title="Save selected instrument to JSON file" />
 					<ToolbarButton
 						icon={IconCarbonDocumentImport}
 						label="Load"
 						onclick={loadInstrument}
-						disabled={instruments.length === 0}
+						disabled={chipInstruments.length === 0}
 						title="Load instrument from JSON file into selected slot" />
 					<ToolbarButton
 						icon={IconCarbonFolder}
 						label="Presets"
 						onclick={openPresets}
-						disabled={instruments.length === 0}
+						disabled={chipInstruments.length === 0}
 						title="Load instrument from built-in presets" />
 				</div>
 			</div>
@@ -599,15 +710,19 @@
 				onmousedown={instrumentListResize.beginResize} />
 
 			<div class="min-h-0 flex-1 overflow-auto p-4">
-				{#if instruments && instruments[selectedInstrumentIndex]}
-					{#key instruments[selectedInstrumentIndex].id}
+				{#if chipInstruments[selectedInstrumentIndex] && InstrumentEditor}
+					{#key chipInstruments[selectedInstrumentIndex].id}
 						<InstrumentEditor
-							instrument={instruments[selectedInstrumentIndex]}
+							instrument={chipInstruments[selectedInstrumentIndex]}
 							{asHex}
 							{isExpanded}
 							onInstrumentChange={handleInstrumentChange}
 							bind:selectedRowIndices={selectedInstrumentRowIndices} />
 					{/key}
+				{:else if chipInstruments[selectedInstrumentIndex] && chip}
+					<p class="text-sm text-[var(--color-app-text-muted)]">
+						Instrument editor for {chip.name} is not available yet.
+					</p>
 				{/if}
 			</div>
 		{/snippet}

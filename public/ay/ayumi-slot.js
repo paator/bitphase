@@ -14,9 +14,10 @@ import {
 	TIMER_EFFECT_SLOT_SYNCBUZZER,
 	disableAllChannelTimerEffects
 } from './ay-timer-effect-constants.js';
+import { resetChipPlaybackOutput } from '../tracker/tracker-engine-transport.js';
 import AYAudioDriver from './ay-audio-driver.js';
 import AyumiEngine from './ayumi-engine.js';
-import TrackerPatternProcessor from './tracker-pattern-processor.js';
+import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
 import { Ay8910WorkletSlot } from './ay8910-worklet-slot.js';
 
 export class AyumiSlot extends Ay8910WorkletSlot {
@@ -175,14 +176,12 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 
 	_prepareOutputForPlay() {
 		this.fadeInSamples = Math.floor(sampleRate * this.fadeInDuration);
-		this.registerState.reset();
-		if (this.audioDriver) {
-			this.audioDriver.resetChannelMixerState();
-		}
-		if (this.ayumiEngine) {
-			this.ayumiEngine.reset();
-			this._applyRegisterStateToEngine();
-		}
+		resetChipPlaybackOutput({
+			registerState: this.registerState,
+			audioDriver: this.audioDriver,
+			chipEngine: this.ayumiEngine,
+			applyRegisterState: () => this._applyRegisterStateToEngine()
+		});
 	}
 
 	resetChannelWaveformCapture() {
@@ -308,7 +307,22 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 	}
 
 	accumulateStereoOutput(sampleIndex, mix) {
-		if (this.audioDriver && this.ayumiEngine) {
+		if (!this.ayumiEngine) {
+			return;
+		}
+		const channelMuted = this.state.channelMuted;
+		const channelSoundEnabled = this.state.channelSoundEnabled;
+		let hasAudibleChannel = false;
+		for (let ch = 0; ch < channelMuted.length; ch++) {
+			if (!channelMuted[ch] && channelSoundEnabled[ch]) {
+				hasAudibleChannel = true;
+				break;
+			}
+		}
+		if (!hasAudibleChannel) {
+			return;
+		}
+		if (this.audioDriver) {
 			const resolveAyumiChannelIndex =
 				this.virtualChannelMixer?.hasVirtualChannels?.()
 					? (channelIndex) => this.virtualChannelMixer.getHardwareChannelIndex(channelIndex)

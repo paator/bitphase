@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import AyumiEngine from '../../public/ayumi-engine.js';
-import AYChipRegisterState from '../../public/ay-chip-register-state.js';
+import AyumiEngine from '../../public/ay/ayumi-engine.js';
+import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 
 describe('export engine register sync', () => {
 	let mockWasm: {

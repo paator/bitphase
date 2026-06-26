@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import AyumiState from '../../public/ayumi-state.js';
+import AyumiState from '../../public/ay/ayumi-state.js';
 
 describe('AyumiState', () => {
 	describe('constructor', () => {

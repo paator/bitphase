@@ -11,6 +11,7 @@ import {
 	TONE_CHANNELS,
 	type SongCaptureFrame
 } from './ay-export-utils';
+import { filterInstrumentsForChip } from '../instrument/instrument-filter';
 
 const DEFAULT_SPEED = 6;
 
@@ -242,7 +243,7 @@ class PsgExportService {
 
 		const state = new AyumiState(totalChannelCount);
 		state.setTuningTable(song.tuningTable);
-		state.setInstruments(project.instruments);
+		state.setInstruments(filterInstrumentsForChip(project.instruments, song.chipType ?? 'ay'));
 		state.setTables(project.tables);
 		state.setPatternOrder(project.patternOrder || [0]);
 		state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
@@ -331,16 +332,16 @@ class PsgExportService {
 
 		onProgress?.(10, 'Loading processor modules...');
 		const baseUrl = import.meta.env.BASE_URL;
-		const { default: AyumiState } = await import(/* @vite-ignore */ `${baseUrl}ayumi-state.js`);
+		const { default: AyumiState } = await import(`${baseUrl}ay/ayumi-state.js`);
 		const { default: TrackerPatternProcessor } = await import(
-			/* @vite-ignore */ `${baseUrl}tracker-pattern-processor.js`
+			`${baseUrl}tracker/tracker-pattern-processor.js`
 		);
-		const { default: AYAudioDriver } = await import(/* @vite-ignore */ `${baseUrl}ay-audio-driver.js`);
+		const { default: AYAudioDriver } = await import(`${baseUrl}ay/ay-audio-driver.js`);
 		const { default: AYChipRegisterState } = await import(
-			/* @vite-ignore */ `${baseUrl}ay-chip-register-state.js`
+			`${baseUrl}ay/ay-chip-register-state.js`
 		);
 		const { default: VirtualChannelMixer } = await import(
-			/* @vite-ignore */ `${baseUrl}virtual-channel-mixer.js`
+			`${baseUrl}ay/virtual-channel-mixer.js`
 		);
 
 		const modules: PsgExportModules = {
@@ -456,16 +457,16 @@ export async function captureSongRegisterFrames(
 		modules = options.modules;
 	} else {
 		const baseUrl = import.meta.env.BASE_URL;
-		const { default: AyumiState } = await import(/* @vite-ignore */ `${baseUrl}ayumi-state.js`);
+		const { default: AyumiState } = await import(`${baseUrl}ay/ayumi-state.js`);
 		const { default: TrackerPatternProcessor } = await import(
-			/* @vite-ignore */ `${baseUrl}tracker-pattern-processor.js`
+			`${baseUrl}tracker/tracker-pattern-processor.js`
 		);
-		const { default: AYAudioDriver } = await import(/* @vite-ignore */ `${baseUrl}ay-audio-driver.js`);
+		const { default: AYAudioDriver } = await import(`${baseUrl}ay/ay-audio-driver.js`);
 		const { default: AYChipRegisterState } = await import(
-			/* @vite-ignore */ `${baseUrl}ay-chip-register-state.js`
+			`${baseUrl}ay/ay-chip-register-state.js`
 		);
 		const { default: VirtualChannelMixer } = await import(
-			/* @vite-ignore */ `${baseUrl}virtual-channel-mixer.js`
+			`${baseUrl}ay/virtual-channel-mixer.js`
 		);
 		modules = {
 			AyumiState,

@@ -116,7 +116,8 @@ export class HistoryClone {
 			instrument.id,
 			instrument.rows.map((row) => this.instrumentRow(row)),
 			instrument.loop,
-			instrument.name
+			instrument.name,
+			instrument.chipType ?? 'ay'
 		);
 		const extended = instrument as Instrument & {
 			timerRows?: {

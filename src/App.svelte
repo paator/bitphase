@@ -132,10 +132,7 @@
 
 			const backup = await autobackupService.getAutobackup();
 			if (backup) {
-				container.audioService.clearChipProcessors();
-				for (const _ of backup.songs) {
-					await container.audioService.addChipProcessor(AY_CHIP);
-				}
+				await projectService.restoreChipProcessorsForSongs(backup.songs);
 				syncChipProcessors();
 				ProjectService.ensureChipSettingsConsistency(backup.songs);
 				projectStore.applyProject(backup);
@@ -204,7 +201,7 @@
 				.forEach((s) => {
 					const value = firstSong[s.key] ?? s.defaultValue;
 					if (value !== undefined) {
-						container.audioService.chipSettings.set(s.key, value);
+						container.audioService.chipSettings.forChip(chipType).set(s.key, value);
 					}
 				});
 		});
@@ -222,6 +219,7 @@
 		removeSong: (index) => {
 			projectStore.removeSong(index);
 			container.audioService.removeChipProcessor(index);
+			container.audioService.updateInstruments(projectStore.instruments);
 			syncChipProcessors();
 		},
 		addSong: (song) => {
@@ -244,7 +242,8 @@
 			activeSongIndex = 0;
 			songView?.resetEditorState?.();
 			patternEditor?.resetToBeginning?.();
-		}
+		},
+		syncChipProcessors
 	};
 
 	const baseHandleMenuAction = createMenuActionHandler(menuActionContext);

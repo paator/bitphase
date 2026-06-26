@@ -1,6 +1,10 @@
-import SongTimeline from './song-timeline.js';
+import SongTimeline from '../tracker/song-timeline.js';
 import { createAudioSlot } from './audio-slot-registry.js';
 import './builtin-audio-slots.js';
+
+function sortPlaySlotsForQuantum(playSlots) {
+	return [...playSlots].sort((a, b) => (b.chipIndex ?? 0) - (a.chipIndex ?? 0));
+}
 
 class BitphaseAudioProcessor extends AudioWorkletProcessor {
 	constructor() {
@@ -78,13 +82,18 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 			return true;
 		}
 
+		const active = slots.filter((s) => s && s.canRender());
+		const anyPreview = active.some((s) => s.isPreviewActive());
+		const playSlots = anyPreview ? [] : active.filter((s) => s.shouldRunPlaybackAccumulation());
+		const outputSlots = anyPreview
+			? []
+			: active.filter((s) => s.shouldAccumulateStereoOutput());
+		const quantumSlots = sortPlaySlotsForQuantum(playSlots);
+		const leaderLen = this.leaderPatternLength();
+
 		for (let i = 0; i < numSamples; i++) {
 			tl.tickAccumulator += tl.tickStep;
 			const mix = { l: 0, r: 0 };
-
-			const active = slots.filter((s) => s && s.canRender());
-			const anyPreview = active.some((s) => s.isPreviewActive());
-			const playSlots = active.filter((s) => s.shouldRunPlaybackAccumulation());
 
 			if (anyPreview) {
 				for (const s of active) {
@@ -94,21 +103,19 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 					}
 				}
 			} else if (playSlots.length > 0 && tl.tickAccumulator >= 1.0) {
-				for (const s of playSlots) {
+				for (const s of quantumSlots) {
 					s.runSharedPlaybackQuantum();
 				}
-				const leaderLen = this.leaderPatternLength();
 				const needsOrderWrap = tl.advancePosition(leaderLen);
 				for (let j = 0; j < slots.length; j++) {
 					const s = slots[j];
 					if (s) s.onPatternOrderAdvanced(needsOrderWrap);
 				}
 				tl.tickAccumulator -= 1.0;
-				for (const s of playSlots) {
-					s.accumulateStereoOutput(i, mix);
-				}
-			} else {
-				for (const s of playSlots) {
+			}
+
+			if (!anyPreview) {
+				for (const s of outputSlots) {
 					s.accumulateStereoOutput(i, mix);
 				}
 			}

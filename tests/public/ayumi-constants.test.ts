@@ -8,14 +8,14 @@ import {
 	DEFAULT_CHANNEL_VOLUMES,
 	DEFAULT_AYM_FREQUENCY,
 	getPanSettingsForLayout
-} from '../../public/ayumi-constants.js';
+} from '../../public/ay/ayumi-constants.js';
 
 describe('ayumi-constants', () => {
 	describe('constants', () => {
 		it('AYUMI_STRUCT_SIZE matches ayumi.wasm', async () => {
 			const fs = await import('node:fs');
 			const path = await import('node:path');
-			const wasmPath = path.join(process.cwd(), 'public/ayumi.wasm');
+			const wasmPath = path.join(process.cwd(), 'public/ay/ayumi.wasm');
 			const wasm = fs.readFileSync(wasmPath);
 			const { instance } = await WebAssembly.instantiate(wasm, {
 				env: { emscripten_notify_memory_growth: () => {} }

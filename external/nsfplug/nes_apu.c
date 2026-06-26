@@ -183,6 +183,13 @@ uint32_t nes_apu_Render (nes_apu_t *s, int32_t b[2])
   return 2;
 }
 
+int32_t nes_apu_GetOut (nes_apu_t *s, int channel)
+{
+  if (channel < 0 || channel > 1)
+    return 0;
+  return s->out[channel];
+}
+
 void nes_apu_Init (nes_apu_t *s)
 {
   s->option[NES_APU_OPT_UNMUTE_ON_RESET] = true;

@@ -11,6 +11,7 @@ import { PatternValueUpdates } from './pattern-value-updates';
 import { editorStateStore } from '../../../stores/editor-state.svelte';
 import { settingsStore } from '../../../stores/settings.svelte';
 import { parseSymbol } from '../../../chips/base/field-formatters';
+import { resolveInstrumentChipType } from '../../instrument/instrument-filter';
 
 export class PatternNoteInput {
 	private static readonly PIANO_KEYBOARD_MAP: Record<
@@ -142,7 +143,19 @@ export class PatternNoteInput {
 			return pattern;
 		}
 
-		const currentInstrumentId = editorStateStore.currentInstrument;
+		const chipType = context.schema.chipType;
+		const currentInstrumentId = editorStateStore.getCurrentInstrument(chipType);
+		if (
+			!currentInstrumentId ||
+			!context.instruments?.some(
+				(instrument) =>
+					instrument.id === currentInstrumentId &&
+					resolveInstrumentChipType(instrument) === chipType
+			)
+		) {
+			return pattern;
+		}
+
 		const instrumentValue = parseSymbol(currentInstrumentId, instrumentFieldDef.length);
 
 		const instrumentFieldInfo: FieldInfo = {

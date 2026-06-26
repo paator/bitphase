@@ -1,19 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PatternNoteInput } from '../../../../../src/lib/services/pattern/editing/pattern-note-input';
-import { Pattern, Note, NoteName } from '../../../../../src/lib/models/song';
+import { Pattern, Note, NoteName, Instrument } from '../../../../../src/lib/models/song';
+import { AY_CHIP_SCHEMA } from '../../../../../src/lib/chips/ay/schema';
 import type {
 	EditingContext,
 	FieldInfo
 } from '../../../../../src/lib/services/pattern/editing/editing-context';
 import { PatternValueUpdates } from '../../../../../src/lib/services/pattern/editing/pattern-value-updates';
 import { parseNoteFromString, formatNoteFromEnum } from '../../../../../src/lib/utils/note-utils';
+import { editorStateStore } from '../../../../../src/lib/stores/editor-state.svelte';
+import { settingsStore } from '../../../../../src/lib/stores/settings.svelte';
 
 vi.mock('../../../../../src/lib/stores/editor-state.svelte', () => ({
 	editorStateStore: {
 		octave: 3,
 		step: 1,
 		envelopeAsNote: false,
-		currentInstrument: '01'
+		currentInstrument: '01',
+		getCurrentInstrument: vi.fn(() => '01')
+	}
+}));
+
+vi.mock('../../../../../src/lib/stores/settings.svelte', () => ({
+	settingsStore: {
+		autoEnterInstrument: false
 	}
 }));
 
@@ -86,6 +96,8 @@ describe('PatternNoteInput', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		settingsStore.autoEnterInstrument = false;
+		vi.mocked(editorStateStore.getCurrentInstrument).mockReturnValue('01');
 
 		mockUpdateFieldValue = vi.fn(
 			(context: EditingContext, fieldInfo: FieldInfo, value: string | number) => {
@@ -184,7 +196,8 @@ describe('PatternNoteInput', () => {
 
 	const createMockContext = (
 		pattern: Pattern,
-		selectedRow: number = DEFAULT_ROW_INDEX
+		selectedRow: number = DEFAULT_ROW_INDEX,
+		overrides: Partial<EditingContext> = {}
 	): EditingContext => {
 		return {
 			pattern,
@@ -193,7 +206,8 @@ describe('PatternNoteInput', () => {
 			cellPositions: [],
 			converter: {} as EditingContext['converter'],
 			formatter: {} as EditingContext['formatter'],
-			schema: {} as EditingContext['schema']
+			schema: {} as EditingContext['schema'],
+			...overrides
 		};
 	};
 
@@ -338,6 +352,43 @@ describe('PatternNoteInput', () => {
 
 				expect(result).not.toBeNull();
 				expect(result?.shouldMoveNext).toBe(false);
+			});
+		});
+
+		describe('auto-enter instrument', () => {
+			it('writes the selected instrument when it exists for the active chip', () => {
+				settingsStore.autoEnterInstrument = true;
+				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
+					schema: AY_CHIP_SCHEMA,
+					instruments: [new Instrument('01', [], 0, 'AY 01', 'ay')]
+				});
+				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+				const result = PatternNoteInput.handleNoteInput(context, fieldInfo, 'q', 'KeyQ');
+
+				expect(result).not.toBeNull();
+				expect(mockUpdateFieldValue).toHaveBeenCalledTimes(2);
+				expect(mockUpdateFieldValue.mock.calls[1][1]).toEqual(
+					expect.objectContaining({ fieldKey: 'instrument' })
+				);
+				expect(mockUpdateFieldValue.mock.calls[1][2]).toBe(1);
+			});
+
+			it('skips stale selected instruments that are missing from the active chip list', () => {
+				settingsStore.autoEnterInstrument = true;
+				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
+					schema: AY_CHIP_SCHEMA,
+					instruments: [new Instrument('02', [], 0, 'AY 02', 'ay')]
+				});
+				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+				const result = PatternNoteInput.handleNoteInput(context, fieldInfo, 'q', 'KeyQ');
+
+				expect(result).not.toBeNull();
+				expect(mockUpdateFieldValue).toHaveBeenCalledTimes(1);
+				expect(mockUpdateFieldValue).toHaveBeenCalledWith(context, fieldInfo, 'C-4');
 			});
 		});
 	});

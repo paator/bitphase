@@ -7,11 +7,20 @@ interface StoredEditorState {
 	step?: number;
 }
 
+interface SelectInstrumentRequest {
+	instrumentId: string;
+	chipType?: string;
+}
+
 class EditorStateStore {
 	octave = $state(4);
 	step = $state(0);
 	envelopeAsNote = $state(false);
-	currentInstrument = $state('01');
+	currentInstrumentByChip = $state<Record<string, string>>({ ay: '01' });
+
+	get currentInstrument(): string {
+		return this.getCurrentInstrument('ay') ?? '01';
+	}
 
 	init(): void {
 		this.envelopeAsNote = settingsStore.envelopeAsNote;
@@ -57,14 +66,26 @@ class EditorStateStore {
 	}
 
 	setCurrentInstrument(instrument: string): void {
-		this.currentInstrument = instrument;
+		this.setCurrentInstrumentForChip('ay', instrument);
 	}
 
-	selectInstrumentRequest = $state<string | null>(null);
+	getCurrentInstrument(chipType: string): string | null {
+		return this.currentInstrumentByChip[chipType] ?? null;
+	}
 
-	requestSelectInstrument(instrumentId: string): void {
-		this.currentInstrument = instrumentId;
-		this.selectInstrumentRequest = instrumentId;
+	setCurrentInstrumentForChip(chipType: string, instrumentId: string): void {
+		this.currentInstrumentByChip[chipType] = instrumentId;
+	}
+
+	selectInstrumentRequest = $state<SelectInstrumentRequest | null>(null);
+
+	requestSelectInstrument(instrumentId: string, chipType?: string): void {
+		if (chipType) {
+			this.setCurrentInstrumentForChip(chipType, instrumentId);
+		} else {
+			this.setCurrentInstrument(instrumentId);
+		}
+		this.selectInstrumentRequest = { instrumentId, chipType };
 	}
 
 	clearSelectInstrumentRequest(): void {

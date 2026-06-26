@@ -80,6 +80,7 @@
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { projectStore } from '../../stores/project.svelte';
+	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
 	import {
 		computeStateHorizon,
 		buildCatchUpSegmentsToHorizon
@@ -137,7 +138,7 @@
 	const patternOrder = $derived(projectStore.patternOrder);
 	const tuningTable = $derived(projectStore.songs[songIndex]?.tuningTable ?? []);
 	const speed = $derived(projectStore.songs[songIndex]?.initialSpeed ?? 3);
-	const instruments = $derived(projectStore.instruments);
+	const instruments = $derived(filterInstrumentsForChip(projectStore.instruments, chip.type));
 	const tables = $derived(projectStore.tables);
 
 	function updatePatterns(newPatterns: Pattern[]): void {
@@ -152,9 +153,9 @@
 
 	const services: { audioService: AudioService } = getContext('container');
 
-	const formatter = getFormatter(chip);
-	const converter = getConverter(chip);
-	const schema = chip.schema;
+	const formatter = $derived.by(() => getFormatter(chip));
+	const converter = $derived.by(() => getConverter(chip));
+	const schema = $derived(chip.schema);
 	const previewService = new PreviewService();
 	const pressedKeyChannels = new Map<string, number>();
 	let previewInitialized = false;
@@ -1412,6 +1413,7 @@
 			converter,
 			formatter,
 			schema,
+			instruments,
 			tuningTable
 		};
 		const fieldInfoBeforeEdit = PatternEditingService.getFieldAtCursor(context);
@@ -1462,7 +1464,10 @@
 			'playPreviewRow' in chipProcessor &&
 			!pressedKeyChannels.has(previewKey)
 		) {
-			services.audioService.setPreviewActiveForChips(songIndex);
+			const previewChipIndex = getChipIndex();
+			if (previewChipIndex >= 0) {
+				services.audioService.setPreviewActiveForChips(previewChipIndex);
+			}
 			const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
 			const isNoteField =
 				fieldInfoBeforeEdit.fieldType === 'note' ||
@@ -1825,7 +1830,7 @@
 					: '';
 				const instrumentId = normalizeInstrumentId(instrumentValue);
 				if (isValidInstrumentId(instrumentId)) {
-					editorStateStore.requestSelectInstrument(instrumentId);
+					editorStateStore.requestSelectInstrument(instrumentId, schema.chipType);
 					event.preventDefault();
 					canvas.focus();
 					draw();
@@ -2681,7 +2686,10 @@
 				previewChannel >= 0 &&
 				(fieldInfo.channelIndex >= 0 || fieldInfo.fieldKey === 'envelopeValue');
 			if (shouldPreview && chipProcessor && 'playPreviewRow' in chipProcessor) {
-				services.audioService.setPreviewActiveForChips(songIndex);
+				const previewChipIndex = getChipIndex();
+				if (previewChipIndex >= 0) {
+					services.audioService.setPreviewActiveForChips(previewChipIndex);
+				}
 				const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
 				const isNoteField =
 					fieldInfo.fieldType === 'note' || fieldInfo.fieldKey === 'envelopeValue';
@@ -2737,19 +2745,38 @@
 	let lastChannelSeparatorWidth = -1;
 	let lastSelectionStyle: 'inverted' | 'filled' = 'inverted';
 	let lastChannelCount = -1;
+	let lastChipType = '';
 	let needsSetup = true;
+
+	function resetEditorSelectionState(): void {
+		selectedColumn = 0;
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		isSelecting = false;
+		mouseDownCell = null;
+	}
 
 	$effect(() => {
 		if (!canvas) return;
 
+		const chipType = chip.type;
 		const currentPatternLength = currentPattern?.length ?? -1;
 		const currentChannelCount = currentPattern?.channels?.length ?? -1;
 		const fontSizeChanged = fontSize !== lastFontSize;
 		const fontFamilyChanged = fontFamily !== lastFontFamily;
 		const channelSeparatorWidthChanged = channelSeparatorWidth !== lastChannelSeparatorWidth;
 		const selectionStyleChanged = selectionStyle !== lastSelectionStyle;
+		const chipTypeChanged = chipType !== lastChipType;
 
-		if (needsSetup || !ctx) {
+		if (chipTypeChanged) {
+			clearAllCaches();
+			resetEditorSelectionState();
+			needsSetup = true;
+		}
+
+		if (needsSetup || !ctx || chipTypeChanged) {
 			ctx = canvas.getContext('2d')!;
 			const ready = setupCanvas();
 			needsSetup = false;
@@ -2766,6 +2793,7 @@
 			lastChannelSeparatorWidth = channelSeparatorWidth;
 			lastSelectionStyle = selectionStyle;
 			lastChannelCount = currentChannelCount;
+			lastChipType = chipType;
 			requestAnimationFrame(() => {
 				if (ctx && canvas && !document.hidden) {
 					updateSize();

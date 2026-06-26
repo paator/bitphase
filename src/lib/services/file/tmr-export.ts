@@ -10,17 +10,13 @@ import { encodeTMR, type EncodedTmrFiles } from './tmr-encoder';
 
 async function loadPsgExportModules(): Promise<PsgExportModules> {
 	const baseUrl = import.meta.env.BASE_URL;
-	const { default: AyumiState } = await import(/* @vite-ignore */ `${baseUrl}ayumi-state.js`);
+	const { default: AyumiState } = await import(`${baseUrl}ay/ayumi-state.js`);
 	const { default: TrackerPatternProcessor } = await import(
-		/* @vite-ignore */ `${baseUrl}tracker-pattern-processor.js`
+		`${baseUrl}tracker/tracker-pattern-processor.js`
 	);
-	const { default: AYAudioDriver } = await import(/* @vite-ignore */ `${baseUrl}ay-audio-driver.js`);
-	const { default: AYChipRegisterState } = await import(
-		/* @vite-ignore */ `${baseUrl}ay-chip-register-state.js`
-	);
-	const { default: VirtualChannelMixer } = await import(
-		/* @vite-ignore */ `${baseUrl}virtual-channel-mixer.js`
-	);
+	const { default: AYAudioDriver } = await import(`${baseUrl}ay/ay-audio-driver.js`);
+	const { default: AYChipRegisterState } = await import(`${baseUrl}ay/ay-chip-register-state.js`);
+	const { default: VirtualChannelMixer } = await import(`${baseUrl}ay/virtual-channel-mixer.js`);
 	return {
 		AyumiState,
 		TrackerPatternProcessor,

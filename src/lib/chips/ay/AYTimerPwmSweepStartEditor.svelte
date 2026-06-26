@@ -7,6 +7,7 @@
 	import { playbackToneDebugStore } from '../../stores/playback-tone-debug.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
+	import { resolveInstrumentChipType } from '../../services/instrument/instrument-filter';
 	import {
 		AY_TIMER_PWM_SWEEP_SHAPE_LABELS,
 		AY_TIMER_PWM_SWEEP_SHAPES,
@@ -43,9 +44,7 @@
 	let isDragging = $state(false);
 	let isHovering = $state(false);
 
-	const minDuty = $derived(
-		controller.timerPwmSweep() > 0 ? controller.timerPwmSweepMin() : 0
-	);
+	const minDuty = $derived(controller.timerPwmSweep() > 0 ? controller.timerPwmSweepMin() : 0);
 	const maxDuty = $derived(controller.timerPwmDuty());
 	const sweepSpeed = $derived(controller.timerPwmSweep());
 	const startPhase = $derived(controller.timerPwmSweepStartPhase());
@@ -53,7 +52,9 @@
 	const shapeLabel = $derived(AY_TIMER_PWM_SWEEP_SHAPE_LABELS[sweepShape]);
 	const instrumentIndex = $derived(
 		projectStore.instruments.findIndex(
-			(instrument) => instrument.id === editorStateStore.currentInstrument
+			(instrument) =>
+				instrument.id === editorStateStore.getCurrentInstrument('ay') &&
+				resolveInstrumentChipType(instrument) === 'ay'
 		)
 	);
 
@@ -273,7 +274,9 @@
 				bind:this={svgEl}
 				viewBox="0 0 {VIEW_WIDTH} {VIEW_HEIGHT}"
 				preserveAspectRatio="none"
-				class="block h-full w-full touch-none {enabled ? 'cursor-crosshair' : 'cursor-not-allowed'}"
+				class="block h-full w-full touch-none {enabled
+					? 'cursor-crosshair'
+					: 'cursor-not-allowed'}"
 				role="slider"
 				tabindex={enabled ? 0 : -1}
 				aria-label="PWM sweep start position on automation curve"
@@ -289,8 +292,14 @@
 				onpointerleave={handlePointerLeave}>
 				<defs>
 					<linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" stop-color="var(--color-pattern-note)" stop-opacity="0.28" />
-						<stop offset="100%" stop-color="var(--color-pattern-note)" stop-opacity="0.03" />
+						<stop
+							offset="0%"
+							stop-color="var(--color-pattern-note)"
+							stop-opacity="0.28" />
+						<stop
+							offset="100%"
+							stop-color="var(--color-pattern-note)"
+							stop-opacity="0.03" />
 					</linearGradient>
 				</defs>
 

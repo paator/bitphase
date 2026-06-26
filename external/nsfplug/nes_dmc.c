@@ -375,6 +375,13 @@ uint32_t nes_dmc_Render (nes_dmc_t* s, int32_t b[2])
   return 2;
 }
 
+int32_t nes_dmc_GetOut (nes_dmc_t* s, int channel)
+{
+  if (channel < 0 || channel > 2)
+    return 0;
+  return (int32_t)s->out[channel];
+}
+
 void nes_dmc_SetPal (nes_dmc_t* s, bool is_pal)
 {
     s->pal = (is_pal ? 1 : 0);
@@ -484,16 +491,16 @@ void nes_dmc_Reset (nes_dmc_t* s)
   s->noise = 1;
   s->noise_tap = (1<<1);
 
-  if (s->option[NES_DMC_OPT_RANDOMIZE_NOISE])
-  {
-      s->noise |= rand();
-      s->counter[1] = -(rand() & 511);
-  }
-  if (s->option[NES_DMC_OPT_RANDOMIZE_TRI])
-  {
-      s->tphase = rand() & 31;
-      s->counter[0] = -(rand() & 2047);
-  }
+  // if (s->option[NES_DMC_OPT_RANDOMIZE_NOISE])
+  // {
+  //     s->noise |= rand();
+  //     s->counter[1] = -(rand() & 511);
+  // }
+  // if (s->option[NES_DMC_OPT_RANDOMIZE_TRI])
+  // {
+  //     s->tphase = rand() & 31;
+  //     s->counter[0] = -(rand() & 2047);
+  // }
 }
 
 void nes_dmc_SetMemory_Read (nes_dmc_t* s, read_func * r)

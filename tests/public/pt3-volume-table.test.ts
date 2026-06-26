@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PT3VolumeTable } from '../../public/pt3-volume-table.js';
+import { PT3VolumeTable } from '../../public/tracker/pt3-volume-table.js';
 
 describe('PT3VolumeTable', () => {
 	it('is an array of 16 rows', () => {

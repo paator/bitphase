@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import AYAudioDriver from '../../public/ay-audio-driver.js';
-import AyumiState from '../../public/ayumi-state.js';
-import EffectAlgorithms from '../../public/effect-algorithms.js';
+import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
+import AyumiState from '../../public/ay/ayumi-state.js';
+import EffectAlgorithms from '../../public/tracker/effect-algorithms.js';
 
 describe('AYAudioDriver', () => {
 	describe('constructor', () => {

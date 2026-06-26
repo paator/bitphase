@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import AYAudioDriver from '../../public/ay-audio-driver.js';
-import AyumiState from '../../public/ayumi-state.js';
+import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
+import AyumiState from '../../public/ay/ayumi-state.js';
 
 describe('AYAudioDriver - Auto Envelope (EA)', () => {
 	let driver: InstanceType<typeof AYAudioDriver>;
@@ -23,7 +23,14 @@ describe('AYAudioDriver - Auto Envelope (EA)', () => {
 	beforeEach(() => {
 		driver = new AYAudioDriver();
 		state = new AyumiState();
-		state.setTuningTable([3328, 3136, 2960, 2794, 2637, 2489, 2349, 2217, 2093, 1975, 1864, 1760, 1664, 1568, 1480, 1397, 1319, 1245, 1175, 1109, 1047, 988, 932, 880, 832, 784, 740, 699, 659, 622, 587, 554, 523, 494, 466, 440, 416, 392, 370, 349, 330, 311, 294, 277, 262, 247, 233, 220, 208, 196, 185, 175, 165, 156, 147, 139, 131, 124, 117, 110, 104, 98, 93, 87, 82, 78, 74, 69, 66, 62, 59, 55, 52, 49, 46, 44, 41, 39, 37, 35, 33, 31, 29, 28, 26, 25, 23, 22, 21, 20, 18, 17, 16, 15, 14, 13]);
+		state.setTuningTable([
+			3328, 3136, 2960, 2794, 2637, 2489, 2349, 2217, 2093, 1975, 1864, 1760, 1664, 1568,
+			1480, 1397, 1319, 1245, 1175, 1109, 1047, 988, 932, 880, 832, 784, 740, 699, 659, 622,
+			587, 554, 523, 494, 466, 440, 416, 392, 370, 349, 330, 311, 294, 277, 262, 247, 233,
+			220, 208, 196, 185, 175, 165, 156, 147, 139, 131, 124, 117, 110, 104, 98, 93, 87, 82,
+			78, 74, 69, 66, 62, 59, 55, 52, 49, 46, 44, 41, 39, 37, 35, 33, 31, 29, 28, 26, 25, 23,
+			22, 21, 20, 18, 17, 16, 15, 14, 13
+		]);
 	});
 
 	describe('getAutoEnvelopeDivisor', () => {
@@ -389,7 +396,23 @@ describe('AYAudioDriver - Auto Envelope (EA)', () => {
 			state.setInstruments([
 				{
 					id: '01',
-					rows: [{ tone: true, volume: 15, noise: false, envelope: true, toneAdd: 0, noiseAdd: 0, envelopeAdd: 0, toneAccumulation: false, noiseAccumulation: false, envelopeAccumulation: false, amplitudeSliding: false, amplitudeSlideUp: false, retriggerEnvelope: false }],
+					rows: [
+						{
+							tone: true,
+							volume: 15,
+							noise: false,
+							envelope: true,
+							toneAdd: 0,
+							noiseAdd: 0,
+							envelopeAdd: 0,
+							toneAccumulation: false,
+							noiseAccumulation: false,
+							envelopeAccumulation: false,
+							amplitudeSliding: false,
+							amplitudeSlideUp: false,
+							retriggerEnvelope: false
+						}
+					],
 					loop: 0
 				}
 			]);

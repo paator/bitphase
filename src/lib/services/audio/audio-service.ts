@@ -5,16 +5,17 @@ import {
 } from '../../chips/base/processor';
 import type { Chip } from '../../chips/types';
 import type { Table } from '../../models/project';
-import { ChipSettings } from './chip-settings';
+import { ChipSettingsRegistry } from './chip-settings';
 import type { CatchUpSegment } from './play-from-position';
 import { channelMuteStore } from '../../stores/channel-mute.svelte';
 import { waveformStore } from '../../stores/waveform.svelte';
 import { playbackToneDebugStore } from '../../stores/playback-tone-debug.svelte';
+import { filterInstrumentsForChip } from '../instrument/instrument-filter';
 
 import type { Pattern } from '../../models/song';
 
 const BITPHASE_AUDIO_PROCESSOR = 'bitphase-audio-processor';
-const BITPHASE_AUDIO_MODULE = `${BITPHASE_AUDIO_PROCESSOR}.js`;
+const BITPHASE_AUDIO_MODULE = 'audio/bitphase-audio-processor.js';
 
 export interface PlayFromRowOptions {
 	catchUpSegments?: CatchUpSegment[];
@@ -27,7 +28,7 @@ export class AudioService {
 	private _audioContext: AudioContext | null = new AudioContext();
 	private _isPlaying = false;
 	private _previewChipIndices = new Set<number>();
-	public chipSettings: ChipSettings = new ChipSettings();
+	public chipSettings = new ChipSettingsRegistry();
 	private _masterGainNode: GainNode | null = null;
 	private _playPatternRestoreOrder: number[] | null = null;
 	private _playPatternRestoreLoopPointId = 0;
@@ -105,6 +106,7 @@ export class AudioService {
 				const wasmBuffer = await this._loadWasm(processor.chip.wasmUrl);
 				if (revision !== this._processorRevision || !this._mixerNode) return;
 				processor.initialize(wasmBuffer, this._mixerNode);
+				this.chipSettings.forChip(processor.chip.type).renotifyAll();
 			}
 		}
 	}
@@ -124,7 +126,7 @@ export class AudioService {
 
 		let unsubscribeSettings: (() => void) | undefined;
 		if (this.hasSettingsSubscription(processor)) {
-			processor.subscribeToSettings(this.chipSettings);
+			processor.subscribeToSettings(this.chipSettings.forChip(chip.type));
 			unsubscribeSettings = () => processor.unsubscribeFromSettings();
 		}
 
@@ -154,6 +156,7 @@ export class AudioService {
 
 		processor.bindChipIndex(chipIndex);
 		processor.initialize(wasmBuffer, this._mixerNode);
+		this.chipSettings.forChip(chip.type).renotifyAll();
 
 		const processorWithWaveform = processor as {
 			setWaveformCallback?: (cb: (channels: Float32Array[]) => void) => void;
@@ -171,13 +174,17 @@ export class AudioService {
 			}) => void) => void;
 		};
 		processorWithWaveform.setWaveformCallback?.((channels: Float32Array[]) => {
-			const showWaveform = this._isPlaying || this._previewChipIndices.has(chipIndex);
-			if (showWaveform) waveformStore.setChannels(chipIndex, channels);
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showWaveform = this._isPlaying || this._previewChipIndices.has(idx);
+			if (showWaveform) waveformStore.setChannels(idx, channels);
 		});
 		processorWithWaveform.setChannelToneHzCallback?.((payload) => {
-			const showToneDebug = this._isPlaying || this._previewChipIndices.has(chipIndex);
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showToneDebug = this._isPlaying || this._previewChipIndices.has(idx);
 			if (showToneDebug) {
-				playbackToneDebugStore.setChipPlaybackHz(chipIndex, {
+				playbackToneDebugStore.setChipPlaybackHz(idx, {
 					toneHz: payload.frequencies,
 					sidTimerHz: payload.sidTimerHz,
 					syncbuzzerTimerHz: payload.syncbuzzerTimerHz,
@@ -188,10 +195,12 @@ export class AudioService {
 			}
 		});
 		processorWithWaveform.setTimerPwmSweepPhaseCallback?.((payload) => {
-			const showToneDebug = this._isPlaying || this._previewChipIndices.has(chipIndex);
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showToneDebug = this._isPlaying || this._previewChipIndices.has(idx);
 			if (showToneDebug) {
 				playbackToneDebugStore.updateChipTimerPwmSweepPhase(
-					chipIndex,
+					idx,
 					payload.timerPwmSweepPhase,
 					payload.channelInstrumentIndex
 				);
@@ -210,7 +219,10 @@ export class AudioService {
 		}
 		const arr = Array.isArray(indices) ? indices : [indices];
 		if (!this._isPlaying) {
-			waveformStore.clear();
+			const layout = this.chipProcessors.map(
+				(p) => p.chip.schema.channelLabels?.length ?? 3
+			);
+			waveformStore.prepareLayout(layout);
 			playbackToneDebugStore.clear();
 		}
 		this._previewChipIndices = new Set(arr);
@@ -313,8 +325,9 @@ export class AudioService {
 	updateInstruments(instruments: import('../../models/song').Instrument[]) {
 		this.chipProcessors.forEach((chipProcessor) => {
 			if ('sendInitInstruments' in chipProcessor) {
+				const chipInstruments = filterInstrumentsForChip(instruments, chipProcessor.chip.type);
 				(chipProcessor as { sendInitInstruments: (i: typeof instruments) => void }).sendInitInstruments(
-					instruments
+					chipInstruments
 				);
 			}
 		});

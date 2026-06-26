@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as ts from '@/lib/chips/ay/instrument';
-import * as jsModule from '../../public/ay-instrument-utils.js';
+import * as jsModule from '../../public/ay/ay-instrument-utils.js';
 
 const js = jsModule as unknown as Record<string, (...args: never[]) => unknown> &
 	Record<string, unknown>;

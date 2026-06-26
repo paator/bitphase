@@ -67,4 +67,6 @@ void nes_apu_SetOption (nes_apu_t *s, int id, int b);
 void nes_apu_SetMask(nes_apu_t *s, int m);
 void nes_apu_SetStereoMix (nes_apu_t *s, int trk, int32_t mixl, int32_t mixr);
 
+int32_t nes_apu_GetOut (nes_apu_t *s, int channel);
+
 #endif

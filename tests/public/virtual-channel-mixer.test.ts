@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import VirtualChannelMixer from '../../public/virtual-channel-mixer.js';
-import AYChipRegisterState from '../../public/ay-chip-register-state.js';
+import VirtualChannelMixer from '../../public/ay/virtual-channel-mixer.js';
+import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 
 function createState(channelCount: number) {
 	return {

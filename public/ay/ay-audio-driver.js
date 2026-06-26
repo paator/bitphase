@@ -1,7 +1,40 @@
 import AYChipRegisterState from './ay-chip-register-state.js';
-import EffectAlgorithms from './effect-algorithms.js';
-import { PT3VolumeTable } from './pt3-volume-table.js';
-import { normalizeAyInstrumentFields, getAySidBaseVolume, computeTimerEffectPeriod, computeTimerPwmPeriods, effectiveRowTimerWaveform, effectiveRowFmWaveform, effectiveRowFmWaveformLoop, effectiveRowEnvFmWaveform, effectiveRowEnvFmWaveformLoop, resolveAyFmOffsetMode, effectiveRowTimerWaveformLoop, effectiveRowTimerPwmDuty, effectiveRowTimerPwmSweep, effectiveRowTimerPwmSweepMin, rowSupportsSidTimerPwm, rowSupportsSyncbuzzerTimerPwm, rowSupportsFmTimerPwm, rowSupportsEnvFmTimerPwm, rowSupportsTimerPwm, rowUsesSyncbuzzerPwmDuty, resolveSyncbuzzerWaveform, isPatternEnvelopeShapeSet, advanceTimerPwmSweep, DEFAULT_AY_TIMER_PWM_DUTY } from './ay-instrument-utils.js';
+import EffectAlgorithms from '../tracker/effect-algorithms.js';
+import { PT3VolumeTable } from '../tracker/pt3-volume-table.js';
+import { advanceInstrumentRowPosition } from '../tracker/tracker-audio-utils.js';
+import {
+	assignPatternRowInstrument,
+	channelHasAssignedInstrument,
+	getChannelInstrument,
+	isChannelOnOffHalted,
+	processChannelOnOffCounters
+} from '../tracker/tracker-instrument-channel.js';
+import {
+	normalizeAyInstrumentFields,
+	getAySidBaseVolume,
+	computeTimerEffectPeriod,
+	computeTimerPwmPeriods,
+	effectiveRowTimerWaveform,
+	effectiveRowFmWaveform,
+	effectiveRowFmWaveformLoop,
+	effectiveRowEnvFmWaveform,
+	effectiveRowEnvFmWaveformLoop,
+	resolveAyFmOffsetMode,
+	effectiveRowTimerWaveformLoop,
+	effectiveRowTimerPwmDuty,
+	effectiveRowTimerPwmSweep,
+	effectiveRowTimerPwmSweepMin,
+	rowSupportsSidTimerPwm,
+	rowSupportsSyncbuzzerTimerPwm,
+	rowSupportsFmTimerPwm,
+	rowSupportsEnvFmTimerPwm,
+	rowSupportsTimerPwm,
+	rowUsesSyncbuzzerPwmDuty,
+	resolveSyncbuzzerWaveform,
+	isPatternEnvelopeShapeSet,
+	advanceTimerPwmSweep,
+	DEFAULT_AY_TIMER_PWM_DUTY
+} from './ay-instrument-utils.js';
 import {
 	instrumentHasSample,
 	computeSampleSidPeriod,
@@ -22,15 +55,6 @@ import {
 	disableAllChannelTimerEffects,
 	disableTimerEffect
 } from './ay-timer-effect-constants.js';
-
-function advanceInstrumentRowPosition(position, rowsLength, loop) {
-	const length = rowsLength > 0 ? rowsLength : 1;
-	let next = position + 1;
-	if (next >= length) {
-		next = loop > 0 && loop < length ? loop : 0;
-	}
-	return next;
-}
 
 class AYAudioDriver {
 	constructor(channelCount = 3) {
@@ -290,30 +314,23 @@ class AYAudioDriver {
 	}
 
 	_processInstrument(state, channelIndex, row) {
-		if (!state.channelInstruments || !state.instruments) return;
-		if (state.channelMuted[channelIndex]) return;
+		const assignment = assignPatternRowInstrument(state, channelIndex, row);
+		if (!assignment.changed) return;
+		if (!assignment.assigned) return;
 
-		if (row.instrument > 0) {
-			const instrumentIndex = state.instrumentIdToIndex.get(row.instrument);
-			if (instrumentIndex !== undefined && state.instruments[instrumentIndex]) {
-				const instrument = state.instruments[instrumentIndex];
-				state.channelInstruments[channelIndex] = instrumentIndex;
-				const preserveSamplePlayback = this.shouldPreserveSamplePlayback(state, channelIndex, row);
-				if (!(preserveSamplePlayback && instrumentHasSample(instrument))) {
-					state.instrumentPositions[channelIndex] = 0;
-					if (state.channelTimerPositions) {
-						state.channelTimerPositions[channelIndex] = 0;
-					}
-				}
-				if (instrumentHasSample(instrument) && !preserveSamplePlayback) {
-					resetChannelSamplePlayback(state, channelIndex, instrument);
-				}
-				const preserveTimerPwmSweep = this.shouldPreserveTimerPwmSweep(state, channelIndex, row);
-				this.resetInstrumentAccumulators(state, channelIndex, { preserveTimerPwmSweep });
-			} else {
-				state.channelInstruments[channelIndex] = -1;
+		const instrument = assignment.instrument;
+		const preserveSamplePlayback = this.shouldPreserveSamplePlayback(state, channelIndex, row);
+		if (!(preserveSamplePlayback && instrumentHasSample(instrument))) {
+			state.instrumentPositions[channelIndex] = 0;
+			if (state.channelTimerPositions) {
+				state.channelTimerPositions[channelIndex] = 0;
 			}
 		}
+		if (instrumentHasSample(instrument) && !preserveSamplePlayback) {
+			resetChannelSamplePlayback(state, channelIndex, instrument);
+		}
+		const preserveTimerPwmSweep = this.shouldPreserveTimerPwmSweep(state, channelIndex, row);
+		this.resetInstrumentAccumulators(state, channelIndex, { preserveTimerPwmSweep });
 	}
 
 	rowHasPortamentoCommand(row) {
@@ -871,8 +888,7 @@ class AYAudioDriver {
 		for (let channelIndex = 0; channelIndex < state.channelInstruments.length; channelIndex++) {
 			const isMuted = state.channelMuted[channelIndex];
 			const isSoundEnabled = state.channelSoundEnabled[channelIndex];
-			const onOffHalted =
-				state.channelOnOffCounter[channelIndex] > 0 && !state.channelSoundEnabled[channelIndex];
+			const onOffHalted = isChannelOnOffHalted(state, channelIndex);
 
 			if (isMuted) {
 				registerState.channels[channelIndex].volume = 0;
@@ -886,8 +902,7 @@ class AYAudioDriver {
 				continue;
 			}
 
-			const instrumentIndex = state.channelInstruments[channelIndex];
-			const instrument = state.instruments[instrumentIndex];
+			const { instrumentIndex, instrument } = getChannelInstrument(state, channelIndex);
 
 			if (instrumentHasSample(instrument)) {
 				this.processSampleInstrument(
@@ -901,7 +916,7 @@ class AYAudioDriver {
 				continue;
 			}
 
-			if (instrumentIndex < 0 || !instrument) {
+			if (!channelHasAssignedInstrument(state, channelIndex)) {
 				registerState.channels[channelIndex].volume = 0;
 				registerState.channels[channelIndex].mixer.tone = false;
 				registerState.channels[channelIndex].mixer.noise = false;
@@ -1196,18 +1211,7 @@ class AYAudioDriver {
 			);
 		}
 
-		for (let channelIndex = 0; channelIndex < state.channelInstruments.length; channelIndex++) {
-			if (state.channelOnOffCounter[channelIndex] > 0) {
-				const result = EffectAlgorithms.processOnOffCounter(
-					state.channelOnOffCounter[channelIndex],
-					state.channelOnDuration[channelIndex],
-					state.channelOffDuration[channelIndex],
-					state.channelSoundEnabled[channelIndex]
-				);
-				state.channelOnOffCounter[channelIndex] = result.counter;
-				state.channelSoundEnabled[channelIndex] = result.enabled;
-			}
-		}
+		processChannelOnOffCounters(state, state.channelInstruments.length);
 
 		this.processEnvelopeOnOff(state);
 

@@ -22,20 +22,30 @@ import {
 import { autoEnvStore } from '../../stores/auto-env.svelte';
 import { editorStateStore } from '../../stores/editor-state.svelte';
 import { loadDemoProject } from '../../config/demo-songs';
-import { getChipByType } from '../../chips/registry';
 import { AY_CHIP } from '../../chips/ay';
+import { NES_CHIP } from '../../chips/nes';
+import type { Chip } from '../../chips/types';
 import type { MenuActionContext } from './menu-action-context';
 
-function addChipProcessorsForProject(
-	container: MenuActionContext['container'],
-	songs: { chipType?: string }[]
-): Promise<void> {
-	return (async () => {
-		for (const song of songs) {
-			const chip = song.chipType ? getChipByType(song.chipType) : null;
-			await container.audioService.addChipProcessor(chip ?? AY_CHIP);
-		}
-	})();
+async function createNewSongFromMenu(ctx: MenuActionContext, chip: Chip): Promise<void> {
+	ctx.playbackStore.isPlaying = false;
+	ctx.container.audioService.stop();
+	const project = ctx.getCurrentProject();
+	const newSong = await ctx.projectService.createNewSong(chip, project.songs);
+	if (project.songs.length > 0 && project.patternOrder.length > 0) {
+		const refSong = project.songs[0] as unknown as {
+			patterns: { id: number; length: number }[];
+		};
+		const schema = newSong.getSchema() ?? chip.schema;
+		const uniquePatternIds = [...new Set(project.patternOrder)];
+		newSong.patterns = uniquePatternIds.map((id) => {
+			const refPattern = refSong.patterns.find((p: { id: number }) => p.id === id);
+			const length = refPattern?.length ?? 64;
+			return new Pattern(id, length, schema);
+		});
+	}
+	ctx.addSong(newSong);
+	ctx.resetPatternEditor();
 }
 
 function dispatchEditorKey(
@@ -204,28 +214,12 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 			}
 
 			if (data.action === 'new-song-ay') {
-				ctx.playbackStore.isPlaying = false;
-				ctx.container.audioService.stop();
-				const project = ctx.getCurrentProject();
-				const newSong = await ctx.projectService.createNewSong(AY_CHIP, project.songs);
-				if (project.songs.length > 0 && project.patternOrder.length > 0) {
-					const refSong = project.songs[0] as unknown as {
-						patterns: { id: number; length: number }[];
-					};
-					const schema =
-						ctx.container.audioService.chipProcessors[0].chip.schema ??
-						newSong.getSchema();
-					const uniquePatternIds = [...new Set(project.patternOrder)];
-					newSong.patterns = uniquePatternIds.map((id) => {
-						const refPattern = refSong.patterns.find(
-							(p: { id: number }) => p.id === id
-						);
-						const length = refPattern?.length ?? 64;
-						return new Pattern(id, length, schema);
-					});
-				}
-				ctx.addSong(newSong);
-				ctx.resetPatternEditor();
+				await createNewSongFromMenu(ctx, AY_CHIP);
+				return;
+			}
+
+			if (data.action === 'new-song-nes') {
+				await createNewSongFromMenu(ctx, NES_CHIP);
 				return;
 			}
 
@@ -331,8 +325,8 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				if (project) {
 					ctx.playbackStore.isPlaying = false;
 					ctx.container.audioService.stop();
-					ctx.container.audioService.clearChipProcessors();
-					await addChipProcessorsForProject(ctx.container, project.songs);
+					await ctx.projectService.restoreChipProcessorsForSongs(project.songs);
+					ctx.syncChipProcessors();
 					ctx.applyProject(project);
 					ctx.resetPatternEditor();
 				}
@@ -343,8 +337,8 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 			if (importedProject) {
 				ctx.playbackStore.isPlaying = false;
 				ctx.container.audioService.stop();
-				ctx.container.audioService.clearChipProcessors();
-				await addChipProcessorsForProject(ctx.container, importedProject.songs);
+				await ctx.projectService.restoreChipProcessorsForSongs(importedProject.songs);
+				ctx.syncChipProcessors();
 				ctx.applyProject(importedProject);
 				ctx.resetPatternEditor();
 			}

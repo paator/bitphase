@@ -139,5 +139,36 @@ describe('ProjectService', () => {
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledOnce();
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledWith(mockChip);
 		});
+
+		it('should inherit initialSpeed from an existing song', async () => {
+			const mockChip = createMockChip();
+			const existing = new Song(mockChip.schema);
+			existing.chipType = CHIP_TYPE_AY;
+			existing.initialSpeed = 12;
+
+			const song = await projectService.createNewSong(mockChip, [existing]);
+
+			expect(song.initialSpeed).toBe(12);
+		});
+	});
+
+	describe('restoreChipProcessorsForSongs', () => {
+		it('clears processors and adds one per song using chipType', async () => {
+			await projectService.restoreChipProcessorsForSongs([
+				{ chipType: 'ay' },
+				{ chipType: 'nes' }
+			]);
+
+			expect(mockAudioService.clearChipProcessors).toHaveBeenCalledOnce();
+			expect(mockAudioService.addChipProcessor).toHaveBeenCalledTimes(2);
+		});
+
+		it('falls back to AY when chipType is missing', async () => {
+			const { AY_CHIP } = await import('../../../../src/lib/chips/ay');
+
+			await projectService.restoreChipProcessorsForSongs([{}]);
+
+			expect(mockAudioService.addChipProcessor).toHaveBeenCalledWith(AY_CHIP);
+		});
 	});
 });

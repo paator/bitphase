@@ -101,6 +101,8 @@ bool nes_dmc_Read (nes_dmc_t* s, uint32_t adr, uint32_t* val);
 void nes_dmc_SetOption (nes_dmc_t* s, int id, int b);
 void nes_dmc_SetStereoMix (nes_dmc_t* s, int trk, int32_t mixl, int32_t mixr);
 
+int32_t nes_dmc_GetOut (nes_dmc_t* s, int channel);
+
 // void nes_dmc_SetCPU(nes_dmc_t* s, NES_CPU* cpu_);
 
 #endif

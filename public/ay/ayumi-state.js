@@ -1,5 +1,11 @@
 import { DEFAULT_AYM_FREQUENCY } from './ayumi-constants.js';
-import TrackerState from './tracker-state.js';
+import TrackerState from '../tracker/tracker-state.js';
+import {
+	buildInstrumentIdToIndex,
+	initChipChannelArrays,
+	resetChipChannelArrays,
+	resizeChipChannelArrays
+} from '../tracker/tracker-chip-state.js';
 
 const AY_CHANNEL_ARRAY_SPECS = [
 	['channelInstruments', -1],
@@ -33,9 +39,7 @@ class AyumiState extends TrackerState {
 		this.instruments = [];
 		this.instrumentIdToIndex = new Map();
 
-		for (const [name, defaultVal] of AY_CHANNEL_ARRAY_SPECS) {
-			this[name] = Array(channelCount).fill(defaultVal);
-		}
+		initChipChannelArrays(this, channelCount, AY_CHANNEL_ARRAY_SPECS);
 
 		this.envelopeSlideDelay = 0;
 		this.envelopeSlideDelayCounter = 0;
@@ -104,36 +108,18 @@ class AyumiState extends TrackerState {
 
 	setInstruments(instruments) {
 		this.instruments = instruments;
-		this.instrumentIdToIndex = new Map();
-		instruments.forEach((instrument, index) => {
-			if (instrument && instrument.id !== undefined) {
-				let numericId;
-				if (typeof instrument.id === 'string') {
-					numericId = parseInt(instrument.id, 36);
-				} else {
-					numericId = instrument.id;
-				}
-				this.instrumentIdToIndex.set(numericId, index);
-			}
-		});
+		this.instrumentIdToIndex = buildInstrumentIdToIndex(instruments);
 	}
 
 	resizeChannels(newCount) {
 		super.resizeChannels(newCount);
-		for (const [name, defaultVal] of AY_CHANNEL_ARRAY_SPECS) {
-			const arr = this[name];
-			while (arr.length < newCount) arr.push(defaultVal);
-			if (arr.length > newCount) arr.length = newCount;
-		}
+		resizeChipChannelArrays(this, newCount, AY_CHANNEL_ARRAY_SPECS);
 	}
 
 	reset(opts = {}) {
 		super.reset(opts);
 
-		for (const [name, defaultVal] of AY_CHANNEL_ARRAY_SPECS) {
-			if (name === 'channelMuted') continue;
-			this[name].fill(defaultVal);
-		}
+		resetChipChannelArrays(this, AY_CHANNEL_ARRAY_SPECS);
 
 		this.envelopeSlideDelay = 0;
 		this.envelopeSlideDelayCounter = 0;

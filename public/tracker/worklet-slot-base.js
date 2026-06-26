@@ -36,6 +36,11 @@ export class WorkletSlotBase {
 
 	_applyPlaybackSpeed(_speed) {}
 
+	_publishLeaderPlaybackSpeed(speed) {
+		if (this.chipIndex !== 0 || !(speed > 0)) return;
+		this._applyPlaybackSpeed(speed);
+	}
+
 	_onTransportStop() {}
 
 	_afterTransportStop() {}
@@ -56,6 +61,7 @@ export class WorkletSlotBase {
 					this._runCatchUpRows(this._slotState().timeline.currentRow);
 				}
 				if (!paused) {
+					this._afterPlaybackPositionSet(this._slotState().timeline.currentRow);
 					this.timelinePattern.postPositionUpdate();
 				}
 			}
@@ -76,7 +82,8 @@ export class WorkletSlotBase {
 		const state = this._slotState();
 
 		if (patternOrderIndex !== undefined) {
-			const patternOrderChanged = state.timeline.currentPatternOrderIndex !== patternOrderIndex;
+			const patternOrderChanged =
+				state.timeline.currentPatternOrderIndex !== patternOrderIndex;
 			state.timeline.currentPatternOrderIndex = patternOrderIndex;
 
 			if (pattern) {
@@ -97,7 +104,7 @@ export class WorkletSlotBase {
 		}
 
 		if (speed !== undefined && speed !== null && speed > 0) {
-			this._applyPlaybackSpeed(speed);
+			this._publishLeaderPlaybackSpeed(speed);
 		}
 
 		if (row !== undefined && (patternChanged || state.currentPattern)) {
@@ -124,10 +131,11 @@ export class WorkletSlotBase {
 			state.timeline.currentPatternOrderIndex = startPatternOrderIndex;
 		}
 		if (initialSpeed !== undefined && initialSpeed > 0) {
-			this._applyPlaybackSpeed(initialSpeed);
+			this._publishLeaderPlaybackSpeed(initialSpeed);
 		}
 
 		this.timelinePattern.postPositionUpdate();
+		this._afterPlaybackPositionSet(state.timeline.currentRow);
 	}
 
 	handlePlayFromRow({ row, patternOrderIndex, speed }) {
@@ -151,11 +159,12 @@ export class WorkletSlotBase {
 		}
 		state.timeline.currentRow = row;
 		if (speed !== undefined && speed !== null && speed > 0) {
-			this._applyPlaybackSpeed(speed);
+			this._publishLeaderPlaybackSpeed(speed);
 		}
 
 		this.timelinePattern.postPositionUpdate();
 		this._runCatchUpRows(state.timeline.currentRow);
+		this._afterPlaybackPositionSet(state.timeline.currentRow);
 	}
 
 	handlePlayFromPosition({
@@ -173,7 +182,7 @@ export class WorkletSlotBase {
 		this.startPlaybackCommon();
 
 		if (speed !== undefined && speed !== null && speed > 0) {
-			this._applyPlaybackSpeed(speed);
+			this._publishLeaderPlaybackSpeed(speed);
 		}
 
 		this._replayCatchUpSegments(catchUpSegments);
@@ -187,6 +196,7 @@ export class WorkletSlotBase {
 		state.timeline.currentRow = startRow;
 
 		this.timelinePattern.postPositionUpdate();
+		this._afterPlaybackPositionSet(startRow);
 	}
 
 	startPlaybackCommon() {
@@ -220,13 +230,15 @@ export class WorkletSlotBase {
 		return p && p.length > 0 ? p.length : 0;
 	}
 
+	_afterPlaybackPositionSet(_rowIndex) {}
+
+	shouldAccumulateStereoOutput() {
+		return !this.paused;
+	}
+
 	shouldRunPlaybackAccumulation() {
 		const state = this._slotState();
-		return (
-			!this.paused &&
-			state.currentPattern &&
-			state.currentPattern.length > 0
-		);
+		return !this.paused && state.currentPattern && state.currentPattern.length > 0;
 	}
 
 	finishAudioBlockFlushTransport(numSamples, paused) {

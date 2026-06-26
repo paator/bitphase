@@ -21,7 +21,14 @@ export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
 							label: 'Song',
 							type: 'expandable',
 							icon: '📁',
-							items: [{ label: 'AY/YM', type: 'normal', action: 'new-song-ay' }]
+							items: [
+								{ label: 'AY/YM', type: 'normal', action: 'new-song-ay' },
+								{
+									label: '2A03 / 2A07 (work in progress)',
+									type: 'normal',
+									action: 'new-song-nes'
+								}
+							]
 						}
 					]
 				},

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import EffectAlgorithms from '../../public/effect-algorithms.js';
+import EffectAlgorithms from '../../public/tracker/effect-algorithms.js';
 
 describe('EffectAlgorithms', () => {
 	describe('initSlide', () => {
