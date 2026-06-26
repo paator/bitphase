@@ -37,7 +37,9 @@ export type HardwareSidState = {
 
 export type HardwareSyncBuzzerState = {
 	enabled: boolean;
+	pwm: boolean;
 	period: number;
+	periodLow: number;
 	waveform: number[];
 	waveformLoop: number;
 };
@@ -212,7 +214,7 @@ function createDisabledSidState(): HardwareSidState {
 }
 
 function createDisabledSyncBuzzerState(): HardwareSyncBuzzerState {
-	return { enabled: false, period: 0, waveform: [0], waveformLoop: 0 };
+	return { enabled: false, pwm: false, period: 0, periodLow: 0, waveform: [0], waveformLoop: 0 };
 }
 
 function createDisabledFmState(): HardwareFmState {
@@ -294,7 +296,9 @@ export function extractHardwareSyncBuzzerStates(registerState: {
 			!!timerEffect?.enabled && timerEffect.kind === TIMER_EFFECT_KIND_ENVELOPE_SHAPE;
 		result.push({
 			enabled,
+			pwm: enabled && timerEffect.pwmMode === TIMER_PWM_MODE_BY_DUTY_INDEX,
 			period: timerEffect?.period ?? 0,
+			periodLow: timerEffect?.periodLow ?? timerEffect?.period ?? 0,
 			waveform: [...(timerEffect?.waveform ?? [0])],
 			waveformLoop: timerEffect?.waveformLoop ?? 0
 		});
@@ -380,7 +384,9 @@ export function syncBuzzerStatesEqual(
 ): boolean {
 	return (
 		a.enabled === b.enabled &&
+		a.pwm === b.pwm &&
 		a.period === b.period &&
+		a.periodLow === b.periodLow &&
 		a.waveformLoop === b.waveformLoop &&
 		a.waveform.length === b.waveform.length &&
 		a.waveform.every((value, index) => value === b.waveform[index])
