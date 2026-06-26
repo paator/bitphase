@@ -10,9 +10,11 @@ describe('export formats', () => {
 		expect(labels).toContain('WAV');
 		expect(labels).toContain('PSG');
 		expect(labels).toContain('TMR');
+		expect(labels).toContain('TAYM');
 		expect(labels).toContain('SNDH');
 		expect(labels).toContain('VGM');
 		expect(labels).not.toContain('PSG (ZIP)');
+		expect(labels).not.toContain('TAYM (ZIP)');
 	});
 
 	it('shows PSG (ZIP) for multiple AY chips', () => {
@@ -24,7 +26,9 @@ describe('export formats', () => {
 		expect(labels).toContain('PSG (ZIP)');
 		expect(labels).toContain('TMR (ZIP)');
 		expect(labels).toContain('VGM');
+		expect(labels).toContain('TAYM (ZIP)');
 		expect(labels).not.toContain('PSG');
+		expect(labels).not.toContain('TAYM');
 		expect(labels).not.toContain('SNDH');
 	});
 

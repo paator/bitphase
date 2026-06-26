@@ -5,6 +5,7 @@
 	import { exportToWAV } from '../../services/file/wav/wav-export';
 	import { exportToPSG } from '../../services/file/ay/psg-export';
 	import { exportToTMR } from '../../services/file/tmr/tmr-export';
+	import { exportToTaym } from '../../services/file/taym/taym-export';
 	import { exportToSNDH } from '../../services/file/ay/sndh-export';
 	import { exportToVGM } from '../../services/file/vgm/vgm-export';
 	import type { Project } from '../../models/project';
@@ -18,7 +19,7 @@
 		dismiss
 	} = $props<{
 		project: Project;
-		exportType?: 'wav' | 'psg' | 'sndh' | 'tmr' | 'vgm';
+		exportType?: 'wav' | 'psg' | 'sndh' | 'tmr' | 'taym' | 'vgm';
 		wavSettings?: WavExportSettings;
 		resolve?: (value?: any) => void;
 		dismiss?: (error?: any) => void;
@@ -51,6 +52,16 @@
 				);
 			} else if (exportType === 'tmr') {
 				await exportToTMR(
+					project,
+					0,
+					(progressValue, messageValue) => {
+						progress = progressValue;
+						message = messageValue;
+					},
+					abortController.signal
+				);
+			} else if (exportType === 'taym') {
+				await exportToTaym(
 					project,
 					0,
 					(progressValue, messageValue) => {

@@ -20,6 +20,7 @@ export type WavExportOptions = {
 	onOutput?: (buffer: ArrayBuffer, filename: string) => void | Promise<void>;
 	resourceLoader?: ResourceLoader;
 	getChip?: (chipType: string) => Chip | null;
+	disableDcFilter?: boolean;
 };
 
 type ExportChannelDescriptor = {
@@ -187,6 +188,8 @@ function encodeWAV(
 export type { ChipRenderer } from '../../../chips/base/renderer';
 
 class WavExportService {
+	private disableDcFilter = false;
+
 	private async tryRenderSharedTimelineSlots(
 		project: Project,
 		nonempty: number[],
@@ -228,7 +231,8 @@ class WavExportService {
 		onProgress?.(2, 'Rendering songs with shared project playback timeline...');
 		const parts = await renderShared.call(renderer, project, sharedSlots, onProgress, {
 			separateChannels,
-			loopCount: loops
+			loopCount: loops,
+			disableDcFilter: this.disableDcFilter
 		});
 		return new Map(parts.map((p) => [p.songIndex, p.channels] as const));
 	}
@@ -346,7 +350,8 @@ class WavExportService {
 			},
 			{
 				separateChannels: separateChannels ?? false,
-				loopCount: loops
+				loopCount: loops,
+				disableDcFilter: this.disableDcFilter
 			}
 		);
 	}
@@ -404,6 +409,7 @@ class WavExportService {
 		options?: WavExportOptions
 	): Promise<void> {
 		const { onOutput, resourceLoader, getChip } = options ?? {};
+		this.disableDcFilter = options?.disableDcFilter ?? false;
 		onProgress?.(0, 'Preparing export...');
 
 		if (abortSignal?.aborted) {
