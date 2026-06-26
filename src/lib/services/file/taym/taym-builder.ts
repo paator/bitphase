@@ -1,5 +1,5 @@
 import type { SongCaptureResult } from '../ay/psg-export';
-import { encodePSGMasked } from '../ay/psg-export';
+import { encodeForegroundPsgFrameData } from './foreground-psg';
 import { buildTaymTimerTables, type TaymTimerMode } from './taym-export-timers';
 import { makeChip, makeTaym, makeTrak, type Taym } from './model';
 import {
@@ -69,7 +69,7 @@ export function buildTaymFromCapture(
 		chipClockHz: capture.chipFrequency
 	});
 	const psg = new Uint8Array(
-		encodePSGMasked(
+		encodeForegroundPsgFrameData(
 			capture.frames.map((frame) => frame.registers),
 			timerTables.ownedRegistersPerFrame
 		)
