@@ -257,10 +257,9 @@ class NesApuEngine {
 				: NES_SQUARE_LENGTH_NIBBLE;
 		const lastPeriodHigh = (lastLengthNibble << 3) | ((last.period >> 8) & 7);
 
-		if (
-			channel.linearReg !== NES_REGISTER_UNCHANGED &&
-			(forceApply || linearReg !== last.linearReg)
-		) {
+		const linearRegChanged =
+			channel.linearReg !== NES_REGISTER_UNCHANGED && linearReg !== last.linearReg;
+		if (forceApply || triggerChannel || channel.retrigger || linearRegChanged) {
 			this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, linearReg);
 			last.linearReg = linearReg;
 		}
