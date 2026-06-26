@@ -257,7 +257,8 @@ export class AYChipRenderer implements ChipRenderer {
 		patterns: Pattern[],
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
-		separateChannels?: boolean
+		separateChannels?: boolean,
+		disableDcFilter?: boolean
 	): Promise<Float32Array[]> {
 		const leftSamples: number[] = [];
 		const rightSamples: number[] = [];
@@ -358,7 +359,9 @@ export class AYChipRenderer implements ChipRenderer {
 				(channelIndex: number) => this.resolveSampleAyumiChannel(mixer, channelIndex)
 			);
 			ayumiEngine.process();
-			ayumiEngine.removeDC();
+			if (!disableDcFilter) {
+				ayumiEngine.removeDC();
+			}
 
 			if (separateChannels) {
 				for (let ch = 0; ch < TONE_CHANNELS; ch++) {
@@ -405,7 +408,8 @@ export class AYChipRenderer implements ChipRenderer {
 		patternOrder: number[],
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
-		separateChannels?: boolean
+		separateChannels?: boolean,
+		disableDcFilter?: boolean
 	): Promise<Float32Array[][]> {
 		const leftByChip: number[][] = contexts.map(() => []);
 		const rightByChip: number[][] = contexts.map(() => []);
@@ -513,7 +517,9 @@ export class AYChipRenderer implements ChipRenderer {
 					(channelIndex: number) => this.resolveSampleAyumiChannel(ctx.mixer, channelIndex)
 				);
 				ctx.ayumiEngine.process();
-				ctx.ayumiEngine.removeDC();
+				if (!disableDcFilter) {
+					ctx.ayumiEngine.removeDC();
+				}
 			}
 
 			for (let ci = 0; ci < contexts.length; ci++) {
@@ -671,7 +677,8 @@ export class AYChipRenderer implements ChipRenderer {
 				patternOrder,
 				loopCount,
 				onProgress,
-				separateChannels
+				separateChannels,
+				options?.disableDcFilter ?? false
 			);
 
 			for (const p of ptrs) {
@@ -787,7 +794,8 @@ export class AYChipRenderer implements ChipRenderer {
 				patterns,
 				loopCount,
 				onProgress,
-				separateChannels
+				separateChannels,
+				options?.disableDcFilter ?? false
 			);
 
 			wasm.free(ayumiPtr);

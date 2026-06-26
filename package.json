@@ -14,7 +14,9 @@
     "test": "vitest",
     "test:run": "vitest run",
     "btp-to-wav": "tsx cli/btp-to-wav.ts",
-    "btp-to-tmr": "tsx cli/btp-to-tmr.ts"
+    "btp-to-tmr": "tsx cli/btp-to-tmr.ts",
+    "btp-to-taym": "tsx cli/btp-to-taym.ts",
+    "btp-to-psg": "tsx cli/btp-to-psg.ts"
   },
   "devDependencies": {
     "@iconify/json": "^2.2.380",

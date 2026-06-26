@@ -51,7 +51,14 @@ export type CaptureRegisterOptions = {
 	captureDigiSamples?: boolean;
 };
 
-function encodePSG(registerFrames: number[][]): ArrayBuffer {
+export function encodePSG(registerFrames: number[][]): ArrayBuffer {
+	return encodePSGMasked(registerFrames);
+}
+
+export function encodePSGMasked(
+	registerFrames: number[][],
+	ownedRegistersPerFrame?: number[][]
+): ArrayBuffer {
 	const headerSize = 16;
 	const data: number[] = [];
 
@@ -65,17 +72,33 @@ function encodePSG(registerFrames: number[][]): ArrayBuffer {
 	}
 
 	const currentRegs = new Array(14).fill(0);
+	let prevOwned = new Array(14).fill(false);
 
-	for (const frameRegs of registerFrames) {
+	for (let frameIndex = 0; frameIndex < registerFrames.length; frameIndex++) {
+		const frameRegs = registerFrames[frameIndex];
+		const owned = ownedRegistersPerFrame?.[frameIndex];
 		data.push(0xff);
 
 		for (let reg = 0; reg < 14; reg++) {
-			if (frameRegs[reg] !== currentRegs[reg]) {
+			const value = frameRegs[reg];
+			if (owned && owned.includes(reg)) {
+				continue;
+			}
+			const releasedFromTimer = prevOwned[reg];
+			if (releasedFromTimer || value !== currentRegs[reg]) {
 				data.push(reg);
-				data.push(frameRegs[reg]);
-				currentRegs[reg] = frameRegs[reg];
+				data.push(value);
+				currentRegs[reg] = value;
 			}
 		}
+
+		const nextOwned = new Array(14).fill(false);
+		if (owned) {
+			for (const reg of owned) {
+				nextOwned[reg] = true;
+			}
+		}
+		prevOwned = nextOwned;
 	}
 
 	data.push(0xfd);

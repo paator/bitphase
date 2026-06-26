@@ -12,8 +12,10 @@ const EXPORT_FORMATS: ExportFormat[] = [
 	{ label: 'WAV', action: 'export-wav', isAvailable: () => true },
 	{ label: 'PSG', action: 'export-psg', isAvailable: (c) => c['ay'] === 1 },
 	{ label: 'TMR', action: 'export-tmr', isAvailable: (c) => c['ay'] === 1 },
+	{ label: 'TAYM', action: 'export-taym', isAvailable: (c) => c['ay'] === 1 },
 	{ label: 'PSG (ZIP)', action: 'export-psg-zip', isAvailable: (c) => (c['ay'] ?? 0) > 1 },
 	{ label: 'TMR (ZIP)', action: 'export-tmr-zip', isAvailable: (c) => (c['ay'] ?? 0) > 1 },
+	{ label: 'TAYM (ZIP)', action: 'export-taym-zip', isAvailable: (c) => (c['ay'] ?? 0) > 1 },
 	{ label: 'SNDH', action: 'export-sndh', isAvailable: (c) => c['ay'] === 1 },
 	{
 		label: 'VGM',
