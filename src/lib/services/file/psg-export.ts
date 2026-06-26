@@ -331,16 +331,16 @@ class PsgExportService {
 
 		onProgress?.(10, 'Loading processor modules...');
 		const baseUrl = import.meta.env.BASE_URL;
-		const { default: AyumiState } = await import(`${baseUrl}ayumi-state.js`);
+		const { default: AyumiState } = await import(/* @vite-ignore */ `${baseUrl}ayumi-state.js`);
 		const { default: TrackerPatternProcessor } = await import(
-			`${baseUrl}tracker-pattern-processor.js`
+			/* @vite-ignore */ `${baseUrl}tracker-pattern-processor.js`
 		);
-		const { default: AYAudioDriver } = await import(`${baseUrl}ay-audio-driver.js`);
+		const { default: AYAudioDriver } = await import(/* @vite-ignore */ `${baseUrl}ay-audio-driver.js`);
 		const { default: AYChipRegisterState } = await import(
-			`${baseUrl}ay-chip-register-state.js`
+			/* @vite-ignore */ `${baseUrl}ay-chip-register-state.js`
 		);
 		const { default: VirtualChannelMixer } = await import(
-			`${baseUrl}virtual-channel-mixer.js`
+			/* @vite-ignore */ `${baseUrl}virtual-channel-mixer.js`
 		);
 
 		const modules: PsgExportModules = {
@@ -456,16 +456,16 @@ export async function captureSongRegisterFrames(
 		modules = options.modules;
 	} else {
 		const baseUrl = import.meta.env.BASE_URL;
-		const { default: AyumiState } = await import(`${baseUrl}ayumi-state.js`);
+		const { default: AyumiState } = await import(/* @vite-ignore */ `${baseUrl}ayumi-state.js`);
 		const { default: TrackerPatternProcessor } = await import(
-			`${baseUrl}tracker-pattern-processor.js`
+			/* @vite-ignore */ `${baseUrl}tracker-pattern-processor.js`
 		);
-		const { default: AYAudioDriver } = await import(`${baseUrl}ay-audio-driver.js`);
+		const { default: AYAudioDriver } = await import(/* @vite-ignore */ `${baseUrl}ay-audio-driver.js`);
 		const { default: AYChipRegisterState } = await import(
-			`${baseUrl}ay-chip-register-state.js`
+			/* @vite-ignore */ `${baseUrl}ay-chip-register-state.js`
 		);
 		const { default: VirtualChannelMixer } = await import(
-			`${baseUrl}virtual-channel-mixer.js`
+			/* @vite-ignore */ `${baseUrl}virtual-channel-mixer.js`
 		);
 		modules = {
 			AyumiState,
