@@ -5,7 +5,6 @@ import {
 	envelopeShapeRegisterApplyMask,
 	registerApplyMask,
 	sidVolumeLevel,
-	timerPwmStepPeriod,
 	toneRegisterApplyMask,
 	volumeRegisterIndex,
 	writeEnvelopePeriodToPsgData,
@@ -89,11 +88,11 @@ export function pwmStepPeriod(state: PwmTimerState, stepIndex: number): number {
 }
 
 export function sidStepPeriod(sid: HardwareSidState, stepIndex: number): number {
-	return timerPwmStepPeriod(sid.waveform[stepIndex] ?? 0, sid.period, sid.periodLow);
+	return pwmStepPeriod(sid, stepIndex);
 }
 
 export function sidStartPeriod(sid: HardwareSidState): number {
-	return timerPwmStepPeriod(sid.waveform[0] ?? 0, sid.period, sid.periodLow);
+	return pwmStepPeriod(sid, 0);
 }
 
 export function pwmStartPeriod(state: PwmTimerState): number {

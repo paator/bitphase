@@ -459,11 +459,7 @@ export function encodeTMR(
 		for (let channelIndex = 0; channelIndex < 3; channelIndex++) {
 			const sid = frame.sid[channelIndex]!;
 			const effectiveSid: HardwareSidState = sid.enabled
-				? {
-						...sid,
-						pwm: true,
-						periodLow: sid.periodLow > 0 ? sid.periodLow : sid.period
-					}
+				? normalizePwmPeriods(sid)
 				: sid;
 			const syncbuzzer: HardwareSyncBuzzerState = frame.syncbuzzer?.[channelIndex] ?? {
 				enabled: false,
