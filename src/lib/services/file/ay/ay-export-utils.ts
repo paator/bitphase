@@ -9,7 +9,6 @@ const TIMER_EFFECT_KIND_VOLUME = 1;
 const TIMER_EFFECT_KIND_ENVELOPE_SHAPE = 2;
 const TIMER_EFFECT_KIND_TONE = 3;
 const TIMER_EFFECT_KIND_ENVELOPE_PERIOD = 4;
-const TIMER_PWM_MODE_BY_STEP_VALUE = 1;
 const TIMER_PWM_MODE_BY_DUTY_INDEX = 2;
 
 type TimerEffectRegisterState = {
@@ -301,7 +300,7 @@ export function extractHardwareSidStates(registerState: {
 			!!timerEffect?.enabled && timerEffect.kind === TIMER_EFFECT_KIND_VOLUME;
 		result.push({
 			enabled,
-			pwm: enabled && timerEffect.pwmMode === TIMER_PWM_MODE_BY_STEP_VALUE,
+			pwm: enabled && timerEffect.pwmMode === TIMER_PWM_MODE_BY_DUTY_INDEX,
 			period: timerEffect?.period ?? 0,
 			periodLow: timerEffect?.periodLow ?? timerEffect?.period ?? 0,
 			baseVolume: timerEffect?.baseVolume ?? 0,

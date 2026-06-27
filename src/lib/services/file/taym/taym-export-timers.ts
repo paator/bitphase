@@ -95,7 +95,7 @@ function collectStepSources(
 
 	const sid = frame.sid?.[channelIndex];
 	if (sid?.enabled) {
-		const state = normalizePwmPeriods({ ...sid, pwm: true });
+		const state = normalizePwmPeriods(sid);
 		sources.push(sidStepSource(channelIndex, state));
 		setKeys.push(`sid:${state.baseVolume}:${state.waveform.join(',')}:${state.waveformLoop}`);
 		periodKeys.push(`${state.period}:${state.periodLow}`);
