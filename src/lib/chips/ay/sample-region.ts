@@ -103,6 +103,23 @@ export function computeSamplePitchScale(referencePeriod: number, effectiveTone: 
 	return referencePeriod / effectiveTone;
 }
 
+export function resolveSamplePlaybackRate(
+	sampleRate: number | undefined,
+	fallbackRate: number
+): number {
+	if (typeof sampleRate === 'number' && sampleRate > 0) {
+		return sampleRate;
+	}
+	return fallbackRate > 0 ? fallbackRate : 44100;
+}
+
+export function computeSampleSidPeriod(clockHz: number, sampleRate: number): number {
+	if (!sampleRate || sampleRate <= 0 || !clockHz || clockHz <= 0) {
+		return 1;
+	}
+	return Math.max(1, Math.round(clockHz / (8 * sampleRate)));
+}
+
 export function clampSamplePlaybackPosition(bounds: SamplePlaybackBounds, position: number): number {
 	return Math.max(bounds.start, Math.min(bounds.end, Math.floor(position)));
 }

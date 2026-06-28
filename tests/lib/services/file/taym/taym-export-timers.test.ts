@@ -35,8 +35,8 @@ function syncBuzzerFrame(channel: number, period: number, periodLow: number): So
 	return frame;
 }
 
-function capture(frames: SongCaptureFrame[]): SongCaptureResult {
-	return { frames, chipFrequency: 1773400, interruptFrequency: 50, isYm: false };
+function capture(frames: SongCaptureFrame[], isYm = false): SongCaptureResult {
+	return { frames, chipFrequency: 1773400, interruptFrequency: 50, isYm };
 }
 
 describe('buildTaymTimerTables', () => {
@@ -62,10 +62,14 @@ describe('buildTaymTimerTables', () => {
 		expect(action.targetId).toBe(ENVELOPE_SHAPE_REGISTER);
 		expect(action.sourceMode).toBe(spec.SRC_BIND_LANE);
 		const lane = tables.lanes[action.operand];
-		expect(tables.vu08.slice(lane.valueOffset, lane.valueOffset + lane.length)).toEqual([13, 9]);
+		expect(tables.vu08.slice(lane.valueOffset, lane.valueOffset + lane.length)).toEqual([
+			13, 9
+		]);
 
 		const tlan = tables.tlanes[start.timerLaneRef];
-		expect(tables.vu32.slice(tlan.valueOffset, tlan.valueOffset + tlan.length)).toEqual([869, 803]);
+		expect(tables.vu32.slice(tlan.valueOffset, tlan.valueOffset + tlan.length)).toEqual([
+			869, 803
+		]);
 
 		expect(tables.ownedRegistersPerFrame[0]).toContain(ENVELOPE_SHAPE_REGISTER);
 	});
@@ -108,6 +112,31 @@ describe('buildTaymTimerTables', () => {
 		expect(tables.ownedRegistersPerFrame[0]).toContain(volumeRegisterIndex(0));
 	});
 
+	it('quantizes SID volume lanes with the selected chip DAC curve', () => {
+		const frame = baseFrame();
+		frame.sid[0] = {
+			enabled: true,
+			pwm: false,
+			period: 500,
+			periodLow: 500,
+			baseVolume: 10,
+			waveform: [7],
+			waveformLoop: 0
+		};
+
+		const ayTables = buildTaymTimerTables([frame], { chipVariant: 'AY' });
+		const ayLane = ayTables.lanes[ayTables.actions[0].operand];
+		expect(ayTables.vu08.slice(ayLane.valueOffset, ayLane.valueOffset + ayLane.length)).toEqual(
+			[4]
+		);
+
+		const ymTables = buildTaymTimerTables([frame], { chipVariant: 'YM' });
+		const ymLane = ymTables.lanes[ymTables.actions[0].operand];
+		expect(ymTables.vu08.slice(ymLane.valueOffset, ymLane.valueOffset + ymLane.length)).toEqual(
+			[2]
+		);
+	});
+
 	it('produces a valid TAYM file whose PSG omits timer-owned registers', () => {
 		const frames = [syncBuzzerFrame(1, 869, 803), syncBuzzerFrame(1, 936, 736)];
 		const taym = buildTaymFromCapture(capture(frames));
@@ -115,5 +144,22 @@ describe('buildTaymTimerTables', () => {
 		expect(() => writeTaym(taym)).not.toThrow();
 		expect(taym.timers).toHaveLength(1);
 		expect(taym.chips[0].frameDataTag).toBe('PSG0');
+	});
+
+	it('uses capture chip variant when exporting SID timer lanes', () => {
+		const frame = baseFrame();
+		frame.sid[0] = {
+			enabled: true,
+			pwm: false,
+			period: 500,
+			periodLow: 500,
+			baseVolume: 10,
+			waveform: [7],
+			waveformLoop: 0
+		};
+
+		const taym = buildTaymFromCapture(capture([frame], true));
+		const lane = taym.lanes[taym.actions[0].operand];
+		expect(taym.vu08.slice(lane.valueOffset, lane.valueOffset + lane.length)).toEqual([2]);
 	});
 });

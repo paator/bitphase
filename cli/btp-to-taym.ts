@@ -33,7 +33,8 @@ async function loadModulesFromPublic(
 		trackerPatternProcessor,
 		ayAudioDriver,
 		ayChipRegisterState,
-		virtualChannelMixer
+		virtualChannelMixer,
+		samplePlayback
 	] = await Promise.all([
 		resourceLoader.loadModule<{ default: PsgExportModules['AyumiState'] }>('ay/ayumi-state.js'),
 		resourceLoader.loadModule<{ default: PsgExportModules['TrackerPatternProcessor'] }>(
@@ -45,14 +46,20 @@ async function loadModulesFromPublic(
 		),
 		resourceLoader.loadModule<{ default: PsgExportModules['VirtualChannelMixer'] }>(
 			'ay/virtual-channel-mixer.js'
-		)
+		),
+		resourceLoader.loadModule<{
+			instrumentHasSample: NonNullable<PsgExportModules['instrumentHasSample']>;
+			advanceSamplePosition: NonNullable<PsgExportModules['advanceSamplePosition']>;
+		}>('ay/ay-sample-playback.js')
 	]);
 	return {
 		AyumiState: ayumiState.default,
 		TrackerPatternProcessor: trackerPatternProcessor.default,
 		AYAudioDriver: ayAudioDriver.default,
 		AYChipRegisterState: ayChipRegisterState.default,
-		VirtualChannelMixer: virtualChannelMixer.default
+		VirtualChannelMixer: virtualChannelMixer.default,
+		instrumentHasSample: samplePlayback.instrumentHasSample,
+		advanceSamplePosition: samplePlayback.advanceSamplePosition
 	};
 }
 

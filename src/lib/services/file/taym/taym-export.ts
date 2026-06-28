@@ -30,12 +30,17 @@ async function loadPsgExportModules(): Promise<PsgExportModules> {
 	const { default: VirtualChannelMixer } = await import(
 		/* @vite-ignore */ `${baseUrl}ay/virtual-channel-mixer.js`
 	);
+	const samplePlayback = await import(
+		/* @vite-ignore */ `${baseUrl}ay/ay-sample-playback.js`
+	);
 	return {
 		AyumiState,
 		TrackerPatternProcessor,
 		AYAudioDriver,
 		AYChipRegisterState,
-		VirtualChannelMixer
+		VirtualChannelMixer,
+		instrumentHasSample: samplePlayback.instrumentHasSample,
+		advanceSamplePosition: samplePlayback.advanceSamplePosition
 	};
 }
 
@@ -60,7 +65,10 @@ export async function generateTaymFile(
 	songIndex: number = 0,
 	options?: TaymExportOptions
 ): Promise<ArrayBuffer> {
-	const capture = await captureSongRegisterFrames(project, songIndex, options);
+	const capture = await captureSongRegisterFrames(project, songIndex, {
+		...options,
+		captureDigiSamples: true
+	});
 	const song = project.songs[songIndex];
 	const metadata = song ? buildTaymMetadata(project, song) : undefined;
 	return writeTaym(buildTaymFromCapture(capture, { metadata, timerMode: options?.timerMode }));

@@ -9,6 +9,7 @@ import {
 	type TimerEffectStepSource
 } from '../ay/ay-timer-effects';
 import { TONE_CHANNELS, type SongCaptureFrame } from '../ay/ay-export-utils';
+import type { AyChipVariant } from '../../../chips/ay/ay-sample-lut';
 import { makeActn, makeLane, makeMods, makeTimr, makeTlan } from './model';
 import type { Actn, Lane, Mods, Timr, Tlan } from './model';
 import {
@@ -35,6 +36,7 @@ export const DEFAULT_TAYM_TIMER_MODE: TaymTimerMode = 'chip-period';
 export interface TaymTimerOptions {
 	timerMode?: TaymTimerMode;
 	chipClockHz?: number;
+	chipVariant?: AyChipVariant;
 }
 
 export type TaymTimerTables = {
@@ -79,7 +81,8 @@ function makeTimerValueEncoder(
 
 function collectStepSources(
 	channelIndex: number,
-	frame: SongCaptureFrame
+	frame: SongCaptureFrame,
+	chipVariant: AyChipVariant
 ): { sources: TimerEffectStepSource[]; setKey: string; periodKey: string } {
 	const sources: TimerEffectStepSource[] = [];
 	const setKeys: string[] = [];
@@ -96,7 +99,7 @@ function collectStepSources(
 	const sid = frame.sid?.[channelIndex];
 	if (sid?.enabled) {
 		const state = normalizePwmPeriods(sid);
-		sources.push(sidStepSource(channelIndex, state));
+		sources.push(sidStepSource(channelIndex, state, chipVariant));
 		setKeys.push(`sid:${state.baseVolume}:${state.waveform.join(',')}:${state.waveformLoop}`);
 		periodKeys.push(`${state.period}:${state.periodLow}`);
 	}
@@ -130,9 +133,10 @@ function collectStepSources(
 
 function buildChannelConfig(
 	channelIndex: number,
-	frame: SongCaptureFrame
+	frame: SongCaptureFrame,
+	chipVariant: AyChipVariant
 ): ChannelEffectConfig | undefined {
-	const { sources, setKey, periodKey } = collectStepSources(channelIndex, frame);
+	const { sources, setKey, periodKey } = collectStepSources(channelIndex, frame, chipVariant);
 	if (sources.length === 0) {
 		return undefined;
 	}
@@ -222,13 +226,14 @@ export function buildTaymTimerTables(
 ): TaymTimerTables {
 	const timerMode = options.timerMode ?? DEFAULT_TAYM_TIMER_MODE;
 	const chipClockHz = options.chipClockHz ?? 0;
+	const chipVariant = options.chipVariant ?? 'AY';
 	const encodeTimerValue = makeTimerValueEncoder(timerMode, chipClockHz);
 	const frameCount = frames.length;
 
 	const channelConfigs: Array<Array<ChannelEffectConfig | undefined>> = [];
 	const channelUsed: boolean[] = [];
 	for (let channelIndex = 0; channelIndex < TONE_CHANNELS; channelIndex++) {
-		const configs = frames.map((frame) => buildChannelConfig(channelIndex, frame));
+		const configs = frames.map((frame) => buildChannelConfig(channelIndex, frame, chipVariant));
 		channelConfigs.push(configs);
 		channelUsed.push(configs.some((config) => config !== undefined));
 	}
