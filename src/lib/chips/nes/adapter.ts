@@ -53,8 +53,8 @@ export class NESConverter implements PatternConverter {
 
 	fromGeneric(generic: GenericPattern): Pattern {
 		const channelLabels = NES_CHIP_SCHEMA.channelLabels ?? [
-			'Square 1',
-			'Square 2',
+			'Pulse 1',
+			'Pulse 2',
 			'Triangle',
 			'Noise',
 			'DPCM'
