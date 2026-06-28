@@ -41,7 +41,7 @@ export const NES_CHIP_SCHEMA: ChipSchema = {
 	chipType: 'nes',
 	defaultTuningTable: NES_DEFAULT_TUNING_TABLE,
 	defaultChipVariant: 'NTSC',
-	channelLabels: ['Square 1', 'Square 2', 'Triangle', 'Noise', 'DPCM'],
+	channelLabels: ['Pulse 1', 'Pulse 2', 'Triangle', 'Noise', 'DPCM'],
 	template: '{note} {instrument}{table}{volume} {effect}',
 	fields: {
 		note: {
