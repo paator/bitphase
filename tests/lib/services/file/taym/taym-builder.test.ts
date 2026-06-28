@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTaymFromCapture, ST_MONO_LAYOUT } from '@/lib/services/file/taym/taym-builder';
 import { readTaym, writeTaym } from '@/lib/services/file/taym/codec';
+import { readTaymFile } from '@/lib/services/file/taym/taym-reader';
 import { check } from '@/lib/services/file/taym/validate';
 import * as spec from '@/lib/services/file/taym/spec';
 import { encodePSG, type SongCaptureResult } from '@/lib/services/file/ay/psg-export';
@@ -53,7 +54,8 @@ describe('buildTaymFromCapture', () => {
 	it('produces a valid, writable TAYM file', () => {
 		const taym = buildTaymFromCapture(capture(frames));
 		expect(() => check(taym)).not.toThrow();
-		expect(() => writeTaym(taym)).not.toThrow();
+		const buffer = writeTaym(taym);
+		expect(() => readTaymFile(buffer)).not.toThrow();
 	});
 
 	it('maps the stereo layout into CHIP.config', () => {

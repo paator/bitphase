@@ -1,13 +1,18 @@
 import type { Project } from '../../../models/project';
+import { EffectType } from '../../../models/song';
 import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 import { getTotalVirtualChannelCount } from '../../../models/virtual-channels';
 import JSZip from 'jszip';
 import {
 	AY_REGISTER_COUNT,
 	convertRegisterStateToAYRegisters,
+	createDisabledTaymSampleStates,
+	createTaymSampleCaptureTracker,
+	suppressSidForTaymSampleChannels,
 	extractHardwareEnvFmStates,
 	extractHardwareFmStates,
 	extractHardwareSampleStates,
+	extractHardwareTaymSampleStates,
 	extractHardwareSidStates,
 	extractHardwareSyncBuzzerStates,
 	TONE_CHANNELS,
@@ -125,6 +130,34 @@ class PsgExportService {
 		return totalRows;
 	}
 
+	private rowHasPortamentoCommand(row: any): boolean {
+		return (
+			row?.effects?.some((effect: any) => effect?.effect === EffectType.Portamento) ?? false
+		);
+	}
+
+	private readSampleRestartFlags(state: any): boolean[] {
+		const flags = new Array(TONE_CHANNELS).fill(false);
+		if (state.timeline.currentTick !== 0 || !state.currentPattern) {
+			return flags;
+		}
+		const rowIndex = state.timeline.currentRow;
+		const channels = state.currentPattern.channels ?? [];
+		for (let channelIndex = 0; channelIndex < TONE_CHANNELS; channelIndex++) {
+			const row = channels[channelIndex]?.rows?.[rowIndex];
+			if (
+				row &&
+				row.note &&
+				row.note.name >= 2 &&
+				!this.rowHasPortamentoCommand(row) &&
+				!state.channelPortamentoActive?.[channelIndex]
+			) {
+				flags[channelIndex] = true;
+			}
+		}
+		return flags;
+	}
+
 	private async captureRegisterStates(
 		state: any,
 		patternProcessor: any,
@@ -136,10 +169,12 @@ class PsgExportService {
 		patterns: any[],
 		modules: PsgExportModules,
 		captureOptions: CaptureRegisterOptions,
+		chipFrequency: number,
 		onProgress?: (progress: number, message: string) => void
 	): Promise<{ frames: SongCaptureFrame[]; orderIndices: number[] }> {
 		const captureFrames: SongCaptureFrame[] = [];
 		const orderIndices: number[] = [];
+		const taymSampleTracker = createTaymSampleCaptureTracker();
 		let totalTicks = 0;
 		const maxTicks = 1000000;
 		const captureDigiSamples = captureOptions.captureDigiSamples === true;
@@ -198,6 +233,7 @@ class PsgExportService {
 			patternProcessor.processEffectTables();
 			audioDriver.processInstruments(state, registerState);
 			patternProcessor.processVibrato();
+			const sampleRestartFlags = this.readSampleRestartFlags(state);
 			patternProcessor.processSlides();
 
 			const stateToConvert = mixer.hasVirtualChannels()
@@ -221,13 +257,27 @@ class PsgExportService {
 						phase: 0,
 						effectiveTone: 0
 					}));
+			const samples = captureDigiSamples && !mixer.hasVirtualChannels()
+				? extractHardwareTaymSampleStates(
+						state,
+						registerState,
+						taymSampleTracker,
+						chipFrequency,
+						sampleRestartFlags
+					)
+				: createDisabledTaymSampleStates();
+			const sid = extractHardwareSidStates(stateToConvert);
+			if (captureDigiSamples) {
+				suppressSidForTaymSampleChannels(sid, samples);
+			}
 			captureFrames.push({
 				registers: [...ayRegisters],
-				sid: extractHardwareSidStates(stateToConvert),
+				sid,
 				syncbuzzer: extractHardwareSyncBuzzerStates(stateToConvert),
 				fm: extractHardwareFmStates(stateToConvert),
 				envFm: extractHardwareEnvFmStates(stateToConvert),
-				sample
+				sample,
+				samples
 			});
 			orderIndices.push(state.timeline.currentPatternOrderIndex);
 			if (mixer.hasVirtualChannels()) {
@@ -268,7 +318,8 @@ class PsgExportService {
 				}
 			}
 
-			const isLastPattern = state.timeline.currentPatternOrderIndex >= state.timeline.patternOrder.length - 1;
+			const isLastPattern =
+				state.timeline.currentPatternOrderIndex >= state.timeline.patternOrder.length - 1;
 			const isLastRow = state.timeline.currentRow >= state.currentPattern.length - 1;
 			const isLastTick = state.timeline.currentTick >= state.timeline.currentSpeed - 1;
 
@@ -381,6 +432,7 @@ class PsgExportService {
 			patterns,
 			modules,
 			captureOptions,
+			chipFrequency,
 			onProgress
 		);
 

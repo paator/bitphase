@@ -48,7 +48,10 @@ function disabledSidFrame(registers: number[] = new Array(14).fill(0)): SongCapt
 	};
 }
 
-function parseEncoded(frames: SongCaptureFrame[], options = { chipFrequency: 1773400, interruptFrequency: 50 }) {
+function parseEncoded(
+	frames: SongCaptureFrame[],
+	options = { chipFrequency: 1773400, interruptFrequency: 50 }
+) {
 	const encoded = encodeTMR(frames, options);
 	const tmr = parseTMR(encoded.tmr);
 	const tel = parseEventList(encoded.eventList);
@@ -109,6 +112,32 @@ describe('tmr encoder', () => {
 		expect(readU16LE(encoded.eventList, TEL_HEADER_SIZE + 14)).toBe(
 			encodeEventPsgApplyMask(volumeMask, 0)
 		);
+	});
+
+	it('quantizes SID event data with the selected chip DAC curve', () => {
+		const frame = disabledSidFrame();
+		frame.sid[0] = {
+			enabled: true,
+			pwm: false,
+			period: 1000,
+			periodLow: 1000,
+			baseVolume: 10,
+			waveform: [7],
+			waveformLoop: 0
+		};
+
+		const ay = encodeTMR([frame], {
+			chipFrequency: 1773400,
+			interruptFrequency: 50
+		});
+		expect(ay.eventItems[0]!.psgData[8]).toBe(4);
+
+		const ym = encodeTMR([frame], {
+			chipFrequency: 1773400,
+			interruptFrequency: 50,
+			isYm: true
+		});
+		expect(ym.eventItems[0]!.psgData[8]).toBe(2);
 	});
 
 	it('emits timer stop when SID turns off', () => {
@@ -212,7 +241,9 @@ describe('tmr encoder', () => {
 		expect(encoded.eventList.byteLength).toBe(TEL_HEADER_SIZE + 2 * TMR_ITEM_SIZE);
 		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + 6)).toBe(0);
 		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + 2)).toBe(storedTimerHz(500));
-		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 2)).toBe(storedTimerHz(520));
+		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 2)).toBe(
+			storedTimerHz(520)
+		);
 		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + 2 * TMR_FRAME_SIZE + 2)).toBe(
 			storedTimerHz(540)
 		);
@@ -255,7 +286,9 @@ describe('tmr encoder', () => {
 		const secondDuty = duties[1]!;
 		const { highPeriod, lowPeriod } = computeTimerPwmPeriods(1000, secondDuty);
 		const secondChainOffset = TEL_HEADER_SIZE + 2 * TMR_ITEM_SIZE;
-		expect(readU32LE(encoded.eventList, secondChainOffset + 16)).toBe(storedTimerHz(highPeriod));
+		expect(readU32LE(encoded.eventList, secondChainOffset + 16)).toBe(
+			storedTimerHz(highPeriod)
+		);
 		expect(readU32LE(encoded.eventList, secondChainOffset + TMR_ITEM_SIZE + 16)).toBe(
 			storedTimerHz(lowPeriod)
 		);
@@ -283,7 +316,9 @@ describe('tmr encoder', () => {
 
 		expect(encoded.eventList.byteLength).toBe(TEL_HEADER_SIZE + 2 * TMR_ITEM_SIZE);
 		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + 6)).toBe(0);
-		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 6)).toBe(TMR_TIMER_EVENT_STOP);
+		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 6)).toBe(
+			TMR_TIMER_EVENT_STOP
+		);
 		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + 2 * TMR_FRAME_SIZE + 6)).toBe(0);
 	});
 
@@ -308,9 +343,13 @@ describe('tmr encoder', () => {
 
 		expect(encoded.eventList.byteLength).toBe(TEL_HEADER_SIZE + 2 * TMR_ITEM_SIZE);
 		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + 6)).toBe(0);
-		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 6)).toBe(TMR_TIMER_EVENT_STOP);
+		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 6)).toBe(
+			TMR_TIMER_EVENT_STOP
+		);
 		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + 2 * TMR_FRAME_SIZE + 6)).toBe(0);
-		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + 2 * TMR_FRAME_SIZE + 2)).toBe(storedTimerHz(900));
+		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + 2 * TMR_FRAME_SIZE + 2)).toBe(
+			storedTimerHz(900)
+		);
 	});
 
 	it('encodes sid event items with per-step timer frequencies when duty is asymmetric', () => {
@@ -569,7 +608,9 @@ describe('tmr encoder', () => {
 			interruptFrequency: 50
 		});
 
-		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 6)).toBe(TMR_TIMER_EVENT_STOP);
+		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 6)).toBe(
+			TMR_TIMER_EVENT_STOP
+		);
 	});
 
 	it('merges coexisting sync-buzzer and Env+FM into one LCM event chain', () => {
@@ -686,7 +727,9 @@ describe('tmr encoder', () => {
 		});
 
 		expect(encoded.eventList.byteLength).toBe(TEL_HEADER_SIZE + 6 * TMR_ITEM_SIZE);
-		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 8)).toBe(storedTimerHz(900));
+		expect(readU32LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 8)).toBe(
+			storedTimerHz(900)
+		);
 		expect(readU16LE(encoded.tmr, TMR_HEADER_SIZE + TMR_FRAME_SIZE + 12)).toBe(0);
 	});
 

@@ -15,6 +15,7 @@ import {
 	type HardwareSyncBuzzerState
 } from './ay-export-utils';
 import { computeEnvFmEnvelopePeriod, computeFmTonePeriod } from '../../../chips/ay/instrument';
+import type { AyChipVariant } from '../../../chips/ay/ay-sample-lut';
 
 export type StepRegisterWrite = { register: number; value: number };
 
@@ -101,7 +102,8 @@ export function pwmStartPeriod(state: PwmTimerState): number {
 
 export function sidStepSource(
 	channelIndex: number,
-	sid: HardwareSidState
+	sid: HardwareSidState,
+	variant: AyChipVariant = 'AY'
 ): TimerEffectStepSource {
 	const volumeReg = volumeRegisterIndex(channelIndex);
 	return {
@@ -109,7 +111,10 @@ export function sidStepSource(
 		length: sid.waveform.length,
 		loop: sid.waveformLoop,
 		writesAtStep: (stepIndex) => [
-			{ register: volumeReg, value: sidVolumeLevel(sid.waveform[stepIndex]!, sid.baseVolume) }
+			{
+				register: volumeReg,
+				value: sidVolumeLevel(sid.waveform[stepIndex]!, sid.baseVolume, variant)
+			}
 		],
 		stepPeriod: (stepIndex) => sidStepPeriod(sid, stepIndex)
 	};
@@ -160,15 +165,16 @@ export function envFmStepSource(envFm: HardwareEnvFmState): TimerEffectStepSourc
 	};
 }
 
-export function syncBuzzerStepSource(
-	syncbuzzer: HardwareSyncBuzzerState
-): TimerEffectStepSource {
+export function syncBuzzerStepSource(syncbuzzer: HardwareSyncBuzzerState): TimerEffectStepSource {
 	return {
 		registerMask: envelopeShapeRegisterApplyMask(),
 		length: syncbuzzer.waveform.length,
 		loop: syncbuzzer.waveformLoop,
 		writesAtStep: (stepIndex) => [
-			{ register: ENVELOPE_SHAPE_REGISTER, value: (syncbuzzer.waveform[stepIndex] ?? 0) & 0xf }
+			{
+				register: ENVELOPE_SHAPE_REGISTER,
+				value: (syncbuzzer.waveform[stepIndex] ?? 0) & 0xf
+			}
 		],
 		stepPeriod: (stepIndex) => pwmStepPeriod(syncbuzzer, stepIndex)
 	};

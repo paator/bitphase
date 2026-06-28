@@ -1,3 +1,14 @@
+import {
+	clampSamplePlaybackPosition,
+	computeSamplePitchScale,
+	normalizeSamplePlaybackBounds,
+	resolveSampleLoopEnabled,
+	resolveSamplePitchReferencePeriod,
+	resolveSamplePlaybackRate,
+	type SamplePlaybackBounds
+} from '../../../chips/ay/sample-region';
+import { sidRegisterVolume, type AyChipVariant } from '../../../chips/ay/sid-waveform-volume';
+
 export const AY_REGISTER_COUNT = 14;
 export const DEFAULT_AY_REGISTERS: readonly number[] = Array.from(
 	{ length: AY_REGISTER_COUNT },
@@ -10,6 +21,7 @@ const TIMER_EFFECT_KIND_ENVELOPE_SHAPE = 2;
 const TIMER_EFFECT_KIND_TONE = 3;
 const TIMER_EFFECT_KIND_ENVELOPE_PERIOD = 4;
 const TIMER_PWM_MODE_BY_DUTY_INDEX = 2;
+const SAMPLE_CAPTURE_FALLBACK_RATE_HZ = 44100;
 
 type TimerEffectRegisterState = {
 	enabled?: boolean;
@@ -85,6 +97,15 @@ export type CapturedAySampleInstrument = {
 	sampleLoopEnabled?: boolean;
 };
 
+export type HardwareTaymSampleState = {
+	enabled: boolean;
+	instanceId: number;
+	sampleBytes: number[];
+	loopIndex: number;
+	rateHz: number;
+	volume: number;
+};
+
 export type SongCaptureFrame = {
 	registers: number[];
 	sid: HardwareSidState[];
@@ -92,6 +113,7 @@ export type SongCaptureFrame = {
 	fm: HardwareFmState[];
 	envFm: HardwareEnvFmState[];
 	sample: HardwareSampleState[];
+	samples?: HardwareTaymSampleState[];
 };
 
 export function convertRegisterStateToAYRegisters(registerState: {
@@ -204,13 +226,12 @@ export function writeEnvelopePeriodToPsgData(psgData: number[], period: number):
 	psgData[12] = (envelopePeriod >> 8) & 0xff;
 }
 
-export function sidVolumeLevel(waveformStep: number, baseVolume: number): number {
-	const w = waveformStep & 0xf;
-	if (w === 0) {
-		return 0;
-	}
-	const vol = Math.floor((w * baseVolume + 14) / 15);
-	return Math.min(15, vol);
+export function sidVolumeLevel(
+	waveformStep: number,
+	baseVolume: number,
+	variant: AyChipVariant = 'AY'
+): number {
+	return sidRegisterVolume(waveformStep, baseVolume, variant);
 }
 
 export { isTimerWaveformLowPhase, timerPwmStepPeriod } from '../../../chips/ay/instrument';
@@ -263,6 +284,23 @@ function createDisabledEnvFmState(): HardwareEnvFmState {
 	};
 }
 
+export const SAMPLE_NO_LOOP = -1;
+
+function createDisabledTaymSampleState(): HardwareTaymSampleState {
+	return {
+		enabled: false,
+		instanceId: 0,
+		sampleBytes: [],
+		loopIndex: SAMPLE_NO_LOOP,
+		rateHz: 0,
+		volume: 0
+	};
+}
+
+export function createDisabledTaymSampleStates(): HardwareTaymSampleState[] {
+	return Array.from({ length: TONE_CHANNELS }, createDisabledTaymSampleState);
+}
+
 export function createDisabledTimerCaptureStates(): {
 	sid: HardwareSidState[];
 	syncbuzzer: HardwareSyncBuzzerState[];
@@ -286,6 +324,214 @@ export function createDisabledTimerCaptureStates(): {
 	};
 }
 
+type SampleCaptureChannelState = {
+	enabled: boolean;
+	instrumentIndex: number;
+	regionKey: string;
+	instanceId: number;
+	sampleBytes: number[];
+	loopIndex: number;
+};
+
+export type TaymSampleCaptureTracker = {
+	channels: SampleCaptureChannelState[];
+	nextInstanceId: number;
+};
+
+export function createTaymSampleCaptureTracker(): TaymSampleCaptureTracker {
+	return {
+		channels: Array.from({ length: TONE_CHANNELS }, () => ({
+			enabled: false,
+			instrumentIndex: -1,
+			regionKey: '',
+			instanceId: 0,
+			sampleBytes: [],
+			loopIndex: SAMPLE_NO_LOOP
+		})),
+		nextInstanceId: 1
+	};
+}
+
+type SampleCaptureEngineState = {
+	channelInstruments: number[];
+	channelSoundEnabled: boolean[];
+	channelMuted: boolean[];
+	channelCurrentNotes: number[];
+	currentTuningTable: number[];
+	channelToneSliding?: number[];
+	channelVibratoSliding?: number[];
+	channelDetune?: number[];
+	channelSamplePositions?: number[];
+	channelSamplePhase?: number[];
+	instruments: Array<{
+		sampleData?: number[];
+		sampleRate?: number;
+		sampleStart?: number;
+		sampleEnd?: number;
+		sampleLoopStart?: number;
+		sampleLength?: number;
+		sampleLoop?: number;
+		sampleLoopEnabled?: boolean;
+	}>;
+	aymFrequency: number;
+};
+
+type SampleCaptureRegisterState = {
+	channels: Array<{
+		timerEffects?: { sid?: { enabled?: boolean; kind?: number; baseVolume?: number } };
+	}>;
+};
+
+function captureEffectiveTone(state: SampleCaptureEngineState, channelIndex: number): number {
+	const noteIndex = state.channelCurrentNotes[channelIndex] ?? -1;
+	if (noteIndex < 0 || noteIndex >= state.currentTuningTable.length) {
+		return 0;
+	}
+	const baseTone = state.currentTuningTable[noteIndex] ?? 0;
+	if (baseTone <= 0) {
+		return 0;
+	}
+	const toneSliding = state.channelToneSliding?.[channelIndex] ?? 0;
+	const vibratoSliding = state.channelVibratoSliding?.[channelIndex] ?? 0;
+	const detune = state.channelDetune?.[channelIndex] ?? 0;
+	return (baseTone + toneSliding + vibratoSliding + detune) & 0xfff;
+}
+
+function samplePositionForCapture(
+	state: SampleCaptureEngineState,
+	channelIndex: number,
+	bounds: SamplePlaybackBounds
+): number {
+	const position = state.channelSamplePositions?.[channelIndex];
+	if (typeof position !== 'number' || !Number.isFinite(position)) {
+		return bounds.start;
+	}
+	return clampSamplePlaybackPosition(bounds, position);
+}
+
+function appendSampleBytes(out: number[], sampleData: number[], start: number, end: number): void {
+	for (let position = start; position <= end; position++) {
+		out.push((sampleData[position] ?? 0) & 0xff);
+	}
+}
+
+function buildSampleBytesFromPosition(
+	instrument: { sampleData?: number[] },
+	bounds: SamplePlaybackBounds,
+	startPosition: number,
+	loopEnabled: boolean
+): { sampleBytes: number[]; loopIndex: number } {
+	const sampleData = instrument.sampleData ?? [];
+	const sampleBytes: number[] = [];
+	appendSampleBytes(sampleBytes, sampleData, startPosition, bounds.end);
+
+	if (!loopEnabled) {
+		return { sampleBytes, loopIndex: SAMPLE_NO_LOOP };
+	}
+
+	if (bounds.loopStart < startPosition) {
+		const loopIndex = sampleBytes.length;
+		appendSampleBytes(sampleBytes, sampleData, bounds.loopStart, bounds.end);
+		return { sampleBytes, loopIndex };
+	}
+
+	return { sampleBytes, loopIndex: bounds.loopStart - startPosition };
+}
+
+export function extractHardwareTaymSampleStates(
+	state: SampleCaptureEngineState,
+	registerState: SampleCaptureRegisterState,
+	tracker: TaymSampleCaptureTracker,
+	chipFrequency: number,
+	sampleRestartFlags: boolean[]
+): HardwareTaymSampleState[] {
+	const clockHz = chipFrequency > 0 ? chipFrequency : 1773400;
+	const referencePeriod = resolveSamplePitchReferencePeriod(clockHz);
+	const result: HardwareTaymSampleState[] = [];
+
+	for (let channelIndex = 0; channelIndex < TONE_CHANNELS; channelIndex++) {
+		const track = tracker.channels[channelIndex]!;
+		const instrumentIndex = state.channelInstruments[channelIndex] ?? -1;
+		const instrument = instrumentIndex >= 0 ? state.instruments[instrumentIndex] : undefined;
+		const bounds = instrument ? normalizeSamplePlaybackBounds(instrument) : null;
+		const sidEffect = registerState.channels[channelIndex]?.timerEffects?.sid;
+		const effectiveTone = captureEffectiveTone(state, channelIndex);
+
+		const playing =
+			!!bounds &&
+			!state.channelMuted[channelIndex] &&
+			!!state.channelSoundEnabled[channelIndex] &&
+			!!sidEffect?.enabled &&
+			sidEffect.kind === TIMER_EFFECT_KIND_VOLUME &&
+			effectiveTone > 0;
+
+		if (!playing || !bounds || !instrument) {
+			track.enabled = false;
+			track.instrumentIndex = -1;
+			track.regionKey = '';
+			track.sampleBytes = [];
+			track.loopIndex = SAMPLE_NO_LOOP;
+			result.push(createDisabledTaymSampleState());
+			continue;
+		}
+
+		const loopEnabled = resolveSampleLoopEnabled(instrument);
+		const regionKey = `${instrumentIndex}:${bounds.start}:${bounds.end}:${bounds.loopStart}:${loopEnabled ? 1 : 0}`;
+		const isNewInstance =
+			!track.enabled ||
+			track.instrumentIndex !== instrumentIndex ||
+			track.regionKey !== regionKey ||
+			!!sampleRestartFlags[channelIndex];
+		const startPosition = track.instanceId !== 0 && isNewInstance
+			? bounds.start
+			: samplePositionForCapture(state, channelIndex, bounds);
+		if (isNewInstance) {
+			track.instanceId = tracker.nextInstanceId++;
+			const sample = buildSampleBytesFromPosition(
+				instrument,
+				bounds,
+				startPosition,
+				loopEnabled
+			);
+			track.sampleBytes = sample.sampleBytes;
+			track.loopIndex = sample.loopIndex;
+		}
+		track.enabled = true;
+		track.instrumentIndex = instrumentIndex;
+		track.regionKey = regionKey;
+
+		const baseRate = resolveSamplePlaybackRate(
+			instrument.sampleRate,
+			SAMPLE_CAPTURE_FALLBACK_RATE_HZ
+		);
+		const pitchScale = computeSamplePitchScale(referencePeriod, effectiveTone);
+		const rateHz = baseRate * pitchScale;
+		const volume = (sidEffect?.baseVolume ?? 0) & 0x0f;
+
+		result.push({
+			enabled: true,
+			instanceId: track.instanceId,
+			sampleBytes: track.sampleBytes,
+			loopIndex: track.loopIndex,
+			rateHz,
+			volume
+		});
+	}
+
+	return result;
+}
+
+export function suppressSidForTaymSampleChannels(
+	sid: HardwareSidState[],
+	samples: HardwareTaymSampleState[]
+): void {
+	for (let channelIndex = 0; channelIndex < TONE_CHANNELS; channelIndex++) {
+		if (samples[channelIndex]?.enabled) {
+			sid[channelIndex] = createDisabledSidState();
+		}
+	}
+}
+
 export function extractHardwareSidStates(registerState: {
 	channels: Array<{
 		timerEffects?: {
@@ -296,8 +542,7 @@ export function extractHardwareSidStates(registerState: {
 	const result: HardwareSidState[] = [];
 	for (let channelIndex = 0; channelIndex < TONE_CHANNELS; channelIndex++) {
 		const timerEffect = registerState.channels[channelIndex]?.timerEffects?.sid;
-		const enabled =
-			!!timerEffect?.enabled && timerEffect.kind === TIMER_EFFECT_KIND_VOLUME;
+		const enabled = !!timerEffect?.enabled && timerEffect.kind === TIMER_EFFECT_KIND_VOLUME;
 		result.push({
 			enabled,
 			pwm: enabled && timerEffect.pwmMode === TIMER_PWM_MODE_BY_DUTY_INDEX,

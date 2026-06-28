@@ -167,11 +167,7 @@ function isFmtVirtualTarget(targetId: number): boolean {
 }
 
 function isDefinedFmtVirtualTarget(targetId: number): boolean {
-	return (
-		targetId === spec.TGT_SAMPLE_AMPLITUDE ||
-		targetId === spec.TGT_SAMPLE_INDEX ||
-		targetId === spec.TGT_SAMPLE_RATE
-	);
+	return spec.TGT_FMT_VIRTUAL_DEFINED.includes(targetId);
 }
 
 function validTarget(targetId: number): boolean {
@@ -188,13 +184,7 @@ function ayTargetOk(targetId: number): boolean {
 	if (targetId <= 0x7f) {
 		return false;
 	}
-	if (isDefinedFmtVirtualTarget(targetId)) {
-		return true;
-	}
-	if (isFmtVirtualTarget(targetId)) {
-		return false;
-	}
-	return targetId >= 0xc0 && targetId <= 0xff;
+	return isDefinedFmtVirtualTarget(targetId);
 }
 
 function validateActions(taym: Taym, problems: string[]): void {
@@ -270,6 +260,20 @@ function checkActionsSlice(
 			}
 		}
 	}
+
+	if (chipType === spec.CHIP_TYPE_AY && mods.actionCount > 0) {
+		const slice = actionSlice(taym, mods);
+		if (slice.some((action) => action.targetId === spec.TGT_SAMPLE_AMPLITUDE)) {
+			const ampCount = slice.filter((action) =>
+				spec.AY_AMP_REGS.includes(action.targetId)
+			).length;
+			if (ampCount !== 1) {
+				problems.push(
+					`S11.1: MODS frame ${frame} timer ${timerIndex} sample amplitude 0x80 needs exactly one paired AY amp reg (R8/R9/R10), got ${ampCount}`
+				);
+			}
+		}
+	}
 }
 
 function checkStart(
@@ -321,6 +325,9 @@ function validateMods(taym: Taym, problems: string[]): void {
 				active[timerIndex] = 'active';
 				const chip = taym.timers[timerIndex].chipIndex;
 				for (const action of actionSlice(taym, mods)) {
+					if (action.targetId === spec.TGT_SAMPLE_AMPLITUDE) {
+						continue;
+					}
 					const key = `${chip}:${action.targetId}`;
 					if (startsThisFrame.has(key)) {
 						problems.push(

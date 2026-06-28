@@ -93,11 +93,11 @@ export function ayStereoLayout(config: number): number {
 }
 
 export const TGT_SAMPLE_AMPLITUDE = 0x80;
-export const TGT_SAMPLE_INDEX = 0x81;
-export const TGT_SAMPLE_RATE = 0x82;
+export const TGT_FMT_VIRTUAL_DEFINED = [TGT_SAMPLE_AMPLITUDE];
 
 export const AY_TARGET_MAX = 0x0d;
 export const AY_R13_SHAPE = 0x0d;
+export const AY_AMP_REGS = [0x08, 0x09, 0x0a];
 
 export const TRAK_SIZE = 16;
 export const CHIP_SIZE = 32;

@@ -21,18 +21,36 @@ function dacTable(variant: AyChipVariant): readonly number[] {
 	return variant === 'YM' ? YM_DAC_TABLE : AY_DAC_TABLE;
 }
 
-export function sidRegisterVolume(waveformStep: number, baseVolume: number): number {
+function nearestRegisterVolume(amplitude: number, variant: AyChipVariant): number {
+	const table = dacTable(variant);
+	let best = 0;
+	let bestDistance = Math.abs((table[1] ?? 0) - amplitude);
+	for (let code = 0; code <= 15; code++) {
+		const distance = Math.abs((table[code * 2 + 1] ?? 0) - amplitude);
+		if (distance <= bestDistance) {
+			best = code;
+			bestDistance = distance;
+		}
+	}
+	return best;
+}
+
+export function sidRegisterVolume(
+	waveformStep: number,
+	baseVolume: number,
+	variant: AyChipVariant = 'AY'
+): number {
 	const w = waveformStep & 0xf;
 	if (w === 0) {
 		return 0;
 	}
-	return Math.min(15, Math.floor((w * baseVolume + 14) / 15));
+	const table = dacTable(variant);
+	const volume = table[(baseVolume & 0xf) * 2 + 1] ?? 0;
+	const step = table[w * 2 + 1] ?? 0;
+	return nearestRegisterVolume(volume * step, variant);
 }
 
-export function registerVolumeToAmplitude(
-	registerVolume: number,
-	variant: AyChipVariant
-): number {
+export function registerVolumeToAmplitude(registerVolume: number, variant: AyChipVariant): number {
 	return lutVolumeLevelToAmplitude(registerVolume, variant);
 }
 
@@ -43,7 +61,7 @@ export function sidStepToAmplitude(
 	baseVolume: number,
 	variant: AyChipVariant
 ): number {
-	return registerVolumeToAmplitude(sidRegisterVolume(waveformStep, baseVolume), variant);
+	return registerVolumeToAmplitude(sidRegisterVolume(waveformStep, baseVolume, variant), variant);
 }
 
 export function amplitudeToNearestSidStep(
