@@ -204,13 +204,19 @@ export class NESProcessor
 		});
 	}
 
-	playPreviewRow(pattern: Pattern, rowIndex: number, instrument?: Instrument): void {
+	playPreviewRow(
+		pattern: Pattern,
+		rowIndex: number,
+		instrument?: Instrument,
+		channelIndex?: number
+	): void {
 		const sanitized = instrument ? sanitizeInstrumentForWorklet(instrument) : undefined;
 		this.bridge.sendCommand({
 			type: 'preview_row',
 			pattern,
 			rowIndex,
-			instrument: sanitized
+			instrument: sanitized,
+			channelIndex
 		});
 	}
 

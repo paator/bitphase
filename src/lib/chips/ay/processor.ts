@@ -345,7 +345,12 @@ export class AYProcessor
 		return this.bridge.isAudioNodeAvailable();
 	}
 
-	playPreviewRow(pattern: Pattern, rowIndex: number, instrument?: Instrument): void {
+	playPreviewRow(
+		pattern: Pattern,
+		rowIndex: number,
+		instrument?: Instrument,
+		channelIndex?: number
+	): void {
 		if (rowIndex < 0 || rowIndex >= pattern.length) return;
 		const patternCopy = structuredClone(pattern);
 		const instrumentCopy = instrument ? sanitizeInstrumentForWorklet(instrument) : undefined;
@@ -353,7 +358,8 @@ export class AYProcessor
 			type: 'preview_row',
 			pattern: patternCopy,
 			rowIndex,
-			instrument: instrumentCopy
+			instrument: instrumentCopy,
+			channelIndex
 		});
 	}
 

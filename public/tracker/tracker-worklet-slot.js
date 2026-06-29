@@ -194,11 +194,11 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 
 	_silencePreviewChannel(_channelIndex) {}
 
-	handlePreviewRow({ pattern, rowIndex, instrument }) {
+	handlePreviewRow({ pattern, rowIndex, instrument, channelIndex }) {
 		if (!this._canPreview()) {
 			return;
 		}
-		this._beforePreviewRow({ pattern, rowIndex, instrument });
+		this._beforePreviewRow({ pattern, rowIndex, instrument, channelIndex });
 		this.paused = true;
 		if (!pattern?.channels || !pattern.patternRows || rowIndex < 0) {
 			return;
@@ -229,8 +229,19 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this._applyRegisterStateToEngine();
 
 		this.previewActiveChannels = new Set();
-		for (let ch = 0; ch < this.registerState.channelCount; ch++) {
-			this.previewActiveChannels.add(ch);
+		const singleChannelPreview =
+			typeof channelIndex === 'number' && channelIndex >= 0;
+		if (singleChannelPreview) {
+			this.previewActiveChannels.add(channelIndex);
+			for (let ch = 0; ch < this.registerState.channelCount; ch++) {
+				if (ch === channelIndex) continue;
+				this._silencePreviewChannel(ch);
+				this.state.channelSoundEnabled[ch] = false;
+			}
+		} else {
+			for (let ch = 0; ch < this.registerState.channelCount; ch++) {
+				this.previewActiveChannels.add(ch);
+			}
 		}
 		this.previewTickSampleCounter = 0;
 	}

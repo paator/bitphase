@@ -43,6 +43,15 @@ export const settingsItems: SettingsItem[] = [
 		category: 'general'
 	},
 	{
+		label: 'Preview Full Row',
+		description:
+			'When enabled, pattern input previews every channel on the current row. When disabled, only the edited channel is previewed',
+		type: 'toggle',
+		defaultValue: true,
+		setting: 'previewFullRow',
+		category: 'general'
+	},
+	{
 		label: 'Debug Mode',
 		description: 'Show playback debug panel and log each playback row in the console',
 		type: 'toggle',

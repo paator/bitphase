@@ -38,6 +38,7 @@
 		decimalRowNumbers: settingsStore.decimalRowNumbers,
 		showOscilloscopes: settingsStore.showOscilloscopes,
 		showInstrumentPreview: settingsStore.showInstrumentPreview,
+		previewFullRow: settingsStore.previewFullRow,
 		debugMode: settingsStore.debugMode,
 		selectionStyle: settingsStore.selectionStyle
 	};

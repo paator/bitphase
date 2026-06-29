@@ -10,6 +10,7 @@ export interface Settings {
 	decimalRowNumbers: boolean;
 	showOscilloscopes: boolean;
 	showInstrumentPreview: boolean;
+	previewFullRow: boolean;
 	debugMode: boolean;
 	selectionStyle: 'inverted' | 'filled';
 }

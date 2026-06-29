@@ -63,7 +63,12 @@ export interface InstrumentSupport {
 }
 
 export interface PreviewNoteSupport {
-	playPreviewRow(pattern: Pattern, rowIndex: number, instrument?: Instrument): void;
+	playPreviewRow(
+		pattern: Pattern,
+		rowIndex: number,
+		instrument?: Instrument,
+		channelIndex?: number
+	): void;
 	stopPreviewNote(channel?: number): void;
 }
 

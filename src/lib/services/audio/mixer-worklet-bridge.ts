@@ -73,7 +73,13 @@ export type MixerSlotCommand =
 			pattern?: Pattern;
 			speed?: number | null;
 	  }
-	| { type: 'preview_row'; pattern: Pattern; rowIndex: number; instrument?: Instrument }
+	| {
+			type: 'preview_row';
+			pattern: Pattern;
+			rowIndex: number;
+			instrument?: Instrument;
+			channelIndex?: number;
+	  }
 	| { type: 'stop_preview'; channel?: number }
 	| {
 			type: 'set_virtual_channel_config';

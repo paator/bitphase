@@ -1470,16 +1470,17 @@
 				services.audioService.setPreviewActiveForChips(previewChipIndex);
 			}
 			const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
-			const isNoteField =
-				fieldInfoBeforeEdit.fieldType === 'note' ||
-				fieldInfoBeforeEdit.fieldKey === 'envelopeValue';
 			const previewChannelResult = previewService.playFromContext(
 				processor,
 				finalPattern,
 				previewChannel,
 				selectedRow,
 				schema,
-				isNoteField
+				converter,
+				{
+					previewFullRow: settingsStore.previewFullRow,
+					isGlobalField: fieldInfoBeforeEdit?.isGlobal ?? false
+				}
 			);
 			if (previewChannelResult !== undefined) {
 				pressedKeyChannels.set(previewKey, previewChannelResult);
@@ -2692,15 +2693,17 @@
 					services.audioService.setPreviewActiveForChips(previewChipIndex);
 				}
 				const processor = chipProcessor as ChipProcessor & PreviewNoteSupport;
-				const isNoteField =
-					fieldInfo.fieldType === 'note' || fieldInfo.fieldKey === 'envelopeValue';
 				previewService.playFromContext(
 					processor,
 					finalPattern,
 					previewChannel,
 					selectedRow,
 					schema,
-					isNoteField
+					converter,
+					{
+						previewFullRow: settingsStore.previewFullRow,
+						isGlobalField: fieldInfo.isGlobal ?? false
+					}
 				);
 			}
 		}

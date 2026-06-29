@@ -15,6 +15,7 @@ class SettingsStore {
 	decimalRowNumbers = $state(false);
 	showOscilloscopes = $state(true);
 	showInstrumentPreview = $state(true);
+	previewFullRow = $state(true);
 	debugMode = $state(false);
 	selectionStyle = $state<'inverted' | 'filled'>('inverted');
 
