@@ -18,13 +18,15 @@
 		IconColumnHeader,
 		LoopMarkerOverlay,
 		NamedRowEditorSync,
+		PaintableValueGridCell,
 		ROW_EDITOR_MAX_ROWS,
 		RowEditorActionsCell,
 		RowEditorContainer,
 		RowEditorLoopCell,
 		RowEditorNameField,
 		RowEditorTableFooter,
-		SelectableRowNumberCell
+		SelectableRowNumberCell,
+		ValuePaintDrag
 	} from '../../components/RowEditorTable';
 	import { ROW_SELECTION_STYLES } from '../../utils/row-selection';
 	import {
@@ -58,6 +60,8 @@
 	} = $props();
 
 	const TABLE_COLUMNS = 13;
+	const VOLUME_VALUES = Array.from({ length: 16 }, (_, i) => i);
+	const showVolumeGrid = $derived(isExpanded);
 	let tableRef: HTMLTableElement | null = $state(null);
 	let editorContainerRef: HTMLDivElement | null = $state(null);
 
@@ -81,6 +85,7 @@
 	});
 
 	const booleanDrag = new BooleanPaintDrag();
+	const volumeDrag = new ValuePaintDrag<number>();
 	const loopMarker = createLoopMarkerMeasure(
 		() => tableRef,
 		() => editorSync.loopRow,
@@ -180,10 +185,11 @@
 <RowEditorContainer bind:editorContainerRef>
 	<RowEditorNameField bind:name={editorSync.name} />
 
-	<div class="relative mt-3 flex flex-col overflow-x-auto">
-		<LoopMarkerOverlay style={loopMarker.style} />
+	<div class="mt-3 flex items-start gap-2 overflow-x-auto">
+		<div class="relative flex flex-col">
+			<LoopMarkerOverlay style={loopMarker.style} />
 
-		<table
+			<table
 			bind:this={tableRef}
 			class="row-editor-table table-fixed border-collapse bg-[var(--color-app-surface)] font-mono text-xs select-none">
 			<thead>
@@ -256,6 +262,13 @@
 						</div>
 					</th>
 				</tr>
+				{#if showVolumeGrid}
+					<tr>
+						{#each { length: TABLE_COLUMNS } as _, columnIndex (columnIndex)}
+							<th></th>
+						{/each}
+					</tr>
+				{/if}
 			</thead>
 			<tbody>
 				{#each editorSync.rows as row, index (index)}
@@ -427,6 +440,57 @@
 						createDefaultNesInstrumentRow,
 						ROW_EDITOR_MAX_ROWS
 					)} />
-		</table>
+			</table>
+		</div>
+
+		{#if showVolumeGrid}
+			<table
+				class="row-editor-table table-fixed border-collapse bg-[var(--color-app-surface)] font-mono text-xs select-none">
+				<thead>
+					<tr>
+						<th class="px-2 py-1.5">row</th>
+						{#each VOLUME_VALUES as v (v)}
+							<th
+								class="w-6 min-w-6 bg-[var(--color-app-surface-secondary)] text-center"
+								title={String(v)}>
+								{formatRowEditorNumber(v, asHex)}
+							</th>
+						{/each}
+					</tr>
+					<tr>
+						<th></th>
+						{#each VOLUME_VALUES as v (v)}
+							<th class="w-6 min-w-6"></th>
+						{/each}
+					</tr>
+				</thead>
+				<tbody>
+					{#each editorSync.rows as row, index (index)}
+						{@const selected = selection.isRowSelected(index)}
+						<tr class="h-8 {selected ? ROW_SELECTION_STYLES.row : ''}">
+							<td
+								class="border border-[var(--color-app-border)] px-2 text-right {selected
+									? ROW_SELECTION_STYLES.rowNumber
+									: 'bg-[var(--color-app-surface-secondary)]'}"
+								>{index}</td>
+							{#each VOLUME_VALUES as v (v)}
+								<PaintableValueGridCell
+									{index}
+									value={v}
+									currentValue={row.volumeOrRate}
+									{selected}
+									formatValue={(value) => formatRowEditorNumber(value, asHex)}
+									onPaintBegin={(_, value) =>
+										volumeDrag.begin(value, (paintValue) =>
+											updateRow(index, { volumeOrRate: paintValue }))}
+									onPaintOver={(_, value) =>
+										volumeDrag.dragOverWithValue(value, (paintValue) =>
+											updateRow(index, { volumeOrRate: paintValue }))} />
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
 	</div>
 </RowEditorContainer>
