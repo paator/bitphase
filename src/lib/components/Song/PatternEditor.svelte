@@ -1447,7 +1447,7 @@
 			moveColumn(1);
 		}
 
-		const shouldPreview =
+		const shouldPreviewField =
 			fieldInfoBeforeEdit &&
 			(fieldInfoBeforeEdit.channelIndex >= 0 ||
 				fieldInfoBeforeEdit.fieldKey === 'envelopeValue');
@@ -1457,8 +1457,9 @@
 				: (fieldInfoBeforeEdit?.channelIndex ?? -1);
 		if (
 			previewKey !== undefined &&
+			editingResult.shouldPreview !== false &&
 			!playbackStore.isPlaying &&
-			shouldPreview &&
+			shouldPreviewField &&
 			previewChannel >= 0 &&
 			chipProcessor &&
 			'playPreviewRow' in chipProcessor &&

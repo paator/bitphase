@@ -6,6 +6,7 @@ import { Pattern as PatternModel } from '../../../../src/lib/models/song';
 import { PatternFieldDetection } from '../../../../src/lib/services/pattern/editing/pattern-field-detection';
 import { PatternNoteInput } from '../../../../src/lib/services/pattern/editing/pattern-note-input';
 import { PatternEnvelopeNoteInput } from '../../../../src/lib/services/pattern/editing/pattern-envelope-note-input';
+import { PatternDeleteHandler } from '../../../../src/lib/services/pattern/editing/pattern-delete-handler';
 import { editorStateStore } from '../../../../src/lib/stores/editor-state.svelte';
 
 vi.mock('../../../../src/lib/stores/editor-state.svelte', () => ({
@@ -17,6 +18,7 @@ vi.mock('../../../../src/lib/stores/editor-state.svelte', () => ({
 vi.mock('../../../../src/lib/services/pattern/editing/pattern-field-detection');
 vi.mock('../../../../src/lib/services/pattern/editing/pattern-note-input');
 vi.mock('../../../../src/lib/services/pattern/editing/pattern-envelope-note-input');
+vi.mock('../../../../src/lib/services/pattern/editing/pattern-delete-handler');
 
 describe('PatternEditingService', () => {
 	const createMockContext = (overrides: Partial<EditingContext> = {}): EditingContext =>
@@ -155,6 +157,33 @@ describe('PatternEditingService', () => {
 			expect(result).toBeNull();
 			expect(PatternNoteInput.handleMidiNoteInput).not.toHaveBeenCalled();
 			expect(PatternEnvelopeNoteInput.handleMidiNoteInput).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('handleKeyInput', () => {
+		it('marks delete and backspace results as non-previewable', () => {
+			const deleteHandlerResult = {
+				updatedPattern: new PatternModel(0, 64) as Pattern,
+				shouldMoveNext: false
+			};
+			vi.mocked(PatternDeleteHandler.handleDelete).mockReturnValue(deleteHandlerResult);
+			const context = createMockContext();
+
+			expect(PatternEditingService.handleKeyInput(context, 'Delete', 'Delete')).toEqual({
+				...deleteHandlerResult,
+				shouldPreview: false
+			});
+			expect(PatternEditingService.handleKeyInput(context, 'Backspace', 'Backspace')).toEqual({
+				...deleteHandlerResult,
+				shouldPreview: false
+			});
+		});
+
+		it('returns null when delete handler makes no change', () => {
+			vi.mocked(PatternDeleteHandler.handleDelete).mockReturnValue(null);
+			const context = createMockContext();
+
+			expect(PatternEditingService.handleKeyInput(context, 'Delete', 'Delete')).toBeNull();
 		});
 	});
 });

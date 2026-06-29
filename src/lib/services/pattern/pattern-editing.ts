@@ -19,7 +19,8 @@ export class PatternEditingService {
 		code: string
 	): PatternEditingResult | null {
 		if (key === 'Delete' || key === 'Backspace') {
-			return PatternDeleteHandler.handleDelete(context);
+			const result = PatternDeleteHandler.handleDelete(context);
+			return result ? { ...result, shouldPreview: false } : null;
 		}
 
 		const fieldInfo = this.getFieldAtCursor(context);

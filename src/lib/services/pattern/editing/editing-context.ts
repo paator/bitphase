@@ -22,6 +22,7 @@ export interface PatternEditingResult {
 	updatedPattern: Pattern;
 	shouldMoveNext: boolean;
 	didChange?: boolean;
+	shouldPreview?: boolean;
 }
 
 export interface FieldInfo {
