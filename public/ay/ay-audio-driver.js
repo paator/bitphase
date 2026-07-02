@@ -227,7 +227,6 @@ class AYAudioDriver {
 					noise: false,
 					envelope: false
 				};
-				state.channelEnvelopeEnabled[channelIndex] = false;
 			} else {
 				this._processNote(state, channelIndex, row, registerState);
 				this._processInstrument(state, channelIndex, row);
@@ -898,7 +897,6 @@ class AYAudioDriver {
 				this.channelMixerState[channelIndex].tone = false;
 				this.channelMixerState[channelIndex].noise = false;
 				this.channelMixerState[channelIndex].envelope = false;
-				state.channelEnvelopeEnabled[channelIndex] = false;
 				continue;
 			}
 
@@ -1223,7 +1221,6 @@ class AYAudioDriver {
 					noise: false,
 					envelope: false
 				};
-				state.channelEnvelopeEnabled[channelIndex] = false;
 			}
 		}
 

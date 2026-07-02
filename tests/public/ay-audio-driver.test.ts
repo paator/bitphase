@@ -614,7 +614,7 @@ describe('AYAudioDriver', () => {
 			expect(registerState.channels[1].mixer.tone).toBe(false);
 			expect(registerState.channels[1].mixer.noise).toBe(false);
 			expect(registerState.channels[1].mixer.envelope).toBe(false);
-			expect(state.channelEnvelopeEnabled[1]).toBe(false);
+			expect(state.channelEnvelopeEnabled[1]).toBe(true);
 		});
 
 		it('note off (name 1) sets channelSoundEnabled false and tone 0', () => {
@@ -725,6 +725,59 @@ describe('AYAudioDriver', () => {
 			expect(registerState.channels[0].mixer.noise).toBe(false);
 			expect(registerState.channels[0].mixer.envelope).toBe(false);
 			expect(registerState.channels[2].volume).toBe(0);
+		});
+
+		it('preserves channelEnvelopeEnabled through mute and restores envelope mixer on unmute', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setTuningTable([600]);
+			state.setInstruments([
+				{
+					id: '01',
+					rows: [{ tone: true, volume: 15, noise: false, envelope: true }],
+					loop: 0
+				}
+			]);
+			state.channelInstruments = [0, -1, -1];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.channelMuted = [true, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelEnvelopeEnabled = [true, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.channelToneAccumulator = [0, 0, 0];
+			state.channelNoiseAccumulator = [0, 0, 0];
+			state.channelEnvelopeAccumulator = [0, 0, 0];
+			state.channelTimerPwmSweep = [-1, -1, -1];
+			state.channelTimerEffectReset = [false, false, false];
+			state.envelopeOnOffCounter = 0;
+			state.envelopeEffectTable = -1;
+			const registerState = {
+				channels: [
+					{ tone: 600, volume: 15, mixer: { tone: true, noise: false, envelope: true } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } }
+				],
+				noise: 0,
+				envelopePeriod: 100,
+				envelopeShape: 12,
+				forceEnvelopeShapeWrite: false
+			};
+
+			driver.processInstruments(state, registerState);
+			expect(state.channelEnvelopeEnabled[0]).toBe(true);
+			expect(registerState.channels[0].volume).toBe(0);
+			expect(registerState.channels[0].mixer.envelope).toBe(false);
+
+			state.channelMuted[0] = false;
+			driver.processInstruments(state, registerState);
+			expect(state.channelEnvelopeEnabled[0]).toBe(true);
+			expect(registerState.channels[0].mixer.envelope).toBe(true);
+			expect(registerState.channels[0].volume & 16).toBe(16);
 		});
 
 		it('muted channel gets volume 0 in processInstruments', () => {

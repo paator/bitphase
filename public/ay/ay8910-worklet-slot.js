@@ -97,7 +97,6 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 			this.state.channelMuted[channelIndex] = muted;
 			if (muted) {
 				this.applyChannelSilent(this.registerState, channelIndex);
-				this.state.channelEnvelopeEnabled[channelIndex] = false;
 				if (this.ayumiEngine) {
 					this._applyRegisterStateToEngine();
 				}
@@ -163,7 +162,6 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 		for (let ch = 0; ch < totalChannels; ch++) {
 			if (this.state.channelMuted[ch]) {
 				this.applyChannelSilent(this.registerState, ch);
-				this.state.channelEnvelopeEnabled[ch] = false;
 			}
 		}
 	}
