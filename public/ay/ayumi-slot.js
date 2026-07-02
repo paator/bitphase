@@ -306,6 +306,44 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 		super.handleStopPreview(channel);
 	}
 
+	_isLogicalChannelAudible(channelIndex) {
+		return (
+			!this.state.channelMuted[channelIndex] &&
+			this.state.channelSoundEnabled[channelIndex]
+		);
+	}
+
+	_isHardwareChannelAudible(hardwareChannelIndex) {
+		const channelCount = this.registerState.channelCount;
+		if (this.virtualChannelMixer?.hasVirtualChannels?.()) {
+			for (let logical = 0; logical < channelCount; logical++) {
+				if (
+					this.virtualChannelMixer.getHardwareChannelIndex(logical) !==
+					hardwareChannelIndex
+				) {
+					continue;
+				}
+				if (this._isLogicalChannelAudible(logical)) {
+					return true;
+				}
+			}
+			return false;
+		}
+		if (hardwareChannelIndex >= channelCount) {
+			return false;
+		}
+		return this._isLogicalChannelAudible(hardwareChannelIndex);
+	}
+
+	_writeWaveformSamples(sampleIndex, channelOut) {
+		const wi = this.channelWaveformWriteIndex;
+		for (let ch = 0; ch < this.channelWaveformBuf.length; ch++) {
+			const sample =
+				channelOut && this._isHardwareChannelAudible(ch) ? channelOut[ch] : 0;
+			this.channelWaveformBuf[ch][(wi + sampleIndex) % 512] = sample;
+		}
+	}
+
 	accumulateStereoOutput(sampleIndex, mix) {
 		if (!this.ayumiEngine) {
 			return;
@@ -320,6 +358,7 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 			}
 		}
 		if (!hasAudibleChannel) {
+			this._writeWaveformSamples(sampleIndex, null);
 			return;
 		}
 		if (this.audioDriver) {
@@ -347,10 +386,7 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 		const rightValue = new Float64Array(wasmModule.memory.buffer, rightOffset, 1)[0];
 
 		const channelOut = new Float64Array(wasmModule.memory.buffer, channelOutOffset, 3);
-		const wi = this.channelWaveformWriteIndex;
-		for (let ch = 0; ch < 3; ch++) {
-			this.channelWaveformBuf[ch][(wi + sampleIndex) % 512] = channelOut[ch];
-		}
+		this._writeWaveformSamples(sampleIndex, channelOut);
 
 		let l = leftValue;
 		let r = rightValue;
