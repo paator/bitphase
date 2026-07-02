@@ -1,10 +1,11 @@
 import SongTimeline from '../tracker/song-timeline.js';
 import { createAudioSlot } from './audio-slot-registry.js';
+import {
+	leaderPatternLengthFromSlots,
+	runSharedTimelineQuantum,
+	sortPlaySlotsForQuantum
+} from '../tracker/shared-playback-orchestrator.js';
 import './builtin-audio-slots.js';
-
-function sortPlaySlotsForQuantum(playSlots) {
-	return [...playSlots].sort((a, b) => (b.chipIndex ?? 0) - (a.chipIndex ?? 0));
-}
 
 class BitphaseAudioProcessor extends AudioWorkletProcessor {
 	constructor() {
@@ -48,21 +49,6 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 		slot.handleMessage(payload);
 	}
 
-	leaderPatternLength() {
-		const rowCount = (slot) =>
-			typeof slot.getLeaderPatternRowCount === 'function' ? slot.getLeaderPatternRowCount() : 0;
-		const s0 = this.slots[0];
-		let n = s0 ? rowCount(s0) : 0;
-		if (n > 0) return n;
-		for (let i = 0; i < this.slots.length; i++) {
-			const s = this.slots[i];
-			if (!s) continue;
-			const len = rowCount(s);
-			if (len > 0) return len;
-		}
-		return 1;
-	}
-
 	process(_inputs, outputs, _parameters) {
 		const output = outputs[0];
 		if (!output || output.length < 2) {
@@ -89,7 +75,7 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 			? []
 			: active.filter((s) => s.shouldAccumulateStereoOutput());
 		const quantumSlots = sortPlaySlotsForQuantum(playSlots);
-		const leaderLen = this.leaderPatternLength();
+		const leaderLen = leaderPatternLengthFromSlots(slots.filter(Boolean));
 
 		for (let i = 0; i < numSamples; i++) {
 			tl.tickAccumulator += tl.tickStep;
@@ -103,14 +89,7 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 					}
 				}
 			} else if (playSlots.length > 0 && tl.tickAccumulator >= 1.0) {
-				for (const s of quantumSlots) {
-					s.runSharedPlaybackQuantum();
-				}
-				const needsOrderWrap = tl.advancePosition(leaderLen);
-				for (let j = 0; j < slots.length; j++) {
-					const s = slots[j];
-					if (s) s.onPatternOrderAdvanced(needsOrderWrap);
-				}
+				runSharedTimelineQuantum(quantumSlots, slots.filter(Boolean), tl, leaderLen);
 				tl.tickAccumulator -= 1.0;
 			}
 

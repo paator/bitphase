@@ -3,6 +3,10 @@ import type { Chip } from '../../chips/types';
 import type { ChipRendererBinding, SharedTimelineExportSlot } from '../../chips/base/renderer';
 import type { ResourceLoader } from '../../chips/base/resource-loader';
 import { mixAudioChannels } from '../../utils/audio-mixer';
+import {
+	isMixedChipSharedTimelineExport,
+	renderMixedChipSharedTimelineSlots
+} from './mixed-chip-shared-timeline-export';
 
 async function getRegistry() {
 	return import('../../chips/registry');
@@ -201,14 +205,30 @@ class WavExportService {
 		if (!sharedSlots) {
 			return null;
 		}
+		if (abortSignal?.aborted) {
+			throw new Error('Export cancelled');
+		}
+
+		if (isMixedChipSharedTimelineExport(sharedSlots)) {
+			onProgress?.(2, 'Rendering songs with shared project playback timeline...');
+			const resolveChip =
+				getChip ?? (await getRegistry()).getChipByType;
+			const parts = await renderMixedChipSharedTimelineSlots(
+				project,
+				sharedSlots,
+				resolveChip,
+				{ separateChannels, loopCount: loops },
+				resourceLoader,
+				onProgress
+			);
+			return new Map(parts.map((part) => [part.songIndex, part.channels] as const));
+		}
+
 		const chip = await this.getChipForSong(project, nonempty[0]!, getChip);
 		const renderer = chip.createRenderer(resourceLoader, this.chipRendererBinding(chip));
 		const renderShared = renderer?.renderSharedTimelineSlots;
 		if (!renderer || typeof renderShared !== 'function') {
 			return null;
-		}
-		if (abortSignal?.aborted) {
-			throw new Error('Export cancelled');
 		}
 		onProgress?.(2, 'Rendering songs with shared project playback timeline...');
 		const parts = await renderShared.call(renderer, project, sharedSlots, onProgress, {
@@ -265,14 +285,8 @@ class WavExportService {
 			return null;
 		}
 		const slots: SharedTimelineExportSlot[] = [];
-		let kind: string | null = null;
 		for (const i of indices) {
 			const chip = await this.getChipForSong(project, i, getChipOverride);
-			if (kind === null) {
-				kind = chip.audioSlotKind;
-			} else if (chip.audioSlotKind !== kind) {
-				return null;
-			}
 			slots.push({ songIndex: i, audioSlotKind: chip.audioSlotKind });
 		}
 		return slots;

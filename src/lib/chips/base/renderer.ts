@@ -21,6 +21,26 @@ export type ChipRendererBinding = {
 	audioSlotKind: string;
 };
 
+export type SharedTimelineExportBuildSession = {
+	patternOrder: number[];
+	startOrderIndex: number;
+	sharedTimeline: unknown | null;
+	separateChannels: boolean;
+	resourceCache?: Map<string, unknown>;
+};
+
+export type SharedTimelineExportLaneHandle = {
+	songIndex: number;
+	audioSlotKind: string;
+	separateChannels: boolean;
+	getLeaderPatternRowCount(): number;
+	runSharedPlaybackQuantum(): void;
+	onPatternOrderAdvanced(needsChange: boolean): void;
+	captureSample(sampleIndex: number): { left: number; right: number; channels?: number[] };
+	createChannelBuffers?(): number[][];
+	release(): void;
+};
+
 export function assertSharedTimelineSlotsForChip(
 	slots: readonly SharedTimelineExportSlot[],
 	binding: ChipRendererBinding
@@ -50,5 +70,10 @@ export interface ChipRenderer {
 		onProgress?: (progress: number, message: string) => void,
 		options?: RenderOptions
 	): Promise<SharedTimelineExportResult[]>;
+	createSharedTimelineExportLane?(
+		project: Project,
+		songIndex: number,
+		session: SharedTimelineExportBuildSession
+	): Promise<SharedTimelineExportLaneHandle>;
 }
 
