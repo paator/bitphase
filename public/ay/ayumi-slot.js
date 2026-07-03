@@ -348,19 +348,6 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 		if (!this.ayumiEngine) {
 			return;
 		}
-		const channelMuted = this.state.channelMuted;
-		const channelSoundEnabled = this.state.channelSoundEnabled;
-		let hasAudibleChannel = false;
-		for (let ch = 0; ch < channelMuted.length; ch++) {
-			if (!channelMuted[ch] && channelSoundEnabled[ch]) {
-				hasAudibleChannel = true;
-				break;
-			}
-		}
-		if (!hasAudibleChannel) {
-			this._writeWaveformSamples(sampleIndex, null);
-			return;
-		}
 		if (this.audioDriver) {
 			const resolveAyumiChannelIndex =
 				this.virtualChannelMixer?.hasVirtualChannels?.()

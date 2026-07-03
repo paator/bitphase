@@ -376,6 +376,7 @@ class TrackerPatternProcessor {
 		this.state.channelOffDuration[channelIndex] = onOffState.offDuration;
 		this.state.channelOnDuration[channelIndex] = onOffState.onDuration;
 		this.state.channelOnOffCounter[channelIndex] = onOffState.counter;
+		this.state.channelSoundEnabled[channelIndex] = onOffState.enabled;
 	}
 
 	_initChannelDetune(channelIndex, effect, hasTableIndex) {

@@ -221,5 +221,23 @@ describe('TrackerPatternProcessor', () => {
 			expect(state.channelSlideDelay[0]).toBe(2);
 			expect(state.channelSlideCount[0]).toBe(2);
 		});
+
+		it('row with on/off effect enables channel sound at on-phase start', () => {
+			const state = createMockState();
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			const pattern = createMockPattern(1);
+			state.channelSoundEnabled[0] = false;
+			pattern.channels[0].rows[0] = {
+				note: { name: 0, octave: 0 },
+				effects: [{ effect: 6, delay: 0, parameter: 0x24 }]
+			};
+			const registerState = new AYChipRegisterState();
+			proc.parsePatternRow(pattern, 0, registerState);
+			expect(state.channelOnOffCounter[0]).toBe(2);
+			expect(state.channelOnDuration[0]).toBe(2);
+			expect(state.channelOffDuration[0]).toBe(4);
+			expect(state.channelSoundEnabled[0]).toBe(true);
+		});
 	});
 });

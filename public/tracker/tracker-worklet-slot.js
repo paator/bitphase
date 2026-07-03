@@ -5,6 +5,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		super(port, chipIndex);
 		this.previewActiveChannels = new Set();
 		this.previewTickSampleCounter = 0;
+		this._rowParsePrimed = -1;
 	}
 
 	_playbackWorkersReady() {
@@ -71,8 +72,8 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		}
 		this.patternProcessor.parsePatternRow(pattern, rowIndex, this.registerState);
 		this.patternProcessor.processSpeedTable();
+		this._rowParsePrimed = rowIndex;
 		this.enforceMuteState();
-		this._processTrackerTick();
 		this._applyRegisterStateToEngine();
 	}
 
@@ -279,12 +280,16 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 				this._resizeForPatternChannels(this.state.currentPattern.channels.length);
 			}
 			const rowIndex = this.state.timeline.currentRow;
-			this.patternProcessor.parsePatternRow(
-				this.state.currentPattern,
-				rowIndex,
-				this.registerState
-			);
-			this.patternProcessor.processSpeedTable();
+			if (this._rowParsePrimed !== rowIndex) {
+				this.patternProcessor.parsePatternRow(
+					this.state.currentPattern,
+					rowIndex,
+					this.registerState
+				);
+				this.patternProcessor.processSpeedTable();
+			} else {
+				this._rowParsePrimed = -1;
+			}
 			this.timelinePattern.queueOrSendPositionUpdate();
 		}
 
