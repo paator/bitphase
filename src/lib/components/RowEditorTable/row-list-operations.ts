@@ -9,6 +9,25 @@ export function clampLoopRow(loopRow: number, rowCount: number): number {
 	return Math.min(loopRow, rowCount - 1);
 }
 
+export function cloneRowValue<T>(row: T): T {
+	if (row === null || typeof row !== 'object') {
+		return row;
+	}
+	if (Array.isArray(row)) {
+		return row.map((item) => cloneRowValue(item)) as T;
+	}
+	const cloned: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
+		cloned[key] = cloneRowValue(value);
+	}
+	return cloned as T;
+}
+
+export function createNextRow<T>(rows: T[], createRow: () => T): T {
+	if (rows.length === 0) return createRow();
+	return cloneRowValue(rows[rows.length - 1]);
+}
+
 export function resizeRowList<T>(
 	rows: T[],
 	targetCount: number,
@@ -19,7 +38,12 @@ export function resizeRowList<T>(
 	if (count === rows.length) return rows;
 	if (count > rows.length) {
 		const toAdd = count - rows.length;
-		return [...rows, ...Array.from({ length: toAdd }, createRow)];
+		const sourceRow = rows.length > 0 ? rows[rows.length - 1] : null;
+		const newRows =
+			sourceRow !== null
+				? Array.from({ length: toAdd }, () => cloneRowValue(sourceRow))
+				: Array.from({ length: toAdd }, createRow);
+		return [...rows, ...newRows];
 	}
 	return rows.slice(0, count);
 }

@@ -1,4 +1,10 @@
-import { clampLoopRow, resizeRowList, removeRowAt, removeRowsFromBottomAt } from './row-list-operations';
+import {
+	clampLoopRow,
+	createNextRow,
+	resizeRowList,
+	removeRowAt,
+	removeRowsFromBottomAt
+} from './row-list-operations';
 
 type NamedRowSource = {
 	id: string | number;
@@ -94,7 +100,7 @@ export class NamedRowEditorSync<TRow> {
 	}
 
 	addRow(createRow: () => TRow): void {
-		this.applyRowChange([...this.rows, createRow()]);
+		this.applyRowChange([...this.rows, createNextRow(this.rows, createRow)]);
 	}
 
 	setRowCount(targetCount: number, createRow: () => TRow, maxRows: number): void {

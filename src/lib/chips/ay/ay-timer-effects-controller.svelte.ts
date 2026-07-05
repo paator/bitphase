@@ -1,3 +1,4 @@
+import { cloneRowValue, createNextRow } from '../../components/RowEditorTable/row-list-operations';
 import { Instrument } from '../../models/song';
 import {
 	createDefaultAyTimerRow,
@@ -192,7 +193,11 @@ export class AyTimerEffectsController {
 	}
 
 	addTimerRow(): void {
-		this.updateTimerRows([...this.fields.timerRows, createDefaultAyTimerRow()]);
+		const rows = this.fields.timerRows;
+		this.updateTimerRows([
+			...rows,
+			createNextRow(rows, createDefaultAyTimerRow)
+		]);
 	}
 
 	setTimerRowCount(targetCount: number): void {
@@ -203,9 +208,13 @@ export class AyTimerEffectsController {
 		}
 		let nextRows: AyTimerRow[];
 		if (count > currentRows.length) {
+			const toAdd = count - currentRows.length;
+			const sourceRow = currentRows.length > 0 ? currentRows[currentRows.length - 1] : null;
 			nextRows = [
 				...currentRows,
-				...Array.from({ length: count - currentRows.length }, () => createDefaultAyTimerRow())
+				...(sourceRow !== null
+					? Array.from({ length: toAdd }, () => cloneRowValue(sourceRow))
+					: Array.from({ length: toAdd }, createDefaultAyTimerRow))
 			];
 		} else {
 			nextRows = currentRows.slice(0, count);
