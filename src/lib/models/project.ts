@@ -18,17 +18,20 @@ class Table {
 	rows: number[];
 	loop: number;
 	name: string;
+	additive: boolean;
 
 	constructor(
 		id: number,
 		rows: number[],
 		loop: number,
-		name: string = `Table ${(id + 1).toString(36).toUpperCase()}`
+		name: string = `Table ${(id + 1).toString(36).toUpperCase()}`,
+		additive: boolean = false
 	) {
 		this.id = id;
 		this.rows = rows;
 		this.loop = loop;
 		this.name = name;
+		this.additive = additive;
 	}
 }
 

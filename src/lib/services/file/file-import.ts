@@ -62,7 +62,8 @@ function reconstructTable(data: any): Table {
 		data.id ?? 0,
 		data.rows || [],
 		data.loop || 0,
-		data.name || `Table ${((data.id ?? 0) + 1).toString(36).toUpperCase()}`
+		data.name || `Table ${((data.id ?? 0) + 1).toString(36).toUpperCase()}`,
+		data.additive === true
 	);
 }
 

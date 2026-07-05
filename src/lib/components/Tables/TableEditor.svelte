@@ -58,6 +58,12 @@
 	const showOffsetGrid = $derived(isExpanded);
 	const showOctaveGrid = $derived(isExpanded);
 	const tableColSpan = $derived(showOffsetGrid ? 29 : 4);
+	const isAdditive = $derived(table.additive);
+
+	function setAdditive(additive: boolean): void {
+		if (isAdditive === additive) return;
+		onTableChange({ ...table, additive });
+	}
 
 	function ensureNonEmptyRows(rowsArray: number[]): number[] {
 		return rowsArray.length === 0 ? [0] : rowsArray;
@@ -276,6 +282,19 @@
 	bind:this={editorContainerRef}
 	tabindex="-1">
 	<RowEditorNameField bind:name={editorSync.name} class="mb-2" />
+
+	<div class="mb-2 ml-2 flex flex-wrap items-center gap-4">
+		<label class="flex cursor-pointer items-center gap-1.5 select-none">
+			<input
+				type="checkbox"
+				class="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] text-[var(--color-app-primary)] focus:ring-2 focus:ring-[var(--color-app-primary)]"
+				checked={isAdditive}
+				title="Each row value adds to the running offset while the table plays"
+				onchange={(event) =>
+					setAdditive((event.currentTarget as HTMLInputElement).checked)} />
+			<span class="text-xs text-[var(--color-app-text-muted)]">Additive</span>
+		</label>
+	</div>
 
 	<div class="flex items-start gap-2 overflow-x-auto">
 		<div class="relative flex flex-col">

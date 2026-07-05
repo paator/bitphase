@@ -39,6 +39,12 @@ describe('Table', () => {
 			expect(table.rows).toEqual([1, 2, 3]);
 			expect(table.loop).toBe(1);
 			expect(table.name).toBe('Table 1');
+			expect(table.additive).toBe(false);
+		});
+
+		it('should create table with additive mode', () => {
+			const table = new Table(0, [1], 0, 'Slide', true);
+			expect(table.additive).toBe(true);
 		});
 
 		it('should create table with custom name', () => {

@@ -108,7 +108,7 @@ export class HistoryClone {
 	}
 
 	static table(table: Table): Table {
-		return new Table(table.id, [...table.rows], table.loop, table.name);
+		return new Table(table.id, [...table.rows], table.loop, table.name, table.additive);
 	}
 
 	static instrument(instrument: Instrument): Instrument {

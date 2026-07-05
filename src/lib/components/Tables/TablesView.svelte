@@ -221,7 +221,13 @@
 		const existingIds = tables.map((t) => t.id);
 		const newId = getNextAvailableTableId(existingIds);
 		if (newId < 0) return;
-		const copy = new TableModel(newId, [...table.rows], table.loop, table.name + ' (Copy)');
+		const copy = new TableModel(
+			newId,
+			[...table.rows],
+			table.loop,
+			table.name + ' (Copy)',
+			table.additive
+		);
 		const beforeTables = projectStore.cloneForHistory(projectStore.tables);
 		projectStore.tables = [...tables, copy];
 		sortTablesAndSyncSelection(newId);
@@ -323,6 +329,7 @@
 		downloadJson(`table-${tableIdToDisplayChar(table.id)}.json`, {
 			name: table.name,
 			loop: table.loop,
+			additive: table.additive,
 			rows: table.rows
 		});
 	}
@@ -344,13 +351,15 @@
 			const o = item as Record<string, unknown>;
 			const rows = (o.rows as number[]).map((n) => (typeof n === 'number' ? n : 0));
 			const loop = typeof o.loop === 'number' ? o.loop : 0;
+			const additive = o.additive === true;
 			const name = o.name != null ? String(o.name) : '';
 			const currentId = tables[selectedTableIndex]?.id ?? 0;
 			const replacement = new TableModel(
 				currentId,
 				rows,
 				loop,
-				name || `Table ${tableIdToDisplayChar(currentId)}`
+				name || `Table ${tableIdToDisplayChar(currentId)}`,
+				additive
 			);
 			const beforeTables = projectStore.cloneForHistory(projectStore.tables);
 			const updated = [...tables];

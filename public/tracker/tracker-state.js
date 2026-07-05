@@ -5,6 +5,7 @@ const CHANNEL_ARRAY_SPECS = [
 	['channelTables', -1],
 	['tablePositions', 0],
 	['tableCounters', 0],
+	['tableAccumulators', 0],
 	['channelBaseNotes', 0],
 	['channelCurrentNotes', 0],
 	['channelToneSliding', 0],

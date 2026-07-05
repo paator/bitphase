@@ -69,7 +69,7 @@ class TrackerPatternProcessor {
 				continue;
 			}
 
-			const tableOffset = table.rows[this.state.tablePositions[channelIndex]];
+			const tableOffset = this._getTableOffset(channelIndex, table);
 			let finalNote = baseNote + tableOffset;
 
 			const maxNote = this.state.currentTuningTable.length - 1;
@@ -117,8 +117,7 @@ class TrackerPatternProcessor {
 			this.state.channelCurrentNotes[channelIndex] = noteValue;
 
 			if (this.state.channelTables[channelIndex] >= 0) {
-				this.state.tablePositions[channelIndex] = 0;
-				this.state.tableCounters[channelIndex] = 0;
+				this._resetTableChannelState(channelIndex);
 			}
 
 			const hasPortamentoCommand = effects.some(
@@ -190,16 +189,30 @@ class TrackerPatternProcessor {
 
 	_disableTable(channelIndex) {
 		this.state.channelTables[channelIndex] = -1;
-		this.state.tablePositions[channelIndex] = 0;
-		this.state.tableCounters[channelIndex] = 0;
+		this._resetTableChannelState(channelIndex);
 	}
 
 	_enableTable(channelIndex, tableIndex) {
 		if (this.state.getTable(tableIndex)) {
 			this.state.channelTables[channelIndex] = tableIndex;
-			this.state.tablePositions[channelIndex] = 0;
-			this.state.tableCounters[channelIndex] = 0;
+			this._resetTableChannelState(channelIndex);
 		}
+	}
+
+	_resetTableChannelState(channelIndex) {
+		this.state.tablePositions[channelIndex] = 0;
+		this.state.tableCounters[channelIndex] = 0;
+		this.state.tableAccumulators[channelIndex] = 0;
+	}
+
+	_getTableOffset(channelIndex, table) {
+		const position = this.state.tablePositions[channelIndex];
+		const rowValue = table.rows[position] ?? 0;
+		if (table.additive) {
+			this.state.tableAccumulators[channelIndex] += rowValue;
+			return this.state.tableAccumulators[channelIndex];
+		}
+		return rowValue;
 	}
 
 	_processVolume(channelIndex, row) {
@@ -392,6 +405,7 @@ class TrackerPatternProcessor {
 
 	_initChannelOrnamentPosition(channelIndex, effect) {
 		this.state.tablePositions[channelIndex] = effect.parameter & 0xff;
+		this.state.tableAccumulators[channelIndex] = 0;
 	}
 
 	_initEffectTable(channelIndex, effect) {

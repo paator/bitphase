@@ -262,7 +262,8 @@ export class AYProcessor
 			id: o.id,
 			rows: Array.from(o.rows),
 			loop: o.loop,
-			name: o.name
+			name: o.name,
+			additive: o.additive
 		}));
 		this.bridge.sendCommand({ type: 'init_tables', tables: sanitized });
 	}

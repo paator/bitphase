@@ -168,6 +168,41 @@ describe('TrackerPatternProcessor', () => {
 			proc.processTables();
 			expect(state.channelCurrentNotes[0]).toBe(0);
 		});
+
+		it('additive table accumulates offset across ticks and loops', () => {
+			const state = createMockState();
+			state.currentTuningTable = Array.from({ length: 12 }, (_, i) => 1000 - i);
+			state.setTables([{ id: 0, rows: [1], loop: 0, name: 'T0', additive: true }]);
+			state.channelTables = [0, -1, -1];
+			state.channelBaseNotes = [1, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.tablePositions = [0, 0, 0];
+			state.tableCounters = [0, 0, 0];
+			state.tableAccumulators = [0, 0, 0];
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			proc.processTables();
+			expect(state.channelCurrentNotes[0]).toBe(2);
+			proc.processTables();
+			expect(state.channelCurrentNotes[0]).toBe(3);
+		});
+
+		it('non-additive table keeps absolute offsets', () => {
+			const state = createMockState();
+			state.currentTuningTable = Array.from({ length: 12 }, (_, i) => 1000 - i);
+			state.setTables([{ id: 0, rows: [1, 3], loop: 0, name: 'T0', additive: false }]);
+			state.channelTables = [0, -1, -1];
+			state.channelBaseNotes = [1, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.tablePositions = [0, 0, 0];
+			state.tableCounters = [0, 0, 0];
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			proc.processTables();
+			expect(state.channelCurrentNotes[0]).toBe(2);
+			proc.processTables();
+			expect(state.channelCurrentNotes[0]).toBe(4);
+		});
 	});
 
 	describe('parsePatternRow effect and volume', () => {

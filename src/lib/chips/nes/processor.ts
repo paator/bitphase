@@ -173,7 +173,8 @@ export class NESProcessor
 			id: table.id,
 			rows: Array.from(table.rows),
 			loop: table.loop,
-			name: table.name
+			name: table.name,
+			additive: table.additive
 		}));
 		this.bridge.sendCommand({ type: 'init_tables', tables: sanitized });
 	}
