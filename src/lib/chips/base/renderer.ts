@@ -76,4 +76,3 @@ export interface ChipRenderer {
 		session: SharedTimelineExportBuildSession
 	): Promise<SharedTimelineExportLaneHandle>;
 }
-

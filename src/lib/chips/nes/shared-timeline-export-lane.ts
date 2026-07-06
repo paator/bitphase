@@ -84,6 +84,9 @@ function createNesLaneHandle(
 			patternProcessor.processArpeggio();
 			patternProcessor.processEffectTables();
 			audioDriver.processInstruments(state, registerState);
+			audioDriver.advancePulseWidthTable(state);
+			audioDriver.advanceSweepTable(state);
+			audioDriver.syncSweepTableRegisterState(state, registerState);
 			patternProcessor.processVibrato();
 			patternProcessor.processSlides();
 			apuEngine.applyRegisterState(registerState);

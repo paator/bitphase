@@ -62,6 +62,21 @@ describe('NesAudioDriver envelope and length macro', () => {
 		expect(registerState.channels[0].lengthNibble).toBe(buildLengthCounterNibble(40));
 	});
 
+	it('uses pulse width cycle override on square channels', () => {
+		const driver = new NesAudioDriver();
+		const registerState = new NesChipRegisterState();
+		const state = createEnvelopeState();
+		state.channelPulseWidthCycleActive = [true, false, false, false, false];
+		state.channelPulseWidthCurrent = [1, 0, 0, 0, 0];
+
+		driver.processInstruments(state, registerState);
+
+		expect(registerState.channels[0].duty).toBe(1);
+		expect(registerState.channels[0].volumeReg).toBe(
+			buildSquareEnvelopeVolumeReg(1, true, 6, 40)
+		);
+	});
+
 	it('uses triangle linear counter for short sound lengths', () => {
 		const driver = new NesAudioDriver();
 		const registerState = new NesChipRegisterState();

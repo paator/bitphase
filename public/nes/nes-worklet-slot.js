@@ -86,6 +86,33 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		}
 	}
 
+	_processTrackerTick() {
+		this.patternProcessor.processTables();
+		this.patternProcessor.processArpeggio();
+		this.patternProcessor.processEffectTables();
+		this.audioDriver.processInstruments(this.state, this.registerState);
+		this.audioDriver.advancePulseWidthTable(this.state);
+		this.audioDriver.advanceSweepTable(this.state);
+		this.audioDriver.syncSweepTableRegisterState(this.state, this.registerState);
+		this.patternProcessor.processVibrato();
+		this.patternProcessor.processSlides();
+	}
+
+	runPreviewStep() {
+		this.previewTickSampleCounter++;
+		if (this.previewTickSampleCounter >= this.state.timeline.samplesPerTick) {
+			this.previewTickSampleCounter = 0;
+			this.patternProcessor.processTables();
+			if (this.state.channelInstruments) {
+				this.audioDriver.processInstruments(this.state, this.registerState);
+				this.audioDriver.advancePulseWidthTable(this.state);
+				this.audioDriver.advanceSweepTable(this.state);
+				this.audioDriver.syncSweepTableRegisterState(this.state, this.registerState);
+			}
+		}
+		this._applyRegisterStateToEngine();
+	}
+
 	resetChannelWaveformCapture() {
 		for (const buf of this.channelWaveformBuf) {
 			buf.fill(0);

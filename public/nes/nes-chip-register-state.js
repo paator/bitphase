@@ -9,6 +9,7 @@ function createDefaultChannel() {
 		duty: 2,
 		retrigger: false,
 		sweepReg: NES_SQUARE_SWEEP_DISABLED,
+		sweepUpdateOnly: false,
 		noisePeriod: 0,
 		noiseMode: false,
 		volumeReg: NES_REGISTER_UNCHANGED,

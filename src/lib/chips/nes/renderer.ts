@@ -46,6 +46,9 @@ type NesSlotLane = {
 	};
 	audioDriver: {
 		processInstruments: (state: unknown, registerState: unknown) => void;
+		advancePulseWidthTable: (state: unknown) => void;
+		advanceSweepTable: (state: unknown) => void;
+		syncSweepTableRegisterState: (state: unknown, registerState: unknown) => void;
 	};
 	apuEngine: {
 		applyRegisterState: (registerState: unknown) => void;
@@ -271,6 +274,9 @@ export class NESChipRenderer implements ChipRenderer {
 				lane.patternProcessor.processArpeggio();
 				lane.patternProcessor.processEffectTables();
 				lane.audioDriver.processInstruments(lane.state, lane.registerState);
+				lane.audioDriver.advancePulseWidthTable(lane.state);
+				lane.audioDriver.advanceSweepTable(lane.state);
+				lane.audioDriver.syncSweepTableRegisterState(lane.state, lane.registerState);
 				lane.patternProcessor.processVibrato();
 				lane.patternProcessor.processSlides();
 				lane.apuEngine.applyRegisterState(lane.registerState);
@@ -364,6 +370,9 @@ export class NESChipRenderer implements ChipRenderer {
 					ctx.patternProcessor.processArpeggio();
 					ctx.patternProcessor.processEffectTables();
 					ctx.audioDriver.processInstruments(ctx.state, ctx.registerState);
+					ctx.audioDriver.advancePulseWidthTable(ctx.state);
+					ctx.audioDriver.advanceSweepTable(ctx.state);
+					ctx.audioDriver.syncSweepTableRegisterState(ctx.state, ctx.registerState);
 					ctx.patternProcessor.processVibrato();
 					ctx.patternProcessor.processSlides();
 					ctx.apuEngine.applyRegisterState(ctx.registerState);

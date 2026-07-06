@@ -15,7 +15,19 @@ const NES_CHANNEL_ARRAY_SPECS = [
 	['channelMuted', false],
 	['channelSoundEnabled', false],
 	['channelKeyOn', false],
-	['channelToneAccumulator', 0]
+	['channelToneAccumulator', 0],
+	['channelPulseWidthCycleActive', false],
+	['channelPulseWidthCurrent', 0],
+	['channelPulseWidthTableMode', false],
+	['channelPulseWidthTableIndex', -1],
+	['channelPulseWidthTablePosition', 0],
+	['channelSweepOverrideActive', false],
+	['channelSweepOverrideReg', 0x08],
+	['channelSweepTableMode', false],
+	['channelSweepTableIndex', -1],
+	['channelSweepTablePosition', 0],
+	['channelSweepDown', false],
+	['channelSweepTableTick', false]
 ];
 
 class NesState extends TrackerState {

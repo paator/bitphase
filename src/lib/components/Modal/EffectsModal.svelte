@@ -162,6 +162,65 @@
 	];
 </script>
 
+{#snippet effectSection(title: string, first = false)}
+	<h2
+		class="{first
+			? 'mb-3'
+			: 'mb-3 mt-8'} border-b border-[var(--color-app-border)] pb-2 text-lg font-bold text-[var(--color-app-text-primary)]">
+		{title}
+	</h2>
+{/snippet}
+
+{#snippet effectCard(effect: (typeof effects)[number])}
+	<div
+		class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+		<div class="mb-2 flex items-center gap-2">
+			<code
+				class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+				{effect.code}
+			</code>
+			<h3 class="font-bold text-[var(--color-app-text-primary)]">
+				{effect.name}
+			</h3>
+		</div>
+		<p class="mb-3 text-[var(--color-app-text-secondary)]">
+			{effect.description}
+		</p>
+
+		<div class="mb-2 space-y-1">
+			<div>
+				<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+				<code class="ml-2 font-mono"
+					>{#each getFormatSegments(effect.format) as seg}
+						<span style="color: {seg.color}">{seg.char}</span>{/each}</code>
+			</div>
+
+			<div>
+				<span class="font-medium text-[var(--color-app-text-primary)]">Delay:</span>
+				<span class="ml-2 text-[var(--color-app-text-secondary)]">{effect.delay}</span>
+			</div>
+			<div>
+				<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+				<span class="ml-2 text-[var(--color-app-text-secondary)]">{effect.parameter}</span>
+			</div>
+			<div>
+				<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+				<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">{effect.example}</code>
+			</div>
+			{#if effect.formatWithTable}
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">With Table:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>{#each getFormatSegments(effect.formatWithTable) as seg}
+							<span style="color: {seg.color}">{seg.char}</span>{/each}</code>
+					<span class="font-medium text-[var(--color-app-text-secondary)]"
+						>{effect.tableDescription}</span>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
 <ModalPanel
 	title="Effects Reference"
 	width="w-[700px] max-w-[90vw]"
@@ -194,75 +253,22 @@
 			</p>
 		</div>
 
+		{@render effectSection('General', true)}
+
 		<div class="space-y-4">
 			{#each effects as effect}
-				<div
-					class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
-					<div class="mb-2 flex items-center gap-2">
-						<code
-							class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
-							{effect.code}
-						</code>
-						<h3 class="font-bold text-[var(--color-app-text-primary)]">
-							{effect.name}
-						</h3>
-					</div>
-					<p class="mb-3 text-[var(--color-app-text-secondary)]">
-						{effect.description}
-					</p>
-
-					<div class="mb-2 space-y-1">
-						<div>
-							<span class="font-medium text-[var(--color-app-text-primary)]"
-								>Format:</span>
-							<code class="ml-2 font-mono"
-								>{#each getFormatSegments(effect.format) as seg}
-									<span style="color: {seg.color}">{seg.char}</span>{/each}</code>
-						</div>
-
-						<div>
-							<span class="font-medium text-[var(--color-app-text-primary)]"
-								>Delay:</span>
-							<span class="ml-2 text-[var(--color-app-text-secondary)]"
-								>{effect.delay}</span>
-						</div>
-						<div>
-							<span class="font-medium text-[var(--color-app-text-primary)]"
-								>Parameter:</span>
-							<span class="ml-2 text-[var(--color-app-text-secondary)]"
-								>{effect.parameter}</span>
-						</div>
-						<div>
-							<span class="font-medium text-[var(--color-app-text-primary)]"
-								>Example:</span>
-							<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-								>{effect.example}</code>
-						</div>
-						{#if effect.formatWithTable}
-							<div>
-								<span class="font-medium text-[var(--color-app-text-primary)]"
-									>With Table:</span>
-								<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-									>{#each getFormatSegments(effect.formatWithTable) as seg}
-										<span style="color: {seg.color}">{seg.char}</span
-										>{/each}</code>
-								<span class="font-medium text-[var(--color-app-text-secondary)]"
-									>{effect.tableDescription}</span>
-							</div>
-						{/if}
-					</div>
-				</div>
+				{@render effectCard(effect)}
 			{/each}
 		</div>
 
-		<div
-			class="mt-6 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
-			<h3 class="mb-2 font-bold text-[var(--color-app-text-primary)]">Envelope Effects</h3>
-			<p class="mb-2 text-[var(--color-app-text-secondary)]">
+		{@render effectSection('AY-3-8910 / YM2149F')}
+
+		<div class="mb-4 text-[var(--color-app-text-secondary)]">
+			<p class="mb-2">
 				Envelope effects use the same effect codes as regular effects but are entered in the
 				envelope effect column.
 			</p>
-			<p class="mb-2 text-[var(--color-app-text-secondary)]">
+			<p>
 				Format:
 				<code class="rounded bg-[var(--color-app-surface)] px-1 py-0.5 font-mono">
 					{#each getFormatSegments('AXYZ') as seg}
@@ -279,20 +285,18 @@
 		</div>
 
 		<div
-			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
 			<div class="mb-2 flex items-center gap-2">
 				<code
 					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
 					EA
 				</code>
-				<h3 class="font-bold text-[var(--color-app-text-primary)]">
-					Auto-Envelope (envelope effect only)
-				</h3>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Auto-Envelope</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Automatically calculates the envelope period from channel notes using a ratio. When
-				active, you only need to set the envelope shape in the channel column - the envelope
-				value is computed in real-time from the playing note.
+				Automatically calculates the envelope period from channel notes using a ratio. When active,
+				you only need to set the envelope shape in the channel column - the envelope value is
+				computed in real-time from the playing note. Enter in the envelope effect column only.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
@@ -328,6 +332,170 @@
 						note changes from arpeggio and tables in real-time.</span>
 				</div>
 			</div>
+		</div>
+
+		{@render effectSection('2A03 / 2A07')}
+
+		<div class="space-y-4">
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E1
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Pulse Width</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists until note off
+				or a row with a different effect.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>1</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
+					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>1</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
+							>X</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Delay:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">N/A (1 is sub-command)</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - fixed pulse width index (00 = 12.5%, 01 = 25%, 02 = 50%, 03 = 75%)</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - reads pulse width indices from table X each tick, looping at the table loop
+						point</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E100 - Set pulse width to 12.5%</code>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E1T1 - Automate pulse width from table 1 each tick</code>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E2
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Sweep Up</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Enables hardware pitch sweep up on Pulse 1 and Pulse 2. Persists until note off, disable
+				command, or a row with a different effect.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>2</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
+					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>2</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
+							>X</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - X = sweep time (0–7), Y = shift amount (0–7). Use Y = 0 to disable.</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - reads sweep time/shift bytes from table X each tick, looping at the table loop
+						point. Each table value uses the same XY encoding.</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E247 - Sweep up, time 4, shift 7</code>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E2T1 - Automate sweep up from table 1 each tick</code>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E200 - Disable sweep</code>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E3
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Sweep Down</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Enables hardware pitch sweep down on Pulse 1 and Pulse 2. Same format as E2.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>3</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
+					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>3</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
+							>X</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - X = sweep time (0–7), Y = shift amount (0–7). Use Y = 0 to disable.</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - reads sweep time/shift bytes from table X each tick, looping at the table loop
+						point. Each table value uses the same XY encoding.</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E317 - Sweep down, time 1, shift 7</code>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E3T1 - Automate sweep down from table 1 each tick</code>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E300 - Disable sweep</code>
+				</div>
+			</div>
+		</div>
 		</div>
 	{/snippet}
 

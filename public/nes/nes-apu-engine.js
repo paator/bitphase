@@ -204,14 +204,22 @@ class NesApuEngine {
 				? NES_SQUARE_SWEEP_DISABLED
 				: channel.sweepReg;
 		const sweepChanged = last.sweepReg !== sweepReg;
+		const sweepUpdateOnly = channel.sweepUpdateOnly === true;
+		const sweepActive = sweepReg !== NES_SQUARE_SWEEP_DISABLED;
 		const sweepRetrigger =
-			triggerChannel && sweepReg !== NES_SQUARE_SWEEP_DISABLED;
+			sweepActive && (triggerChannel || channel.retrigger) && !sweepUpdateOnly;
+		const sweepChannelRetrigger = sweepChanged && !sweepUpdateOnly;
 		if (forceApply || sweepChanged || sweepRetrigger) {
 			this.wasmModule.nes_apu_Write(this.apuPtr, base + 1, sweepReg);
 			last.sweepReg = sweepReg;
 		}
 
-		if (forceApply || periodLow !== (last.period & 0xff) || sweepChanged) {
+		if (
+			forceApply ||
+			periodLow !== (last.period & 0xff) ||
+			sweepChannelRetrigger ||
+			(channel.retrigger && sweepActive && !sweepUpdateOnly)
+		) {
 			this.wasmModule.nes_apu_Write(this.apuPtr, base + 2, periodLow);
 		}
 
@@ -220,7 +228,7 @@ class NesApuEngine {
 			triggerChannel ||
 			channel.retrigger ||
 			periodHigh !== lastPeriodHigh ||
-			sweepChanged ||
+			sweepChannelRetrigger ||
 			(channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
 				lengthNibble !== lastLengthNibble)
 		) {

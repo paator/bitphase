@@ -27,6 +27,16 @@ import {
 	usesTriangleLinearCounter
 } from './nes-instrument-utils.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
+import {
+	advanceNesPulseWidthTable,
+	processNesPulseWidthCycleEffect,
+	resetNesChannelPulseWidthCycle
+} from './nes-pulse-width-cycle.js';
+import {
+	processNesSweepEffect,
+	resetNesChannelSweepOverride,
+	advanceNesSweepTable
+} from './nes-sweep-effect.js';
 
 const NES_NOISE_PERIOD_COUNT = 16;
 
@@ -52,6 +62,8 @@ class NesAudioDriver {
 			} else {
 				this._processNote(state, channelIndex, row);
 				this._processInstrument(state, channelIndex, row);
+				processNesPulseWidthCycleEffect(state, channelIndex, row);
+				processNesSweepEffect(state, channelIndex, row);
 			}
 		}
 	}
@@ -80,7 +92,7 @@ class NesAudioDriver {
 		}
 	}
 
-	_applyEnvelopeAndLength(channel, channelIndex, row, patternVolume) {
+	_applyEnvelopeAndLength(channel, channelIndex, row, patternVolume, state) {
 		const combinedVolume = this.calculateVolume(patternVolume, row.volumeOrRate);
 		const volumeNibble = resolveEnvelopeVolumeOrRate(
 			row.envelope,
@@ -91,13 +103,17 @@ class NesAudioDriver {
 		channel.volume = combinedVolume;
 
 		if (channelIndex <= 1) {
+			const pulseWidth =
+				state.channelPulseWidthCycleActive?.[channelIndex] === true
+					? (state.channelPulseWidthCurrent[channelIndex] ?? row.pulseWidth)
+					: row.pulseWidth;
 			channel.volumeReg = buildSquareEnvelopeVolumeReg(
-				row.pulseWidth,
+				pulseWidth,
 				row.envelope,
 				volumeNibble,
 				row.soundLength
 			);
-			channel.duty = row.pulseWidth;
+			channel.duty = pulseWidth;
 			channel.lengthNibble = buildLengthCounterNibble(row.soundLength);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		} else if (channelIndex === 2) {
@@ -152,6 +168,8 @@ class NesAudioDriver {
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = false;
 			this._resetToneAccumulator(state, channelIndex);
+			resetNesChannelPulseWidthCycle(state, channelIndex);
+			resetNesChannelSweepOverride(state, channelIndex);
 		} else if (row.note.name !== 0) {
 			state.channelSoundEnabled[channelIndex] = true;
 			state.instrumentPositions[channelIndex] = 0;
@@ -226,13 +244,17 @@ class NesAudioDriver {
 					: basePeriod;
 			const keyOn = state.channelKeyOn[channelIndex];
 
-			this._applyEnvelopeAndLength(channel, channelIndex, row, patternVolume);
+			this._applyEnvelopeAndLength(channel, channelIndex, row, patternVolume, state);
 			const audible = this._isChannelAudible(row, patternVolume, combinedVolume);
 
 			if (channelIndex <= 1) {
 				channel.enabled = period > 0 && audible;
 				channel.period = period;
-				channel.sweepReg = buildSquareSweepReg(row.sweep, row.sweepRate, row.sweepShift);
+				channel.sweepUpdateOnly = false;
+				channel.sweepReg =
+					state.channelSweepOverrideActive?.[channelIndex] === true
+						? state.channelSweepOverrideReg[channelIndex]
+						: buildSquareSweepReg(row.sweep, row.sweepRate, row.sweepShift);
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
 			} else if (channelIndex === 2) {
@@ -259,6 +281,27 @@ class NesAudioDriver {
 		}
 
 		processChannelOnOffCounters(state, NES_CHANNEL_COUNT);
+	}
+
+	advancePulseWidthTable(state) {
+		advanceNesPulseWidthTable(state);
+	}
+
+	advanceSweepTable(state) {
+		advanceNesSweepTable(state);
+	}
+
+	syncSweepTableRegisterState(state, registerState) {
+		for (let channelIndex = 0; channelIndex < 2; channelIndex++) {
+			if (!state.channelSweepTableTick?.[channelIndex]) continue;
+			const channel = registerState.channels[channelIndex];
+			if (!channel) continue;
+			if (state.channelSweepOverrideActive?.[channelIndex] === true) {
+				channel.sweepReg = state.channelSweepOverrideReg[channelIndex];
+				channel.sweepUpdateOnly = true;
+			}
+			state.channelSweepTableTick[channelIndex] = false;
+		}
 	}
 }
 

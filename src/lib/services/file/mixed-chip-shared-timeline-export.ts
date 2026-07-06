@@ -174,7 +174,9 @@ export async function renderMixedChipSharedTimelineSlots(
 	}
 }
 
-export function isMixedChipSharedTimelineExport(slots: readonly SharedTimelineExportSlot[]): boolean {
+export function isMixedChipSharedTimelineExport(
+	slots: readonly SharedTimelineExportSlot[]
+): boolean {
 	if (slots.length < 2) return false;
 	const firstKind = slots[0]?.audioSlotKind;
 	return slots.some((slot) => slot.audioSlotKind !== firstKind);

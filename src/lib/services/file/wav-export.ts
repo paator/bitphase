@@ -43,11 +43,7 @@ function writeString(view: DataView, offset: number, string: string) {
 	}
 }
 
-function resampleAudio(
-	channels: Float32Array[],
-	fromRate: number,
-	toRate: number
-): Float32Array[] {
+function resampleAudio(channels: Float32Array[], fromRate: number, toRate: number): Float32Array[] {
 	if (fromRate === toRate) {
 		return channels;
 	}
@@ -211,8 +207,7 @@ class WavExportService {
 
 		if (isMixedChipSharedTimelineExport(sharedSlots)) {
 			onProgress?.(2, 'Rendering songs with shared project playback timeline...');
-			const resolveChip =
-				getChip ?? (await getRegistry()).getChipByType;
+			const resolveChip = getChip ?? (await getRegistry()).getChipByType;
 			const parts = await renderMixedChipSharedTimelineSlots(
 				project,
 				sharedSlots,
@@ -243,8 +238,7 @@ class WavExportService {
 		songIndex: number,
 		getChipOverride?: (chipType: string) => Chip | null
 	): Promise<Chip> {
-		const resolveChip =
-			getChipOverride ?? (await getRegistry()).getChipByType;
+		const resolveChip = getChipOverride ?? (await getRegistry()).getChipByType;
 		const song = project.songs[songIndex];
 
 		if (song?.chipType) {
@@ -346,7 +340,8 @@ class WavExportService {
 			project,
 			songIndex,
 			(progress, message) => {
-				const mappedProgress = progressStart + 5 + (progress / 100) * (progressEnd - progressStart - 5);
+				const mappedProgress =
+					progressStart + 5 + (progress / 100) * (progressEnd - progressStart - 5);
 				onProgress?.(mappedProgress, `Song ${songIndex + 1}/${totalSongs}: ${message}`);
 			},
 			{

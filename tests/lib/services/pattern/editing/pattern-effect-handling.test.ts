@@ -128,5 +128,64 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.tableIndex).toBe(2);
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6.T3');
 		});
+
+		it('E1XY pulse width effect parses and formats', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E102');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe('E'.charCodeAt(0));
+			expect(parsed!.delay).toBe(1);
+			expect(parsed!.parameter).toBe(0x02);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E102');
+		});
+
+		it('E100 formats zero parameter as dots', () => {
+			const effect = {
+				effect: 'E'.charCodeAt(0),
+				delay: 1,
+				parameter: 0
+			};
+			expect(PatternEffectHandling.formatEffectAsString(effect)).toBe('E1..');
+			expect(PatternEffectHandling.formatEffectAsString(
+				PatternEffectHandling.parseEffectFromString('E100')!
+			)).toBe('E1..');
+		});
+
+		it('E1TX pulse width table effect parses and formats', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E1T1');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe('E'.charCodeAt(0));
+			expect(parsed!.delay).toBe(1);
+			expect(parsed!.parameter).toBe(0);
+			expect(parsed!.tableIndex).toBe(0);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E1T1');
+		});
+
+		it('E2XY and E3XY sweep effects parse and format', () => {
+			const up = PatternEffectHandling.parseEffectFromString('E247');
+			expect(up).not.toBeNull();
+			expect(up!.delay).toBe(2);
+			expect(up!.parameter).toBe(0x47);
+			expect(PatternEffectHandling.formatEffectAsString(up!)).toBe('E247');
+
+			const down = PatternEffectHandling.parseEffectFromString('E317');
+			expect(down).not.toBeNull();
+			expect(down!.delay).toBe(3);
+			expect(down!.parameter).toBe(0x17);
+			expect(PatternEffectHandling.formatEffectAsString(down!)).toBe('E317');
+		});
+
+		it('E2TX and E3TX sweep table effects parse and format', () => {
+			const up = PatternEffectHandling.parseEffectFromString('E2T1');
+			expect(up).not.toBeNull();
+			expect(up!.delay).toBe(2);
+			expect(up!.tableIndex).toBe(0);
+			expect(PatternEffectHandling.formatEffectAsString(up!)).toBe('E2T1');
+
+			const down = PatternEffectHandling.parseEffectFromString('E3T2');
+			expect(down).not.toBeNull();
+			expect(down!.delay).toBe(3);
+			expect(down!.tableIndex).toBe(1);
+			expect(PatternEffectHandling.formatEffectAsString(down!)).toBe('E3T2');
+		});
 	});
 });
