@@ -173,7 +173,7 @@ describe('NES WAV export pulse width', () => {
 		pattern.channels[0].rows[0].note = new Note(NoteName.C, 1);
 		pattern.channels[0].rows[0].instrument = 1;
 		pattern.channels[0].rows[0].effects = [
-			new Effect('E'.charCodeAt(0), 1, 0x02)
+			new Effect('E'.charCodeAt(0), 1, 0x03)
 		];
 
 		const instrument = new Instrument(
@@ -226,7 +226,7 @@ describe('NES WAV export pulse width', () => {
 		const lane = await createExportLane(project, pattern);
 		try {
 			const duties = runWavExportTicks(lane, 4);
-			expect(duties).toEqual([0, 2, 3, 2]);
+			expect(duties).toEqual([3, 1, 2, 1]);
 		} finally {
 			lane.engine.dispose();
 		}

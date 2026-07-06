@@ -163,10 +163,6 @@ export function processNesSweepEffect(state, channelIndex, row) {
 		}
 		return;
 	}
-	const rowHasExplicitEffect = effect != null && effect.effect !== 0;
-	if (rowHasExplicitEffect) {
-		resetNesChannelSweepOverride(state, channelIndex);
-	}
 }
 
 export function advanceNesSweepTable(state) {

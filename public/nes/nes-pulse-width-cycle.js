@@ -23,11 +23,27 @@ export function normalizeNesPulseWidthIndex(index) {
 	return ((index % PULSE_WIDTH_COUNT) + PULSE_WIDTH_COUNT) % PULSE_WIDTH_COUNT;
 }
 
+export function applyNesPulseWidthEffectParameter(state, channelIndex, parameter, keepTableMode = false) {
+	if (parameter === 0) {
+		state.channelPulseWidthCycleActive[channelIndex] = false;
+		state.channelPulseWidthCurrent[channelIndex] = 0;
+		if (!keepTableMode) {
+			state.channelPulseWidthTableMode[channelIndex] = false;
+			state.channelPulseWidthTableIndex[channelIndex] = -1;
+			state.channelPulseWidthTablePosition[channelIndex] = 0;
+		}
+		return;
+	}
+
+	state.channelPulseWidthCycleActive[channelIndex] = true;
+	state.channelPulseWidthCurrent[channelIndex] = normalizeNesPulseWidthIndex(parameter - 1);
+}
+
 function readNesPulseWidthTableValue(state, tableIndex, position) {
 	const table = state.getTable?.(tableIndex);
 	const rows = table?.rows ?? [];
 	if (rows.length === 0) return 0;
-	return normalizeNesPulseWidthIndex(rows[position] ?? 0);
+	return rows[position] ?? 0;
 }
 
 function advanceNesPulseWidthTablePosition(table, position) {
@@ -57,15 +73,15 @@ export function resetNesChannelPulseWidthCycle(state, channelIndex) {
 export function processNesPulseWidthCycleEffect(state, channelIndex, row) {
 	const effect = row.effects?.[0];
 	if (isNesPulseWidthCycleEffect(effect)) {
-		state.channelPulseWidthCycleActive[channelIndex] = true;
 		if (isNesPulseWidthTableEffect(effect)) {
 			state.channelPulseWidthTableMode[channelIndex] = true;
 			state.channelPulseWidthTableIndex[channelIndex] = effect.tableIndex;
 			state.channelPulseWidthTablePosition[channelIndex] = 0;
-			state.channelPulseWidthCurrent[channelIndex] = readNesPulseWidthTableValue(
+			applyNesPulseWidthEffectParameter(
 				state,
-				effect.tableIndex,
-				0
+				channelIndex,
+				readNesPulseWidthTableValue(state, effect.tableIndex, 0),
+				true
 			);
 			if (state.channelEffectTables) {
 				state.channelEffectTables[channelIndex] = -1;
@@ -74,15 +90,9 @@ export function processNesPulseWidthCycleEffect(state, channelIndex, row) {
 			state.channelPulseWidthTableMode[channelIndex] = false;
 			state.channelPulseWidthTableIndex[channelIndex] = -1;
 			state.channelPulseWidthTablePosition[channelIndex] = 0;
-			state.channelPulseWidthCurrent[channelIndex] = normalizeNesPulseWidthIndex(
-				effect.parameter
-			);
+			applyNesPulseWidthEffectParameter(state, channelIndex, effect.parameter);
 		}
 		return;
-	}
-	const rowHasExplicitEffect = effect != null && effect.effect !== 0;
-	if (rowHasExplicitEffect) {
-		resetNesChannelPulseWidthCycle(state, channelIndex);
 	}
 }
 
@@ -103,10 +113,11 @@ export function advanceNesPulseWidthTable(state) {
 			state.channelPulseWidthTablePosition[channelIndex]
 		);
 		state.channelPulseWidthTablePosition[channelIndex] = nextPosition;
-		state.channelPulseWidthCurrent[channelIndex] = readNesPulseWidthTableValue(
+		applyNesPulseWidthEffectParameter(
 			state,
-			tableIndex,
-			nextPosition
+			channelIndex,
+			readNesPulseWidthTableValue(state, tableIndex, nextPosition),
+			true
 		);
 	}
 }

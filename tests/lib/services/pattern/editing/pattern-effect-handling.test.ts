@@ -21,13 +21,13 @@ describe('PatternEffectHandling', () => {
 			expect(result).toBe('EA11');
 		});
 
-		it('formats auto-envelope effect with zero delay as E.32', () => {
+		it('formats auto-envelope effect with zero delay as E032', () => {
 			const result = PatternEffectHandling.formatEffectAsString({
 				effect: 'E'.charCodeAt(0),
 				delay: 0,
 				parameter: 0x32
 			});
-			expect(result).toBe('E.32');
+			expect(result).toBe('E032');
 		});
 	});
 
@@ -73,7 +73,7 @@ describe('PatternEffectHandling', () => {
 				parameter: 0x0a,
 				tableIndex: 2
 			});
-			expect(result).toBe('4.0A');
+			expect(result).toBe('400A');
 		});
 
 		it('effect 5 (ornament position) parses 5050 as parameter not table', () => {
@@ -90,7 +90,7 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.tableIndex).toBe(3);
 			expect(parsed!.delay).toBe(0);
 			const formatted = PatternEffectHandling.formatEffectAsString(parsed!);
-			expect(formatted).toBe('S.T4');
+			expect(formatted).toBe('S0T4');
 		});
 
 		it('Speed with table S.T. preserves T when table char is placeholder', () => {
@@ -99,7 +99,7 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.effect).toBe('S'.charCodeAt(0));
 			expect(parsed!.tableIndex).toBe(0);
 			const formatted = PatternEffectHandling.formatEffectAsString(parsed!);
-			expect(formatted).toBe('S.T1');
+			expect(formatted).toBe('S0T1');
 		});
 
 		it('Detune with table D.TG parses table 16 (G)', () => {
@@ -108,16 +108,16 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.effect).toBe('D'.charCodeAt(0));
 			expect(parsed!.tableIndex).toBe(15);
 			const formatted = PatternEffectHandling.formatEffectAsString(parsed!);
-			expect(formatted).toBe('D.TG');
+			expect(formatted).toBe('D0TG');
 		});
 
-		it('effect 6 (on/off) ignores delay digit and formats with dot', () => {
+		it('effect 6 (on/off) ignores delay digit and formats with zero delay', () => {
 			const parsed = PatternEffectHandling.parseEffectFromString('6124');
 			expect(parsed).not.toBeNull();
 			expect(parsed!.effect).toBe(6);
 			expect(parsed!.delay).toBe(0);
 			expect(parsed!.parameter).toBe(0x24);
-			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6.24');
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6024');
 		});
 
 		it('effect 6 with table parses 6.T3', () => {
@@ -126,7 +126,7 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.effect).toBe(6);
 			expect(parsed!.delay).toBe(0);
 			expect(parsed!.tableIndex).toBe(2);
-			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6.T3');
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('60T3');
 		});
 
 		it('E1XY pulse width effect parses and formats', () => {
@@ -138,16 +138,16 @@ describe('PatternEffectHandling', () => {
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E102');
 		});
 
-		it('E100 formats zero parameter as dots', () => {
+		it('E100 formats zero parameter as 00', () => {
 			const effect = {
 				effect: 'E'.charCodeAt(0),
 				delay: 1,
 				parameter: 0
 			};
-			expect(PatternEffectHandling.formatEffectAsString(effect)).toBe('E1..');
+			expect(PatternEffectHandling.formatEffectAsString(effect)).toBe('E100');
 			expect(PatternEffectHandling.formatEffectAsString(
 				PatternEffectHandling.parseEffectFromString('E100')!
-			)).toBe('E1..');
+			)).toBe('E100');
 		});
 
 		it('E1TX pulse width table effect parses and formats', () => {

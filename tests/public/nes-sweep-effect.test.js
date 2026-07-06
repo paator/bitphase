@@ -137,7 +137,7 @@ describe('nes-sweep-effect', () => {
 		expect(state.channelSweepOverrideReg[0]).toBe(NES_SQUARE_SWEEP_DISABLED);
 	});
 
-	it('resets on explicit non-sweep effect', () => {
+	it('persists through other effects', () => {
 		const state = createState();
 		state.channelSweepOverrideActive[0] = true;
 		state.channelSweepTableMode[0] = true;
@@ -145,8 +145,8 @@ describe('nes-sweep-effect', () => {
 		processNesSweepEffect(state, 0, {
 			effects: [{ effect: 1, delay: 0, parameter: 0 }]
 		});
-		expect(state.channelSweepOverrideActive[0]).toBe(false);
-		expect(state.channelSweepTableMode[0]).toBe(false);
+		expect(state.channelSweepOverrideActive[0]).toBe(true);
+		expect(state.channelSweepTableMode[0]).toBe(true);
 	});
 
 	it('persists override on empty rows', () => {

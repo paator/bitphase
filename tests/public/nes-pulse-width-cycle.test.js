@@ -64,11 +64,22 @@ describe('nes-pulse-width-cycle', () => {
 		});
 		expect(state.channelPulseWidthCycleActive[0]).toBe(true);
 		expect(state.channelPulseWidthTableMode[0]).toBe(false);
-		expect(state.channelPulseWidthCurrent[0]).toBe(2);
+		expect(state.channelPulseWidthCurrent[0]).toBe(1);
+	});
+
+	it('resets to instrument duty from E100', () => {
+		const state = createState();
+		state.channelPulseWidthCycleActive[0] = true;
+		state.channelPulseWidthCurrent[0] = 3;
+		processNesPulseWidthCycleEffect(state, 0, {
+			effects: [{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0 }]
+		});
+		expect(state.channelPulseWidthCycleActive[0]).toBe(false);
+		expect(state.channelPulseWidthCurrent[0]).toBe(0);
 	});
 
 	it('initializes table mode from E1TX', () => {
-		const state = createState([{ rows: [0, 2, 3], loop: 1 }]);
+		const state = createState([{ rows: [1, 3, 4], loop: 1 }]);
 		processNesPulseWidthCycleEffect(state, 0, {
 			effects: [
 				{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0, tableIndex: 0 }
@@ -83,7 +94,7 @@ describe('nes-pulse-width-cycle', () => {
 	});
 
 	it('advances table pulse width each tick with loop', () => {
-		const state = createState([{ rows: [0, 2, 3], loop: 1 }]);
+		const state = createState([{ rows: [1, 3, 4], loop: 1 }]);
 		processNesPulseWidthCycleEffect(state, 0, {
 			effects: [
 				{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0, tableIndex: 0 }
@@ -103,16 +114,31 @@ describe('nes-pulse-width-cycle', () => {
 		expect(state.channelPulseWidthCurrent[0]).toBe(2);
 	});
 
+	it('resets instrument duty from table value zero', () => {
+		const state = createState([{ rows: [0, 2, 3], loop: 1 }]);
+		processNesPulseWidthCycleEffect(state, 0, {
+			effects: [
+				{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0, tableIndex: 0 }
+			]
+		});
+		expect(state.channelPulseWidthCycleActive[0]).toBe(false);
+		expect(state.channelPulseWidthTableMode[0]).toBe(true);
+
+		advanceNesPulseWidthTable(state);
+		expect(state.channelPulseWidthCycleActive[0]).toBe(true);
+		expect(state.channelPulseWidthCurrent[0]).toBe(1);
+	});
+
 	it('does not advance fixed E1XY pulse width', () => {
 		const state = createState();
 		processNesPulseWidthCycleEffect(state, 0, {
-			effects: [{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x03 }]
+			effects: [{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x04 }]
 		});
 		advanceNesPulseWidthTable(state);
 		expect(state.channelPulseWidthCurrent[0]).toBe(3);
 	});
 
-	it('resets on explicit non-E1 effect', () => {
+	it('persists through other effects', () => {
 		const state = createState([{ rows: [1, 2], loop: 0 }]);
 		state.channelPulseWidthCycleActive[0] = true;
 		state.channelPulseWidthTableMode[0] = true;
@@ -121,9 +147,9 @@ describe('nes-pulse-width-cycle', () => {
 		processNesPulseWidthCycleEffect(state, 0, {
 			effects: [{ effect: 1, delay: 1, parameter: 5 }]
 		});
-		expect(state.channelPulseWidthCycleActive[0]).toBe(false);
-		expect(state.channelPulseWidthTableMode[0]).toBe(false);
-		expect(state.channelPulseWidthCurrent[0]).toBe(0);
+		expect(state.channelPulseWidthCycleActive[0]).toBe(true);
+		expect(state.channelPulseWidthTableMode[0]).toBe(true);
+		expect(state.channelPulseWidthCurrent[0]).toBe(2);
 	});
 
 	it('keeps fixed pulse width until reset', () => {

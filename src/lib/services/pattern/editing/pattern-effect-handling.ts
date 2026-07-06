@@ -1,5 +1,3 @@
-import { formatHex } from '../../../chips/base/field-formatters';
-
 export type EffectLikeObject = {
 	effect: number;
 	delay: number;
@@ -57,8 +55,7 @@ export class PatternEffectHandling {
 		} else {
 			type = effect.effect.toString(16).toUpperCase();
 		}
-		const noDelay = PatternEffectHandling.effectIgnoresDelay(effect.effect);
-		const delay = noDelay ? '.' : formatHex(effect.delay, 1);
+		const delay = PatternEffectHandling.formatEffectDelay(effect.effect, effect.delay);
 
 		const noTableSyntax =
 			effect.effect === 4 || effect.effect === 5;
@@ -71,8 +68,19 @@ export class PatternEffectHandling {
 			return type + delay + 'T' + tableChar;
 		}
 
-		const param = formatHex(effect.parameter, 2);
+		const param = PatternEffectHandling.formatEffectParameter(effect.parameter);
 		return type + delay + param;
+	}
+
+	private static formatEffectDelay(effect: number, delay: number): string {
+		if (PatternEffectHandling.effectIgnoresDelay(effect)) {
+			return '0';
+		}
+		return (delay ?? 0).toString(16).toUpperCase().padStart(1, '0');
+	}
+
+	private static formatEffectParameter(parameter: number): string {
+		return (parameter ?? 0).toString(16).toUpperCase().padStart(2, '0');
 	}
 
 	static parseEffectFromString(value: string): {

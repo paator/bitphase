@@ -348,7 +348,7 @@
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
 				Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists until note off
-				or a row with a different effect.
+				or a new E1 command. Use E100 to restore the instrument duty cycle.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
@@ -374,20 +374,23 @@
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]"
-						>XY - fixed pulse width index (00 = 12.5%, 01 = 25%, 02 = 50%, 03 = 75%)</span>
+						>XY - 00 restores instrument duty, 01–04 select duty cycles 1–4 (12.5%, 25%, 50%,
+						75%)</span>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]"
-						>TX - reads pulse width indices from table X each tick, looping at the table loop
-						point</span>
+						>TX - reads the same values from table X each tick (0 = instrument duty), looping at
+						the table loop point</span>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E100 - Set pulse width to 12.5%</code>
+						>E100 - Restore instrument duty cycle</code>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E1T1 - Automate pulse width from table 1 each tick</code>
+						>E102 - Set duty cycle 2 (25%)</code>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E1T1 - Automate duty cycle from table 1 each tick</code>
 				</div>
 			</div>
 		</div>
@@ -403,7 +406,7 @@
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
 				Enables hardware pitch sweep up on Pulse 1 and Pulse 2. Persists until note off, disable
-				command, or a row with a different effect.
+				command, or a new E2 command.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
