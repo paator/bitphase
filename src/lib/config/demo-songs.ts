@@ -64,3 +64,9 @@ export async function loadDemoProject(path: string): Promise<Project | null> {
 	const text = await FileImportService.decompressData(blob);
 	return FileImportService.reconstructFromJsonAsync(text);
 }
+
+export const EMPTY_STATE_DEMO_PATH = '../../demo/man.btp';
+
+export function loadEmptyStateDemoProject(): Promise<Project | null> {
+	return loadDemoProject(EMPTY_STATE_DEMO_PATH);
+}

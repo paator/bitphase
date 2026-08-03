@@ -48,7 +48,7 @@ function reconstructProject(data: any, getChip: (chipType: string) => Chip | nul
 	return new Project(
 		data.name || '',
 		data.author || '',
-		songs.length > 0 ? songs : [new Song()],
+		songs,
 		data.loopPointId || 0,
 		data.patternOrder || [0],
 		tables.length > 0 ? tables : [new Table(0, [], 0, 'Table 1')],

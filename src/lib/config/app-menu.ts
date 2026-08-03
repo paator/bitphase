@@ -7,6 +7,33 @@ const demoMenuItems: MenuItem[] = getDemoMenuItems();
 
 export const editMenuItems: MenuItem[] = buildEditMenuItems();
 
+export type NewSongOption = {
+	label: string;
+	action: string;
+	examples: string;
+	workInProgress?: boolean;
+};
+
+export const newSongOptions: NewSongOption[] = [
+	{
+		label: 'AY/YM',
+		action: 'new-song-ay',
+		examples: 'ZX Spectrum, Amstrad CPC, Atari ST…'
+	},
+	{
+		label: '2A03 / 2A07',
+		action: 'new-song-nes',
+		examples: 'NES, Famicom',
+		workInProgress: true
+	}
+];
+
+export const newSongMenuItems: MenuItem[] = newSongOptions.map((option) => ({
+	label: option.workInProgress ? `${option.label} (work in progress)` : option.label,
+	type: 'normal',
+	action: option.action
+}));
+
 export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
 	return [
 		{
@@ -21,14 +48,7 @@ export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
 							label: 'Song',
 							type: 'expandable',
 							icon: '📁',
-							items: [
-								{ label: 'AY/YM', type: 'normal', action: 'new-song-ay' },
-								{
-									label: '2A03 / 2A07 (work in progress)',
-									type: 'normal',
-									action: 'new-song-nes'
-								}
-							]
+							items: newSongMenuItems
 						}
 					]
 				},

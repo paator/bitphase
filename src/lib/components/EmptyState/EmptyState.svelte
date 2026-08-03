@@ -30,7 +30,7 @@
 		<Icon class="h-8 w-8 text-[var(--color-app-text-tertiary)]/70" />
 	{/if}
 	{#if title}
-		<p class="text-xs text-[var(--color-app-text-muted)]">{title}</p>
+		<p class="text-sm font-medium text-[var(--color-app-text-primary)]">{title}</p>
 	{/if}
 	{#if message}
 		<p class="text-xs text-[var(--color-app-text-muted)]">{message}</p>
@@ -39,6 +39,8 @@
 		<p class="text-[10px] text-[var(--color-app-text-tertiary)]">{hint}</p>
 	{/if}
 	{#if children}
-		{@render children()}
+		<div class="mt-2 w-full">
+			{@render children()}
+		</div>
 	{/if}
 </div>

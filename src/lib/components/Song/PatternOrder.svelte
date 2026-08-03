@@ -40,6 +40,7 @@
 	const patternOrder = $derived(projectStore.patternOrder);
 	const patternOrderColors = $derived(projectStore.patternOrderColors);
 	const loopPointId = $derived(projectStore.loopPointId);
+	const hasSongs = $derived(projectStore.songs.length > 0);
 
 	const patternsRecord = $derived.by(() => {
 		const record: Record<number, Pattern> = {};
@@ -390,8 +391,10 @@
 			if (x <= PADDING + CELL_WIDTH && x >= PADDING) {
 				finishPatternEdit();
 				switchPattern(clickedIndex);
-				editingPatternIndex = clickedIndex;
-				editingPatternValue = '';
+				if (hasSongs) {
+					editingPatternIndex = clickedIndex;
+					editingPatternValue = '';
+				}
 				draw();
 			} else {
 				finishPatternEdit();
@@ -403,7 +406,7 @@
 	}
 
 	function handleMouseDown(event: MouseEvent): void {
-		if (isDragging) return;
+		if (isDragging || !hasSongs) return;
 
 		justFinishedDrag = false;
 
@@ -498,6 +501,12 @@
 		const { key } = event;
 
 		if (editingPatternIndex !== null) {
+			if (!hasSongs) {
+				editingPatternIndex = null;
+				editingPatternValue = '';
+				draw();
+				return;
+			}
 			if (key === 'Enter') {
 				finishPatternEdit();
 			} else if (key === 'Escape') {
@@ -531,7 +540,7 @@
 	}
 
 	function applyPatternEditValue(value: string): void {
-		if (editingPatternIndex === null || value === '') return;
+		if (!hasSongs || editingPatternIndex === null || value === '') return;
 
 		const displayedValue = value.padStart(2, '0');
 		const newId = parseInt(displayedValue);
@@ -709,6 +718,7 @@
 	}
 
 	function addPatternAtIndex(index: number): void {
+		if (!hasSongs) return;
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder],
@@ -738,6 +748,7 @@
 	}
 
 	function removePatternAtIndex(index: number): void {
+		if (!hasSongs) return;
 		const before = {
 			patternOrder: [...projectStore.patternOrder],
 			loopPointId: projectStore.loopPointId,
@@ -762,6 +773,7 @@
 	}
 
 	function clonePatternAtIndex(index: number): void {
+		if (!hasSongs) return;
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder],
@@ -792,6 +804,7 @@
 	}
 
 	function makePatternUniqueAtIndex(index: number): void {
+		if (!hasSongs) return;
 		if (projectStore.patterns.length > 1 && onMakeUnique) {
 			onMakeUnique(index);
 			return;
@@ -834,10 +847,12 @@
 	const buttonCenterY = $derived(canvasHeight / 2);
 	const totalHeight = BUTTON_SIZE * 4 + BUTTON_SPACING * 3;
 	const startY = $derived(buttonCenterY - totalHeight / 2);
-	const canRemove = $derived(patternOrder.length > 1);
+	const canRemove = $derived(hasSongs && patternOrder.length > 1);
+	const canEditOrder = $derived(hasSongs);
 
 	function handleContextMenu(event: MouseEvent): void {
 		event.preventDefault();
+		if (!hasSongs) return;
 		const rect = canvas.getBoundingClientRect();
 		const x = event.clientX - rect.left;
 		const y = event.clientY - rect.top;
@@ -997,8 +1012,9 @@
 			buttonType="up"
 			isHovered={hoveredButton === 'up'}
 			onClick={() => makePatternUniqueAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = 'up')}
+			onMouseEnter={() => (hoveredButton = canEditOrder ? 'up' : null)}
 			onMouseLeave={() => (hoveredButton = null)}
+			disabled={!canEditOrder}
 			title="Make Unique"
 			size={BUTTON_SIZE}>
 			<IconCarbonUnlink
@@ -1024,8 +1040,9 @@
 			buttonType="add"
 			isHovered={hoveredButton === 'add'}
 			onClick={() => addPatternAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = 'add')}
+			onMouseEnter={() => (hoveredButton = canEditOrder ? 'add' : null)}
 			onMouseLeave={() => (hoveredButton = null)}
+			disabled={!canEditOrder}
 			title="Add"
 			size={BUTTON_SIZE}>
 			<IconCarbonAdd
@@ -1036,8 +1053,9 @@
 			buttonType="clone"
 			isHovered={hoveredButton === 'clone'}
 			onClick={() => clonePatternAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = 'clone')}
+			onMouseEnter={() => (hoveredButton = canEditOrder ? 'clone' : null)}
 			onMouseLeave={() => (hoveredButton = null)}
+			disabled={!canEditOrder}
 			title="Clone"
 			size={BUTTON_SIZE}
 			hasMargin={false}>

@@ -86,6 +86,7 @@
 		chip ? filterInstrumentsForChip(allInstruments, chip.type) : []
 	);
 	const songs = $derived(projectStore.songs);
+	const hasSongs = $derived(songs.length > 0);
 
 	const instrumentListResize = createPersistedResizableListHeight({
 		storageKey: 'instrumentListHeight',
@@ -272,6 +273,7 @@
 	}
 
 	function handleInstrumentChange(instrument: Instrument): void {
+		if (!hasSongs) return;
 		const id = instrument.id;
 		const idx = allInstruments.findIndex((inst) => inst.id === id);
 		if (idx >= 0) {
@@ -285,6 +287,7 @@
 	}
 
 	async function addInstrument(): Promise<void> {
+		if (!hasSongs) return;
 		flushInstrumentUpdateHistory();
 		const existingIds = allInstruments.map((inst) => inst.id);
 		const newId = getNextAvailableInstrumentId(existingIds);
@@ -317,6 +320,7 @@
 	}
 
 	function removeInstrument(index: number): void {
+		if (!hasSongs) return;
 		flushInstrumentUpdateHistory();
 		const toRemove = chipInstruments[index];
 		if (!toRemove || chipInstruments.length <= 1) return;
@@ -343,6 +347,7 @@
 	}
 
 	async function copyInstrument(copiedIndex: number): Promise<void> {
+		if (!hasSongs) return;
 		flushInstrumentUpdateHistory();
 		const instrument = chipInstruments[copiedIndex];
 		if (!instrument || !chip) return;
@@ -589,9 +594,12 @@
 										nameLabel={instrument.name}
 										copyTitle="Copy instrument"
 										removeTitle="Remove instrument"
-										showRemove={chipInstruments.length > 1}
+										showCopy={hasSongs}
+										showRemove={hasSongs && chipInstruments.length > 1}
 										onSelect={() => (selectedInstrumentIndex = index)}
-										onDoubleClick={() => startEditingInstrumentId(index)}
+										onDoubleClick={() => {
+											if (hasSongs) startEditingInstrumentId(index);
+										}}
 										onCopy={(e) => {
 											e.stopPropagation();
 											copyInstrument(index);
@@ -630,27 +638,29 @@
 						icon={IconCarbonAdd}
 						label="Add"
 						onclick={addInstrument}
-						disabled={allInstruments.length >= MAX_INSTRUMENT_ID_NUM}
-						title={allInstruments.length >= MAX_INSTRUMENT_ID_NUM
-							? 'Maximum 1295 instruments (01–ZZ)'
-							: 'Add new instrument'} />
+						disabled={!hasSongs || allInstruments.length >= MAX_INSTRUMENT_ID_NUM}
+						title={!hasSongs
+							? 'Add a song before creating instruments'
+							: allInstruments.length >= MAX_INSTRUMENT_ID_NUM
+								? 'Maximum 1295 instruments (01–ZZ)'
+								: 'Add new instrument'} />
 					<ToolbarButton
 						icon={IconCarbonSave}
 						label="Save"
 						onclick={saveInstrument}
-						disabled={chipInstruments.length === 0}
+						disabled={!hasSongs || chipInstruments.length === 0}
 						title="Save selected instrument to JSON file" />
 					<ToolbarButton
 						icon={IconCarbonDocumentImport}
 						label="Load"
 						onclick={loadInstrument}
-						disabled={chipInstruments.length === 0}
+						disabled={!hasSongs || chipInstruments.length === 0}
 						title="Load instrument from JSON file into selected slot" />
 					<ToolbarButton
 						icon={IconCarbonFolder}
 						label="Presets"
 						onclick={openPresets}
-						disabled={chipInstruments.length === 0}
+						disabled={!hasSongs || chipInstruments.length === 0}
 						title="Load instrument from built-in presets" />
 				</div>
 			</div>
@@ -660,7 +670,10 @@
 				label="Drag to resize instrument list"
 				onmousedown={instrumentListResize.beginResize} />
 
-			<div class="min-h-0 flex-1 overflow-auto p-4">
+			<div
+				class="min-h-0 flex-1 overflow-auto p-4"
+				class:pointer-events-none={!hasSongs}
+				class:opacity-50={!hasSongs}>
 				{#if chipInstruments[selectedInstrumentIndex] && InstrumentEditor}
 					{#key chipInstruments[selectedInstrumentIndex].id}
 						<InstrumentEditor

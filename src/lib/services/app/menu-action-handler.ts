@@ -190,7 +190,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				ctx.playbackStore.isPlaying = false;
 				ctx.container.audioService.stop();
 				await ctx.clearAutobackup();
-				const newProject = await ctx.projectService.resetProject(AY_CHIP);
+				const newProject = await ctx.projectService.resetProject();
 				ctx.applyProject(newProject);
 				ctx.resetPatternEditor();
 				return;
@@ -198,7 +198,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 
 			if (data.action === 'remove-song' && typeof data.songIndex === 'number') {
 				const index = data.songIndex;
-				if (ctx.getSongsLength() <= 1 || index < 0 || index >= ctx.getSongsLength()) return;
+				if (index < 0 || index >= ctx.getSongsLength()) return;
 				const confirmed = await ctx.open(ConfirmModal, {
 					message: `Remove song (${index + 1})? This cannot be undone.`
 				});

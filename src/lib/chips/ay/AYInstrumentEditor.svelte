@@ -7,6 +7,7 @@
 	import IconCarbonWaveform from '~icons/carbon/waveform';
 	import IconCarbonActivity from '~icons/carbon/activity';
 	import IconCarbonRepeat from '~icons/carbon/repeat';
+	import IconCarbonWarningAltFilled from '~icons/carbon/warning-alt-filled';
 	import PillTabs, { type PillTab } from '../../components/PillTabs/PillTabs.svelte';
 	import {
 		BooleanPaintableCell,
@@ -46,6 +47,7 @@
 	import AYTimerEffectsRowCells from './AYTimerEffectsRowCells.svelte';
 	import AYTimerPwmControls from './AYTimerPwmControls.svelte';
 	import AYInstrumentSamplePanel from './AYInstrumentSamplePanel.svelte';
+	import { AlertBanner } from '../../components/AlertBanner';
 	import { AyTimerEffectsController } from './ay-timer-effects-controller.svelte.js';
 	import type { TimerEditPanel, TimerEffectDragField } from './ay-timer-effects-controller.svelte';
 	import { setAyTimerEffectsContext } from './ay-timer-effects-context';
@@ -497,6 +499,39 @@
 			size="sm"
 			class="mt-2 ml-2"
 			onSelect={(tabId) => timerEffects.setTimerEditPanel(tabId as TimerEditPanel)} />
+		<AlertBanner variant="warning" class="mx-2 mt-2 px-3 py-2 text-xs">
+			<div class="flex gap-2">
+				<IconCarbonWarningAltFilled
+					class="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-pattern-note-off)]" />
+				<div class="min-w-0">
+					<p class="font-medium text-[var(--color-pattern-note-off)]">
+						Experimental — use at your own risk
+					</p>
+					<p class="mt-1 text-[var(--color-app-text-secondary)]">
+						Timer effects are not supported on real AY/YM hardware yet. Playback is emulator-only
+						for now, and breaking changes to the format and behavior are expected.
+					</p>
+				</div>
+			</div>
+		</AlertBanner>
+	{/if}
+
+	{#if activeTab === 'sample'}
+		<AlertBanner variant="warning" class="mx-2 mt-2 px-3 py-2 text-xs">
+			<div class="flex gap-2">
+				<IconCarbonWarningAltFilled
+					class="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-pattern-note-off)]" />
+				<div class="min-w-0">
+					<p class="font-medium text-[var(--color-pattern-note-off)]">
+						Experimental — use at your own risk
+					</p>
+					<p class="mt-1 text-[var(--color-app-text-secondary)]">
+						Sample instruments are not supported on real AY/YM hardware yet. Playback is
+						emulator-only for now, and breaking changes to the format and behavior are expected.
+					</p>
+				</div>
+			</div>
+		</AlertBanner>
 	{/if}
 
 	{#if activeTab === 'timer' && timerEffects.waveformEditorRowIndex !== null}

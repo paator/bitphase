@@ -4,6 +4,24 @@ import { normalizeAyInstrumentFields } from '@/lib/chips/ay/instrument';
 import type { Instrument } from '@/lib/models/song';
 
 describe('FileImportService', () => {
+	it('preserves projects with zero songs', async () => {
+		const json = JSON.stringify({
+			name: 'empty',
+			author: 'test',
+			songs: [],
+			patternOrder: [0],
+			tables: [{ id: 0, rows: [], loop: 0, name: 'Table 1' }],
+			instruments: [{ id: '01', name: 'Instrument 01', loop: 0, rows: [] }]
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+
+		expect(project.songs).toHaveLength(0);
+		expect(project.name).toBe('empty');
+		expect(project.instruments).toHaveLength(1);
+		expect(project.tables).toHaveLength(1);
+	});
+
 	it('preserves fm and env-fm timer waveforms when reconstructing instruments', async () => {
 		const json = JSON.stringify({
 			name: 'test',

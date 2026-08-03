@@ -14,16 +14,9 @@ export class ProjectService {
 		return new Project();
 	}
 
-	async resetProject(chip: Chip): Promise<Project> {
+	async resetProject(): Promise<Project> {
 		this.audioService.clearChipProcessors();
-		const newProject = this.createNewProject();
-		const song = new Song(chip.schema);
-		song.chipType = chip.type;
-		applySchemaDefaults(song, chip.schema);
-		this.applyChipDefaults(song, chip.schema);
-		newProject.songs = [song];
-		await this.audioService.addChipProcessor(chip);
-		return newProject;
+		return this.createNewProject();
 	}
 
 	async createNewSong(chip: Chip, existingSongs: Song[] = []): Promise<Song> {

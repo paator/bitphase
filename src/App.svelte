@@ -12,7 +12,6 @@
 	import { setContext } from 'svelte';
 	import { AudioService } from './lib/services/audio/audio-service';
 	import { ProjectService } from './lib/services/project/project-service';
-	import { AY_CHIP } from './lib/chips/ay';
 	import { getChipByType } from './lib/chips/registry';
 	import SongView from './lib/components/Song/SongView.svelte';
 	import { playbackStore } from './lib/stores/playback.svelte';
@@ -126,16 +125,16 @@
 		if (projectStore.initialized) return;
 
 		(async () => {
-			const newProject = await projectService.resetProject(AY_CHIP);
-			syncChipProcessors();
-			projectStore.applyProject(newProject);
-
 			const backup = await autobackupService.getAutobackup();
 			if (backup) {
 				await projectService.restoreChipProcessorsForSongs(backup.songs);
 				syncChipProcessors();
 				ProjectService.ensureChipSettingsConsistency(backup.songs);
 				projectStore.applyProject(backup);
+			} else {
+				const newProject = await projectService.resetProject();
+				syncChipProcessors();
+				projectStore.applyProject(newProject);
 			}
 			projectStore.initialized = true;
 		})();
@@ -305,12 +304,14 @@
 	class="flex h-screen flex-col gap-1 overflow-hidden bg-[var(--color-app-surface-secondary)] font-sans text-xs text-[var(--color-app-text-primary)]">
 	<MenuBar {menuItems} onAction={handleMenuAction} />
 	<div class="flex-1 overflow-hidden">
-		<SongView
-			bind:this={songView}
-			bind:patternEditor
-			bind:activeEditorIndex={activeSongIndex}
-			onaction={handleMenuAction}
-			chipProcessors={chipProcessors} />
+		{#if projectStore.initialized}
+			<SongView
+				bind:this={songView}
+				bind:patternEditor
+				bind:activeEditorIndex={activeSongIndex}
+				onaction={handleMenuAction}
+				chipProcessors={chipProcessors} />
+		{/if}
 	</div>
 	<ModalContainer />
 	<HistoryFeedback />

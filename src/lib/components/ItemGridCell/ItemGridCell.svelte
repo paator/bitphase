@@ -23,6 +23,7 @@
 		onDoubleClick,
 		onCopy,
 		onRemove,
+		showCopy = true,
 		showRemove = true,
 		edit
 	}: {
@@ -39,6 +40,7 @@
 		onDoubleClick: () => void;
 		onCopy: (event: MouseEvent) => void;
 		onRemove: (event: MouseEvent) => void;
+		showCopy?: boolean;
 		showRemove?: boolean;
 		edit: Snippet;
 	} = $props();
@@ -73,7 +75,9 @@
 		</button>
 		<div
 			class="absolute top-1 right-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-			<OverlayIconButton icon={IconCarbonCopy} title={copyTitle} onclick={onCopy} />
+			{#if showCopy}
+				<OverlayIconButton icon={IconCarbonCopy} title={copyTitle} onclick={onCopy} />
+			{/if}
 			{#if showRemove}
 				<OverlayIconButton
 					icon={IconCarbonTrashCan}

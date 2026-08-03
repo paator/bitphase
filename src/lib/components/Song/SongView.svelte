@@ -38,6 +38,10 @@
 	import { isEditableElement } from '../../utils/shortcut-input-exclusion';
 	import { ACTION_REDO, ACTION_TOGGLE_PLAYBACK, ACTION_UNDO } from '../../config/keybindings';
 	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
+	import { EmptyState } from '../EmptyState';
+	import { newSongOptions } from '../../config/app-menu';
+	import IconCarbonChevronRight from '~icons/carbon/chevron-right';
+	import EmptySongPatternBackdrop from './EmptySongPatternBackdrop.svelte';
 
 	let {
 		chipProcessors,
@@ -514,93 +518,140 @@
 			<div
 				class="flex min-h-0 min-w-max flex-1 flex-col overflow-hidden transition-all duration-300 {blurredContentClass}">
 				<div class="flex min-h-0 min-w-0 flex-1 flex-nowrap justify-center">
-					{#each projectStore.songs as song, i (song)}
-						{@const chipProcessor = chipProcessors[i]}
-						{#if chipProcessor}
-							<Card
-								title={`${chipProcessor.chip.name} - (${i + 1})`}
-								fullHeight={true}
-								icon={IconCarbonChip}
-								class="flex shrink-0 flex-col p-0">
-								{#snippet headerContent()}
-									<div class="flex items-center gap-1">
-										<div
-											class="flex items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] {playbackStore.isPlaying
-												? 'opacity-50'
-												: ''}">
-											<Input
-												value={patternLengthValue}
-												id="pattern-length-input-{i}"
-												type="number"
-												min="1"
-												max="256"
-												step="1"
-												disabled={playbackStore.isPlaying}
-												class="h-5 w-10 border-0 bg-transparent px-1 py-0 text-center font-mono text-xs leading-none focus:ring-0 disabled:cursor-not-allowed"
-												onfocus={() => {
-													if (!playbackStore.isPlaying) {
-														activeEditorIndex = i;
-														patternEditor = patternEditors[i];
-													}
-												}}
-												oninput={(e) => {
-													if (!playbackStore.isPlaying) {
-														patternLengthValue = (
-															e.target as HTMLInputElement
-														).value;
-													}
-												}}
-												onblur={() => {
-													if (!playbackStore.isPlaying) {
-														commitPatternLength();
-													}
-												}}
-												onkeydown={(e: KeyboardEvent) => {
-													if (playbackStore.isPlaying) {
-														e.preventDefault();
-														return;
-													}
-													if (e.key === 'Enter') {
-														e.preventDefault();
-														commitPatternLength();
-														(e.target as HTMLInputElement)?.blur();
-													}
-												}} />
+					{#if projectStore.songs.length === 0}
+						<div class="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+							<EmptySongPatternBackdrop />
+							<div
+								class="pointer-events-none absolute inset-0 bg-[var(--color-app-surface-secondary)]/50">
+							</div>
+							<div class="relative z-10 flex items-center justify-center p-8 pointer-events-auto">
+								<EmptyState
+									icon={IconCarbonChip}
+									title="No songs yet"
+									message="Add a song to start tracking."
+									class="w-full max-w-sm gap-3 border-[var(--color-app-border)] bg-[var(--color-app-surface)]/90 px-8 py-10 shadow-lg backdrop-blur-sm">
+									<div class="flex flex-col gap-2">
+										{#each newSongOptions as option (option.action)}
+											<button
+												type="button"
+												class="group flex w-full cursor-pointer items-center gap-3 rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-3 py-2.5 text-left text-[var(--color-app-text-secondary)] transition-colors hover:border-[var(--color-app-border-hover)] hover:bg-[var(--color-app-surface-hover)]"
+												onclick={() => onaction?.({ action: option.action })}>
+												<span
+													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-[var(--color-app-surface-secondary)]">
+													<IconCarbonChip
+														class="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
+												</span>
+												<span class="min-w-0 flex-1">
+													<span
+														class="block text-xs font-medium text-[var(--color-app-text-primary)]">
+														{option.label}
+														{#if option.workInProgress}
+															<span
+																class="ml-1 font-normal text-[var(--color-app-text-tertiary)]">
+																(WIP)
+															</span>
+														{/if}
+													</span>
+													<span
+														class="mt-0.5 block text-[10px] text-[var(--color-app-text-tertiary)]">
+														{option.examples}
+													</span>
+												</span>
+												<IconCarbonChevronRight
+													class="h-3.5 w-3.5 shrink-0 text-[var(--color-app-text-muted)] opacity-60 transition-transform group-hover:translate-x-0.5" />
+											</button>
+										{/each}
+									</div>
+								</EmptyState>
+							</div>
+						</div>
+					{:else}
+						{#each projectStore.songs as song, i (song)}
+							{@const chipProcessor = chipProcessors[i]}
+							{#if chipProcessor}
+								<Card
+									title={`${chipProcessor.chip.name} - (${i + 1})`}
+									fullHeight={true}
+									icon={IconCarbonChip}
+									class="flex shrink-0 flex-col p-0">
+									{#snippet headerContent()}
+										<div class="flex items-center gap-1">
 											<div
-												class="flex flex-col border-l border-[var(--color-app-border)]">
-												<button
-													type="button"
+												class="flex items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] {playbackStore.isPlaying
+													? 'opacity-50'
+													: ''}">
+												<Input
+													value={patternLengthValue}
+													id="pattern-length-input-{i}"
+													type="number"
+													min="1"
+													max="256"
+													step="1"
 													disabled={playbackStore.isPlaying}
-													class="flex h-2.5 w-3.5 cursor-pointer items-center justify-center border-b border-[var(--color-app-border)] transition-colors hover:bg-[var(--color-app-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-													onclick={() => {
+													class="h-5 w-10 border-0 bg-transparent px-1 py-0 text-center font-mono text-xs leading-none focus:ring-0 disabled:cursor-not-allowed"
+													onfocus={() => {
 														if (!playbackStore.isPlaying) {
 															activeEditorIndex = i;
 															patternEditor = patternEditors[i];
-															incrementPatternLength();
 														}
 													}}
-													title="Increment pattern length">
-													<IconCarbonChevronUp
-														class="h-2 w-2 text-[var(--color-app-text-muted)]" />
-												</button>
-												<button
-													type="button"
-													disabled={playbackStore.isPlaying}
-													class="flex h-2.5 w-3.5 cursor-pointer items-center justify-center transition-colors hover:bg-[var(--color-app-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-													onclick={() => {
+													oninput={(e) => {
 														if (!playbackStore.isPlaying) {
-															activeEditorIndex = i;
-															patternEditor = patternEditors[i];
-															decrementPatternLength();
+															patternLengthValue = (
+																e.target as HTMLInputElement
+															).value;
 														}
 													}}
-													title="Decrement pattern length">
-													<IconCarbonChevronDown
-														class="h-2 w-2 text-[var(--color-app-text-muted)]" />
-												</button>
+													onblur={() => {
+														if (!playbackStore.isPlaying) {
+															commitPatternLength();
+														}
+													}}
+													onkeydown={(e: KeyboardEvent) => {
+														if (playbackStore.isPlaying) {
+															e.preventDefault();
+															return;
+														}
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															commitPatternLength();
+															(e.target as HTMLInputElement)?.blur();
+														}
+													}} />
+												<div
+													class="flex flex-col border-l border-[var(--color-app-border)]">
+													<button
+														type="button"
+														disabled={playbackStore.isPlaying}
+														class="flex h-2.5 w-3.5 cursor-pointer items-center justify-center border-b border-[var(--color-app-border)] transition-colors hover:bg-[var(--color-app-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+														onclick={() => {
+															if (!playbackStore.isPlaying) {
+																activeEditorIndex = i;
+																patternEditor = patternEditors[i];
+																incrementPatternLength();
+															}
+														}}
+														title="Increment pattern length">
+														<IconCarbonChevronUp
+															class="h-2 w-2 text-[var(--color-app-text-muted)]" />
+													</button>
+													<button
+														type="button"
+														disabled={playbackStore.isPlaying}
+														class="flex h-2.5 w-3.5 cursor-pointer items-center justify-center transition-colors hover:bg-[var(--color-app-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+														onclick={() => {
+															if (!playbackStore.isPlaying) {
+																activeEditorIndex = i;
+																patternEditor = patternEditors[i];
+																decrementPatternLength();
+															}
+														}}
+														title="Decrement pattern length">
+														<IconCarbonChevronDown
+															class="h-2 w-2 text-[var(--color-app-text-muted)]" />
+													</button>
+												</div>
 											</div>
-										</div>
-										{#if projectStore.songs.length > 1}
 											<button
 												type="button"
 												disabled={playbackStore.isPlaying}
@@ -613,40 +664,43 @@
 													})}>
 												<IconCarbonClose class="h-3.5 w-3.5" />
 											</button>
-										{/if}
+										</div>
+									{/snippet}
+									<div class="flex flex-1 flex-col overflow-hidden">
+										{#key `${i}-${chipProcessor.chip.type}`}
+											<PatternEditor
+												bind:this={patternEditors[i]}
+												songIndex={i}
+												bind:currentPatternOrderIndex={
+													sharedPatternOrderIndex
+												}
+												bind:selectedRow={sharedSelectedRow}
+												isActive={activeEditorIndex === i}
+												isPlaybackMaster={i === 0}
+												onfocus={() => {
+													activeEditorIndex = i;
+													patternEditor = patternEditors[i];
+												}}
+												canFocusOnHover={() =>
+													!patternEditors.some(
+														(e) =>
+															e?.getCanvas?.() ===
+															document.activeElement
+													)}
+												{onaction}
+												initAllChips={initAllChipsForPlayback}
+												{initAllChipsForPlayPattern}
+												{getSpeedForChip}
+												{getSpeedForPlayPattern}
+												{tuningTableVersion}
+												chip={chipProcessor.chip}
+												{chipProcessor} />
+										{/key}
 									</div>
-								{/snippet}
-								<div class="flex flex-1 flex-col overflow-hidden">
-									{#key `${i}-${chipProcessor.chip.type}`}
-										<PatternEditor
-											bind:this={patternEditors[i]}
-											songIndex={i}
-											bind:currentPatternOrderIndex={sharedPatternOrderIndex}
-											bind:selectedRow={sharedSelectedRow}
-											isActive={activeEditorIndex === i}
-											isPlaybackMaster={i === 0}
-											onfocus={() => {
-												activeEditorIndex = i;
-												patternEditor = patternEditors[i];
-											}}
-											canFocusOnHover={() =>
-												!patternEditors.some(
-													(e) =>
-														e?.getCanvas?.() === document.activeElement
-												)}
-											{onaction}
-											initAllChips={initAllChipsForPlayback}
-											{initAllChipsForPlayPattern}
-											{getSpeedForChip}
-											{getSpeedForPlayPattern}
-											{tuningTableVersion}
-											chip={chipProcessor.chip}
-											{chipProcessor} />
-									{/key}
-								</div>
-							</Card>
-						{/if}
-					{/each}
+								</Card>
+							{/if}
+						{/each}
+					{/if}
 				</div>
 				{#if settingsStore.debugMode}
 					<PlaybackToneDebug {chipProcessors} />
