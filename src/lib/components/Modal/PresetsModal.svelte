@@ -6,6 +6,7 @@
 	import type { TreeNode } from '../TreeView/types';
 	import type { InstrumentPresetData } from '../../presets/instrument-presets';
 	import { getInstrumentPresetTree } from '../../presets/instrument-presets';
+	import { parseInstrumentPreset } from '../../services/instrument/instrument-preset';
 
 	let {
 		resolve,
@@ -36,16 +37,11 @@
 		error = null;
 		try {
 			const text = await node.data.load();
-			const parsed: unknown = JSON.parse(text);
-			const item = Array.isArray(parsed) ? parsed[0] : parsed;
-			if (
-				item == null ||
-				typeof item !== 'object' ||
-				!Array.isArray((item as Record<string, unknown>).rows)
-			) {
+			const payload = parseInstrumentPreset(JSON.parse(text));
+			if (!payload) {
 				throw new Error('Invalid format: expected an instrument object');
 			}
-			resolve?.(item);
+			resolve?.(payload);
 		} catch (err) {
 			error = (err as Error).message;
 		} finally {

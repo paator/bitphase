@@ -1,4 +1,5 @@
 import type { TreeNode } from '../components/TreeView/types';
+import { parseInstrumentPreset } from '../services/instrument/instrument-preset';
 
 const glob = import.meta.glob('../../presets/instruments/**/*.json', {
 	query: '?raw',
@@ -20,17 +21,13 @@ function pathToCategoryAndLabel(relativePath: string): { category: string; label
 }
 
 function getNameFromPresetContent(raw: string): string | null {
+	let parsed: unknown;
 	try {
-		const parsed: unknown = JSON.parse(raw);
-		const item = Array.isArray(parsed) ? parsed[0] : parsed;
-		if (item != null && typeof item === 'object' && 'name' in item) {
-			const name = (item as Record<string, unknown>).name;
-			return name != null ? String(name) : null;
-		}
+		parsed = JSON.parse(raw);
 	} catch {
-		// ignore
+		return null;
 	}
-	return null;
+	return parseInstrumentPreset(parsed)?.name || null;
 }
 
 export function getInstrumentPresetTree(): TreeNode<InstrumentPresetData>[] {

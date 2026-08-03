@@ -38,8 +38,9 @@
 		resolveInstrumentChipType
 	} from '../../services/instrument/instrument-filter';
 	import {
-		instrumentFromPreset,
-		parseInstrumentPreset
+		applyInstrumentPreset,
+		parseInstrumentPreset,
+		type InstrumentPresetPayload
 	} from '../../services/instrument/instrument-preset';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
@@ -459,6 +460,35 @@
 		});
 	}
 
+	function replaceInstrumentFromPreset(
+		id: string,
+		payload: InstrumentPresetPayload,
+		label: string
+	): void {
+		if (!chip) return;
+		const updated = applyInstrumentPreset(allInstruments, payload, id, chip.type);
+		if (updated) {
+			const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
+			projectStore.instruments = updated;
+			projectStore.recordHistory(
+				{
+					type: 'instrument.replace',
+					label,
+					affectedDomains: ['instruments']
+				},
+				[
+					projectStore.createSetDiff(
+						['instruments'],
+						beforeInstruments,
+						projectStore.instruments
+					)
+				]
+			);
+		}
+		services.audioService.updateInstruments(projectStore.instruments);
+		requestPatternRedraw?.();
+	}
+
 	async function loadInstrument(): Promise<void> {
 		flushInstrumentUpdateHistory();
 		if (!chip || chipInstruments.length === 0) return;
@@ -469,30 +499,7 @@
 				throw new Error('Invalid format: expected an instrument object');
 			}
 			const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
-			const replacement = instrumentFromPreset(payload, currentId, chip.type);
-			const idx = allInstruments.findIndex((inst) => inst.id === currentId);
-			if (idx >= 0) {
-				const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-				const updated = [...allInstruments];
-				updated[idx] = replacement;
-				projectStore.instruments = updated;
-				projectStore.recordHistory(
-					{
-						type: 'instrument.replace',
-						label: `Replace instrument ${currentId}`,
-						affectedDomains: ['instruments']
-					},
-					[
-						projectStore.createSetDiff(
-							['instruments'],
-							beforeInstruments,
-							projectStore.instruments
-						)
-					]
-				);
-			}
-			services.audioService.updateInstruments(projectStore.instruments);
-			requestPatternRedraw?.();
+			replaceInstrumentFromPreset(currentId, payload, `Replace instrument ${currentId}`);
 		} catch (err) {
 			if ((err as Error).message !== 'No file selected') {
 				alert('Failed to load instrument: ' + (err as Error).message);
@@ -510,30 +517,7 @@
 			return;
 		}
 		const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
-		const replacement = instrumentFromPreset(payload, currentId, chip.type);
-		const idx = allInstruments.findIndex((inst) => inst.id === currentId);
-		if (idx >= 0) {
-			const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-			const updated = [...allInstruments];
-			updated[idx] = replacement;
-			projectStore.instruments = updated;
-			projectStore.recordHistory(
-				{
-					type: 'instrument.replace',
-					label: `Apply preset to instrument ${currentId}`,
-					affectedDomains: ['instruments']
-				},
-				[
-					projectStore.createSetDiff(
-						['instruments'],
-						beforeInstruments,
-						projectStore.instruments
-					)
-				]
-			);
-		}
-		services.audioService.updateInstruments(projectStore.instruments);
-		requestPatternRedraw?.();
+		replaceInstrumentFromPreset(currentId, payload, `Apply preset to instrument ${currentId}`);
 	}
 
 	function getInstrumentIdError(index: number, id: string): string | null {
