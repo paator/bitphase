@@ -37,6 +37,11 @@
 		getOrderedProjectChipTypes,
 		resolveInstrumentChipType
 	} from '../../services/instrument/instrument-filter';
+	import {
+		applyInstrumentPreset,
+		parseInstrumentPreset,
+		type InstrumentPresetPayload
+	} from '../../services/instrument/instrument-preset';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
@@ -455,105 +460,20 @@
 		});
 	}
 
-	async function loadInstrument(): Promise<void> {
-		flushInstrumentUpdateHistory();
-		if (!chip || chipInstruments.length === 0) return;
-		try {
-			const text = await pickFileAsText();
-			const parsed: unknown = JSON.parse(text);
-			const item = Array.isArray(parsed) ? parsed[0] : parsed;
-			if (
-				item == null ||
-				typeof item !== 'object' ||
-				!Array.isArray((item as Record<string, unknown>).rows)
-			) {
-				throw new Error('Invalid format: expected an instrument object');
-			}
-			const o = item as Record<string, unknown>;
-			const rows = (o.rows as Record<string, unknown>[]).map((r) => new InstrumentRow(r));
-			const loop = typeof o.loop === 'number' ? o.loop : 0;
-			const name = o.name != null ? String(o.name) : '';
-			const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
-			const replacement = new InstrumentModel(
-				currentId,
-				rows,
-				loop,
-				name || `Instrument ${currentId}`,
-				chip.type
-			);
-			const idx = allInstruments.findIndex((inst) => inst.id === currentId);
-			if (idx >= 0) {
-				const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-				const updated = [...allInstruments];
-				updated[idx] = new InstrumentModel(
-					currentId,
-					replacement.rows.map((r) => new InstrumentRow({ ...r })),
-					replacement.loop,
-					replacement.name
-				);
-				projectStore.instruments = updated;
-				projectStore.recordHistory(
-					{
-						type: 'instrument.replace',
-						label: `Replace instrument ${currentId}`,
-						affectedDomains: ['instruments']
-					},
-					[
-						projectStore.createSetDiff(
-							['instruments'],
-							beforeInstruments,
-							projectStore.instruments
-						)
-					]
-				);
-			}
-			services.audioService.updateInstruments(projectStore.instruments);
-			requestPatternRedraw?.();
-		} catch (err) {
-			if ((err as Error).message !== 'No file selected') {
-				alert('Failed to load instrument: ' + (err as Error).message);
-			}
-		}
-	}
-
-	async function openPresets(): Promise<void> {
-		flushInstrumentUpdateHistory();
-		if (!chip || chipInstruments.length === 0) return;
-		const item = await open(PresetsModal, { presetType: 'instrument' });
-		if (
-			item == null ||
-			typeof item !== 'object' ||
-			!Array.isArray((item as Record<string, unknown>).rows)
-		) {
-			return;
-		}
-		const o = item as Record<string, unknown>;
-		const rows = (o.rows as Record<string, unknown>[]).map((r) => new InstrumentRow(r));
-		const loop = typeof o.loop === 'number' ? o.loop : 0;
-		const name = o.name != null ? String(o.name) : '';
-		const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
-		const replacement = new InstrumentModel(
-			currentId,
-			rows,
-			loop,
-			name || `Instrument ${currentId}`,
-			chip.type
-		);
-		const idx = allInstruments.findIndex((inst) => inst.id === currentId);
-		if (idx >= 0) {
+	function replaceInstrumentFromPreset(
+		id: string,
+		payload: InstrumentPresetPayload,
+		label: string
+	): void {
+		if (!chip) return;
+		const updated = applyInstrumentPreset(allInstruments, payload, id, chip.type);
+		if (updated) {
 			const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
-			const updated = [...allInstruments];
-			updated[idx] = new InstrumentModel(
-				currentId,
-				replacement.rows.map((r) => new InstrumentRow({ ...r })),
-				replacement.loop,
-				replacement.name
-			);
 			projectStore.instruments = updated;
 			projectStore.recordHistory(
 				{
 					type: 'instrument.replace',
-					label: `Apply preset to instrument ${currentId}`,
+					label,
 					affectedDomains: ['instruments']
 				},
 				[
@@ -567,6 +487,37 @@
 		}
 		services.audioService.updateInstruments(projectStore.instruments);
 		requestPatternRedraw?.();
+	}
+
+	async function loadInstrument(): Promise<void> {
+		flushInstrumentUpdateHistory();
+		if (!chip || chipInstruments.length === 0) return;
+		try {
+			const text = await pickFileAsText();
+			const payload = parseInstrumentPreset(JSON.parse(text));
+			if (!payload) {
+				throw new Error('Invalid format: expected an instrument object');
+			}
+			const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
+			replaceInstrumentFromPreset(currentId, payload, `Replace instrument ${currentId}`);
+		} catch (err) {
+			if ((err as Error).message !== 'No file selected') {
+				alert('Failed to load instrument: ' + (err as Error).message);
+			}
+		}
+	}
+
+	async function openPresets(): Promise<void> {
+		flushInstrumentUpdateHistory();
+		if (!chip || chipInstruments.length === 0) return;
+		const payload = parseInstrumentPreset(
+			await open(PresetsModal, { presetType: 'instrument' })
+		);
+		if (!payload) {
+			return;
+		}
+		const currentId = chipInstruments[selectedInstrumentIndex]?.id ?? '01';
+		replaceInstrumentFromPreset(currentId, payload, `Apply preset to instrument ${currentId}`);
 	}
 
 	function getInstrumentIdError(index: number, id: string): string | null {
