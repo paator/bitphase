@@ -74,7 +74,7 @@ export class PatternEffectHandling {
 
 	private static formatEffectDelay(effect: number, delay: number): string {
 		if (PatternEffectHandling.effectIgnoresDelay(effect)) {
-			return '0';
+			return '.';
 		}
 		return (delay ?? 0).toString(16).toUpperCase().padStart(1, '0');
 	}

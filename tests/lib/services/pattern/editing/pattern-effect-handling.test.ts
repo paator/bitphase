@@ -73,7 +73,7 @@ describe('PatternEffectHandling', () => {
 				parameter: 0x0a,
 				tableIndex: 2
 			});
-			expect(result).toBe('400A');
+			expect(result).toBe('4.0A');
 		});
 
 		it('effect 5 (ornament position) parses 5050 as parameter not table', () => {
@@ -90,7 +90,7 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.tableIndex).toBe(3);
 			expect(parsed!.delay).toBe(0);
 			const formatted = PatternEffectHandling.formatEffectAsString(parsed!);
-			expect(formatted).toBe('S0T4');
+			expect(formatted).toBe('S.T4');
 		});
 
 		it('Speed with table S.T. preserves T when table char is placeholder', () => {
@@ -99,7 +99,7 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.effect).toBe('S'.charCodeAt(0));
 			expect(parsed!.tableIndex).toBe(0);
 			const formatted = PatternEffectHandling.formatEffectAsString(parsed!);
-			expect(formatted).toBe('S0T1');
+			expect(formatted).toBe('S.T1');
 		});
 
 		it('Detune with table D.TG parses table 16 (G)', () => {
@@ -108,16 +108,16 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.effect).toBe('D'.charCodeAt(0));
 			expect(parsed!.tableIndex).toBe(15);
 			const formatted = PatternEffectHandling.formatEffectAsString(parsed!);
-			expect(formatted).toBe('D0TG');
+			expect(formatted).toBe('D.TG');
 		});
 
-		it('effect 6 (on/off) ignores delay digit and formats with zero delay', () => {
+		it('effect 6 (on/off) ignores delay digit and formats with dot delay', () => {
 			const parsed = PatternEffectHandling.parseEffectFromString('6124');
 			expect(parsed).not.toBeNull();
 			expect(parsed!.effect).toBe(6);
 			expect(parsed!.delay).toBe(0);
 			expect(parsed!.parameter).toBe(0x24);
-			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6024');
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6.24');
 		});
 
 		it('effect 6 with table parses 6.T3', () => {
@@ -126,7 +126,17 @@ describe('PatternEffectHandling', () => {
 			expect(parsed!.effect).toBe(6);
 			expect(parsed!.delay).toBe(0);
 			expect(parsed!.tableIndex).toBe(2);
-			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('60T3');
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6.T3');
+		});
+
+		it('Speed formats unused delay as dot', () => {
+			expect(
+				PatternEffectHandling.formatEffectAsString({
+					effect: 'S'.charCodeAt(0),
+					delay: 0,
+					parameter: 0x01
+				})
+			).toBe('S.01');
 		});
 
 		it('E1XY pulse width effect parses and formats', () => {
