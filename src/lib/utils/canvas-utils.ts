@@ -28,7 +28,7 @@ export function setupCanvas(options: CanvasSetupOptions): void {
 	canvas.style.width = `${width}px`;
 	canvas.style.height = `${height}px`;
 
-	ctx.scale(scale, scale);
+	ctx.setTransform(scale, 0, 0, scale, 0, 0);
 	ctx.font = `${fontSize}px ${fonts.mono}`;
 	ctx.textAlign = textAlign;
 	ctx.textBaseline = textBaseline;

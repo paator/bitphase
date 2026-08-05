@@ -40,7 +40,6 @@
 	const patternOrder = $derived(projectStore.patternOrder);
 	const patternOrderColors = $derived(projectStore.patternOrderColors);
 	const loopPointId = $derived(projectStore.loopPointId);
-	const hasSongs = $derived(projectStore.songs.length > 0);
 
 	const patternsRecord = $derived.by(() => {
 		const record: Record<number, Pattern> = {};
@@ -81,44 +80,48 @@
 	$effect(() => {
 		if (!canvas) return;
 
+		const orderIndex = currentPatternOrderIndex;
+		const orderLength = patternOrder.length;
+		const loopId = loopPointId;
+		const height = canvasHeight;
+		const hover = hoveredIndex;
+		projectStore.songs.length;
+		patternsRecord;
+		patternOrderColors;
+
 		if (needsSetup || !ctx) {
 			ctx = canvas.getContext('2d')!;
 			setupCanvas();
 			needsSetup = false;
-			lastDrawnOrderIndex = currentPatternOrderIndex;
-			lastPatternOrderLength = patternOrder.length;
-			lastLoopPointId = loopPointId;
-			lastCanvasHeight = canvasHeight;
+			lastDrawnOrderIndex = orderIndex;
+			lastPatternOrderLength = orderLength;
+			lastLoopPointId = loopId;
+			lastCanvasHeight = height;
+			lastHoveredIndex = hover;
 			draw();
 			return;
 		}
 
-		const sizeChanged = canvasHeight !== lastCanvasHeight;
-		const colorsChanged = patternOrderColors;
+		const sizeChanged = height !== lastCanvasHeight;
 		const orderChanged =
-			currentPatternOrderIndex !== lastDrawnOrderIndex ||
-			patternOrder.length !== lastPatternOrderLength ||
+			orderIndex !== lastDrawnOrderIndex ||
+			orderLength !== lastPatternOrderLength ||
 			sizeChanged ||
-			loopPointId !== lastLoopPointId;
+			loopId !== lastLoopPointId;
 
 		if (sizeChanged) {
 			setupCanvas();
 		}
 
-		if (orderChanged || colorsChanged) {
-			lastDrawnOrderIndex = currentPatternOrderIndex;
-			lastPatternOrderLength = patternOrder.length;
-			lastLoopPointId = loopPointId;
-			lastCanvasHeight = canvasHeight;
-			draw();
-			lastHoveredIndex = hoveredIndex;
+		lastDrawnOrderIndex = orderIndex;
+		lastPatternOrderLength = orderLength;
+		lastLoopPointId = loopId;
+		lastCanvasHeight = height;
+		lastHoveredIndex = hover;
+		draw();
 
-			if (lastMouseY !== null && lastMouseX !== null && !isDragging) {
-				updateCursor(lastMouseY, lastMouseX);
-			}
-		} else if (hoveredIndex !== lastHoveredIndex) {
-			draw();
-			lastHoveredIndex = hoveredIndex;
+		if (orderChanged && lastMouseY !== null && lastMouseX !== null && !isDragging) {
+			updateCursor(lastMouseY, lastMouseX);
 		}
 	});
 
@@ -316,6 +319,7 @@
 		if (!ctx || !renderer) return;
 
 		const centerY = canvasHeight / 2;
+		const hasSongs = projectStore.songs.length > 0;
 
 		renderer.drawBackground(canvasHeight);
 
@@ -325,7 +329,7 @@
 			if (i < 0 || i >= patternOrder.length) continue;
 
 			const patternId = patternOrder[i];
-			let pattern = patternsRecord[patternId];
+			const pattern = patternsRecord[patternId];
 
 			const y = centerY - (currentPatternOrderIndex - i) * CELL_HEIGHT;
 
@@ -347,7 +351,8 @@
 				index: i,
 				isDragging: isDraggingThis,
 				orderIndexColor: patternOrderColors[i],
-				isLoopMarker: i === loopPointId
+				isLoopMarker: i === loopPointId,
+				isMissingPattern: hasSongs && pattern === undefined
 			});
 		}
 
@@ -391,10 +396,8 @@
 			if (x <= PADDING + CELL_WIDTH && x >= PADDING) {
 				finishPatternEdit();
 				switchPattern(clickedIndex);
-				if (hasSongs) {
-					editingPatternIndex = clickedIndex;
-					editingPatternValue = '';
-				}
+				editingPatternIndex = clickedIndex;
+				editingPatternValue = '';
 				draw();
 			} else {
 				finishPatternEdit();
@@ -406,7 +409,7 @@
 	}
 
 	function handleMouseDown(event: MouseEvent): void {
-		if (isDragging || !hasSongs) return;
+		if (isDragging) return;
 
 		justFinishedDrag = false;
 
@@ -501,12 +504,6 @@
 		const { key } = event;
 
 		if (editingPatternIndex !== null) {
-			if (!hasSongs) {
-				editingPatternIndex = null;
-				editingPatternValue = '';
-				draw();
-				return;
-			}
 			if (key === 'Enter') {
 				finishPatternEdit();
 			} else if (key === 'Escape') {
@@ -540,7 +537,7 @@
 	}
 
 	function applyPatternEditValue(value: string): void {
-		if (!hasSongs || editingPatternIndex === null || value === '') return;
+		if (editingPatternIndex === null || value === '') return;
 
 		const displayedValue = value.padStart(2, '0');
 		const newId = parseInt(displayedValue);
@@ -718,7 +715,6 @@
 	}
 
 	function addPatternAtIndex(index: number): void {
-		if (!hasSongs) return;
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder],
@@ -748,7 +744,6 @@
 	}
 
 	function removePatternAtIndex(index: number): void {
-		if (!hasSongs) return;
 		const before = {
 			patternOrder: [...projectStore.patternOrder],
 			loopPointId: projectStore.loopPointId,
@@ -773,7 +768,6 @@
 	}
 
 	function clonePatternAtIndex(index: number): void {
-		if (!hasSongs) return;
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder],
@@ -786,8 +780,6 @@
 			index,
 			(songIndex) => projectStore.songs[songIndex]?.getSchema()
 		);
-
-		if (!result) return;
 
 		result.newPatternsPerSong.forEach((newPatterns, songIndex) => {
 			projectStore.updatePatterns(songIndex, newPatterns);
@@ -804,31 +796,27 @@
 	}
 
 	function makePatternUniqueAtIndex(index: number): void {
-		if (!hasSongs) return;
 		if (projectStore.patterns.length > 1 && onMakeUnique) {
 			onMakeUnique(index);
 			return;
 		}
 
 		const targetPatternId = patternOrder[index];
-		const targetPattern = patternsRecord[targetPatternId] ?? null;
-
-		if (!targetPattern) return;
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder]
 		};
 
-		const result = PatternService.makePatternUnique(
-			patternsRecord,
+		const result = PatternService.makePatternUniqueMultiChip(
+			projectStore.patterns,
 			patternOrder,
 			index,
-			targetPattern
+			(songIndex) => projectStore.songs[songIndex]?.getSchema()
 		);
 
-		if (!result) return;
-
-		projectStore.addPatternToAllSongs(result.newPatterns[result.newPatternId]);
+		result.updatedPatterns.forEach((newPatterns, songIndex) => {
+			projectStore.updatePatterns(songIndex, newPatterns);
+		});
 		projectStore.patternOrder = result.newPatternOrder;
 		recordPatternOrderHistory(
 			'patternOrder.makeUnique',
@@ -847,12 +835,10 @@
 	const buttonCenterY = $derived(canvasHeight / 2);
 	const totalHeight = BUTTON_SIZE * 4 + BUTTON_SPACING * 3;
 	const startY = $derived(buttonCenterY - totalHeight / 2);
-	const canRemove = $derived(hasSongs && patternOrder.length > 1);
-	const canEditOrder = $derived(hasSongs);
+	const canRemove = $derived(patternOrder.length > 1);
 
 	function handleContextMenu(event: MouseEvent): void {
 		event.preventDefault();
-		if (!hasSongs) return;
 		const rect = canvas.getBoundingClientRect();
 		const x = event.clientX - rect.left;
 		const y = event.clientY - rect.top;
@@ -1012,9 +998,8 @@
 			buttonType="up"
 			isHovered={hoveredButton === 'up'}
 			onClick={() => makePatternUniqueAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = canEditOrder ? 'up' : null)}
+			onMouseEnter={() => (hoveredButton = 'up')}
 			onMouseLeave={() => (hoveredButton = null)}
-			disabled={!canEditOrder}
 			title="Make Unique"
 			size={BUTTON_SIZE}>
 			<IconCarbonUnlink
@@ -1040,9 +1025,8 @@
 			buttonType="add"
 			isHovered={hoveredButton === 'add'}
 			onClick={() => addPatternAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = canEditOrder ? 'add' : null)}
+			onMouseEnter={() => (hoveredButton = 'add')}
 			onMouseLeave={() => (hoveredButton = null)}
-			disabled={!canEditOrder}
 			title="Add"
 			size={BUTTON_SIZE}>
 			<IconCarbonAdd
@@ -1053,9 +1037,8 @@
 			buttonType="clone"
 			isHovered={hoveredButton === 'clone'}
 			onClick={() => clonePatternAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = canEditOrder ? 'clone' : null)}
+			onMouseEnter={() => (hoveredButton = 'clone')}
 			onMouseLeave={() => (hoveredButton = null)}
-			disabled={!canEditOrder}
 			title="Clone"
 			size={BUTTON_SIZE}
 			hasMargin={false}>

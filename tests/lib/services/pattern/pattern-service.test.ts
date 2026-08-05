@@ -169,6 +169,34 @@ describe('PatternService', () => {
 		});
 	});
 
+	describe('clonePatternAfterMultiChip', () => {
+		it('should insert a new pattern id in the order when there are no songs', () => {
+			const result = PatternService.clonePatternAfterMultiChip([], [0, 1], 0, () => undefined);
+
+			expect(result.newPatternOrder).toEqual([0, 2, 1]);
+			expect(result.newPatternId).toBe(2);
+			expect(result.insertIndex).toBe(1);
+			expect(result.newPatternsPerSong).toEqual([]);
+		});
+
+		it('should clone source patterns when present', () => {
+			const source = new Pattern(0, 4);
+			source.channels[0].rows[0].note = new Note(NoteName.C, 4);
+			const allPatterns: Pattern[][] = [[source]];
+
+			const result = PatternService.clonePatternAfterMultiChip(
+				allPatterns,
+				[0],
+				0,
+				() => undefined
+			);
+
+			expect(result.newPatternOrder).toEqual([0, 1]);
+			expect(result.newPatternsPerSong[0]).toHaveLength(2);
+			expect(result.newPatternsPerSong[0][1].channels[0].rows[0].note.name).toBe(NoteName.C);
+		});
+	});
+
 	describe('makePatternUnique', () => {
 		it('should create unique copy and replace in order', () => {
 			const source = new Pattern(0, 4);
@@ -253,6 +281,25 @@ describe('PatternService', () => {
 
 			expect(result.updatedPatterns[0]).toHaveLength(2);
 			expect(result.updatedPatterns[1]).toHaveLength(0);
+		});
+
+		it('should still update the order when there are no songs', () => {
+			const result = PatternService.makePatternUniqueMultiChip([], [0, 0, 0], 1, () => undefined);
+
+			expect(result.newPatternOrder).toEqual([0, 1, 0]);
+			expect(result.updatedPatterns).toEqual([]);
+		});
+
+		it('should allocate sequential ids when repeatedly making unique with no songs', () => {
+			let order = [0, 1];
+
+			for (let expectedId = 2; expectedId <= 6; expectedId++) {
+				const result = PatternService.makePatternUniqueMultiChip([], order, 1, () => undefined);
+				expect(result.newPatternOrder[1]).toBe(expectedId);
+				order = result.newPatternOrder;
+			}
+
+			expect(order).toEqual([0, 6]);
 		});
 	});
 

@@ -48,7 +48,6 @@
 	} = $props();
 
 	let tables = $derived(projectStore.tables);
-	const hasSongs = $derived(projectStore.songs.length > 0);
 	const songs = $derived(projectStore.songs);
 
 	const tableListResize = createPersistedResizableListHeight({
@@ -126,7 +125,6 @@
 	}
 
 	function handleTableChange(table: Table): void {
-		if (!hasSongs) return;
 		const beforeTables = projectStore.cloneForHistory(projectStore.tables);
 		const updated = [...tables];
 		updated[selectedTableIndex] = { ...table };
@@ -167,7 +165,6 @@
 	}
 
 	async function addTable(): Promise<void> {
-		if (!hasSongs) return;
 		flushTableUpdateHistory();
 		const existingIds = tables.map((t) => t.id);
 		const newId = getNextAvailableTableId(existingIds);
@@ -198,7 +195,6 @@
 	}
 
 	function removeTable(index: number): void {
-		if (!hasSongs) return;
 		flushTableUpdateHistory();
 		if (tables.length <= 1) return;
 		const beforeTables = projectStore.cloneForHistory(projectStore.tables);
@@ -219,7 +215,6 @@
 	}
 
 	async function copyTable(copiedIndex: number): Promise<void> {
-		if (!hasSongs) return;
 		flushTableUpdateHistory();
 		const table = tables[copiedIndex];
 		if (!table) return;
@@ -437,12 +432,10 @@
 										nameLabel={table.name}
 										copyTitle="Copy table"
 										removeTitle="Remove table"
-										showCopy={hasSongs}
-										showRemove={hasSongs && tables.length > 1}
+										showCopy={true}
+										showRemove={tables.length > 1}
 										onSelect={() => (selectedTableIndex = index)}
-										onDoubleClick={() => {
-											if (hasSongs) startEditingTableId(index);
-										}}
+										onDoubleClick={() => startEditingTableId(index)}
 										onCopy={(e) => {
 											e.stopPropagation();
 											copyTable(index);
@@ -478,23 +471,19 @@
 						icon={IconCarbonAdd}
 						label="Add"
 						onclick={addTable}
-						disabled={!hasSongs || tables.length > MAX_TABLE_ID}
-						title={!hasSongs
-							? 'Add a song before creating tables'
-							: tables.length > MAX_TABLE_ID
-								? 'Maximum 35 tables'
-								: 'Add new table'} />
+						disabled={tables.length > MAX_TABLE_ID}
+						title={tables.length > MAX_TABLE_ID ? 'Maximum 35 tables' : 'Add new table'} />
 					<ToolbarButton
 						icon={IconCarbonSave}
 						label="Save"
 						onclick={saveTable}
-						disabled={!hasSongs || tables.length === 0}
+						disabled={tables.length === 0}
 						title="Save selected table to JSON file" />
 					<ToolbarButton
 						icon={IconCarbonDocumentImport}
 						label="Load"
 						onclick={loadTable}
-						disabled={!hasSongs || tables.length === 0}
+						disabled={tables.length === 0}
 						title="Load table from JSON file into selected slot" />
 				</div>
 			</div>
@@ -504,10 +493,7 @@
 				label="Drag to resize table list"
 				onmousedown={tableListResize.beginResize} />
 
-			<div
-				class="min-h-0 flex-1 overflow-auto p-4"
-				class:pointer-events-none={!hasSongs}
-				class:opacity-50={!hasSongs}>
+			<div class="min-h-0 flex-1 overflow-auto p-4">
 				{#if tables[selectedTableIndex]}
 					{#key tables[selectedTableIndex].id}
 						<TableEditor

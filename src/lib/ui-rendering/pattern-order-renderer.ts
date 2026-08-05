@@ -26,6 +26,7 @@ export interface PatternCell {
 	isDragging?: boolean;
 	orderIndexColor?: string;
 	isLoopMarker?: boolean;
+	isMissingPattern?: boolean;
 }
 
 const CONTRAST_DARK = '#1a1a1a';
@@ -75,7 +76,7 @@ export class PatternOrderRenderer extends BaseCanvasRenderer {
 
 	drawPatternCell(cell: PatternCell): void {
 		const cellY = cell.y - this.cellHeight / 2;
-		const isEmpty = !cell.pattern;
+		const isEmpty = cell.isMissingPattern === true;
 
 		if (cell.isDragging) {
 			this.save();

@@ -32,14 +32,12 @@ async function createNewSongFromMenu(ctx: MenuActionContext, chip: Chip): Promis
 	ctx.container.audioService.stop();
 	const project = ctx.getCurrentProject();
 	const newSong = await ctx.projectService.createNewSong(chip, project.songs);
-	if (project.songs.length > 0 && project.patternOrder.length > 0) {
-		const refSong = project.songs[0] as unknown as {
-			patterns: { id: number; length: number }[];
-		};
+	if (project.patternOrder.length > 0) {
+		const refPatterns = project.songs[0]?.patterns ?? [];
 		const schema = newSong.getSchema() ?? chip.schema;
 		const uniquePatternIds = [...new Set(project.patternOrder)];
 		newSong.patterns = uniquePatternIds.map((id) => {
-			const refPattern = refSong.patterns.find((p: { id: number }) => p.id === id);
+			const refPattern = refPatterns.find((p) => p.id === id);
 			const length = refPattern?.length ?? 64;
 			return new Pattern(id, length, schema);
 		});

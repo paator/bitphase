@@ -244,7 +244,7 @@ export class PatternService {
 		newPatternOrder: number[];
 		newPatternId: number;
 		insertIndex: number;
-	} | null {
+	} {
 		const targetPatternId = patternOrder[index];
 		const newPatternId =
 			this.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder);
@@ -252,21 +252,23 @@ export class PatternService {
 		const newPatternOrder = [...patternOrder];
 		newPatternOrder.splice(insertIndex, 0, newPatternId);
 
-		const hasAnySource = allPatterns.some((songPatterns) =>
-			songPatterns.some((p) => p.id === targetPatternId)
-		);
-		if (!hasAnySource) return null;
-
 		const newPatternsPerSong = allPatterns.map((songPatterns, songIndex) => {
 			const sourcePattern = songPatterns.find((p) => p.id === targetPatternId);
-			if (!sourcePattern) return songPatterns;
+			if (sourcePattern) {
+				const clonedPattern = this.clonePattern(
+					sourcePattern,
+					newPatternId,
+					getSchema(songIndex)
+				);
+				return [...songPatterns, clonedPattern];
+			}
 
-			const clonedPattern = this.clonePattern(
-				sourcePattern,
-				newPatternId,
-				getSchema(songIndex)
-			);
-			return [...songPatterns, clonedPattern];
+			const emptyPattern = this.createEmptyPattern(newPatternId, getSchema(songIndex));
+			const existing = songPatterns.find((p) => p.id === newPatternId);
+			if (existing) {
+				return songPatterns.map((p) => (p.id === newPatternId ? emptyPattern : p));
+			}
+			return [...songPatterns, emptyPattern];
 		});
 
 		return {
@@ -297,6 +299,22 @@ export class PatternService {
 		return newPatternId;
 	}
 
+	static findNextSequentialPatternId(
+		allPatterns: Pattern[][],
+		patternOrder: number[]
+	): number {
+		let maxId = -1;
+		for (const id of patternOrder) {
+			if (id > maxId) maxId = id;
+		}
+		for (const songPatterns of allPatterns) {
+			for (const pattern of songPatterns) {
+				if (pattern.id > maxId) maxId = pattern.id;
+			}
+		}
+		return maxId + 1;
+	}
+
 	static makePatternUniqueMultiChip(
 		allPatterns: Pattern[][],
 		patternOrder: number[],
@@ -304,7 +322,7 @@ export class PatternService {
 		getSchema: (songIndex: number) => ChipSchema | undefined
 	): { newPatternOrder: number[]; updatedPatterns: Pattern[][] } {
 		const currentId = patternOrder[index];
-		const newId = this.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder);
+		const newId = this.findNextSequentialPatternId(allPatterns, patternOrder);
 		const newPatternOrder = [...patternOrder];
 		newPatternOrder[index] = newId;
 
@@ -337,7 +355,8 @@ export class PatternService {
 	} | null {
 		if (!targetPattern) return null;
 
-		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
+		const allPatterns = [Object.values(patterns)];
+		const newPatternId = this.findNextSequentialPatternId(allPatterns, patternOrder);
 		const uniquePattern = this.clonePattern(targetPattern, newPatternId, schema);
 
 		const newPatterns = { ...patterns, [newPatternId]: uniquePattern };
