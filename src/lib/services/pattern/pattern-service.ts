@@ -1,4 +1,4 @@
-import { Pattern, Note, Effect } from '../../models/song';
+import { Pattern, Note, Effect, DEFAULT_PATTERN_LENGTH } from '../../models/song';
 import { isEffectLike, toNumber } from '../../utils/type-guards';
 import type { ChipSchema } from '../../chips/base/schema';
 import { PatternEffectHandling } from './editing/pattern-effect-handling';
@@ -27,9 +27,10 @@ export class PatternService {
 	static createEmptyPattern(
 		id: number,
 		schema?: ChipSchema,
-		effectiveChannelLabels?: string[]
+		effectiveChannelLabels?: string[],
+		length: number = DEFAULT_PATTERN_LENGTH
 	): Pattern {
-		return new Pattern(id, 64, schema, effectiveChannelLabels);
+		return new Pattern(id, length, schema, effectiveChannelLabels);
 	}
 
 	/**
@@ -100,7 +101,8 @@ export class PatternService {
 		patterns: Record<number, Pattern>,
 		patternOrder: number[],
 		index: number,
-		schema?: ChipSchema
+		schema?: ChipSchema,
+		length: number = DEFAULT_PATTERN_LENGTH
 	): {
 		newPatterns: Record<number, Pattern>;
 		newPatternOrder: number[];
@@ -108,7 +110,7 @@ export class PatternService {
 		insertIndex: number;
 	} {
 		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
-		const newPattern = this.createEmptyPattern(newPatternId, schema);
+		const newPattern = this.createEmptyPattern(newPatternId, schema, undefined, length);
 
 		const newPatterns = { ...patterns, [newPatternId]: newPattern };
 		const newPatternOrder = [...patternOrder];
@@ -132,7 +134,8 @@ export class PatternService {
 		patternOrder: number[],
 		index: number,
 		getSchema: (songIndex: number) => ChipSchema | undefined,
-		getEffectiveLabels?: (songIndex: number) => string[] | undefined
+		getEffectiveLabels?: (songIndex: number) => string[] | undefined,
+		length: number = DEFAULT_PATTERN_LENGTH
 	): {
 		newPatternsPerSong: Pattern[][];
 		newPatternOrder: number[];
@@ -148,7 +151,8 @@ export class PatternService {
 			const newPattern = this.createEmptyPattern(
 				newPatternId,
 				getSchema(songIndex),
-				getEffectiveLabels?.(songIndex)
+				getEffectiveLabels?.(songIndex),
+				length
 			);
 			const existing = songPatterns.find((p) => p.id === newPatternId);
 			if (existing) {
@@ -397,7 +401,8 @@ export class PatternService {
 		index: number,
 		newId: number,
 		currentPattern?: Pattern,
-		schema?: ChipSchema
+		schema?: ChipSchema,
+		length: number = DEFAULT_PATTERN_LENGTH
 	): {
 		newPatterns: Record<number, Pattern>;
 		newPatternOrder: number[];
@@ -407,7 +412,7 @@ export class PatternService {
 		if (!patterns[newId]) {
 			const newPattern = currentPattern
 				? this.clonePattern(currentPattern, newId, schema)
-				: this.createEmptyPattern(newId, schema);
+				: this.createEmptyPattern(newId, schema, undefined, length);
 			patterns = { ...patterns, [newId]: newPattern };
 		}
 
@@ -428,7 +433,8 @@ export class PatternService {
 		index: number,
 		newId: number,
 		getSchema: (songIndex: number) => ChipSchema | undefined,
-		getEffectiveLabels?: (songIndex: number) => string[] | undefined
+		getEffectiveLabels?: (songIndex: number) => string[] | undefined,
+		length: number = DEFAULT_PATTERN_LENGTH
 	): {
 		newPatternsPerSong: Pattern[][];
 		newPatternOrder: number[];
@@ -444,7 +450,12 @@ export class PatternService {
 			const currentPattern = songPatterns.find((p) => p.id === patternOrder[index]);
 			const newPattern = currentPattern
 				? this.clonePattern(currentPattern, newId, getSchema(songIndex))
-				: this.createEmptyPattern(newId, getSchema(songIndex), getEffectiveLabels?.(songIndex));
+				: this.createEmptyPattern(
+						newId,
+						getSchema(songIndex),
+						getEffectiveLabels?.(songIndex),
+						length
+					);
 			return [...songPatterns, newPattern];
 		});
 
@@ -459,11 +470,14 @@ export class PatternService {
 	 */
 	static findOrCreatePattern(
 		patterns: Pattern[],
-		patternId: number
+		patternId: number,
+		schema?: ChipSchema,
+		effectiveChannelLabels?: string[],
+		length: number = DEFAULT_PATTERN_LENGTH
 	): { pattern: Pattern; newPatterns: Pattern[] } {
 		let pattern = patterns.find((p) => p.id === patternId);
 		if (!pattern) {
-			pattern = this.createEmptyPattern(patternId);
+			pattern = this.createEmptyPattern(patternId, schema, effectiveChannelLabels, length);
 			return { pattern, newPatterns: [...patterns, pattern] };
 		}
 		return { pattern, newPatterns: patterns };

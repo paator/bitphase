@@ -1,4 +1,5 @@
 import type { Song, Instrument, Pattern } from '../models/song';
+import { DEFAULT_PATTERN_LENGTH } from '../models/song';
 import { Project, Table } from '../models/project';
 import { filterInstrumentsForActiveChipTypes } from '../services/instrument/instrument-filter';
 import { undoRedoStore } from './undo-redo.svelte';
@@ -18,7 +19,8 @@ class ProjectStore {
 	settings = $state<Record<string, unknown>>({
 		title: '',
 		author: '',
-		initialSpeed: 3
+		initialSpeed: 3,
+		defaultPatternLength: DEFAULT_PATTERN_LENGTH
 	});
 	initialized = $state(false);
 
@@ -77,7 +79,8 @@ class ProjectStore {
 		this.settings = {
 			title: project.name,
 			author: project.author,
-			initialSpeed: project.songs[0]?.initialSpeed ?? 3
+			initialSpeed: project.songs[0]?.initialSpeed ?? 3,
+			defaultPatternLength: project.songs[0]?.defaultPatternLength ?? DEFAULT_PATTERN_LENGTH
 		};
 		this.patterns = project.songs.map((song) => song.patterns);
 		this.songs = project.songs;
@@ -117,8 +120,24 @@ class ProjectStore {
 		if (typeof projectInitialSpeed === 'number' && projectInitialSpeed >= 1) {
 			song.initialSpeed = projectInitialSpeed;
 		}
+		const projectDefaultPatternLength = this.settings.defaultPatternLength;
+		if (
+			typeof projectDefaultPatternLength === 'number' &&
+			projectDefaultPatternLength >= 1 &&
+			projectDefaultPatternLength <= 256
+		) {
+			song.defaultPatternLength = projectDefaultPatternLength;
+		}
 		this.songs = [...this.songs, song];
 		this.patterns = [...this.patterns, song.patterns];
+	}
+
+	getDefaultPatternLength(): number {
+		const value = this.settings.defaultPatternLength;
+		if (typeof value === 'number' && value >= 1 && value <= 256) {
+			return Math.floor(value);
+		}
+		return DEFAULT_PATTERN_LENGTH;
 	}
 
 	updatePatterns(songIndex: number, newPatterns: Pattern[]): void {

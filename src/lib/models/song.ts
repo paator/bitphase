@@ -142,6 +142,8 @@ class Channel {
 	}
 }
 
+export const DEFAULT_PATTERN_LENGTH = 64;
+
 class Pattern {
 	id: number;
 	length: number;
@@ -150,7 +152,7 @@ class Pattern {
 
 	constructor(
 		id: number,
-		length: number = 64,
+		length: number = DEFAULT_PATTERN_LENGTH,
 		schema?: ChipSchema,
 		effectiveChannelLabels?: string[]
 	) {
@@ -170,6 +172,7 @@ class Song {
 	public patterns: Pattern[];
 	public tuningTable: number[];
 	public initialSpeed: number;
+	public defaultPatternLength: number;
 	public chipType?: string;
 	public chipVariant?: string;
 	public chipFrequency?: number;
@@ -182,7 +185,8 @@ class Song {
 	constructor(schema?: ChipSchema) {
 		this.schema = schema;
 		this.initialSpeed = 3;
-		this.patterns = [new Pattern(0, 64, schema)];
+		this.defaultPatternLength = DEFAULT_PATTERN_LENGTH;
+		this.patterns = [new Pattern(0, this.defaultPatternLength, schema)];
 		this.tuningTable = [];
 		this.interruptFrequency = 50;
 	}
@@ -203,7 +207,7 @@ class Song {
 	addPattern(): Pattern {
 		const newId = this.patterns.length;
 		const effectiveLabels = this.getEffectiveChannelLabels();
-		const pattern = new Pattern(newId, 64, this.schema, effectiveLabels);
+		const pattern = new Pattern(newId, this.defaultPatternLength, this.schema, effectiveLabels);
 		this.patterns.push(pattern);
 		return pattern;
 	}

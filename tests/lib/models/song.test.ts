@@ -17,6 +17,7 @@ describe('Song', () => {
 			const song = new Song(AY_CHIP_SCHEMA);
 
 			expect(song.initialSpeed).toBe(3);
+			expect(song.defaultPatternLength).toBe(64);
 			expect(song.patterns).toHaveLength(1);
 			expect(song.patterns[0].id).toBe(0);
 			expect(song.tuningTable).toEqual([]);
@@ -43,6 +44,14 @@ describe('Song', () => {
 
 			expect(pattern.length).toBe(64);
 			expect(pattern.channels).toHaveLength(3);
+		});
+
+		it('should create pattern with song defaultPatternLength', () => {
+			const song = new Song(AY_CHIP_SCHEMA);
+			song.defaultPatternLength = 32;
+			const pattern = song.addPattern();
+
+			expect(pattern.length).toBe(32);
 		});
 	});
 });

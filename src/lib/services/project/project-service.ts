@@ -26,6 +26,7 @@ export class ProjectService {
 		this.applyChipDefaults(newSong, chip.schema);
 		if (existingSongs.length > 0) {
 			newSong.initialSpeed = existingSongs[0].initialSpeed;
+			newSong.defaultPatternLength = existingSongs[0].defaultPatternLength;
 		}
 		this.syncFromPeerSongs(newSong, existingSongs, chip.schema);
 		await this.audioService.addChipProcessor(chip);
@@ -57,6 +58,7 @@ export class ProjectService {
 		}
 
 		targetSong.initialSpeed = peer.initialSpeed;
+		targetSong.defaultPatternLength = peer.defaultPatternLength;
 		targetSong.tuningTable = [...peer.tuningTable];
 	}
 
@@ -104,6 +106,9 @@ export class ProjectService {
 
 				if (target.initialSpeed !== source.initialSpeed) {
 					target.initialSpeed = source.initialSpeed;
+				}
+				if (target.defaultPatternLength !== source.defaultPatternLength) {
+					target.defaultPatternLength = source.defaultPatternLength;
 				}
 			}
 

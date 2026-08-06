@@ -160,6 +160,21 @@
 	const pressedKeyChannels = new Map<string, number>();
 	let previewInitialized = false;
 
+	function createEmptyPatternForSong(patternId: number, forSongIndex: number = songIndex): Pattern {
+		const song = projectStore.songs[forSongIndex];
+		const songSchema =
+			song?.getSchema() ??
+			(forSongIndex === songIndex
+				? schema
+				: services.audioService.chipProcessors[forSongIndex]?.chip?.schema);
+		return PatternService.createEmptyPattern(
+			patternId,
+			songSchema,
+			song?.getEffectiveChannelLabels(),
+			song?.defaultPatternLength ?? projectStore.getDefaultPatternLength()
+		);
+	}
+
 	$effect(() => {
 		if (chipProcessor && chipProcessor.isAudioNodeAvailable()) {
 			const withTuningTables = chipProcessor as ChipProcessor & Partial<TuningTableSupport>;
@@ -286,7 +301,14 @@
 	});
 
 	function findOrCreatePattern(patternId: number): Pattern {
-		const { pattern, newPatterns } = PatternService.findOrCreatePattern(patterns, patternId);
+		const song = projectStore.songs[songIndex];
+		const { pattern, newPatterns } = PatternService.findOrCreatePattern(
+			patterns,
+			patternId,
+			song?.getSchema() ?? schema,
+			song?.getEffectiveChannelLabels(),
+			song?.defaultPatternLength ?? projectStore.getDefaultPatternLength()
+		);
 		if (newPatterns !== patterns) {
 			updatePatterns(newPatterns);
 		}
@@ -605,10 +627,9 @@
 						getStartPatternForChip: (chipIndex: number) => {
 							const patternId = patternOrder[currentPatternOrderIndex];
 							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							const schema = chipProcessors[chipIndex]?.chip?.schema;
 							return (
 								songPatterns.find((p) => p.id === patternId) ??
-								PatternService.createEmptyPattern(patternId, schema)
+								createEmptyPatternForSong(patternId, chipIndex)
 							);
 						},
 						getCatchUpSegmentsForChip: (chipIndex: number) => {
@@ -702,10 +723,9 @@
 						getStartPatternForChip: (chipIndex: number) => {
 							const patternId = currentPattern.id;
 							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							const schema = chipProcessors[chipIndex]?.chip?.schema;
 							return (
 								songPatterns.find((p) => p.id === patternId) ??
-								PatternService.createEmptyPattern(patternId, schema)
+								createEmptyPatternForSong(patternId, chipIndex)
 							);
 						},
 						getCatchUpSegmentsForChip: (chipIndex: number) => {
@@ -805,10 +825,9 @@
 							getStartPatternForChip: (chipIndex: number) => {
 								const patternId = patternOrder[currentPatternOrderIndex];
 								const songPatterns = projectStore.patterns[chipIndex] ?? [];
-								const schema = chipProcessors[chipIndex]?.chip?.schema;
 								return (
 									songPatterns.find((p) => p.id === patternId) ??
-									PatternService.createEmptyPattern(patternId, schema)
+									createEmptyPatternForSong(patternId, chipIndex)
 								);
 							},
 							getCatchUpSegmentsForChip: (chipIndex: number) => {
@@ -918,7 +937,7 @@
 				canvasHeight,
 				lineHeight,
 				createPatternIfMissing: (patternId: number) => {
-					const newPattern = PatternService.createEmptyPattern(patternId);
+					const newPattern = createEmptyPatternForSong(patternId);
 					updatePatterns([...patterns, newPattern]);
 					return newPattern;
 				}
@@ -3019,7 +3038,7 @@
 			) {
 				const requestedPattern =
 					latestPatterns.find((p) => p.id === patternId) ||
-					PatternService.createEmptyPattern(patternId);
+					createEmptyPatternForSong(patternId);
 
 				chipProcessor.sendRequestedPattern(
 					requestedPattern,

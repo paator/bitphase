@@ -115,6 +115,17 @@ describe('ProjectService', () => {
 			expect(song.initialSpeed).toBe(12);
 		});
 
+		it('should inherit defaultPatternLength from an existing song', async () => {
+			const mockChip = createMockChip();
+			const existing = new Song(mockChip.schema);
+			existing.chipType = CHIP_TYPE_AY;
+			existing.defaultPatternLength = 32;
+
+			const song = await projectService.createNewSong(mockChip, [existing]);
+
+			expect(song.defaultPatternLength).toBe(32);
+		});
+
 		it('should apply chip schema defaultTuningTable and defaultChipVariant to song', async () => {
 			const defaultTuningTable = [1, 2, 3];
 			const defaultChipVariant = 'YM';

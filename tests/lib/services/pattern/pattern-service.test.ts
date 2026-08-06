@@ -43,7 +43,7 @@ describe('PatternService', () => {
 		});
 
 		it('should create a pattern with specified length', () => {
-			const pattern = new Pattern(10, 32);
+			const pattern = PatternService.createEmptyPattern(10, undefined, undefined, 32);
 			expect(pattern.id).toBe(10);
 			expect(pattern.length).toBe(32);
 		});

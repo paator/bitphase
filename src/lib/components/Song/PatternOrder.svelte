@@ -548,7 +548,8 @@
 			editingPatternIndex,
 			newId,
 			(songIndex) => projectStore.songs[songIndex]?.getSchema(),
-			(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels()
+			(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels(),
+			projectStore.getDefaultPatternLength()
 		);
 
 		if (result) {
@@ -726,7 +727,8 @@
 			patternOrder,
 			index,
 			(songIndex) => projectStore.songs[songIndex]?.getSchema(),
-			(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels()
+			(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels(),
+			projectStore.getDefaultPatternLength()
 		);
 
 		result.newPatternsPerSong.forEach((newPatterns, songIndex) => {

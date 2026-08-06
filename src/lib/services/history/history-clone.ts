@@ -45,6 +45,7 @@ export class HistoryClone {
 		cloned.patterns = song.patterns.map((pattern) => this.pattern(pattern));
 		cloned.tuningTable = [...song.tuningTable];
 		cloned.initialSpeed = song.initialSpeed;
+		cloned.defaultPatternLength = song.defaultPatternLength;
 		cloned.chipType = song.chipType;
 		cloned.chipVariant = song.chipVariant;
 		cloned.chipFrequency = song.chipFrequency;

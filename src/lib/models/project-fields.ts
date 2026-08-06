@@ -14,6 +14,16 @@ export const PROJECT_FIELDS: ChipSetting[] = [
 		group: 'project'
 	},
 	{
+		key: 'defaultPatternLength',
+		label: 'Default Pattern Length',
+		type: 'number',
+		defaultValue: 64,
+		group: 'project',
+		min: 1,
+		max: 256,
+		step: 1
+	},
+	{
 		key: 'initialSpeed',
 		label: 'Initial Speed',
 		type: 'number',
@@ -22,7 +32,6 @@ export const PROJECT_FIELDS: ChipSetting[] = [
 		min: 1,
 		max: 255,
 		step: 1,
-		fullWidth: true,
 		dependsOn: ['interruptFrequency'],
 		computedHint: (speed, context) => {
 			const freq = Number(context?.interruptFrequency ?? 50);

@@ -26,19 +26,21 @@ import { AY_CHIP } from '../../chips/ay';
 import { NES_CHIP } from '../../chips/nes';
 import type { Chip } from '../../chips/types';
 import type { MenuActionContext } from './menu-action-context';
+import { projectStore } from '../../stores/project.svelte';
 
 async function createNewSongFromMenu(ctx: MenuActionContext, chip: Chip): Promise<void> {
 	ctx.playbackStore.isPlaying = false;
 	ctx.container.audioService.stop();
 	const project = ctx.getCurrentProject();
 	const newSong = await ctx.projectService.createNewSong(chip, project.songs);
+	newSong.defaultPatternLength = projectStore.getDefaultPatternLength();
 	if (project.patternOrder.length > 0) {
 		const refPatterns = project.songs[0]?.patterns ?? [];
 		const schema = newSong.getSchema() ?? chip.schema;
 		const uniquePatternIds = [...new Set(project.patternOrder)];
 		newSong.patterns = uniquePatternIds.map((id) => {
 			const refPattern = refPatterns.find((p) => p.id === id);
-			const length = refPattern?.length ?? 64;
+			const length = refPattern?.length ?? newSong.defaultPatternLength;
 			return new Pattern(id, length, schema);
 		});
 	}

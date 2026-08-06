@@ -11,7 +11,8 @@ import {
 	NoteName,
 	EffectType,
 	Instrument,
-	InstrumentRow
+	InstrumentRow,
+	DEFAULT_PATTERN_LENGTH
 } from '../../models/song';
 import { isValidInstrumentSampleByteLength } from '../../utils/audio-sample-decode';
 import { normalizeSamplePlaybackBounds } from '../../chips/ay/sample-region';
@@ -80,7 +81,7 @@ function reconstructSong(data: any, getChip: (chipType: string) => Chip | null):
 
 	song.patterns = data.patterns?.map((patternData: any) =>
 		reconstructPattern(patternData, schema, effectiveLabels)
-	) || [new Pattern(0, 64, schema)];
+	) || [new Pattern(0, DEFAULT_PATTERN_LENGTH, schema)];
 	song.tuningTable = data.tuningTable || song.tuningTable;
 	song.chipType = data.chipType;
 	const songRecord = song as unknown as Record<string, unknown>;
@@ -107,6 +108,13 @@ function reconstructSong(data: any, getChip: (chipType: string) => Chip | null):
 	const loadedSpeed = data.initialSpeed;
 	song.initialSpeed =
 		typeof loadedSpeed === 'number' && loadedSpeed >= 1 && loadedSpeed <= 255 ? loadedSpeed : 3;
+	const loadedDefaultPatternLength = data.defaultPatternLength;
+	song.defaultPatternLength =
+		typeof loadedDefaultPatternLength === 'number' &&
+		loadedDefaultPatternLength >= 1 &&
+		loadedDefaultPatternLength <= 256
+			? Math.floor(loadedDefaultPatternLength)
+			: DEFAULT_PATTERN_LENGTH;
 	return song;
 }
 
@@ -115,7 +123,7 @@ function reconstructPattern(
 	schema?: ChipSchema,
 	effectiveChannelLabels?: string[]
 ): Pattern {
-	const length = data.length ?? 64;
+	const length = data.length ?? DEFAULT_PATTERN_LENGTH;
 	const pattern = new Pattern(data.id ?? 0, length, schema, effectiveChannelLabels);
 	const channelLabels = effectiveChannelLabels ?? schema?.channelLabels ?? ['A', 'B', 'C'];
 	if (data.channels) {
