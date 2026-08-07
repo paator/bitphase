@@ -8,11 +8,12 @@ Open the tracker at [bitphase.app](https://bitphase.app/).
 
 | Chip                | Status                                            |
 | ------------------- | ------------------------------------------------- |
-| AY-3-8910 / YM2149F | Primary - full editor, playback, and export paths |
+| AY-3-8910 / YM2149F (MSX, Atari ST, ZX Spectrum 128k) | Primary - full editor, playback, and export paths |
 | 2A03 / 2A07 (NES)   | Experimental - available as a WIP song type       |
 
 ## What’s in these docs
 
+- [Glossary](/glossary) - list of definitions of terms used throughout these documents
 - [Getting started](/getting-started) - create a project and find your way around
 - [Keyboard](/keyboard) - note entry and default shortcuts
 - [Effects](/effects) - pattern effect reference
