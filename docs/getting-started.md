@@ -1,5 +1,62 @@
 # Getting started
 
+## Building
+Bitphase can be accessed via bitphase.app, which always contains the freshest codebase build. Alternatively you can make your own, self hosted build:
+### Prerequisites
+
+- **Node.js** (v18 or higher)
+- **pnpm** (v10.11.0 or higher) - Package manager
+- **Emscripten SDK** - Required for building WebAssembly modules
+
+### Installing Emscripten
+
+1. Download and install Emscripten from [emscripten.org](https://emscripten.org/docs/getting_started/downloads.html)
+2. Set the `EMSDK` environment variable to point to your Emscripten installation
+3. Ensure `emcc` is available in your PATH
+
+### Getting Started
+
+1. **Clone the repository**
+
+   ```bash
+   git clone <repository-url>
+   cd bitphase
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+3. **Build WebAssembly modules**
+
+   ```bash
+   pnpm build:wasm
+   ```
+
+   This compiles the Ayumi chip emulator to WebAssembly. You only need to run this once, or when the WASM code changes.
+
+4. **Start the development server**
+
+   ```bash
+   pnpm dev
+   ```
+
+5. **Open your browser**
+   Navigate to `http://localhost:5173` (or the port shown in the terminal)
+
+### Available Scripts
+
+- `pnpm dev` - Build WASM and start development server with hot module replacement
+- `pnpm build` - Build WASM and create production build
+- `pnpm build:wasm` - Build only the WebAssembly modules
+- `pnpm preview` - Preview the production build locally
+- `pnpm check` - Run TypeScript and Svelte type checking
+- `pnpm test` - Run tests in watch mode
+- `pnpm test:run` - Run tests once
+
+
 ## Open the tracker
 
 Go to [bitphase.app](https://bitphase.app/). Bitphase runs in the desktop browser - no separate download is required. Mobile is not supported yet.
@@ -10,6 +67,17 @@ You can also install it as an app (PWA) so it opens in its own window:
 - **Safari (macOS):** open the site, then **File → Add to Dock**.
 
 After install, launch Bitphase from your dock or app list like a normal application.
+
+## Main areas
+Regardless whether you built your own instance or you went to bitphase.app, you are presented with the following:
+
+| Area                  | What it’s for                                     |
+| --------------------- | ------------------------------------------------- |
+| Pattern editor        | Enter notes, table arpeggios, volumes and effects |
+| Order list            | Arrange which patterns play, and in what order    |
+| Instruments           | Edit sound and behavior settings for instruments  |
+| Tables                | Tables used by instruments and effects            |
+| Song / project fields | Title, author, chip settings and more             |
 
 ## Create a project
 
@@ -34,16 +102,6 @@ Bitphase's goal is to support real-life multi-chip setups related to AY chips, s
 The tracker does not enforce realistic combinations - keep real-life limits in mind if you want to export and play the song on actual hardware.
 
 Use **File → New Song** to add another song for a chosen chip without starting a new project.
-
-## Main areas
-
-| Area                  | What it’s for                                     |
-| --------------------- | ------------------------------------------------- |
-| Pattern editor        | Enter notes, table arpeggios, volumes and effects |
-| Order list            | Arrange which patterns play, and in what order    |
-| Instruments           | Edit sound and behavior settings for instruments  |
-| Tables                | Tables used by instruments and effects            |
-| Song / project fields | Title, author, chip settings and more             |
 
 ## Playback basics
 
