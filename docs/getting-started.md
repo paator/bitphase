@@ -1,12 +1,15 @@
 # Getting started
 
-## Building
-Bitphase can be accessed via bitphase.app, which always contains the freshest codebase build. Alternatively you can make your own, self hosted build:
+## Running / Building
+
+Bitphase can be accessed via [bitphase.app](https://bitphase.app/), which always contains the freshest codebase build. Alternatively you can make your own, self hosted build:
+
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
-- **pnpm** (v10.11.0 or higher) - Package manager
-- **Emscripten SDK** - Required for building WebAssembly modules
+- **Node.js** (v18 or higher; v20 recommended)
+- **pnpm** (v10.11.0 or higher)
+- **Emscripten SDK** - required for building WebAssembly modules (AY and NES)
+- **Git submodules** - the Ayumi emulator lives in `external/ayumi`
 
 ### Installing Emscripten
 
@@ -18,44 +21,47 @@ Bitphase can be accessed via bitphase.app, which always contains the freshest co
 
 1. **Clone the repository**
 
-   ```bash
-   git clone <repository-url>
-   cd bitphase
-   ```
+    ```bash
+    git clone --recurse-submodules https://github.com/paator/bitphase.git
+    cd bitphase
+    ```
+
+    If you already cloned without submodules:
+
+    ```bash
+    git submodule update --init --recursive
+    ```
 
 2. **Install dependencies**
 
-   ```bash
-   pnpm install
-   ```
+    ```bash
+    pnpm install
+    ```
 
-3. **Build WebAssembly modules**
+3. **Start the development server**
 
-   ```bash
-   pnpm build:wasm
-   ```
+    ```bash
+    pnpm dev
+    ```
 
-   This compiles the Ayumi chip emulator to WebAssembly. You only need to run this once, or when the WASM code changes.
+    This builds the WASM modules (Ayumi + NES) and starts Vite. You can also run `pnpm build:wasm` on its own when the C sources change.
 
-4. **Start the development server**
+4. **Open your browser**
 
-   ```bash
-   pnpm dev
-   ```
-
-5. **Open your browser**
-   Navigate to `http://localhost:5173` (or the port shown in the terminal)
+    Navigate to `http://localhost:5173` (or the port shown in the terminal)
 
 ### Available Scripts
 
-- `pnpm dev` - Build WASM and start development server with hot module replacement
-- `pnpm build` - Build WASM and create production build
-- `pnpm build:wasm` - Build only the WebAssembly modules
-- `pnpm preview` - Preview the production build locally
-- `pnpm check` - Run TypeScript and Svelte type checking
-- `pnpm test` - Run tests in watch mode
-- `pnpm test:run` - Run tests once
-
+- `pnpm dev` - build WASM and start the development server with hot module replacement
+- `pnpm build` - build WASM, the tracker production bundle, and the docs site into `dist/`
+- `pnpm build:wasm` - build only the WebAssembly modules (`public/ay/ayumi.wasm`, `public/nes/*.wasm`)
+- `pnpm docs:dev` - run the VitePress docs site locally
+- `pnpm docs:build` - build docs into `dist/docs`
+- `pnpm preview` - preview the production tracker build locally
+- `pnpm check` - run TypeScript and Svelte type checking
+- `pnpm test` - run tests in watch mode
+- `pnpm test:run` - run tests once
+- `pnpm btp-to-wav` - export a `.btp` project to WAV from the command line
 
 ## Open the tracker
 
@@ -69,6 +75,7 @@ You can also install it as an app (PWA) so it opens in its own window:
 After install, launch Bitphase from your dock or app list like a normal application.
 
 ## Main areas
+
 Regardless whether you built your own instance or you went to bitphase.app, you are presented with the following:
 
 | Area                  | What it’s for                                     |

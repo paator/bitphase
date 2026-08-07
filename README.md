@@ -54,8 +54,8 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
 
 - **Node.js** (v18 or higher; v20 recommended)
 - **pnpm** (v10.11.0 or higher)
-- **Emscripten SDK** — required for building the Ayumi WebAssembly module
-- **Git submodules** — the Ayumi emulator lives in `external/ayumi`
+- **Emscripten SDK** - required for building WebAssembly modules (AY and NES)
+- **Git submodules** - the Ayumi emulator lives in `external/ayumi`
 
 ### Installing Emscripten
 
@@ -84,45 +84,43 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
    pnpm install
    ```
 
-3. **Build WebAssembly modules**
-
-   ```bash
-   pnpm build:wasm
-   ```
-
-   This compiles the Ayumi chip emulator to `public/ayumi.wasm`. Run this once after cloning, or whenever the WASM source changes.
-
-4. **Start the development server**
+3. **Start the development server**
 
    ```bash
    pnpm dev
    ```
 
-5. **Open your browser**
+   This builds the WASM modules (Ayumi + NES) and starts Vite. You can also run `pnpm build:wasm` on its own when the C sources change.
+
+4. **Open your browser**
 
    Navigate to `http://localhost:5173` (or the port shown in the terminal)
 
 ## Available Scripts
 
-- `pnpm dev` — build WASM and start the development server with hot module replacement
-- `pnpm build` — build WASM and create a production build
-- `pnpm build:wasm` — build only the WebAssembly modules
-- `pnpm preview` — preview the production build locally
-- `pnpm check` — run TypeScript and Svelte type checking
-- `pnpm test` — run tests in watch mode
-- `pnpm test:run` — run tests once
-- `pnpm btp-to-wav` — export a `.btp` project to WAV from the command line
+- `pnpm dev` - build WASM and start the development server with hot module replacement
+- `pnpm build` - build WASM, the tracker production bundle, and the docs site into `dist/`
+- `pnpm build:wasm` - build only the WebAssembly modules (`public/ay/ayumi.wasm`, `public/nes/*.wasm`)
+- `pnpm docs:dev` - run the VitePress docs site locally
+- `pnpm docs:build` - build docs into `dist/docs`
+- `pnpm preview` - preview the production tracker build locally
+- `pnpm check` - run TypeScript and Svelte type checking
+- `pnpm test` - run tests in watch mode
+- `pnpm test:run` - run tests once
+- `pnpm btp-to-wav` - export a `.btp` project to WAV from the command line
 
 ## Project Structure
 
 ```
 bitphase/
 ├── cli/                     # Command-line tools (btp-to-wav, BTP loading)
-├── docs/                    # Format documentation (e.g. TMR spec)
+├── docs/                    # User docs (VitePress) and format specs
 ├── external/
-│   └── ayumi/               # AY-8910 emulator C source (git submodule)
+│   ├── ayumi/               # AY-8910 emulator C source (git submodule)
+│   └── nsfplug/             # NES APU / MMC5 C sources used for WASM
 ├── public/                  # Static assets and runtime audio code
-│   ├── ayumi.wasm           # Compiled chip emulator
+│   ├── ay/ayumi.wasm        # Compiled AY chip emulator
+│   ├── nes/*.wasm           # Compiled NES chip emulators
 │   ├── bitphase-audio-processor.js
 │   ├── tracker-*.js         # AudioWorklet tracker pipeline
 │   ├── ay-*.js              # AY chip audio runtime
