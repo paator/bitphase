@@ -124,5 +124,6 @@ Use **File → New Song** to add another song for a chosen chip without starting
 
 - Learn [note entry and shortcuts](/keyboard)
 - Read the [pattern editor](/pattern-editor) overview
+- Arrange patterns in the [order list](/order-list)
 - Browse the [effects reference](/effects)
 - Try a demo song under **Help → Demo songs**

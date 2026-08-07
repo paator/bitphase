@@ -18,5 +18,6 @@ Open the tracker at [bitphase.app](https://bitphase.app/) or build the app yours
 - [Keyboard](/keyboard) - note entry and default shortcuts
 - [Effects](/effects) - pattern effect reference
 - [Pattern editor](/pattern-editor) - columns, editing, selection, and AY helpers
+- [Order list](/order-list) - arrange patterns, loop marker, clone and make unique
 
-More sections (order list, instruments, import/export, settings) are stubs for now and will grow over time.
+More sections (instruments, import/export, settings) are stubs for now and will grow over time.
