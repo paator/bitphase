@@ -123,5 +123,6 @@ Use **File → New Song** to add another song for a chosen chip without starting
 ## Next steps
 
 - Learn [note entry and shortcuts](/keyboard)
+- Read the [pattern editor](/pattern-editor) overview
 - Browse the [effects reference](/effects)
 - Try a demo song under **Help → Demo songs**
