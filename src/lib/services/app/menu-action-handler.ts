@@ -233,6 +233,11 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				return;
 			}
 
+			if (data.action === 'documentation') {
+				window.open('/docs/', '_blank', 'noopener,noreferrer');
+				return;
+			}
+
 			if (data.action === 'about') {
 				await ctx.open(AboutModal, {});
 				return;

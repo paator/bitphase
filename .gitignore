@@ -11,6 +11,8 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+docs/.vitepress/cache
+docs/.vitepress/dist
 .idea/
 *.wasm
 /pa_ay_ts

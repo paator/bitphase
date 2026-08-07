@@ -1,0 +1,138 @@
+# Effects
+
+Effects are written in the effect column using the format **`AXYZ`**,
+where `A` indicates the effect type and `XYZ` are its parameters.
+
+They can also use tables as a source of parameter values: **`AXTY`** (`T` + table id (`Y`)).
+For example, rather than manually alternating `S.03`, `S.05`, `S.03` to create a groove tempo,
+you can put the tempo values in table 1 and simply use `S.T1`.
+
+All values used in effects are hexadecimal (`0`-`9`, `A`-`F`).
+
+## General
+
+### A - Arpeggio
+
+Rapidly alternates between the current note and two additional notes.
+
+|                  |                                                                          |
+| ---------------- | ------------------------------------------------------------------------ |
+| **Format**       | `AXYZ`                                                                   |
+| **Steps length** | `X` - ticks between arpeggio steps (`0`-`F`)                             |
+| **Parameter**    | `Y` / `Z` - semitone offsets (`0`-`F`)                                   |
+| **With table**   | `AXTY` - `Y` is table id (`0`-`9`, `A`-`Z`); offsets come from the table |
+| **Example**      | `A137` - steps length 1, offsets +3 and +7 (minor chord)                 |
+
+### V - Vibrato
+
+Modulates pitch up and down.
+
+|                |                                             |
+| -------------- | ------------------------------------------- |
+| **Format**     | `VXYZ`                                      |
+| **Delay**      | `X` - delay between vibrato steps (`0`-`F`) |
+| **Parameter**  | `Y` speed, `Z` depth (`0`-`F`)              |
+| **With table** | `VXTY` - speed/depth from table each tick   |
+| **Example**    | `V158` - delay 1, speed 5, depth 8          |
+
+### 1 - Slide down
+
+Gradually decreases pitch.
+
+|                |                                                                         |
+| -------------- | ----------------------------------------------------------------------- |
+| **Format**     | `1XYZ`                                                                  |
+| **Delay**      | `X` - delay between slide steps (`0`-`F`)                               |
+| **Parameter**  | `YZ` - step size (`00`-`FF`)                                            |
+| **With table** | `1XTY` - step size from table each tick                                 |
+| **Example**    | `1130` - delay 1, step `30`. Use `.` for delay `0` for a one-tick slide |
+
+### 2 - Slide up
+
+Gradually increases pitch. Same shape as slide down (`2XYZ` / `2XTY`).
+
+**Example:** `2150` - delay 1, step `50`.
+
+### P - Portamento
+
+Smoothly slides from the previous note to the current note (`PXYZ` / `PXTY`).
+
+**Example:** `P30F` - delay 3, speed `0F`.
+
+### 4 - Sample position
+
+Sets the starting row within the instrument (`4.XY`).
+
+**Example:** `4.05` - start instrument from row 5.
+
+### 5 - Ornament position
+
+Sets the starting position within the table / ornament (`5.XY`).
+
+**Example:** `5.03` - start table from row 3.
+
+### 6 - On/Off
+
+Alternates between playing and muting (`6.XY` / `6.TY`).
+
+**Example:** `6.24` - on duration 2, off duration 4.
+
+### D - Detune
+
+Offsets channel pitch by a signed amount (`D.XY` / `D.TY`).
+Doesn't reset on new notes. Use `D.80` to bring back original tuning.
+
+`XY` is signed (`00`-`FF`, `80` = 0). `00`-`7F` negative, `81`-`FF` positive.
+
+**Example:** `D.85` - detune +5.
+
+### S - Speed
+
+Changes song playback speed (`S.XY` / `S.TY`).
+
+**Example:** `S.03` - set speed to 3.
+
+## AY-3-8910 / YM2149F
+
+Envelope effects use the same codes but are entered in the **envelope effect** column.
+On top of that, there are special effects only targeted towards envelopes:
+
+### EA - Auto-envelope
+
+Automatically calculates the envelope period from channel notes using a ratio. When active, set the envelope shape in the channel column - the envelope value is computed from the playing note. Enter in the envelope effect column only.
+
+|               |                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------- |
+| **Format**    | `EAXY`                                                                                 |
+| **Parameter** | `X` numerator (`1`-`F`), `Y` denominator (`1`-`F`) → ratio `X:Y`                       |
+| **Example**   | `EA32` - ratio 3:2                                                                     |
+| **Shapes**    | Works with repeating shapes `8`, `A`, `C`, `E`. Divisor 16 for `8`/`C`, 32 for `A`/`E` |
+
+Persists across rows until another envelope effect replaces it or a new envelope shape is written. Follows note changes in real time.
+
+## 2A03 / 2A07 (NES)
+
+### E1 - Pulse width
+
+Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists until note off or a new `E1`. Use `E100` to restore the instrument duty cycle.
+
+|               |                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------- |
+| **Format**    | `E1XY` or `E1TX`                                                                       |
+| **Parameter** | `00` restores instrument duty; `01`-`04` select duty cycles 1-4 (12.5%, 25%, 50%, 75%) |
+| **Table**     | `TX` - values from table `X` each tick (`0` = instrument duty)                         |
+| **Examples**  | `E100`, `E102`, `E1T1`                                                                 |
+
+### E2 - Sweep up
+
+Hardware pitch sweep up on Pulse 1 / Pulse 2 (`E2XY` / `E2TX`).
+
+`X` = sweep time (`0`-`7`), `Y` = shift (`0`-`7`). `Y = 0` disables.
+
+**Examples:** `E247`, `E2T1`, `E200`.
+
+### E3 - Sweep down
+
+Same format as `E2`, sweeping down (`E3XY` / `E3TX`).
+
+**Examples:** `E317`, `E3T1`, `E300`.
