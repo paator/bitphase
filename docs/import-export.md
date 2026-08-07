@@ -13,7 +13,7 @@ Bitphase can import the following files:
 
 ## Export
 
- Bitphase can import the following files:
+Bitphase can export the following files:
 
 - `.btp` - see above
 - `.json` - see above

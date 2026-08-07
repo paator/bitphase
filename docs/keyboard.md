@@ -30,7 +30,7 @@ Shortcuts are customizable under **Settings → Keyboard**. Defaults below use `
 | Transpose octave down | `Shift+-`     |
 | Swap channels left    | `Mod+Alt+←`   |
 | Swap channels right   | `Mod+Alt+→`   |
-| Apply script…         | `Mod+Shift+S` |
+| Apply script...       | `Mod+Shift+S` |
 
 ## Navigation
 
@@ -59,7 +59,7 @@ With the pattern editor focused on a note field, keys map like a tracker piano l
 | Key                                             | Note                                         |
 | ----------------------------------------------- | -------------------------------------------- |
 | `Q` `2` `W` `3` `E` `R` `5` `T` `6` `Y` `7` `U` | C C# D D# E F F# G G# A A# B                 |
-| `I` `9` `O` `0` `P` `[`                         | C C# D D# E F (+2 octaves from base for I–[) |
+| `I` `9` `O` `0` `P` `[`                         | C C# D D# E F (+2 octaves from base for I-[) |
 
 ### Lower row (base octave)
 
@@ -67,6 +67,10 @@ With the pattern editor focused on a note field, keys map like a tracker piano l
 | ----------------------------------------------- | ---------------------------- |
 | `Z` `S` `X` `D` `C` `V` `G` `B` `H` `N` `J` `M` | C C# D D# E F F# G G# A A# B |
 | `,` `L` `.` `;` `/`                             | C C# D D# E (+1 octave)      |
+
+::: tip
+With the default shortcuts, `/` is **octave down**, so it does not enter the piano **E** from the table above. Remap octave down under **Settings → Keyboard** if you want `/` for note entry.
+:::
 
 ### Note off
 

@@ -12,4 +12,4 @@
 - `Channel` - a "voice" output of a sound chip. It's represented in a tracker as a horizontal series of tracks next to each other.
 - `Tick` - the smallest execution unit, and 1 step = n ticks. Events that vary by count (effects such as vibrato) are based on ticks.
 - `Song` - in context of a Bitphase, IT IS NOT A SUB-SONG. It's an instance of a sound chip added next to other chip. With them you can make multi-chip songs.
-- `Module/Project` - a data (file) created by the tracker. The module holds a song data, instruments, and settings common to the specific song.
+- `Module/Project` - a data file created by the tracker (`.btp`). A project can hold several songs (chip instances), plus shared pattern order, instruments, tables, and project settings.

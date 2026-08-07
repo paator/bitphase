@@ -88,13 +88,13 @@ Regardless whether you built your own instance or you went to bitphase.app, you 
 
 ## Create a project
 
-1. Open **File → New Project**.
-2. Choose a chip:
+1. Open **File → New → Project**. That clears the workspace to an empty project (no songs yet).
+2. Add a song by choosing a chip from the empty-state buttons, or use **File → New → Song**:
     - **AY-3-8910 / YM2149F** - recommended starting point
     - **NES (2A03 / 2A07)** - WIP, still in development
-3. You will now see a blank song, initialized with an empty pattern ready for you to begin composing music, add patterns, and define instruments and effects.
+3. You will now see a blank song with an empty pattern, ready for notes, instruments, and effects.
 
-You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import Vortex/ProTracker modules (`.vt2` / `.pt3`) with **File → Import**.
+You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import Vortex/ProTracker modules (`.vt2` / `.pt3`) with **File → Import Module**.
 
 ## Songs and chips
 
@@ -108,7 +108,7 @@ Bitphase's goal is to support real-life multi-chip setups related to AY chips, s
 **2×AY-3-8910 (Turbosound)**, **2×YM2203 (Turbosound FM)**, and **NES + Sunsoft 5B**.
 The tracker does not enforce realistic combinations - keep real-life limits in mind if you want to export and play the song on actual hardware.
 
-Use **File → New Song** to add another song for a chosen chip without starting a new project.
+Use **File → New → Song** to add another song for a chosen chip without starting a new project.
 
 ## Playback basics
 

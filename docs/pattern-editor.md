@@ -123,7 +123,7 @@ In AY, paste can also convert between a **note** and the **Env** period when tho
 
 | Action                     | Default                   |
 | -------------------------- | ------------------------- |
-| Increment / decrement      | `+` / `-`                 |
+| Increment / decrement      | `=` / `-`                 |
 | Transpose octave up / down | `Shift++` / `Shift+-`     |
 | Swap channel left / right  | `Mod+Alt+←` / `Mod+Alt+→` |
 | Apply script...            | `Mod+Shift+S`             |

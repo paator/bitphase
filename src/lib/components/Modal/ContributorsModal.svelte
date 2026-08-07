@@ -10,11 +10,12 @@
 
 	const credits = [
 		'Main code: Pator',
-		'Contributors: Alex Winston, spkr, CyberL1, dualjack',
+		'Contributors: Alex Winston, spkr, RuGrantez, phase-mod, Natt Akuma, Jakim, CyberL1, dualjack',
 		'Testers: phase-mod, Abyxus',
 		'Ayumi emulator by Peter Sovietov',
+		"NSFPlug soundchip cores based on Brad Smith's NSFPlay 2.6",
 		'Bitphase logo by Grongy',
-		'Special thanks to Otomata Labs, Megus, Jammer, Tygrys, e!ghtbm, Tomarkus, arabek, RuGrantez, MmcM, nq, KK, AceMan, MaV, Jakim, LiSU, Volutar, MameXLIII',
+		'Special thanks to Otomata Labs, Megus, Jammer, Tygrys, e!ghtbm, Tomarkus, arabek, MmcM, nq, KK, AceMan, MaV, LiSU, Volutar, MameXLIII',
 		"and everyone else I've forgot to mention",
 		'Thank you for using Bitphase'
 	];
