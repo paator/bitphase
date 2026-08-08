@@ -2,6 +2,7 @@ import type { Song, Instrument, Pattern } from '../models/song';
 import { DEFAULT_PATTERN_LENGTH } from '../models/song';
 import { Project, Table } from '../models/project';
 import { filterInstrumentsForActiveChipTypes } from '../services/instrument/instrument-filter';
+import { channelMuteStore } from './channel-mute.svelte';
 import { undoRedoStore } from './undo-redo.svelte';
 import type { ProjectDiff, ProjectHistoryEntry, ProjectHistoryMetadata } from '../models/history';
 import { HistoryClone } from '../services/history/history-clone';
@@ -76,6 +77,7 @@ class ProjectStore {
 
 	applyProject(project: Project): void {
 		undoRedoStore.clear();
+		channelMuteStore.clear();
 		this.settings = {
 			title: project.name,
 			author: project.author,
@@ -113,6 +115,7 @@ class ProjectStore {
 		this.songs = this.songs.filter((_, i) => i !== index);
 		this.patterns = this.patterns.filter((_, i) => i !== index);
 		this.instruments = filterInstrumentsForActiveChipTypes(this.songs, this.instruments);
+		channelMuteStore.removeChip(index);
 	}
 
 	addSong(song: Song): void {
