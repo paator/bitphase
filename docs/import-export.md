@@ -1,28 +1,70 @@
 # Import & export
 
-Bitphase can open and save a multiple type of files, each with a different target.
+Bitphase can open projects, import classic AY modules, and export audio or hardware-oriented dumps. What you see under **File → Export** depends on which chips are in the project - for example PSG / SNDH only appear for AY songs.
 
-## Import
+## Projects (`.btp`)
 
-Bitphase can import the following files:
+| Action | Menu            |
+| ------ | --------------- |
+| Open   | **File → Open** |
+| Save   | **File → Save** |
 
-- `.pt3` - ProTracker 3.4 AY modules
-- `.vt2` - Vortex Tracker 2 AY modules
-- `.btp` - BitPhase's own module format, in fact a compressed JSON file.
-- `.json` - standard JSON files, used to store instrument data, table data, color schemes
+`.btp` is Bitphase's own project format: the full project serialized as JSON, then gzip-compressed. It keeps songs, patterns, order, instruments, tables, and settings together.
 
-## Export
+Save always downloads a file named from the project title (browsers do not overwrite a path on disk the way a desktop app would). There is no separate **Save As** in the menu.
 
-Bitphase can export the following files:
+## Import modules (`.pt3` / `.vt2`)
 
-- `.btp` - see above
-- `.json` - see above
-- `.wav` - uncompressed Wave audio stream. Supports the following options (the dialog will open):
-    - Sample rate - the sample rate of the output file (default: 44100 Hz)
-    - Bit depth - the resolution of the output file (default: 16-bit PCM)
-    - Amount of loop repeats (default: 0)
-    - Channel export - it can export full song to one .wav file or it can export multiple .wavs, one per each channel in the song (useful for oscilloscope views).
-    - Metadata - author, title, album, year and .wav comments.
-- `.psg` - register dump format of AY-3-8910, can be used for playback on real hardware or dedicated players. In case of multichip AY songs, a .psg file, each per a chip, will be exported in a .zip archive, containing two or more files.
+**File → Import Module** opens a picker for:
 
-More to come, including timer effects export declarations (`.tmr`)
+| Format | What it is                  |
+| ------ | --------------------------- |
+| `.pt3` | ProTracker 3.4 AY modules   |
+| `.vt2` | Vortex Tracker 2 AY modules |
+
+These bring in classic AY tracker songs.
+
+## Side data (`.json`)
+
+Instruments, tables, and themes can be saved or loaded as `.json` from their own panels - not from the File menu.
+User scripts have their own JSON export/import in the scripts UI.
+
+## Export overview
+
+Open **File → Export** and pick a format. Availability:
+
+| Format        | When it appears       |
+| ------------- | --------------------- |
+| **WAV**       | Always                |
+| **PSG**       | Exactly one AY song   |
+| **SNDH**      | Exactly one AY song   |
+| **PSG (ZIP)** | More than one AY song |
+
+NES-only projects still get **WAV**. PSG / SNDH are AY paths.
+
+### WAV
+
+Opens **WAV Export Settings**, then renders the song (or songs) to audio.
+
+| Option       | Choices                                         | Default                                    |
+| ------------ | ----------------------------------------------- | ------------------------------------------ |
+| Sample rate  | 22050 / 44100 / 48000 / 96000 Hz                | 44100                                      |
+| Bit depth    | 16-bit PCM / 24-bit PCM / 32-bit float          | 16-bit PCM                                 |
+| Loop repeats | Extra passes after the first play (0-9)         | 0 (play once)                              |
+| Channels     | Mixed stereo file, or separate file per channel | Mixed                                      |
+| Metadata     | Title, artist, album, year, comment             | Title and artist from the project when set |
+
+**Separate channels** packs the WAVs into a ZIP (handy for oscilloscope or DAW stems).
+
+From the command line you can also run `pnpm btp-to-wav` on a `.btp` file (see the project README).
+
+### PSG
+
+AY register dump for hardware players and emulators. One interrupt frame after another; no options dialog beyond a progress indicator.
+
+- **One AY song** → `{project}.psg`
+- **Several AY songs** → **PSG (ZIP)** with one `.psg` per AY chip (`..._ay1.psg`, `..._ay2.psg`, ...)
+
+### SNDH
+
+Available for a **single** AY song. Used for Atari ST hardware playback. Bitphase builds an SNDH file from a PSG dump plus a fixed header (including a 50 Hz timer tag).

@@ -19,6 +19,6 @@ Open the tracker at [bitphase.app](https://bitphase.app/) or build the app yours
 - [Effects](/effects) - pattern effect reference
 - [Pattern editor](/pattern-editor) - columns, editing, selection, and AY helpers
 - [Order list](/order-list) - arrange patterns, loop marker, clone and make unique
-- [Import & export](/import-export) - open, import modules, and export audio / dumps
+- [Import & export](/import-export) - open projects, import modules, WAV / PSG / SNDH
 
 More sections (instruments, settings) are stubs for now and will grow over time.
