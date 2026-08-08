@@ -84,6 +84,30 @@ export interface KeyboardShortcutResult {
 	shouldPreventDefault: boolean;
 }
 
+function extendSelectionTo(
+	ctx: PatternKeyboardShortcutsContext,
+	row: number,
+	column: number
+): void {
+	if (!ctx.hasSelection()) {
+		ctx.onSetSelectionAnchor(ctx.selectedRow, ctx.selectedColumn);
+	}
+	ctx.onExtendSelection(row, column);
+}
+
+function resolveActionForEvent(event: KeyboardEvent): string | null {
+	const shortcut = ShortcutString.fromEvent(event);
+	const action = keybindingsStore.getActionForShortcut(shortcut);
+	if (action !== null) return action;
+	if (!event.shiftKey) return null;
+	const withoutShift = shortcut
+		.split('+')
+		.filter((part) => part !== 'Shift')
+		.join('+');
+	if (withoutShift === shortcut || withoutShift.length === 0) return null;
+	return keybindingsStore.getActionForShortcut(withoutShift);
+}
+
 function dispatchCommandAction(
 	action: string,
 	ctx: PatternKeyboardShortcutsContext,
@@ -186,9 +210,6 @@ function dispatchCommandAction(
 		case ACTION_PAGE_UP:
 			if (!ctx.isPlaying) {
 				if (event?.shiftKey) {
-					if (!ctx.hasSelection()) {
-						ctx.onSetSelectionAnchor(ctx.selectedRow, ctx.selectedColumn);
-					}
 					const newState = PatternNavigationService.moveRow(
 						{
 							selectedRow: ctx.selectedRow,
@@ -198,7 +219,7 @@ function dispatchCommandAction(
 						ctx.navigationContext,
 						-16
 					);
-					ctx.onExtendSelection(newState.selectedRow, newState.selectedColumn);
+					extendSelectionTo(ctx, newState.selectedRow, newState.selectedColumn);
 					ctx.onSetSelectedRow(newState.selectedRow);
 					if (newState.currentPatternOrderIndex !== ctx.currentPatternOrderIndex) {
 						ctx.onSetCurrentPatternOrderIndex(newState.currentPatternOrderIndex);
@@ -212,9 +233,6 @@ function dispatchCommandAction(
 		case ACTION_PAGE_DOWN:
 			if (!ctx.isPlaying) {
 				if (event?.shiftKey) {
-					if (!ctx.hasSelection()) {
-						ctx.onSetSelectionAnchor(ctx.selectedRow, ctx.selectedColumn);
-					}
 					const newState = PatternNavigationService.moveRow(
 						{
 							selectedRow: ctx.selectedRow,
@@ -224,7 +242,7 @@ function dispatchCommandAction(
 						ctx.navigationContext,
 						16
 					);
-					ctx.onExtendSelection(newState.selectedRow, newState.selectedColumn);
+					extendSelectionTo(ctx, newState.selectedRow, newState.selectedColumn);
 					ctx.onSetSelectedRow(newState.selectedRow);
 					if (newState.currentPatternOrderIndex !== ctx.currentPatternOrderIndex) {
 						ctx.onSetCurrentPatternOrderIndex(newState.currentPatternOrderIndex);
@@ -238,7 +256,7 @@ function dispatchCommandAction(
 		case ACTION_HOME:
 			if (!ctx.isPlaying) {
 				if (event?.shiftKey) {
-					ctx.onExtendSelection(0, ctx.selectedColumn);
+					extendSelectionTo(ctx, 0, ctx.selectedColumn);
 				} else {
 					ctx.onClearSelection();
 				}
@@ -247,7 +265,7 @@ function dispatchCommandAction(
 			return true;
 		case ACTION_HOME_COLUMN:
 			if (event?.shiftKey) {
-				ctx.onExtendSelection(ctx.selectedRow, 0);
+				extendSelectionTo(ctx, ctx.selectedRow, 0);
 			} else {
 				ctx.onClearSelection();
 			}
@@ -256,7 +274,7 @@ function dispatchCommandAction(
 		case ACTION_END:
 			if (!ctx.isPlaying) {
 				if (event?.shiftKey) {
-					ctx.onExtendSelection(ctx.pattern.length - 1, ctx.selectedColumn);
+					extendSelectionTo(ctx, ctx.pattern.length - 1, ctx.selectedColumn);
 				} else {
 					ctx.onClearSelection();
 				}
@@ -273,7 +291,7 @@ function dispatchCommandAction(
 				ctx.navigationContext
 			);
 			if (event?.shiftKey) {
-				ctx.onExtendSelection(ctx.selectedRow, navigationState.selectedColumn);
+				extendSelectionTo(ctx, ctx.selectedRow, navigationState.selectedColumn);
 			} else {
 				ctx.onClearSelection();
 			}
@@ -291,10 +309,8 @@ export class PatternKeyboardShortcutsService {
 		shortcutsContext: PatternKeyboardShortcutsContext
 	): KeyboardShortcutResult {
 		const isModifier = event.shiftKey;
-		const key = event.key.toLowerCase();
 
-		const shortcut = ShortcutString.fromEvent(event);
-		const action = keybindingsStore.getActionForShortcut(shortcut);
+		const action = resolveActionForEvent(event);
 		if (action !== null) {
 			if (PATTERN_EDITOR_ACTION_IDS.has(action)) {
 				const result = dispatchCommandAction(action, shortcutsContext, event);
@@ -328,12 +344,6 @@ export class PatternKeyboardShortcutsService {
 			case 'ArrowUp':
 				if (!shortcutsContext.isPlaying) {
 					if (event.shiftKey) {
-						if (!shortcutsContext.hasSelection()) {
-							shortcutsContext.onSetSelectionAnchor(
-								shortcutsContext.selectedRow,
-								shortcutsContext.selectedColumn
-							);
-						}
 						const newState = PatternNavigationService.moveRow(
 							{
 								selectedRow: shortcutsContext.selectedRow,
@@ -343,7 +353,8 @@ export class PatternKeyboardShortcutsService {
 							shortcutsContext.navigationContext,
 							-1
 						);
-						shortcutsContext.onExtendSelection(
+						extendSelectionTo(
+							shortcutsContext,
 							newState.selectedRow,
 							newState.selectedColumn
 						);
@@ -365,12 +376,6 @@ export class PatternKeyboardShortcutsService {
 			case 'ArrowDown':
 				if (!shortcutsContext.isPlaying) {
 					if (event.shiftKey) {
-						if (!shortcutsContext.hasSelection()) {
-							shortcutsContext.onSetSelectionAnchor(
-								shortcutsContext.selectedRow,
-								shortcutsContext.selectedColumn
-							);
-						}
 						const newState = PatternNavigationService.moveRow(
 							{
 								selectedRow: shortcutsContext.selectedRow,
@@ -380,7 +385,8 @@ export class PatternKeyboardShortcutsService {
 							shortcutsContext.navigationContext,
 							1
 						);
-						shortcutsContext.onExtendSelection(
+						extendSelectionTo(
+							shortcutsContext,
 							newState.selectedRow,
 							newState.selectedColumn
 						);
@@ -401,12 +407,6 @@ export class PatternKeyboardShortcutsService {
 				return { handled: true, shouldPreventDefault: true };
 			case 'ArrowLeft':
 				if (event.shiftKey) {
-					if (!shortcutsContext.hasSelection()) {
-						shortcutsContext.onSetSelectionAnchor(
-							shortcutsContext.selectedRow,
-							shortcutsContext.selectedColumn
-						);
-					}
 					const newState = PatternNavigationService.moveColumnByDelta(
 						{
 							selectedRow: shortcutsContext.selectedRow,
@@ -416,7 +416,8 @@ export class PatternKeyboardShortcutsService {
 						shortcutsContext.navigationContext,
 						-1
 					);
-					shortcutsContext.onExtendSelection(
+					extendSelectionTo(
+						shortcutsContext,
 						newState.selectedRow,
 						newState.selectedColumn
 					);
@@ -428,12 +429,6 @@ export class PatternKeyboardShortcutsService {
 				return { handled: true, shouldPreventDefault: true };
 			case 'ArrowRight':
 				if (event.shiftKey) {
-					if (!shortcutsContext.hasSelection()) {
-						shortcutsContext.onSetSelectionAnchor(
-							shortcutsContext.selectedRow,
-							shortcutsContext.selectedColumn
-						);
-					}
 					const newState = PatternNavigationService.moveColumnByDelta(
 						{
 							selectedRow: shortcutsContext.selectedRow,
@@ -443,7 +438,8 @@ export class PatternKeyboardShortcutsService {
 						shortcutsContext.navigationContext,
 						1
 					);
-					shortcutsContext.onExtendSelection(
+					extendSelectionTo(
+						shortcutsContext,
 						newState.selectedRow,
 						newState.selectedColumn
 					);
