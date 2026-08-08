@@ -33,14 +33,15 @@ User scripts have their own JSON export/import in the scripts UI.
 
 Open **File → Export** and pick a format. Availability:
 
-| Format        | When it appears       |
-| ------------- | --------------------- |
-| **WAV**       | Always                |
-| **PSG**       | Exactly one AY song   |
-| **SNDH**      | Exactly one AY song   |
-| **PSG (ZIP)** | More than one AY song |
+| Format        | When it appears                                    |
+| ------------- | -------------------------------------------------- |
+| **WAV**       | Always                                             |
+| **PSG**       | Exactly one AY song                                |
+| **SNDH**      | Exactly one AY song                                |
+| **PSG (ZIP)** | More than one AY song                              |
+| **VGM**       | AY and/or NES, at most 2 of each type (one `.vgm`) |
 
-NES-only projects still get **WAV**. PSG / SNDH are AY paths.
+NES-only projects get **WAV** and **VGM**. PSG / SNDH are AY paths.
 
 ### WAV
 
@@ -68,3 +69,7 @@ AY register dump for hardware players and emulators. One interrupt frame after a
 ### SNDH
 
 Available for a **single** AY song. Used for Atari ST hardware playback. Bitphase builds an SNDH file from a PSG dump plus a fixed header (including a 50 Hz timer tag).
+
+### VGM
+
+Multi-chip register dump for [VGM](https://vgmrips.net/wiki/VGM_Specification) players.

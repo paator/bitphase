@@ -5,8 +5,8 @@ import {
 import {
 	AY_REGISTER_COUNT,
 	DEFAULT_AY_REGISTERS
-} from '../../services/file/ay-export-utils';
-import { AY_REGISTER_NAMES, formatTimerFrequencyHz } from '../../services/file/tmr-parser';
+} from '../../services/file/ay/ay-export-utils';
+import { AY_REGISTER_NAMES, formatTimerFrequencyHz } from '../../services/file/tmr/tmr-parser';
 
 export const AY_PLAYBACK_DEBUG: ChipPlaybackDebugSpec = {
 	metrics: [

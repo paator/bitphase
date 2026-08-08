@@ -2,12 +2,13 @@
 	import IconCarbonDownload from '~icons/carbon/download';
 	import { onMount, onDestroy } from 'svelte';
 	import { ModalPanel } from '../ModalPanel';
-	import { exportToWAV } from '../../services/file/wav-export';
-	import { exportToPSG } from '../../services/file/psg-export';
-	import { exportToTMR } from '../../services/file/tmr-export';
-	import { exportToSNDH } from '../../services/file/sndh-export';
+	import { exportToWAV } from '../../services/file/wav/wav-export';
+	import { exportToPSG } from '../../services/file/ay/psg-export';
+	import { exportToTMR } from '../../services/file/tmr/tmr-export';
+	import { exportToSNDH } from '../../services/file/ay/sndh-export';
+	import { exportToVGM } from '../../services/file/vgm/vgm-export';
 	import type { Project } from '../../models/project';
-	import type { WavExportSettings } from '../../services/file/wav-export-settings';
+	import type { WavExportSettings } from '../../services/file/wav/wav-export-settings';
 
 	let {
 		project,
@@ -17,7 +18,7 @@
 		dismiss
 	} = $props<{
 		project: Project;
-		exportType?: 'wav' | 'psg' | 'sndh' | 'tmr';
+		exportType?: 'wav' | 'psg' | 'sndh' | 'tmr' | 'vgm';
 		wavSettings?: WavExportSettings;
 		resolve?: (value?: any) => void;
 		dismiss?: (error?: any) => void;
@@ -60,6 +61,16 @@
 				);
 			} else if (exportType === 'sndh') {
 				await exportToSNDH(
+					project,
+					0,
+					(progressValue, messageValue) => {
+						progress = progressValue;
+						message = messageValue;
+					},
+					abortController.signal
+				);
+			} else if (exportType === 'vgm') {
+				await exportToVGM(
 					project,
 					0,
 					(progressValue, messageValue) => {

@@ -22,8 +22,8 @@
 		parseTMR,
 		summarizeTmrFile,
 		type ParsedTmrFile
-	} from '../../services/file/tmr-parser';
-	import { parseEventList } from '../../services/file/tmr-event-list';
+	} from '../../services/file/tmr/tmr-parser';
+	import { parseEventList } from '../../services/file/tmr/tmr-event-list';
 
 	let { resolve } = $props<{
 		resolve?: (value?: unknown) => void;

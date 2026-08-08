@@ -1,5 +1,5 @@
-import type { Project } from '../../models/project';
-import { downloadFile, sanitizeFilename } from '../../utils/file-download';
+import type { Project } from '../../../models/project';
+import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 import { generatePSGBuffer } from './psg-export';
 
 const SNDH_HEADER = new Uint8Array([

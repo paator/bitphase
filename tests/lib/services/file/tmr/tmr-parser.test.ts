@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { encodeTMR, TMR_HEADER_SIZE } from '@/lib/services/file/tmr-encoder';
-import { parseEventList, TEL_HEADER_SIZE } from '@/lib/services/file/tmr-event-list';
+import { encodeTMR, TMR_HEADER_SIZE } from '@/lib/services/file/tmr/tmr-encoder';
+import { parseEventList, TEL_HEADER_SIZE } from '@/lib/services/file/tmr/tmr-event-list';
 import {
 	attachEventListToTmrFile,
 	buildTmrSchedule,
@@ -10,10 +10,10 @@ import {
 	formatTimerSlotSummary,
 	parseTMR,
 	resolveTimerCommand
-} from '@/lib/services/file/tmr-parser';
-import { exportTimerFrequencyHzFromYmPeriod } from '@/lib/services/file/tmr-format';
-import type { SongCaptureFrame } from '@/lib/services/file/ay-export-utils';
-import { createDisabledTimerCaptureStates } from '@/lib/services/file/ay-export-utils';
+} from '@/lib/services/file/tmr/tmr-parser';
+import { exportTimerFrequencyHzFromYmPeriod } from '@/lib/services/file/tmr/tmr-format';
+import type { SongCaptureFrame } from '@/lib/services/file/ay/ay-export-utils';
+import { createDisabledTimerCaptureStates } from '@/lib/services/file/ay/ay-export-utils';
 
 function disabledSidFrame(): SongCaptureFrame {
 	return {

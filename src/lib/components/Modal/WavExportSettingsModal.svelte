@@ -12,7 +12,7 @@
 		bitDepthOptions,
 		channelModeOptions,
 		type WavExportSettings
-	} from '../../services/file/wav-export-settings';
+	} from '../../services/file/wav/wav-export-settings';
 	import type { Project } from '../../models/project';
 
 	let {

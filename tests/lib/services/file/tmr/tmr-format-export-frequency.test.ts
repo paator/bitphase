@@ -3,7 +3,7 @@ import {
 	decodeTimerFrequencyHz,
 	exportTimerFrequencyStoredFromYmPeriod,
 	ymSidToneFrequencyHz
-} from '@/lib/services/file/tmr-format';
+} from '@/lib/services/file/tmr/tmr-format';
 
 describe('tmr export timer frequency', () => {
 	it('exports YM SID tone rate from captured period', () => {

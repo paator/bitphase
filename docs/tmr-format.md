@@ -149,4 +149,4 @@ Asymmetric duty: e.g. **Start** at `f_high` Hz; item 1 sets frequency to `f_low`
 
 ## Export
 
-`src/lib/services/file/tmr-export.ts` — exports paired `.tmr` + `.tel` files (both included in TMR ZIP exports).
+`src/lib/services/file/tmr/tmr-export.ts` — exports paired `.tmr` + `.tel` files (both included in TMR ZIP exports).

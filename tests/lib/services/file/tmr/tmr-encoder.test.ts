@@ -6,13 +6,13 @@ import {
 	TMR_HEADER_SIZE,
 	TMR_ITEM_SIZE,
 	TMR_TIMER_EVENT_STOP
-} from '@/lib/services/file/tmr-encoder';
-import { parseEventList, TEL_HEADER_SIZE } from '@/lib/services/file/tmr-event-list';
-import { attachEventListToTmrFile, parseTMR } from '@/lib/services/file/tmr-parser';
+} from '@/lib/services/file/tmr/tmr-encoder';
+import { parseEventList, TEL_HEADER_SIZE } from '@/lib/services/file/tmr/tmr-event-list';
+import { attachEventListToTmrFile, parseTMR } from '@/lib/services/file/tmr/tmr-parser';
 import {
 	encodeTimerFrequencyHz,
 	exportTimerFrequencyStoredFromYmPeriod
-} from '@/lib/services/file/tmr-format';
+} from '@/lib/services/file/tmr/tmr-format';
 import {
 	registerApplyMask,
 	registersChangedMask,
@@ -22,7 +22,7 @@ import {
 	envelopePeriodRegisterApplyMask,
 	envelopeShapeRegisterApplyMask,
 	type SongCaptureFrame
-} from '@/lib/services/file/ay-export-utils';
+} from '@/lib/services/file/ay/ay-export-utils';
 import { computeFmTonePeriod, computeTimerPwmPeriods } from '@/lib/chips/ay/instrument';
 
 function storedTimerHz(period: number, psgClockHz = 1773400): number {

@@ -1,4 +1,4 @@
-import { AY_REGISTER_COUNT } from './ay-export-utils';
+import { AY_REGISTER_COUNT } from '../ay/ay-export-utils';
 import { TMR_ITEM_SIZE, type TmrEventItemRecord } from './tmr-format';
 
 export const TEL_MAGIC = [0x54, 0x45, 0x4c, 0x1a] as const;

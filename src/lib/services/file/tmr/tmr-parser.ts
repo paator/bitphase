@@ -1,4 +1,4 @@
-import { AY_REGISTER_COUNT, registerApplyMask } from './ay-export-utils';
+import { AY_REGISTER_COUNT, registerApplyMask } from '../ay/ay-export-utils';
 import {
 	decodeTimerFrequencyHz,
 	registerMaskFromEventPsgApplyMask,

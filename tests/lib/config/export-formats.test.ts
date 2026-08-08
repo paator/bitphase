@@ -11,6 +11,7 @@ describe('export formats', () => {
 		expect(labels).toContain('PSG');
 		expect(labels).toContain('TMR');
 		expect(labels).toContain('SNDH');
+		expect(labels).toContain('VGM');
 		expect(labels).not.toContain('PSG (ZIP)');
 	});
 
@@ -22,7 +23,26 @@ describe('export formats', () => {
 		expect(labels).toContain('WAV');
 		expect(labels).toContain('PSG (ZIP)');
 		expect(labels).toContain('TMR (ZIP)');
+		expect(labels).toContain('VGM');
 		expect(labels).not.toContain('PSG');
 		expect(labels).not.toContain('SNDH');
+	});
+
+	it('shows VGM for NES and mixed chips within dual limits', () => {
+		expect(buildExportMenuItems(buildChipConfiguration(['nes'])).map((i) => i.label)).toContain(
+			'VGM'
+		);
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['ay', 'ay', 'nes'])).map((i) => i.label)
+		).toContain('VGM');
+	});
+
+	it('hides VGM when more than two chips of the same type', () => {
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['ay', 'ay', 'ay'])).map((i) => i.label)
+		).not.toContain('VGM');
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['nes', 'nes', 'nes'])).map((i) => i.label)
+		).not.toContain('VGM');
 	});
 });

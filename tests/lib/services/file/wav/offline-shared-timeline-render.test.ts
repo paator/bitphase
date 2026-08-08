@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import SongTimeline from '../../../../public/tracker/song-timeline.js';
-import { renderOfflineSharedTimeline } from '../../../../src/lib/services/file/offline-shared-timeline-render';
+import SongTimeline from '../../../../../public/tracker/song-timeline.js';
+import { renderOfflineSharedTimeline } from '../../../../../src/lib/services/file/wav/offline-shared-timeline-render';
 
 describe('offline shared timeline render', () => {
 	it('produces equal buffer lengths for all lanes when one lane changes speed', async () => {

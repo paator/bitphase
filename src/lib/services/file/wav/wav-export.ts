@@ -1,17 +1,17 @@
-import type { Project } from '../../models/project';
-import type { Chip } from '../../chips/types';
-import type { ChipRendererBinding, SharedTimelineExportSlot } from '../../chips/base/renderer';
-import type { ResourceLoader } from '../../chips/base/resource-loader';
-import { mixAudioChannels } from '../../utils/audio-mixer';
+import type { Project } from '../../../models/project';
+import type { Chip } from '../../../chips/types';
+import type { ChipRendererBinding, SharedTimelineExportSlot } from '../../../chips/base/renderer';
+import type { ResourceLoader } from '../../../chips/base/resource-loader';
+import { mixAudioChannels } from '../../../utils/audio-mixer';
 import {
 	isMixedChipSharedTimelineExport,
 	renderMixedChipSharedTimelineSlots
 } from './mixed-chip-shared-timeline-export';
 
 async function getRegistry() {
-	return import('../../chips/registry');
+	return import('../../../chips/registry');
 }
-import { downloadFile, sanitizeFilename } from '../../utils/file-download';
+import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 import type { WavExportSettings } from './wav-export-settings';
 import { defaultWavExportSettings } from './wav-export-settings';
 import JSZip from 'jszip';
@@ -184,7 +184,7 @@ function encodeWAV(
 	return buffer;
 }
 
-export type { ChipRenderer } from '../../chips/base/renderer';
+export type { ChipRenderer } from '../../../chips/base/renderer';
 
 class WavExportService {
 	private async tryRenderSharedTimelineSlots(

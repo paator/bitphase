@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FileImportService } from '@/lib/services/file/file-import';
+import { FileImportService } from '@/lib/services/file/project/file-import';
 import { normalizeAyInstrumentFields } from '@/lib/chips/ay/instrument';
 import type { Instrument } from '@/lib/models/song';
 

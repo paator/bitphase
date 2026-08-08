@@ -1,11 +1,11 @@
-import type { Project } from '../../models/project';
-import { downloadFile, sanitizeFilename } from '../../utils/file-download';
+import type { Project } from '../../../models/project';
+import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 import JSZip from 'jszip';
 import {
 	captureSongRegisterFrames,
 	type GenerateCaptureOptions,
 	type PsgExportModules
-} from './psg-export';
+} from '../ay/psg-export';
 import { encodeTMR, type EncodedTmrFiles } from './tmr-encoder';
 
 async function loadPsgExportModules(): Promise<PsgExportModules> {

@@ -1,6 +1,6 @@
 import type { Project } from '../../models/project';
-import { FileExportService } from '../file/file-export';
-import { FileImportService } from '../file/file-import';
+import { FileExportService } from '../file/project/file-export';
+import { FileImportService } from '../file/project/file-import';
 
 const DB_NAME = 'bitphase';
 const DB_VERSION = 1;

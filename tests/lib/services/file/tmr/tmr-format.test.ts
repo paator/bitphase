@@ -4,7 +4,7 @@ import {
 	encodeTimerFrequencyHz,
 	timerFrequencyHzToPeriodTicks,
 	timerPeriodTicksToFrequencyHz
-} from '@/lib/services/file/tmr-format';
+} from '@/lib/services/file/tmr/tmr-format';
 
 describe('tmr timer frequency encoding', () => {
 	it('round-trips Hz through 16.16 fixed point', () => {

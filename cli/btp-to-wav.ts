@@ -4,8 +4,8 @@ import { fileURLToPath } from 'url';
 import { loadBtpFromFile } from './btp-loader';
 import { FileSystemResourceLoader } from './resource-loader-node';
 import { ensureCoreRegistry, getChipByType } from '../src/lib/chips/registry-core';
-import { exportToWAV } from '../src/lib/services/file/wav-export';
-import { defaultWavExportSettings } from '../src/lib/services/file/wav-export-settings';
+import { exportToWAV } from '../src/lib/services/file/wav/wav-export';
+import { defaultWavExportSettings } from '../src/lib/services/file/wav/wav-export-settings';
 import { sanitizeFilename } from '../src/lib/utils/file-download';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -1,4 +1,4 @@
-import { Project, Table } from '../../models/project';
+import { Project, Table } from '../../../models/project';
 import {
 	Song,
 	Pattern,
@@ -8,9 +8,9 @@ import {
 	EffectType,
 	Instrument,
 	InstrumentRow
-} from '../../models/song';
-import { PT3TuneTables, generate12TETTuningTable } from '../../models/pt3/tuning-tables';
-import { numberToInstrumentId } from '../../utils/instrument-id';
+} from '../../../models/song';
+import { PT3TuneTables, generate12TETTuningTable } from '../../../models/pt3/tuning-tables';
+import { numberToInstrumentId } from '../../../utils/instrument-id';
 import { convertPT3ToVT2, isTurboSoundPT3, splitTurboSoundPT3 } from './pt3-to-vt2';
 
 interface VT2Module {

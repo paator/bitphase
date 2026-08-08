@@ -1,29 +1,34 @@
-import type { Project } from '../../models/project';
-import { downloadFile, sanitizeFilename } from '../../utils/file-download';
-import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
+import type { Project } from '../../../models/project';
+import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
+import { getTotalVirtualChannelCount } from '../../../models/virtual-channels';
 import JSZip from 'jszip';
 import {
 	convertRegisterStateToAYRegisters,
 	extractHardwareEnvFmStates,
 	extractHardwareFmStates,
+	extractHardwareSampleStates,
 	extractHardwareSidStates,
 	extractHardwareSyncBuzzerStates,
 	TONE_CHANNELS,
+	type CapturedAySampleInstrument,
 	type SongCaptureFrame
 } from './ay-export-utils';
-import { filterInstrumentsForChip } from '../instrument/instrument-filter';
+import { filterInstrumentsForChip } from '../../instrument/instrument-filter';
 
 const DEFAULT_SPEED = 6;
+const CAPTURE_OUTPUT_SAMPLE_RATE = 44100;
 
 export type SongCaptureResult = {
 	frames: SongCaptureFrame[];
+	orderIndices: number[];
+	instruments: CapturedAySampleInstrument[];
 	chipFrequency: number;
 	interruptFrequency: number;
 	isYm: boolean;
 };
 
 export type PsgExportModules = {
-	AyumiState: new (channelCount?: number) => any;
+	AyumiState: new (channelCount?: number, sharedTimeline?: unknown) => any;
 	TrackerPatternProcessor: new (
 		state: any,
 		driver: any,
@@ -32,6 +37,18 @@ export type PsgExportModules = {
 	AYAudioDriver: new (channelCount?: number) => any;
 	AYChipRegisterState: new (channelCount?: number) => any;
 	VirtualChannelMixer: new () => any;
+	instrumentHasSample?: (instrument: any) => boolean;
+	advanceSamplePosition?: (
+		state: any,
+		channelIndex: number,
+		instrument: any,
+		outputSampleRate: number,
+		effectiveTone?: number
+	) => { active: boolean; volume: number };
+};
+
+export type CaptureRegisterOptions = {
+	captureDigiSamples?: boolean;
 };
 
 function encodePSG(registerFrames: number[][]): ArrayBuffer {
@@ -115,11 +132,21 @@ class PsgExportService {
 		song: any,
 		totalRows: number,
 		patterns: any[],
+		modules: PsgExportModules,
+		captureOptions: CaptureRegisterOptions,
 		onProgress?: (progress: number, message: string) => void
-	): Promise<SongCaptureFrame[]> {
+	): Promise<{ frames: SongCaptureFrame[]; orderIndices: number[] }> {
 		const captureFrames: SongCaptureFrame[] = [];
+		const orderIndices: number[] = [];
 		let totalTicks = 0;
 		const maxTicks = 1000000;
+		const captureDigiSamples = captureOptions.captureDigiSamples === true;
+		const instrumentHasSample = modules.instrumentHasSample;
+		const advanceSamplePosition = modules.advanceSamplePosition;
+		const samplesPerInterrupt = Math.max(
+			1,
+			Math.round(CAPTURE_OUTPUT_SAMPLE_RATE / (song.interruptFrequency ?? 50))
+		);
 
 		let lastProgressUpdate = 0;
 		const progressUpdateInterval = 1000;
@@ -175,15 +202,68 @@ class PsgExportService {
 				? mixer.merge(registerState, state)
 				: registerState;
 			const ayRegisters = convertRegisterStateToAYRegisters(stateToConvert);
+			const sample = captureDigiSamples
+				? extractHardwareSampleStates(
+						state,
+						(channelIndex) => audioDriver.getEffectiveTone(state, channelIndex),
+						(channelIndex) =>
+							mixer.hasVirtualChannels()
+								? mixer.getHardwareChannelIndex(channelIndex)
+								: channelIndex
+					)
+				: Array.from({ length: TONE_CHANNELS }, (_, hardwareChannelIndex) => ({
+						enabled: false,
+						hardwareChannelIndex,
+						instrumentIndex: -1,
+						position: 0,
+						phase: 0,
+						effectiveTone: 0
+					}));
 			captureFrames.push({
 				registers: [...ayRegisters],
 				sid: extractHardwareSidStates(stateToConvert),
 				syncbuzzer: extractHardwareSyncBuzzerStates(stateToConvert),
 				fm: extractHardwareFmStates(stateToConvert),
-				envFm: extractHardwareEnvFmStates(stateToConvert)
+				envFm: extractHardwareEnvFmStates(stateToConvert),
+				sample
 			});
+			orderIndices.push(state.timeline.currentPatternOrderIndex);
 			if (mixer.hasVirtualChannels()) {
 				registerState.forceEnvelopeShapeWrite = false;
+			}
+
+			if (
+				captureDigiSamples &&
+				instrumentHasSample &&
+				advanceSamplePosition
+			) {
+				for (
+					let channelIndex = 0;
+					channelIndex < state.channelInstruments.length;
+					channelIndex++
+				) {
+					if (state.channelMuted?.[channelIndex]) continue;
+					if (!state.channelSoundEnabled?.[channelIndex]) continue;
+					const instrumentIndex = state.channelInstruments[channelIndex];
+					const instrument =
+						instrumentIndex >= 0 ? state.instruments[instrumentIndex] : null;
+					if (!instrumentHasSample(instrument)) continue;
+					const effectiveTone = audioDriver.getEffectiveTone(state, channelIndex);
+					if (effectiveTone <= 0) continue;
+					for (let sampleIndex = 0; sampleIndex < samplesPerInterrupt; sampleIndex++) {
+						const playback = advanceSamplePosition(
+							state,
+							channelIndex,
+							instrument,
+							CAPTURE_OUTPUT_SAMPLE_RATE,
+							effectiveTone
+						);
+						if (!playback.active) {
+							state.channelSoundEnabled[channelIndex] = false;
+							break;
+						}
+					}
+				}
 			}
 
 			const isLastPattern = state.timeline.currentPatternOrderIndex >= state.timeline.patternOrder.length - 1;
@@ -209,7 +289,7 @@ class PsgExportService {
 			totalTicks++;
 		}
 
-		return captureFrames;
+		return { frames: captureFrames, orderIndices };
 	}
 
 	async captureSongFrames(
@@ -217,7 +297,8 @@ class PsgExportService {
 		songIndex: number,
 		modules: PsgExportModules,
 		onProgress?: (progress: number, message: string) => void,
-		abortSignal?: AbortSignal
+		abortSignal?: AbortSignal,
+		captureOptions: CaptureRegisterOptions = {}
 	): Promise<SongCaptureResult> {
 		const song = project.songs[songIndex];
 		if (!song || song.patterns.length === 0) {
@@ -226,7 +307,10 @@ class PsgExportService {
 
 		const chipFrequency = song.chipFrequency ?? 1773400;
 		const interruptFrequency = song.interruptFrequency ?? 50;
-		const isYm = chipFrequency >= 2000000;
+		const isYm =
+			Boolean((song as { stMixing?: boolean }).stMixing) ||
+			song.chipVariant === 'YM' ||
+			chipFrequency >= 2000000;
 
 		const {
 			AyumiState,
@@ -241,12 +325,24 @@ class PsgExportService {
 			? getTotalVirtualChannelCount(TONE_CHANNELS, virtualChannelMap)
 			: TONE_CHANNELS;
 
+		const filteredInstruments = filterInstrumentsForChip(
+			project.instruments,
+			song.chipType ?? 'ay'
+		);
 		const state = new AyumiState(totalChannelCount);
 		state.setTuningTable(song.tuningTable);
-		state.setInstruments(filterInstrumentsForChip(project.instruments, song.chipType ?? 'ay'));
+		state.setInstruments(filteredInstruments);
 		state.setTables(project.tables);
 		state.setPatternOrder(project.patternOrder || [0]);
 		state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+		if (typeof state.setChipVariant === 'function') {
+			state.setChipVariant(isYm ? 'YM' : 'AY');
+		}
+		if (typeof state.setAymFrequency === 'function') {
+			state.setAymFrequency(chipFrequency);
+		} else if (state.aymFrequency !== undefined) {
+			state.aymFrequency = chipFrequency;
+		}
 		if (song.interruptFrequency) {
 			state.timeline.intFrequency = song.interruptFrequency;
 		}
@@ -272,7 +368,7 @@ class PsgExportService {
 		state.timeline.currentPatternOrderIndex = 0;
 
 		const totalRows = this.calculateTotalRows(song, patternOrder);
-		const frames = await this.captureRegisterStates(
+		const { frames, orderIndices } = await this.captureRegisterStates(
 			state,
 			patternProcessor,
 			audioDriver,
@@ -281,6 +377,8 @@ class PsgExportService {
 			song,
 			totalRows,
 			patterns,
+			modules,
+			captureOptions,
 			onProgress
 		);
 
@@ -290,6 +388,8 @@ class PsgExportService {
 
 		return {
 			frames,
+			orderIndices,
+			instruments: filteredInstruments as CapturedAySampleInstrument[],
 			chipFrequency,
 			interruptFrequency,
 			isYm
@@ -440,6 +540,9 @@ interface GeneratePSGBufferOptions {
 
 export interface GenerateCaptureOptions {
 	modules?: PsgExportModules;
+	onProgress?: (progress: number, message: string) => void;
+	abortSignal?: AbortSignal;
+	captureDigiSamples?: boolean;
 }
 
 export async function captureSongRegisterFrames(
@@ -452,6 +555,7 @@ export async function captureSongRegisterFrames(
 		throw new Error('Song is empty');
 	}
 
+	const captureDigiSamples = options?.captureDigiSamples === true;
 	let modules: PsgExportModules;
 	if (options?.modules) {
 		modules = options.modules;
@@ -476,8 +580,27 @@ export async function captureSongRegisterFrames(
 			VirtualChannelMixer
 		};
 	}
+	if (
+		captureDigiSamples &&
+		(!modules.instrumentHasSample || !modules.advanceSamplePosition)
+	) {
+		const baseUrl = import.meta.env.BASE_URL;
+		const samplePlayback = await import(`${baseUrl}ay/ay-sample-playback.js`);
+		modules = {
+			...modules,
+			instrumentHasSample: samplePlayback.instrumentHasSample,
+			advanceSamplePosition: samplePlayback.advanceSamplePosition
+		};
+	}
 
-	return psgExportService.captureSongFrames(project, songIndex, modules);
+	return psgExportService.captureSongFrames(
+		project,
+		songIndex,
+		modules,
+		options?.onProgress,
+		options?.abortSignal,
+		{ captureDigiSamples }
+	);
 }
 
 export async function generatePSGBuffer(

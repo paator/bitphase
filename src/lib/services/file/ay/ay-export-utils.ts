@@ -66,12 +66,33 @@ export type HardwareEnvFmState = {
 	waveformLoop: number;
 };
 
+export type HardwareSampleState = {
+	enabled: boolean;
+	hardwareChannelIndex: number;
+	instrumentIndex: number;
+	position: number;
+	phase: number;
+	effectiveTone: number;
+};
+
+export type CapturedAySampleInstrument = {
+	sampleData?: number[];
+	sampleRate?: number;
+	sampleStart?: number;
+	sampleEnd?: number;
+	sampleLoopStart?: number;
+	sampleLength?: number;
+	sampleLoop?: number;
+	sampleLoopEnabled?: boolean;
+};
+
 export type SongCaptureFrame = {
 	registers: number[];
 	sid: HardwareSidState[];
 	syncbuzzer: HardwareSyncBuzzerState[];
 	fm: HardwareFmState[];
 	envFm: HardwareEnvFmState[];
+	sample: HardwareSampleState[];
 };
 
 export function convertRegisterStateToAYRegisters(registerState: {
@@ -193,7 +214,7 @@ export function sidVolumeLevel(waveformStep: number, baseVolume: number): number
 	return Math.min(15, vol);
 }
 
-export { isTimerWaveformLowPhase, timerPwmStepPeriod } from '../../chips/ay/instrument';
+export { isTimerWaveformLowPhase, timerPwmStepPeriod } from '../../../chips/ay/instrument';
 
 function resolveCapturedFmOffsetMode(
 	mode: TimerEffectRegisterState['fmOffsetMode']
@@ -248,12 +269,21 @@ export function createDisabledTimerCaptureStates(): {
 	syncbuzzer: HardwareSyncBuzzerState[];
 	fm: HardwareFmState[];
 	envFm: HardwareEnvFmState[];
+	sample: HardwareSampleState[];
 } {
 	return {
 		sid: Array.from({ length: TONE_CHANNELS }, createDisabledSidState),
 		syncbuzzer: Array.from({ length: TONE_CHANNELS }, createDisabledSyncBuzzerState),
 		fm: Array.from({ length: TONE_CHANNELS }, createDisabledFmState),
-		envFm: Array.from({ length: TONE_CHANNELS }, createDisabledEnvFmState)
+		envFm: Array.from({ length: TONE_CHANNELS }, createDisabledEnvFmState),
+		sample: Array.from({ length: TONE_CHANNELS }, (_, hardwareChannelIndex) => ({
+			enabled: false,
+			hardwareChannelIndex,
+			instrumentIndex: -1,
+			position: 0,
+			phase: 0,
+			effectiveTone: 0
+		}))
 	};
 }
 
@@ -357,6 +387,70 @@ export function extractHardwareEnvFmStates(registerState: {
 		});
 	}
 	return result;
+}
+
+function createDisabledSampleState(hardwareChannelIndex: number): HardwareSampleState {
+	return {
+		enabled: false,
+		hardwareChannelIndex,
+		instrumentIndex: -1,
+		position: 0,
+		phase: 0,
+		effectiveTone: 0
+	};
+}
+
+export function extractHardwareSampleStates(
+	state: {
+		channelInstruments?: number[];
+		channelSoundEnabled?: boolean[];
+		channelMuted?: boolean[];
+		channelSamplePositions?: number[];
+		channelSamplePhase?: number[];
+		instruments?: Array<{ sampleData?: number[] }>;
+	},
+	getEffectiveTone: (channelIndex: number) => number,
+	getHardwareChannelIndex: (channelIndex: number) => number
+): HardwareSampleState[] {
+	const byHardware = [
+		createDisabledSampleState(0),
+		createDisabledSampleState(1),
+		createDisabledSampleState(2)
+	];
+	const channelCount = state.channelInstruments?.length ?? 0;
+	for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+		if (state.channelMuted?.[channelIndex]) {
+			continue;
+		}
+		if (!state.channelSoundEnabled?.[channelIndex]) {
+			continue;
+		}
+		const instrumentIndex = state.channelInstruments?.[channelIndex] ?? -1;
+		const instrument = instrumentIndex >= 0 ? state.instruments?.[instrumentIndex] : null;
+		if (!instrument?.sampleData?.length) {
+			continue;
+		}
+		const effectiveTone = getEffectiveTone(channelIndex);
+		if (effectiveTone <= 0) {
+			continue;
+		}
+		const hardwareChannelIndex = getHardwareChannelIndex(channelIndex);
+		if (hardwareChannelIndex < 0 || hardwareChannelIndex >= TONE_CHANNELS) {
+			continue;
+		}
+		if (byHardware[hardwareChannelIndex]?.enabled) {
+			continue;
+		}
+		byHardware[hardwareChannelIndex] = {
+			enabled: true,
+			hardwareChannelIndex,
+			instrumentIndex,
+			position: state.channelSamplePositions?.[channelIndex] ?? 0,
+			phase: state.channelSamplePhase?.[channelIndex] ?? 0,
+			effectiveTone
+		};
+	}
+	return byHardware;
 }
 
 export const ENVELOPE_SHAPE_REGISTER = 13;

@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { exportToWAV } from '../../../../src/lib/services/file/wav-export';
-import type { Chip } from '../../../../src/lib/chips/types';
-import { Project } from '../../../../src/lib/models/project';
-import { Song, Pattern } from '../../../../src/lib/models/song';
-import { AYUMI_AUDIO_SLOT_KIND } from '../../../../src/lib/chips/ay/audio-slot-kind';
-import { NES_AUDIO_SLOT_KIND } from '../../../../src/lib/chips/nes/audio-slot-kind';
+import { exportToWAV } from '../../../../../src/lib/services/file/wav/wav-export';
+import type { Chip } from '../../../../../src/lib/chips/types';
+import { Project } from '../../../../../src/lib/models/project';
+import { Song, Pattern } from '../../../../../src/lib/models/song';
+import { AYUMI_AUDIO_SLOT_KIND } from '../../../../../src/lib/chips/ay/audio-slot-kind';
+import { NES_AUDIO_SLOT_KIND } from '../../../../../src/lib/chips/nes/audio-slot-kind';
 
-vi.mock('../../../../src/lib/services/file/mixed-chip-shared-timeline-export', async (importOriginal) => {
+vi.mock('../../../../../src/lib/services/file/wav/mixed-chip-shared-timeline-export', async (importOriginal) => {
 	const actual = await importOriginal<
-		typeof import('../../../../src/lib/services/file/mixed-chip-shared-timeline-export')
+		typeof import('../../../../../src/lib/services/file/wav/mixed-chip-shared-timeline-export')
 	>();
 	return {
 		...actual,
@@ -19,7 +19,7 @@ vi.mock('../../../../src/lib/services/file/mixed-chip-shared-timeline-export', a
 	};
 });
 
-import { renderMixedChipSharedTimelineSlots } from '../../../../src/lib/services/file/mixed-chip-shared-timeline-export';
+import { renderMixedChipSharedTimelineSlots } from '../../../../../src/lib/services/file/wav/mixed-chip-shared-timeline-export';
 
 describe('wav export loop behavior', () => {
 	beforeEach(() => {

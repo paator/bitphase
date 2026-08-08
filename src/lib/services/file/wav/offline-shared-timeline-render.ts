@@ -1,9 +1,9 @@
-import type { SharedTimelineExportLaneHandle } from '../../chips/base/renderer';
+import type { SharedTimelineExportLaneHandle } from '../../../chips/base/renderer';
 import {
 	leaderPatternLengthFromSlots,
 	runSharedTimelineQuantum,
 	sortPlaySlotsForQuantum
-} from '../../../../public/tracker/shared-playback-orchestrator.js';
+} from '../../../../../public/tracker/shared-playback-orchestrator.js';
 
 export type OfflineSharedTimeline = {
 	tickAccumulator: number;

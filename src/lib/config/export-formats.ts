@@ -14,7 +14,16 @@ const EXPORT_FORMATS: ExportFormat[] = [
 	{ label: 'TMR', action: 'export-tmr', isAvailable: (c) => c['ay'] === 1 },
 	{ label: 'PSG (ZIP)', action: 'export-psg-zip', isAvailable: (c) => (c['ay'] ?? 0) > 1 },
 	{ label: 'TMR (ZIP)', action: 'export-tmr-zip', isAvailable: (c) => (c['ay'] ?? 0) > 1 },
-	{ label: 'SNDH', action: 'export-sndh', isAvailable: (c) => c['ay'] === 1 }
+	{ label: 'SNDH', action: 'export-sndh', isAvailable: (c) => c['ay'] === 1 },
+	{
+		label: 'VGM',
+		action: 'export-vgm',
+		isAvailable: (c) => {
+			const ay = c['ay'] ?? 0;
+			const nes = c['nes'] ?? 0;
+			return ay <= 2 && nes <= 2 && ay + nes >= 1;
+		}
+	}
 ];
 
 export function buildChipConfiguration(chipTypes: string[]): ChipConfiguration {

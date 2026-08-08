@@ -1,18 +1,18 @@
-import type { Project } from '../../models/project';
-import type { Pattern } from '../../models/song';
-import type { Chip } from '../../chips/types';
-import type { ResourceLoader } from '../../chips/base/resource-loader';
+import type { Project } from '../../../models/project';
+import type { Pattern } from '../../../models/song';
+import type { Chip } from '../../../chips/types';
+import type { ResourceLoader } from '../../../chips/base/resource-loader';
 import type {
 	RenderOptions,
 	SharedTimelineExportResult,
 	SharedTimelineExportSlot
-} from '../../chips/base/renderer';
-import { AYUMI_AUDIO_SLOT_KIND } from '../../chips/ay/audio-slot-kind';
-import { NES_AUDIO_SLOT_KIND } from '../../chips/nes/audio-slot-kind';
-import { AYChipRenderer } from '../../chips/ay/renderer';
-import { NESChipRenderer } from '../../chips/nes/renderer';
-import { createAySharedTimelineExportLane } from '../../chips/ay/shared-timeline-export-lane';
-import { createNesSharedTimelineExportLane } from '../../chips/nes/shared-timeline-export-lane';
+} from '../../../chips/base/renderer';
+import { AYUMI_AUDIO_SLOT_KIND } from '../../../chips/ay/audio-slot-kind';
+import { NES_AUDIO_SLOT_KIND } from '../../../chips/nes/audio-slot-kind';
+import { AYChipRenderer } from '../../../chips/ay/renderer';
+import { NESChipRenderer } from '../../../chips/nes/renderer';
+import { createAySharedTimelineExportLane } from '../../../chips/ay/shared-timeline-export-lane';
+import { createNesSharedTimelineExportLane } from '../../../chips/nes/shared-timeline-export-lane';
 import {
 	renderOfflineSharedTimeline,
 	type OfflineSharedTimeline

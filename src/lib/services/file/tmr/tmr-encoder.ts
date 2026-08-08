@@ -16,8 +16,8 @@ import {
 	type HardwareSidState,
 	type HardwareSyncBuzzerState,
 	type SongCaptureFrame
-} from './ay-export-utils';
-import { computeEnvFmEnvelopePeriod, computeFmTonePeriod } from '../../chips/ay/instrument';
+} from '../ay/ay-export-utils';
+import { computeEnvFmEnvelopePeriod, computeFmTonePeriod } from '../../../chips/ay/instrument';
 import { encodeEventList } from './tmr-event-list';
 import {
 	encodeEventPsgApplyMask,

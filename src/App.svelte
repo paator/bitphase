@@ -3,8 +3,8 @@
 	import './app.css';
 	import { buildMenuItems } from './lib/config/app-menu';
 	import { buildChipConfiguration } from './lib/config/export-formats';
-	import { handleFileImport } from './lib/services/file/file-import';
-	import { handleFileExport } from './lib/services/file/file-export';
+	import { handleFileImport } from './lib/services/file/project/file-import';
+	import { handleFileExport } from './lib/services/file/project/file-export';
 	import type { Song } from './lib/models/song';
 	import PatternEditor from './lib/components/Song/PatternEditor.svelte';
 	import ModalContainer from './lib/components/Modal/ModalContainer.svelte';

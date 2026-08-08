@@ -1,5 +1,5 @@
-import type { Project } from '../../models/project';
-import { downloadFile, sanitizeFilename } from '../../utils/file-download';
+import type { Project } from '../../../models/project';
+import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 
 export class FileExportService {
 	static serializeProject(project: Project): string {

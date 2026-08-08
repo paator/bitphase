@@ -1,6 +1,6 @@
-import type { Chip } from '../../chips/types';
-import { loadVT2File, loadPT3File } from './vt-converter';
-import { Project, Table } from '../../models/project';
+import type { Chip } from '../../../chips/types';
+import { loadVT2File, loadPT3File } from '../modules/vt-converter';
+import { Project, Table } from '../../../models/project';
 import {
 	Song,
 	Pattern,
@@ -13,12 +13,12 @@ import {
 	Instrument,
 	InstrumentRow,
 	DEFAULT_PATTERN_LENGTH
-} from '../../models/song';
-import { isValidInstrumentSampleByteLength } from '../../utils/audio-sample-decode';
-import { normalizeSamplePlaybackBounds } from '../../chips/ay/sample-region';
-import { normalizeNesInstrumentRow } from '../../chips/nes/instrument';
-import type { ChipSchema } from '../../chips/base/schema';
-import { computeEffectiveChannelLabels } from '../../models/virtual-channels';
+} from '../../../models/song';
+import { isValidInstrumentSampleByteLength } from '../../../utils/audio-sample-decode';
+import { normalizeSamplePlaybackBounds } from '../../../chips/ay/sample-region';
+import { normalizeNesInstrumentRow } from '../../../chips/nes/instrument';
+import type { ChipSchema } from '../../../chips/base/schema';
+import { computeEffectiveChannelLabels } from '../../../models/virtual-channels';
 
 function reconstructProject(data: any, getChip: (chipType: string) => Chip | null): Project {
 	const songs = data.songs?.map((songData: any) => reconstructSong(songData, getChip)) || [];
@@ -420,7 +420,7 @@ export class FileImportService {
 	}
 
 	static async reconstructFromJsonAsync(json: string): Promise<Project> {
-		const { getChipByType } = await import('../../chips/registry');
+		const { getChipByType } = await import('../../../chips/registry');
 		return this.reconstructFromJson(json, getChipByType);
 	}
 

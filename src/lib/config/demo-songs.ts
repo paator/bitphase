@@ -1,5 +1,5 @@
 import type { MenuItem } from '../components/Menu/types';
-import { FileImportService } from '../services/file/file-import';
+import { FileImportService } from '../services/file/project/file-import';
 import type { Project } from '../models/project';
 
 const btpGlob = import.meta.glob('../../demo/*.btp', {

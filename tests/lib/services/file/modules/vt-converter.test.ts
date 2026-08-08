@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertVT2String } from '@/lib/services/file/vt-converter';
+import { convertVT2String } from '@/lib/services/file/modules/vt-converter';
 
 describe('VT2Converter', () => {
 	describe('TurboSound (2xAY) import', () => {
