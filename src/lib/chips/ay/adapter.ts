@@ -17,7 +17,7 @@ export class AYConverter implements PatternConverter {
 		};
 
 		for (let i = 0; i < ayPattern.channels.length; i++) {
-			generic.channels.push({ rows: [] });
+			generic.channels.push({ rows: [], label: ayPattern.channels[i].label });
 		}
 
 		for (let rowIndex = 0; rowIndex < ayPattern.length; rowIndex++) {
@@ -70,7 +70,7 @@ export class AYConverter implements PatternConverter {
 
 	fromGeneric(generic: GenericPattern): Pattern {
 		const channelLabels = generic.channels.map(
-			(_, i) => String.fromCharCode(65 + Math.min(i, 25))
+			(channel, i) => channel.label ?? String.fromCharCode(65 + Math.min(i, 25))
 		);
 		const ayPattern = new AYPattern(generic.id, generic.length, undefined, channelLabels);
 

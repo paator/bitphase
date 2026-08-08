@@ -18,7 +18,7 @@ export class NESConverter implements PatternConverter {
 		};
 
 		for (let i = 0; i < nesPattern.channels.length; i++) {
-			generic.channels.push({ rows: [] });
+			generic.channels.push({ rows: [], label: nesPattern.channels[i].label });
 		}
 
 		for (let rowIndex = 0; rowIndex < nesPattern.length; rowIndex++) {
@@ -52,18 +52,21 @@ export class NESConverter implements PatternConverter {
 	}
 
 	fromGeneric(generic: GenericPattern): Pattern {
-		const channelLabels = NES_CHIP_SCHEMA.channelLabels ?? [
+		const defaultLabels = NES_CHIP_SCHEMA.channelLabels ?? [
 			'Pulse 1',
 			'Pulse 2',
 			'Triangle',
 			'Noise',
 			'DPCM'
 		];
+		const channelLabels = generic.channels.map(
+			(channel, index) => channel.label ?? defaultLabels[index] ?? `Ch${index + 1}`
+		);
 		const nesPattern = new NesPattern(
 			generic.id,
 			generic.length,
 			NES_CHIP_SCHEMA,
-			channelLabels.slice(0, generic.channels.length)
+			channelLabels
 		);
 
 		for (let rowIndex = 0; rowIndex < generic.length; rowIndex++) {
@@ -72,7 +75,8 @@ export class NESConverter implements PatternConverter {
 			for (let channelIndex = 0; channelIndex < generic.channels.length; channelIndex++) {
 				const genericChannel = generic.channels[channelIndex];
 				const genericRow = genericChannel.rows[rowIndex];
-				const nesRow = nesPattern.channels[channelIndex].rows[rowIndex];
+				const nesRow = nesPattern.channels[channelIndex]?.rows[rowIndex];
+				if (!genericRow || !nesRow) continue;
 
 				if (genericRow.note && isString(genericRow.note)) {
 					const { noteName, octave } = parseNoteFromString(genericRow.note);

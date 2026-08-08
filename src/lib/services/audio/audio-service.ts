@@ -160,6 +160,7 @@ export class AudioService {
 
 		const processorWithWaveform = processor as {
 			setWaveformCallback?: (cb: (channels: Float32Array[]) => void) => void;
+			setChannelLevelsCallback?: (cb: (levels: number[]) => void) => void;
 			setChannelToneHzCallback?: (cb: (payload: {
 				frequencies: (number | null)[];
 				sidTimerHz: (number | null)[];
@@ -178,6 +179,12 @@ export class AudioService {
 			if (idx < 0) return;
 			const showWaveform = this._isPlaying || this._previewChipIndices.has(idx);
 			if (showWaveform) waveformStore.setChannels(idx, channels);
+		});
+		processorWithWaveform.setChannelLevelsCallback?.((levels: number[]) => {
+			const idx = this.chipProcessors.indexOf(processor);
+			if (idx < 0) return;
+			const showLevels = this._isPlaying || this._previewChipIndices.has(idx);
+			if (showLevels) waveformStore.setChannelLevels(idx, levels);
 		});
 		processorWithWaveform.setChannelToneHzCallback?.((payload) => {
 			const idx = this.chipProcessors.indexOf(processor);

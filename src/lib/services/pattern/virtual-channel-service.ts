@@ -1,6 +1,6 @@
 import { Pattern, Channel, Row, type Song } from '../../models/song';
 import type { ChipSchema } from '../../chips/base/schema';
-import { computeEffectiveChannelLabels } from '../../models/virtual-channels';
+import { computeEffectiveChannelLabels, formatVirtualChannelLabel } from '../../models/virtual-channels';
 
 export class VirtualChannelService {
 	static addVirtualChannel(
@@ -16,7 +16,7 @@ export class VirtualChannelService {
 
 		const insertIndex = this.getGroupEndIndex(hwChannelIndex, song.virtualChannelMap) + 1;
 
-		const newLabel = `${hwLabels[hwChannelIndex]}${currentCount + 1}`;
+		const newLabel = formatVirtualChannelLabel(hwLabels[hwChannelIndex], currentCount + 1);
 
 		const updatedPatterns = patterns.map((pattern) => {
 			const newChannels = [...pattern.channels];
@@ -26,7 +26,7 @@ export class VirtualChannelService {
 			if (currentCount === 1 && newChannels[insertIndex - 1]) {
 				newChannels[insertIndex - 1] = new Channel(
 					pattern.length,
-					`${hwLabels[hwChannelIndex]}1`,
+					formatVirtualChannelLabel(hwLabels[hwChannelIndex], 1),
 					schema?.fields
 				);
 				this.copyChannelData(pattern.channels[insertIndex - 1], newChannels[insertIndex - 1]);

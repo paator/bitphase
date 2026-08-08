@@ -14,6 +14,7 @@ class SettingsStore {
 	channelSeparatorWidth = $state(1);
 	decimalRowNumbers = $state(false);
 	showOscilloscopes = $state(true);
+	showChannelVolumeBars = $state(true);
 	showInstrumentPreview = $state(true);
 	previewFullRow = $state(true);
 	debugMode = $state(false);

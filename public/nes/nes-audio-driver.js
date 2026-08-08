@@ -48,9 +48,24 @@ function resolveNesNoisePeriodFromSemitoneOffset(semitoneOffset) {
 }
 
 class NesAudioDriver {
+	constructor() {
+		this.resolveHardwareChannel = null;
+	}
+
+	setHardwareChannelResolver(resolver) {
+		this.resolveHardwareChannel = resolver;
+	}
+
 	resetChannelMixerState() {}
 
 	resizeChannels(_newCount) {}
+
+	_getHardwareChannelType(channelIndex) {
+		if (typeof this.resolveHardwareChannel === 'function') {
+			return this.resolveHardwareChannel(channelIndex);
+		}
+		return channelIndex;
+	}
 
 	processPatternRow(state, pattern, rowIndex, _patternRow, registerState) {
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
@@ -71,19 +86,20 @@ class NesAudioDriver {
 	_silenceChannel(registerState, channelIndex) {
 		const channel = registerState.channels[channelIndex];
 		if (!channel) return;
+		const hwType = this._getHardwareChannelType(channelIndex);
 		channel.enabled = false;
 		channel.period = 0;
 		channel.volume = 0;
 		channel.retrigger = false;
 		channel.lengthNibble = NES_REGISTER_UNCHANGED;
-		if (channelIndex <= 1) {
+		if (hwType <= 1) {
 			channel.volumeReg = buildSquareSilentVolumeReg(channel.duty);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 			channel.sweepReg = NES_SQUARE_SWEEP_DISABLED;
-		} else if (channelIndex === 2) {
+		} else if (hwType === 2) {
 			channel.volumeReg = NES_REGISTER_UNCHANGED;
 			channel.linearReg = buildTriangleSilentLinearReg();
-		} else if (channelIndex === 3) {
+		} else if (hwType === 3) {
 			channel.volumeReg = buildNoiseSilentVolumeReg();
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		} else {
@@ -101,8 +117,9 @@ class NesAudioDriver {
 			combinedVolume
 		);
 		channel.volume = combinedVolume;
+		const hwType = this._getHardwareChannelType(channelIndex);
 
-		if (channelIndex <= 1) {
+		if (hwType <= 1) {
 			const pulseWidth =
 				state.channelPulseWidthCycleActive?.[channelIndex] === true
 					? (state.channelPulseWidthCurrent[channelIndex] ?? row.pulseWidth)
@@ -116,14 +133,14 @@ class NesAudioDriver {
 			channel.duty = pulseWidth;
 			channel.lengthNibble = buildLengthCounterNibble(row.soundLength);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
-		} else if (channelIndex === 2) {
+		} else if (hwType === 2) {
 			channel.volumeReg = NES_REGISTER_UNCHANGED;
 			channel.linearReg = buildTriangleLinearReg(row.soundLength);
 			channel.lengthNibble = usesTriangleLinearCounter(row.soundLength)
 				? NES_REGISTER_UNCHANGED
 				: buildLengthCounterNibble(row.soundLength);
 			channel.duty = 0;
-		} else if (channelIndex === 3) {
+		} else if (hwType === 3) {
 			channel.volumeReg = buildNoiseEnvelopeVolumeReg(
 				row.envelope,
 				volumeNibble,
@@ -216,13 +233,15 @@ class NesAudioDriver {
 	}
 
 	processInstruments(state, registerState) {
-		for (let channelIndex = 0; channelIndex < NES_CHANNEL_COUNT; channelIndex++) {
+		const channelCount = registerState.channelCount ?? NES_CHANNEL_COUNT;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
 			const channel = registerState.channels[channelIndex];
 			if (!channel) continue;
 
 			const isMuted = state.channelMuted[channelIndex];
 			const isSoundEnabled = state.channelSoundEnabled[channelIndex];
 			const onOffHalted = isChannelOnOffHalted(state, channelIndex);
+			const hwType = this._getHardwareChannelType(channelIndex);
 
 			if (isMuted || !isSoundEnabled) {
 				this._silenceChannel(registerState, channelIndex);
@@ -239,7 +258,7 @@ class NesAudioDriver {
 			const combinedVolume = this.calculateVolume(patternVolume, row.volumeOrRate);
 			const basePeriod = this.getEffectivePeriod(state, channelIndex);
 			const period =
-				channelIndex <= 2
+				hwType <= 2
 					? this._applyToneOffset(state, channelIndex, row, basePeriod)
 					: basePeriod;
 			const keyOn = state.channelKeyOn[channelIndex];
@@ -247,7 +266,7 @@ class NesAudioDriver {
 			this._applyEnvelopeAndLength(channel, channelIndex, row, patternVolume, state);
 			const audible = this._isChannelAudible(row, patternVolume, combinedVolume);
 
-			if (channelIndex <= 1) {
+			if (hwType <= 1) {
 				channel.enabled = period > 0 && audible;
 				channel.period = period;
 				channel.sweepUpdateOnly = false;
@@ -257,12 +276,12 @@ class NesAudioDriver {
 						: buildSquareSweepReg(row.sweep, row.sweepRate, row.sweepShift);
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
-			} else if (channelIndex === 2) {
+			} else if (hwType === 2) {
 				channel.enabled = period > 0 && combinedVolume > 0;
 				channel.period = period;
 				channel.retrigger = row.retrigger || keyOn;
 				state.channelKeyOn[channelIndex] = false;
-			} else if (channelIndex === 3) {
+			} else if (hwType === 3) {
 				channel.enabled = audible;
 				channel.noisePeriod = this.resolveNoisePeriod(state, channelIndex);
 				channel.retrigger = row.retrigger || keyOn;
@@ -280,7 +299,7 @@ class NesAudioDriver {
 			}
 		}
 
-		processChannelOnOffCounters(state, NES_CHANNEL_COUNT);
+		processChannelOnOffCounters(state, channelCount);
 	}
 
 	advancePulseWidthTable(state) {
@@ -292,7 +311,9 @@ class NesAudioDriver {
 	}
 
 	syncSweepTableRegisterState(state, registerState) {
-		for (let channelIndex = 0; channelIndex < 2; channelIndex++) {
+		const channelCount = registerState.channelCount ?? NES_CHANNEL_COUNT;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			if (this._getHardwareChannelType(channelIndex) > 1) continue;
 			if (!state.channelSweepTableTick?.[channelIndex]) continue;
 			const channel = registerState.channels[channelIndex];
 			if (!channel) continue;

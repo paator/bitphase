@@ -9,6 +9,7 @@ export interface Settings {
 	channelSeparatorWidth: number;
 	decimalRowNumbers: boolean;
 	showOscilloscopes: boolean;
+	showChannelVolumeBars: boolean;
 	showInstrumentPreview: boolean;
 	previewFullRow: boolean;
 	debugMode: boolean;

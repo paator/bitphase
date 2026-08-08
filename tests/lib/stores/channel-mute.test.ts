@@ -41,4 +41,14 @@ describe('ChannelMuteStore', () => {
 		expect(channelMuteStore.isChannelMuted(1, 1)).toBe(false);
 		expect(channelMuteStore.isChannelMuted(2, 2)).toBe(false);
 	});
+
+	it('sets and checks mute for multiple virtual channels', () => {
+		channelMuteStore.setChannelsMuted(0, [0, 1], true);
+
+		expect(channelMuteStore.areChannelsMuted(0, [0, 1])).toBe(true);
+		expect(channelMuteStore.areChannelsMuted(0, [0, 1, 2])).toBe(false);
+
+		channelMuteStore.setChannelMuted(0, 1, false);
+		expect(channelMuteStore.areChannelsMuted(0, [0, 1])).toBe(false);
+	});
 });

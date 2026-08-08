@@ -161,4 +161,27 @@ describe('VirtualChannelMixer', () => {
 			expect(result.forceEnvelopeShapeWrite).toBe(true);
 		});
 	});
+
+	describe('getAudibleVirtualChannelIndices', () => {
+		it('returns only the leftmost active virtual channel per hardware group', () => {
+			mixer.configure({ 0: 2, 1: 2 }, 3);
+			const registerState = new AYChipRegisterState(5);
+			registerState.channels[0].volume = 15;
+			registerState.channels[1].volume = 10;
+			registerState.channels[2].volume = 0;
+			registerState.channels[3].volume = 12;
+			registerState.channels[4].volume = 8;
+
+			expect(mixer.getAudibleVirtualChannelIndices(registerState)).toEqual([0, 3, 4]);
+		});
+
+		it('returns empty when no virtual channel in a group is active', () => {
+			mixer.configure({ 0: 2 }, 3);
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].volume = 0;
+			registerState.channels[1].volume = 0;
+
+			expect(mixer.getAudibleVirtualChannelIndices(registerState)).toEqual([]);
+		});
+	});
 });

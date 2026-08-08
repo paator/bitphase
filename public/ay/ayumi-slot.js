@@ -387,6 +387,28 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 		mix.r += r;
 	}
 
+	_collectChannelLevels() {
+		const channelCount = this.registerState.channelCount;
+		const levels = new Array(channelCount).fill(0);
+		const audibleIndices =
+			this.virtualChannelMixer?.hasVirtualChannels?.()
+				? new Set(this.virtualChannelMixer.getAudibleVirtualChannelIndices(this.registerState))
+				: null;
+
+		for (let i = 0; i < channelCount; i++) {
+			if (!this._isLogicalChannelAudible(i)) continue;
+			if (audibleIndices && !audibleIndices.has(i)) continue;
+
+			const volume = this.registerState.channels[i]?.volume ?? 0;
+			if ((volume & 0x10) !== 0) {
+				levels[i] = 1;
+			} else {
+				levels[i] = (volume & 0x0f) / 15;
+			}
+		}
+		return levels;
+	}
+
 	finishAudioBlock(numSamples) {
 		if (this.paused && !this.isPreviewActive()) {
 			this.finishAudioBlockFlushTransport(numSamples, this.paused);
@@ -406,6 +428,7 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 				return out;
 			});
 			this._post({ type: 'channel_waveform', channels });
+			this._post({ type: 'channel_levels', levels: this._collectChannelLevels() });
 			const playbackHz = this._collectChannelPlaybackHz();
 			this._post({
 				type: 'channel_tone_hz',

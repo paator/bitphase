@@ -6,7 +6,8 @@ import type {
 	SettingsSubscriber,
 	TuningTableSupport,
 	InstrumentSupport,
-	PreviewNoteSupport
+	PreviewNoteSupport,
+	VirtualChannelSupport
 } from '../base/processor';
 import type { ChipSettings } from '../../services/audio/chip-settings';
 import type { CatchUpSegment } from '../../services/audio/play-from-position';
@@ -29,7 +30,8 @@ export class NESProcessor
 		SettingsSubscriber,
 		TuningTableSupport,
 		InstrumentSupport,
-		PreviewNoteSupport
+		PreviewNoteSupport,
+		VirtualChannelSupport
 {
 	chip: Chip;
 	private readonly bridge: MixerWorkletBridge;
@@ -101,6 +103,10 @@ export class NESProcessor
 
 	setWaveformCallback(callback: (channels: Float32Array[]) => void): void {
 		this.bridge.setWaveformCallback(callback);
+	}
+
+	setChannelLevelsCallback(callback: (levels: number[]) => void): void {
+		this.bridge.setChannelLevelsCallback(callback);
 	}
 
 	setChannelToneHzCallback(
@@ -263,5 +269,16 @@ export class NESProcessor
 
 	isAudioNodeAvailable(): boolean {
 		return this.bridge.isAudioNodeAvailable();
+	}
+
+	sendVirtualChannelConfig(
+		virtualChannelMap: Record<number, number>,
+		hwChannelCount: number
+	): void {
+		this.bridge.sendCommand({
+			type: 'set_virtual_channel_config',
+			virtualChannelMap,
+			hwChannelCount
+		});
 	}
 }

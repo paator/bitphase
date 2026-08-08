@@ -190,6 +190,10 @@ export class AYProcessor
 		this.bridge.setWaveformCallback(callback);
 	}
 
+	setChannelLevelsCallback(callback: (levels: number[]) => void): void {
+		this.bridge.setChannelLevelsCallback(callback);
+	}
+
 	setChannelToneHzCallback(
 		callback: (payload: {
 			frequencies: (number | null)[];

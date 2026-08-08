@@ -37,6 +37,7 @@
 		channelSeparatorWidth: settingsStore.channelSeparatorWidth,
 		decimalRowNumbers: settingsStore.decimalRowNumbers,
 		showOscilloscopes: settingsStore.showOscilloscopes,
+		showChannelVolumeBars: settingsStore.showChannelVolumeBars,
 		showInstrumentPreview: settingsStore.showInstrumentPreview,
 		previewFullRow: settingsStore.previewFullRow,
 		debugMode: settingsStore.debugMode,

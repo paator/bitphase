@@ -21,6 +21,11 @@ export type MixerWorkletIncomingMessage =
 			channels: Float32Array[];
 	  }
 	| {
+			type: 'channel_levels';
+			chipIndex?: number;
+			levels: number[];
+	  }
+	| {
 			type: 'channel_tone_hz';
 			chipIndex?: number;
 			frequencies: (number | null)[];
@@ -93,6 +98,7 @@ export class MixerWorkletBridge {
 	private onPositionUpdate?: (currentRow: number, currentPatternOrderIndex?: number) => void;
 	private onPatternRequest?: (patternOrderIndex: number) => void;
 	private waveformCallback?: (channels: Float32Array[]) => void;
+	private channelLevelsCallback?: (levels: number[]) => void;
 	private channelToneHzCallback?: (payload: {
 		frequencies: (number | null)[];
 		sidTimerHz: (number | null)[];
@@ -123,6 +129,10 @@ export class MixerWorkletBridge {
 
 	setWaveformCallback(callback: (channels: Float32Array[]) => void): void {
 		this.waveformCallback = callback;
+	}
+
+	setChannelLevelsCallback(callback: (levels: number[]) => void): void {
+		this.channelLevelsCallback = callback;
 	}
 
 	setChannelToneHzCallback(
@@ -156,6 +166,7 @@ export class MixerWorkletBridge {
 			msgType !== 'position_update' &&
 			msgType !== 'request_pattern' &&
 			msgType !== 'channel_waveform' &&
+			msgType !== 'channel_levels' &&
 			msgType !== 'channel_tone_hz' &&
 			msgType !== 'timer_pwm_sweep_phase'
 		) {
@@ -171,6 +182,9 @@ export class MixerWorkletBridge {
 				break;
 			case 'channel_waveform':
 				this.waveformCallback?.(message.channels);
+				break;
+			case 'channel_levels':
+				this.channelLevelsCallback?.(message.levels);
 				break;
 			case 'channel_tone_hz':
 				this.channelToneHzCallback?.({

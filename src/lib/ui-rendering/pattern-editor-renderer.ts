@@ -5,6 +5,8 @@ import { PatternTemplateParser } from '../services/pattern/editing/pattern-templ
 import type { getColors } from '../utils/colors';
 import type { VirtualChannelGroup } from '../models/virtual-channels';
 
+export const CHANNEL_LEVEL_STRIP_HEIGHT = 6;
+
 export interface PatternEditorRenderOptions extends Omit<BaseRenderOptions, 'colors'> {
 	colors: ReturnType<typeof getColors>;
 	lineHeight: number;
@@ -31,6 +33,7 @@ export interface ChannelLabelData {
 	channelLabels: string[];
 	channelMuted: boolean[];
 	virtualChannelGroups?: VirtualChannelGroup[];
+	channelLevels?: number[];
 }
 
 export class PatternEditorRenderer extends BaseCanvasRenderer {
@@ -59,6 +62,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		const channelPositions = this.calculateChannelPositions(data.rowString);
 		const labelY = this.lineHeight / 2;
 		const borderWidth = 1;
+		const hasLevels = data.channelLevels !== undefined;
 
 		this.fillRect(0, 0, this.canvasWidth, this.lineHeight, this.patternColors.patternBg);
 
@@ -110,6 +114,10 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			}
 		}
 
+		if (hasLevels) {
+			this.drawChannelLevelStrip(data, channelPositions, separatorMargin);
+		}
+
 		this.restore();
 	}
 
@@ -150,8 +158,12 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				const vchIdx = indices[vi];
 				if (vchIdx >= channelPositions.length) continue;
 				const virtualLabel = group.virtualLabels[vi] ?? '';
+				let suffix = virtualLabel.startsWith(group.hardwareLabel)
+					? virtualLabel.slice(group.hardwareLabel.length)
+					: virtualLabel;
+				suffix = suffix.replace(/^[:\-\s]+/, '');
 				this.drawSingleChannelLabel(
-					`${group.hardwareLabel}:${virtualLabel.replace(group.hardwareLabel, '')}`,
+					suffix ? `${group.hardwareLabel}:${suffix}` : group.hardwareLabel,
 					vchIdx,
 					channelPositions,
 					separatorMargin,
@@ -232,6 +244,53 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.restore();
 
 		this.fillText(label, textX, labelY, textColor);
+	}
+
+	private drawChannelLevelStrip(
+		data: ChannelLabelData,
+		channelPositions: number[],
+		separatorMargin: number
+	): void {
+		const levels = data.channelLevels;
+		if (!levels) return;
+
+		const barHeight = Math.max(2, Math.round(CHANNEL_LEVEL_STRIP_HEIGHT * 0.5));
+		const barY = this.lineHeight + Math.floor((CHANNEL_LEVEL_STRIP_HEIGHT - barHeight) / 2);
+
+		for (let i = 0; i < channelPositions.length; i++) {
+			const channelStart = channelPositions[i];
+			const channelEnd =
+				i < channelPositions.length - 1 ? channelPositions[i + 1] : this.canvasWidth;
+			const buttonX = Math.max(0, channelStart - separatorMargin);
+			const buttonEnd =
+				i < channelPositions.length - 1 ? channelEnd - separatorMargin : this.canvasWidth;
+			const buttonWidth = buttonEnd - buttonX;
+			const isMuted = data.channelMuted[i] ?? false;
+			const level = isMuted ? 0 : (levels[i] ?? 0);
+
+			this.drawCenteredChannelLevelBar(buttonX, buttonWidth, barY, barHeight, level, isMuted);
+		}
+	}
+
+	private drawCenteredChannelLevelBar(
+		buttonX: number,
+		buttonWidth: number,
+		barY: number,
+		barHeight: number,
+		level: number,
+		isMuted: boolean
+	): void {
+		const barWidth = Math.max(10, Math.round(buttonWidth * 0.85));
+		const barX = buttonX + (buttonWidth - barWidth) / 2;
+		const fillColor = isMuted
+			? this.patternColors.patternEmpty
+			: this.patternColors.patternNote || this.patternColors.patternText;
+		const clamped = Math.min(1, Math.max(0, level));
+		const fillWidth = Math.round(barWidth * clamped);
+		if (fillWidth <= 0) return;
+
+		const fillX = barX + (barWidth - fillWidth) / 2;
+		this.fillRectWithAlpha(fillX, barY, fillWidth, barHeight, fillColor, isMuted ? 0.35 : 0.85);
 	}
 
 	drawChannelSeparators(

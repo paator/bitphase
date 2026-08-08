@@ -129,6 +129,14 @@ export const settingsItems: SettingsItem[] = [
 		category: 'appearance'
 	},
 	{
+		label: 'Show Channel Volume Bars',
+		description: 'Display live volume meters under pattern editor channel headers',
+		type: 'toggle',
+		defaultValue: true,
+		setting: 'showChannelVolumeBars',
+		category: 'appearance'
+	},
+	{
 		label: 'Selection Style',
 		description:
 			'Inverted uses a negative filter for high visibility; Filled uses a semi-transparent overlay',

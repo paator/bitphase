@@ -3,6 +3,7 @@ import {
 	computeEffectiveChannelLabels,
 	getHardwareChannelIndex,
 	getVirtualChannelGroups,
+	getVirtualIndicesForHardwareChannel,
 	getTotalVirtualChannelCount,
 	hasVirtualChannels
 } from '../../../src/lib/models/virtual-channels';
@@ -83,6 +84,18 @@ describe('getVirtualChannelGroups', () => {
 		expect(groups[0].virtualChannelIndices).toEqual([0, 1]);
 		expect(groups[1].virtualChannelIndices).toEqual([2, 3]);
 		expect(groups[2].virtualChannelIndices).toEqual([4, 5]);
+	});
+});
+
+describe('getVirtualIndicesForHardwareChannel', () => {
+	it('returns the single index when there are no virtual channels', () => {
+		expect(getVirtualIndicesForHardwareChannel(1, HW_LABELS, {})).toEqual([1]);
+	});
+
+	it('returns all virtual indices for a split hardware channel', () => {
+		expect(getVirtualIndicesForHardwareChannel(0, HW_LABELS, { 0: 2 })).toEqual([0, 1]);
+		expect(getVirtualIndicesForHardwareChannel(1, HW_LABELS, { 0: 2 })).toEqual([2]);
+		expect(getVirtualIndicesForHardwareChannel(2, HW_LABELS, { 0: 2 })).toEqual([3]);
 	});
 });
 

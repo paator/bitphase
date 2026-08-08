@@ -30,6 +30,7 @@
 	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
 	import { Cache } from '../../utils/memoize';
 	import { channelMuteStore } from '../../stores/channel-mute.svelte';
+	import { waveformStore } from '../../stores/waveform.svelte';
 	import { PatternFieldDetection } from '../../services/pattern/editing/pattern-field-detection';
 	import {
 		PatternValueUpdates,
@@ -92,7 +93,6 @@
 		getTotalVirtualChannelCount
 	} from '../../models/virtual-channels';
 	import { VirtualChannelService } from '../../services/pattern/virtual-channel-service';
-	import { AYProcessor } from '../../chips/ay/processor';
 	import { midiService } from '../../services/midi/midi-service';
 	import type {
 		EditingContext,
@@ -150,6 +150,11 @@
 	let channelContextMenuHwIndex = $state<number>(-1);
 	let channelContextMenuVirtualIndex = $state<number>(-1);
 	const editContextMenuItems = $derived(buildEditMenuItems());
+
+	const CHANNEL_LEVEL_DECAY = 0.82;
+	const CHANNEL_LEVEL_EPSILON = 0.01;
+
+	let channelLevels: number[] = $state([]);
 
 	const services: { audioService: AudioService } = getContext('container');
 
@@ -1073,6 +1078,32 @@
 		);
 	}
 
+	function computeDisplayChannelLevels(): { levels: number[]; active: boolean } {
+		const chipIndex = getChipIndex();
+		const logicalLevels = chipIndex >= 0 ? waveformStore.getChannelLevels(chipIndex) : [];
+		const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
+		const vcMap = projectStore.songs[songIndex]?.virtualChannelMap ?? {};
+		const virtualCount = getTotalVirtualChannelCount(hwLabels.length, vcMap);
+		const prev = channelLevels;
+		const levels = new Array<number>(virtualCount);
+		let anyLevel = false;
+
+		for (let vi = 0; vi < virtualCount; vi++) {
+			const muted = chipIndex >= 0 && channelMuteStore.isChannelMuted(chipIndex, vi);
+			const peak = muted ? 0 : (logicalLevels[vi] ?? 0);
+			const previous = prev[vi] ?? 0;
+			let value = peak >= previous ? peak : previous * CHANNEL_LEVEL_DECAY;
+			if (value < CHANNEL_LEVEL_EPSILON) value = 0;
+			levels[vi] = value;
+			if (value > 0) anyLevel = true;
+		}
+
+		return {
+			levels,
+			active: anyLevel || playbackStore.isPlaying
+		};
+	}
+
 	function getPatternRowData(
 		pattern: Pattern,
 		rowIndex: number,
@@ -1203,11 +1234,72 @@
 					rowString,
 					channelLabels,
 					channelMuted,
-					virtualChannelGroups: vcGroups
+					virtualChannelGroups: vcGroups,
+					channelLevels:
+						settingsStore.showChannelVolumeBars && channelLevels.length > 0
+							? channelLevels
+							: undefined
 				});
 			}
 		}
 	}
+
+	$effect(() => {
+		songIndex;
+		schema;
+		const showBars = settingsStore.showChannelVolumeBars;
+
+		let cancelled = false;
+		let rafId = 0;
+
+		if (!showBars) {
+			if (channelLevels.length > 0) {
+				channelLevels = [];
+				draw();
+			}
+			return;
+		}
+
+		const tick = () => {
+			if (cancelled) return;
+			rafId = requestAnimationFrame(tick);
+
+			if (document.hidden) return;
+
+			const { levels, active } = computeDisplayChannelLevels();
+			const playing = playbackStore.isPlaying;
+
+			if (!playing && !active) {
+				if (channelLevels.length > 0) {
+					channelLevels = [];
+					draw();
+				}
+				return;
+			}
+
+			let changed = levels.length !== channelLevels.length;
+			if (!changed) {
+				for (let i = 0; i < levels.length; i++) {
+					if (levels[i] !== channelLevels[i]) {
+						changed = true;
+						break;
+					}
+				}
+			}
+
+			if (changed) {
+				channelLevels = levels;
+				draw();
+			}
+		};
+
+		rafId = requestAnimationFrame(tick);
+
+		return () => {
+			cancelled = true;
+			cancelAnimationFrame(rafId);
+		};
+	});
 
 	function moveRow(delta: number) {
 		if (playbackStore.isPlaying) return;
@@ -2139,12 +2231,12 @@
 		const isPlaying = playbackStore.isPlaying;
 
 		if (data.action === 'add_virtual_channel') {
-			if (isPlaying) return;
+			if (isPlaying || !supportsVirtualChannels()) return;
 			applyVirtualChannelChange(
 				VirtualChannelService.addVirtualChannel(song, hwIndex, patterns)
 			);
 		} else if (data.action === 'remove_virtual_channel') {
-			if (isPlaying) return;
+			if (isPlaying || !supportsVirtualChannels()) return;
 			const result = VirtualChannelService.removeVirtualChannel(
 				song,
 				hwIndex,
@@ -2161,6 +2253,12 @@
 		}
 	}
 
+	function supportsVirtualChannels(): boolean {
+		return Boolean(
+			chipProcessor && 'sendVirtualChannelConfig' in chipProcessor
+		);
+	}
+
 	function getChannelContextMenuItems(): MenuItem[] {
 		const song = projectStore.songs[songIndex];
 		const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
@@ -2173,6 +2271,7 @@
 		);
 		const clickedLabel = effectiveLabels[channelContextMenuVirtualIndex] ?? hwLabel;
 		const isPlaying = playbackStore.isPlaying;
+		const canUseVirtualChannels = supportsVirtualChannels();
 
 		const items: MenuItem[] = [
 			{
@@ -2182,19 +2281,21 @@
 			{
 				label: 'Unmute all',
 				action: 'unmute_all'
-			},
-			{
+			}
+		];
+		if (canUseVirtualChannels) {
+			items.push({
 				label: `Add virtual channel to ${hwLabel}`,
 				action: 'add_virtual_channel',
 				disabled: isPlaying
-			}
-		];
-		if (currentCount > 1) {
-			items.push({
-				label: `Remove virtual channel ${clickedLabel}`,
-				action: 'remove_virtual_channel',
-				disabled: isPlaying
 			});
+			if (currentCount > 1) {
+				items.push({
+					label: `Remove virtual channel ${clickedLabel}`,
+					action: 'remove_virtual_channel',
+					disabled: isPlaying
+				});
+			}
 		}
 		return items;
 	}
@@ -2204,10 +2305,14 @@
 		if (!song) return;
 		const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
 		if (chipProcessor && 'sendVirtualChannelConfig' in chipProcessor) {
-			(chipProcessor as AYProcessor).sendVirtualChannelConfig(
-				song.virtualChannelMap,
-				hwLabels.length
-			);
+			(
+				chipProcessor as ChipProcessor & {
+					sendVirtualChannelConfig: (
+						virtualChannelMap: Record<number, number>,
+						hwChannelCount: number
+					) => void;
+				}
+			).sendVirtualChannelConfig(song.virtualChannelMap, hwLabels.length);
 		}
 	}
 

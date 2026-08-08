@@ -5,6 +5,13 @@ export interface VirtualChannelGroup {
 	virtualLabels: string[];
 }
 
+export function formatVirtualChannelLabel(hwLabel: string, virtualIndex1Based: number): string {
+	if (hwLabel.length <= 2 && !/\d$/.test(hwLabel)) {
+		return `${hwLabel}${virtualIndex1Based}`;
+	}
+	return `${hwLabel}:${virtualIndex1Based}`;
+}
+
 export function computeEffectiveChannelLabels(
 	hwLabels: string[],
 	virtualChannelMap: Record<number, number>
@@ -16,7 +23,7 @@ export function computeEffectiveChannelLabels(
 			labels.push(hwLabels[i]);
 		} else {
 			for (let v = 0; v < virtualCount; v++) {
-				labels.push(`${hwLabels[i]}${v + 1}`);
+				labels.push(formatVirtualChannelLabel(hwLabels[i], v + 1));
 			}
 		}
 	}
@@ -51,7 +58,9 @@ export function getVirtualChannelGroups(
 		const labels: string[] = [];
 		for (let v = 0; v < virtualCount; v++) {
 			indices.push(offset + v);
-			labels.push(virtualCount > 1 ? `${hwLabels[i]}${v + 1}` : hwLabels[i]);
+			labels.push(
+				virtualCount > 1 ? formatVirtualChannelLabel(hwLabels[i], v + 1) : hwLabels[i]
+			);
 		}
 		groups.push({
 			hardwareChannelIndex: i,
@@ -62,6 +71,18 @@ export function getVirtualChannelGroups(
 		offset += virtualCount;
 	}
 	return groups;
+}
+
+export function getVirtualIndicesForHardwareChannel(
+	hwIndex: number,
+	hwLabels: string[],
+	virtualChannelMap: Record<number, number>
+): number[] {
+	return (
+		getVirtualChannelGroups(hwLabels, virtualChannelMap)[hwIndex]?.virtualChannelIndices ?? [
+			hwIndex
+		]
+	);
 }
 
 export function getTotalVirtualChannelCount(

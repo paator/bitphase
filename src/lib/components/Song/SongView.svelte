@@ -43,6 +43,7 @@
 	import { newSongOptions } from '../../config/app-menu';
 	import IconCarbonChevronRight from '~icons/carbon/chevron-right';
 	import EmptySongPatternBackdrop from './EmptySongPatternBackdrop.svelte';
+	import { getVirtualIndicesForHardwareChannel } from '../../models/virtual-channels';
 
 	let {
 		chipProcessors,
@@ -143,19 +144,47 @@
 
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
 
+	function getHardwareChannelLabels(chipIndex: number): string[] {
+		return chipProcessors[chipIndex]?.chip.schema.channelLabels ?? ['A', 'B', 'C'];
+	}
+
+	function getVirtualIndicesForOscilloscopeChannel(
+		chipIndex: number,
+		hwIndex: number
+	): number[] {
+		return getVirtualIndicesForHardwareChannel(
+			hwIndex,
+			getHardwareChannelLabels(chipIndex),
+			projectStore.songs[chipIndex]?.virtualChannelMap ?? {}
+		);
+	}
+
+	function isHardwareChannelMuted(chipIndex: number, hwIndex: number): boolean {
+		return channelMuteStore.areChannelsMuted(
+			chipIndex,
+			getVirtualIndicesForOscilloscopeChannel(chipIndex, hwIndex)
+		);
+	}
+
 	function toggleOscilloscopeChannelMute(flatIndex: number): void {
 		let remaining = flatIndex;
 		for (let chipIndex = 0; chipIndex < chipProcessors.length; chipIndex++) {
-			const channelCount =
-				chipProcessors[chipIndex]?.chip.schema.channelLabels?.length ?? 3;
-			if (remaining < channelCount) {
-				channelMuteStore.toggleChannel(chipIndex, remaining);
-				const isMuted = channelMuteStore.isChannelMuted(chipIndex, remaining);
-				chipProcessors[chipIndex]?.updateParameter(`channelMute_${remaining}`, isMuted);
+			const labels = getHardwareChannelLabels(chipIndex);
+			if (remaining < labels.length) {
+				const virtualIndices = getVirtualIndicesForOscilloscopeChannel(
+					chipIndex,
+					remaining
+				);
+				const muted = !channelMuteStore.areChannelsMuted(chipIndex, virtualIndices);
+				channelMuteStore.setChannelsMuted(chipIndex, virtualIndices, muted);
+				const processor = chipProcessors[chipIndex];
+				for (const virtualIndex of virtualIndices) {
+					processor?.updateParameter(`channelMute_${virtualIndex}`, muted);
+				}
 				patternEditors.forEach((editor) => editor?.requestRedraw?.());
 				return;
 			}
-			remaining -= channelCount;
+			remaining -= labels.length;
 		}
 	}
 	const previewInstrumentId = $derived.by(() => {
@@ -800,13 +829,9 @@
 								)}
 								channelMuted={projectStore.songs.flatMap((_, i) => {
 									muteTick;
-									return (
-										chipProcessors[i]?.chip.schema.channelLabels ?? [
-											'A',
-											'B',
-											'C'
-										]
-									).map((__, ch) => channelMuteStore.isChannelMuted(i, ch));
+									return getHardwareChannelLabels(i).map((__, hw) =>
+										isHardwareChannelMuted(i, hw)
+									);
 								})}
 								onChannelClick={toggleOscilloscopeChannelMute} />
 						</div>

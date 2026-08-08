@@ -6,6 +6,7 @@ class WaveformStore {
 	private channelDataByChip: Float32Array[][] = $state([]);
 	private writeIndexByChip: number[] = $state([]);
 	private channelCountByChip: number[] = $state([]);
+	private channelLevelsByChip: number[][] = $state([]);
 
 	get channels(): Float32Array[] {
 		return this.channelCountByChip.flatMap((count, chipIndex) => {
@@ -32,6 +33,7 @@ class WaveformStore {
 			Array.from({ length: count }, () => new Float32Array(ringSize))
 		);
 		this.writeIndexByChip = channelCounts.map(() => 0);
+		this.channelLevelsByChip = channelCounts.map(() => []);
 	}
 
 	setChannels(chipIndex: number, channels: Float32Array[]): void {
@@ -60,10 +62,25 @@ class WaveformStore {
 		this.writeIndexByChip[chipIndex] = writeIndex;
 	}
 
+	setChannelLevels(chipIndex: number, levels: number[]): void {
+		while (this.channelLevelsByChip.length <= chipIndex) {
+			this.channelLevelsByChip = [...this.channelLevelsByChip, []];
+		}
+		this.channelLevelsByChip = this.channelLevelsByChip.slice();
+		this.channelLevelsByChip[chipIndex] = levels.map((level) =>
+			Math.min(1, Math.max(0, level))
+		);
+	}
+
+	getChannelLevels(chipIndex: number): number[] {
+		return this.channelLevelsByChip[chipIndex] ?? [];
+	}
+
 	clear(): void {
 		this.channelDataByChip = [];
 		this.writeIndexByChip = [];
 		this.channelCountByChip = [];
+		this.channelLevelsByChip = [];
 	}
 }
 

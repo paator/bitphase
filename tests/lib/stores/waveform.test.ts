@@ -30,4 +30,11 @@ describe('WaveformStore', () => {
 		expect(waveformStore.channels).toHaveLength(5);
 		expect(waveformStore.channels.every((channel) => channel[0] === 0)).toBe(true);
 	});
+
+	it('stores editor channel levels independently of hardware waveform peaks', () => {
+		waveformStore.clear();
+		waveformStore.setChannelLevels(0, [0.2, 0.8, 0, 1.5, -0.1]);
+
+		expect(waveformStore.getChannelLevels(0)).toEqual([0.2, 0.8, 0, 1, 0]);
+	});
 });
