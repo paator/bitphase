@@ -32,6 +32,7 @@
 	import { settingsStore } from '../../stores/settings.svelte';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
+	import { channelMuteStore } from '../../stores/channel-mute.svelte';
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { undoRedoStore } from '../../stores/undo-redo.svelte';
 	import { ShortcutString } from '../../utils/shortcut-string';
@@ -139,7 +140,24 @@
 	const blurredContentClass = $derived(
 		isRightPanelExpanded ? 'pointer-events-none opacity-50' : ''
 	);
+
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
+
+	function toggleOscilloscopeChannelMute(flatIndex: number): void {
+		let remaining = flatIndex;
+		for (let chipIndex = 0; chipIndex < chipProcessors.length; chipIndex++) {
+			const channelCount =
+				chipProcessors[chipIndex]?.chip.schema.channelLabels?.length ?? 3;
+			if (remaining < channelCount) {
+				channelMuteStore.toggleChannel(chipIndex, remaining);
+				const isMuted = channelMuteStore.isChannelMuted(chipIndex, remaining);
+				chipProcessors[chipIndex]?.updateParameter(`channelMute_${remaining}`, isMuted);
+				patternEditors.forEach((editor) => editor?.requestRedraw?.());
+				return;
+			}
+			remaining -= channelCount;
+		}
+	}
 	const previewInstrumentId = $derived.by(() => {
 		const chipType = activeChipProcessor?.chip.type;
 		if (!chipType) return '';
@@ -766,6 +784,7 @@
 						</div>
 					{/if}
 					{#if settingsStore.showOscilloscopes}
+						{@const muteTick = channelMuteStore.muteState}
 						<div class="border-t border-[var(--color-app-border)]/50">
 							<ChannelOscilloscopes
 								channelLabels={projectStore.songs.flatMap((_, i) =>
@@ -778,7 +797,18 @@
 									).map((l) =>
 										projectStore.songs.length > 1 ? `${i + 1}${l}` : l
 									)
-								)} />
+								)}
+								channelMuted={projectStore.songs.flatMap((_, i) => {
+									muteTick;
+									return (
+										chipProcessors[i]?.chip.schema.channelLabels ?? [
+											'A',
+											'B',
+											'C'
+										]
+									).map((__, ch) => channelMuteStore.isChannelMuted(i, ch));
+								})}
+								onChannelClick={toggleOscilloscopeChannelMute} />
 						</div>
 					{/if}
 				</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconCarbonVolumeMute from '~icons/carbon/volume-mute';
 	import { waveformStore } from '../../stores/waveform.svelte';
 
 	const triggerWidth = 0.1;
@@ -7,16 +8,20 @@
 
 	let {
 		channelLabels = ['A', 'B', 'C'],
+		channelMuted = [],
 		height = 80,
 		zoom = 1,
 		amplify = 1,
-		escapeBoundary = false
+		escapeBoundary = false,
+		onChannelClick
 	}: {
 		channelLabels?: string[];
+		channelMuted?: boolean[];
 		height?: number;
 		zoom?: number;
 		amplify?: number;
 		escapeBoundary?: boolean;
+		onChannelClick?: (channelIndex: number) => void;
 	} = $props();
 
 	let canvasEls: (HTMLCanvasElement | null)[] = $state([]);
@@ -156,14 +161,17 @@
 	}
 
 	const defaultStrokeColor = '#89b4fa';
+	const defaultMutedStrokeColor = '#6c7086';
 
 	$effect(() => {
 		const canvases = canvasEls;
+		const mutedFlags = channelMuted;
 		if (canvases.length === 0) return;
 
 		let rafId: number;
 		let frameCount = 0;
 		let cachedStrokeColor = defaultStrokeColor;
+		let cachedMutedStrokeColor = defaultMutedStrokeColor;
 
 		function tick() {
 			rafId = requestAnimationFrame(tick);
@@ -171,10 +179,11 @@
 			if (document.hidden) return;
 
 			if (frameCount % STROKE_COLOR_CACHE_FRAMES === 0) {
-				const v = getComputedStyle(document.documentElement)
-					.getPropertyValue('--color-pattern-note')
-					.trim();
-				cachedStrokeColor = v || defaultStrokeColor;
+				const styles = getComputedStyle(document.documentElement);
+				const note = styles.getPropertyValue('--color-pattern-note').trim();
+				const muted = styles.getPropertyValue('--color-app-text-muted').trim();
+				cachedStrokeColor = note || defaultStrokeColor;
+				cachedMutedStrokeColor = muted || defaultMutedStrokeColor;
 			}
 
 			const ch = waveformStore.channels;
@@ -197,7 +206,14 @@
 					ch.length > 0 && index < ch.length && ch[index]
 						? ch[index]
 						: ZERO_SAMPLES;
-				drawChannel(ctx, samples, w, h, cachedStrokeColor);
+				const isMuted = mutedFlags[index] ?? false;
+				drawChannel(
+					ctx,
+					samples,
+					w,
+					h,
+					isMuted ? cachedMutedStrokeColor : cachedStrokeColor
+				);
 			}
 		}
 
@@ -209,13 +225,29 @@
 <div
 	class="flex shrink-0 gap-px border-t border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
 	style="height: {height}px">
-	{#each channelLabels as label, i}
-		<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-			<div class="text-center text-xs text-[var(--color-app-text-muted)]">{label}</div>
-			<canvas
-				bind:this={canvasEls[i]}
-				class="block h-full w-full"
-				style="height: {height - 20}px"></canvas>
-		</div>
+	{#each channelLabels as label, i (i)}
+		{@const muted = channelMuted[i] ?? false}
+		<button
+			type="button"
+			class="relative flex min-w-0 flex-1 cursor-pointer flex-col overflow-hidden border-0 bg-transparent p-0"
+			onclick={() => onChannelClick?.(i)}>
+			<div
+				class="text-center text-xs text-[var(--color-app-text-muted)] {muted
+					? 'opacity-45'
+					: ''}">{label}</div>
+			<div class="relative min-h-0 flex-1">
+				<canvas
+					bind:this={canvasEls[i]}
+					class="pointer-events-none block h-full w-full {muted ? 'opacity-45' : ''}"
+					style="height: {height - 20}px"></canvas>
+				{#if muted}
+					<div
+						class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-0.5">
+						<IconCarbonVolumeMute
+							class="h-3.5 w-3.5 text-[var(--color-pattern-note-off)] opacity-45" />
+					</div>
+				{/if}
+			</div>
+		</button>
 	{/each}
 </div>
