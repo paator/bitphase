@@ -500,8 +500,38 @@
 		}
 	}
 
+	function startPatternEdit(index: number): void {
+		editingPatternIndex = index;
+		editingPatternValue = '';
+		draw();
+	}
+
+	function movePatternSelection(delta: number): void {
+		const newIndex = currentPatternOrderIndex + delta;
+		if (newIndex < 0 || newIndex >= patternOrder.length) return;
+
+		if (editingPatternIndex !== null) {
+			finishPatternEdit();
+		}
+
+		switchPattern(newIndex);
+		startPatternEdit(newIndex);
+	}
+
 	function handleKeyDown(event: KeyboardEvent): void {
 		const { key } = event;
+
+		if (key === 'ArrowUp') {
+			event.preventDefault();
+			movePatternSelection(-1);
+			return;
+		}
+
+		if (key === 'ArrowDown') {
+			event.preventDefault();
+			movePatternSelection(1);
+			return;
+		}
 
 		if (editingPatternIndex !== null) {
 			if (key === 'Enter') {
@@ -527,12 +557,11 @@
 			return;
 		}
 
-		if (key === 'ArrowUp' && currentPatternOrderIndex > 0) {
-			event.preventDefault();
-			switchPattern(currentPatternOrderIndex - 1);
-		} else if (key === 'ArrowDown' && currentPatternOrderIndex < patternOrder.length - 1) {
-			event.preventDefault();
-			switchPattern(currentPatternOrderIndex + 1);
+		if (key >= '0' && key <= '9') {
+			startPatternEdit(currentPatternOrderIndex);
+			editingPatternValue += key;
+			applyPatternEditValue(editingPatternValue);
+			draw();
 		}
 	}
 

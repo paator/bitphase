@@ -37,6 +37,7 @@ If the list is long, fade arrows (`▲` / `▼`) hint that more slots exist abov
 ## Selecting a slot
 
 - Click a slot to select it.
+- Use Up/Down when the order list is focused (also works while rewriting a pattern id).
 - Use the mouse wheel while hovering the order list.
 
 Selecting a slot loads that pattern in the editor and moves the cursor to row `0`. You can also leave the top or bottom of the pattern editor to jump into the previous or next order entry when one exists.
