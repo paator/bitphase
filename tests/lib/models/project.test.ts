@@ -14,6 +14,7 @@ describe('Project', () => {
 			expect(project.loopPointId).toBe(0);
 			expect(project.patternOrder).toEqual([0]);
 			expect(project.tables).toHaveLength(1);
+			expect(project.instruments).toHaveLength(0);
 		});
 
 		it('should create project with custom values', () => {

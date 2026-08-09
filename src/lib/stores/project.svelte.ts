@@ -1,7 +1,11 @@
 import type { Song, Instrument, Pattern } from '../models/song';
-import { DEFAULT_PATTERN_LENGTH } from '../models/song';
+import { DEFAULT_PATTERN_LENGTH, Instrument as InstrumentModel } from '../models/song';
 import { Project, Table } from '../models/project';
-import { filterInstrumentsForActiveChipTypes } from '../services/instrument/instrument-filter';
+import {
+	filterInstrumentsForActiveChipTypes,
+	resolveInstrumentChipType
+} from '../services/instrument/instrument-filter';
+import { getNextAvailableInstrumentId } from '../utils/instrument-id';
 import { channelMuteStore } from './channel-mute.svelte';
 import { undoRedoStore } from './undo-redo.svelte';
 import type { ProjectDiff, ProjectHistoryEntry, ProjectHistoryMetadata } from '../models/history';
@@ -133,6 +137,21 @@ class ProjectStore {
 		}
 		this.songs = [...this.songs, song];
 		this.patterns = [...this.patterns, song.patterns];
+		this.ensureDefaultInstrumentForChip(song.chipType);
+	}
+
+	private ensureDefaultInstrumentForChip(chipType: string | undefined): void {
+		if (!chipType) return;
+		const hasInstrumentForChip = this.instruments.some(
+			(instrument) => resolveInstrumentChipType(instrument) === chipType
+		);
+		if (hasInstrumentForChip) return;
+		const newId = getNextAvailableInstrumentId(this.instruments.map((instrument) => instrument.id));
+		if (!newId) return;
+		this.instruments = [
+			...this.instruments,
+			new InstrumentModel(newId, [], 0, `Instrument ${newId}`, chipType)
+		];
 	}
 
 	getDefaultPatternLength(): number {
