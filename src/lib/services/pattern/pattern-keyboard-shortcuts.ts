@@ -21,6 +21,7 @@ import {
 	ACTION_APPLY_SCRIPT,
 	ACTION_TOGGLE_PLAYBACK,
 	ACTION_CYCLE_CHANNEL,
+	ACTION_CYCLE_CHANNEL_REVERSE,
 	ACTION_SWAP_CHANNEL_LEFT,
 	ACTION_SWAP_CHANNEL_RIGHT,
 	ACTION_PLAY_SOLO,
@@ -183,6 +184,20 @@ function dispatchCommandAction(
 		case ACTION_CYCLE_CHANNEL:
 			if (!ctx.isPlaying) {
 				const newState = PatternNavigationService.moveToNextChannel(
+					{
+						selectedRow: ctx.selectedRow,
+						currentPatternOrderIndex: ctx.currentPatternOrderIndex,
+						selectedColumn: ctx.selectedColumn
+					},
+					ctx.navigationContext
+				);
+				ctx.onClearSelection();
+				ctx.onSetSelectedColumn(newState.selectedColumn);
+			}
+			return true;
+		case ACTION_CYCLE_CHANNEL_REVERSE:
+			if (!ctx.isPlaying) {
+				const newState = PatternNavigationService.moveToPreviousChannel(
 					{
 						selectedRow: ctx.selectedRow,
 						currentPatternOrderIndex: ctx.currentPatternOrderIndex,

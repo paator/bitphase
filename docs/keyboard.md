@@ -37,6 +37,7 @@ Shortcuts are customizable under **Settings → Keyboard**. Defaults below use `
 | Action                               | Default                |
 | ------------------------------------ | ---------------------- |
 | Cycle channel                        | `` ` ``                |
+| Cycle channel (reverse)              | `` Shift+` ``          |
 | Page up / down                       | `PageUp` / `PageDown`  |
 | First / last row                     | `Home` / `End`         |
 | First / last column                  | `Mod+Home` / `Mod+End` |

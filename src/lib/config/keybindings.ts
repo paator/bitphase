@@ -20,6 +20,7 @@ export const ACTION_PLAY_FROM_CURSOR = 'play-from-cursor';
 export const ACTION_PLAY_FROM_BEGINNING = 'play-from-beginning';
 export const ACTION_PLAY_PATTERN = 'play-pattern';
 export const ACTION_CYCLE_CHANNEL = 'cycle-channel';
+export const ACTION_CYCLE_CHANNEL_REVERSE = 'cycle-channel-reverse';
 export const ACTION_SWAP_CHANNEL_LEFT = 'swap-channel-left';
 export const ACTION_SWAP_CHANNEL_RIGHT = 'swap-channel-right';
 export const ACTION_TOGGLE_AUTO_ENVELOPE = 'toggle-auto-envelope';
@@ -65,6 +66,11 @@ export const BINDABLE_ACTIONS: BindableAction[] = [
 	{ id: ACTION_PLAY_FROM_BEGINNING, label: 'Play from beginning', defaultShortcut: 'F5' },
 	{ id: ACTION_PLAY_PATTERN, label: 'Play pattern (loop)', defaultShortcut: 'F6' },
 	{ id: ACTION_CYCLE_CHANNEL, label: 'Cycle channel', defaultShortcut: '`' },
+	{
+		id: ACTION_CYCLE_CHANNEL_REVERSE,
+		label: 'Cycle channel (reverse)',
+		defaultShortcut: 'Shift+`'
+	},
 	{
 		id: ACTION_SWAP_CHANNEL_LEFT,
 		label: 'Swap channels left',

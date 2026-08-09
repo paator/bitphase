@@ -143,6 +143,21 @@ export class PatternNavigationService {
 	}
 
 	static moveToNextChannel(state: NavigationState, context: NavigationContext): NavigationState {
+		return PatternNavigationService.moveToAdjacentChannel(state, context, 1);
+	}
+
+	static moveToPreviousChannel(
+		state: NavigationState,
+		context: NavigationContext
+	): NavigationState {
+		return PatternNavigationService.moveToAdjacentChannel(state, context, -1);
+	}
+
+	private static moveToAdjacentChannel(
+		state: NavigationState,
+		context: NavigationContext,
+		direction: 1 | -1
+	): NavigationState {
 		const { currentPattern, converter, formatter, schema, getCellPositions } = context;
 		const genericPattern = converter.toGeneric(currentPattern);
 		const genericPatternRow = genericPattern.patternRows[state.selectedRow];
@@ -194,7 +209,12 @@ export class PatternNavigationService {
 			state.selectedColumn >= 0 && state.selectedColumn < slotForColumn.length
 				? slotForColumn[state.selectedColumn]
 				: 0;
-		const nextSlot = currentSlot >= 0 ? (currentSlot + 1) % totalSlots : 0;
+		const nextSlot =
+			currentSlot >= 0
+				? (currentSlot + direction + totalSlots) % totalSlots
+				: direction > 0
+					? 0
+					: totalSlots - 1;
 		const targetColumn = firstColumnForSlot[nextSlot];
 		if (targetColumn === undefined) return state;
 
