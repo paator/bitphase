@@ -42,6 +42,9 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	private patternColors: ReturnType<typeof getColors>;
 	private channelSeparatorWidth: number;
 	private selectionStyle: 'inverted' | 'filled';
+	private channelPositionsCacheKey = '';
+	private channelPositionsCache: number[] = [];
+	private stripBackground: ImageData | null = null;
 
 	constructor(options: PatternEditorRenderOptions) {
 		super(options);
@@ -119,6 +122,31 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		}
 
 		this.restore();
+	}
+
+	drawChannelLevelStripOnly(data: ChannelLabelData): void {
+		if (data.channelLevels === undefined) return;
+
+		const channelPositions = this.calculateChannelPositions(data.rowString);
+		const separatorMargin = 4;
+
+		if (this.stripBackground) {
+			this.ctx.putImageData(this.stripBackground, 0, this.lineHeight);
+		}
+		this.drawChannelLevelStrip(data, channelPositions, separatorMargin);
+	}
+
+	captureStripBackground(): void {
+		if (this.canvasWidth <= 0 || this.lineHeight <= 0) {
+			this.stripBackground = null;
+			return;
+		}
+		this.stripBackground = this.ctx.getImageData(
+			0,
+			this.lineHeight,
+			this.canvasWidth,
+			CHANNEL_LEVEL_STRIP_HEIGHT
+		);
 	}
 
 	private drawVirtualChannelGroupLabels(
@@ -381,6 +409,11 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	}
 
 	calculateChannelPositions(rowString: string): number[] {
+		const cacheKey = `${this.ctx.font}\0${rowString}`;
+		if (cacheKey === this.channelPositionsCacheKey) {
+			return this.channelPositionsCache;
+		}
+
 		const positions: number[] = [];
 		let x = 10;
 		let i = 0;
@@ -458,6 +491,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			}
 		}
 
+		this.channelPositionsCacheKey = cacheKey;
+		this.channelPositionsCache = positions;
 		return positions;
 	}
 
@@ -558,6 +593,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		let segmentIndex = 0;
 		let currentSegment = data.segments[0];
 		const originalAlpha = this.ctx.globalAlpha;
+		const channelIndexByChar = this.buildChannelIndexByChar(data.rowString);
 
 		for (let i = 0; i < data.rowString.length; i++) {
 			const char = data.rowString[i];
@@ -572,7 +608,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				currentSegment = data.segments[segmentIndex];
 			}
 
-			const channelIndex = this.getChannelIndexForChar(data, currentSegment, i);
+			const channelIndex = channelIndexByChar[i] ?? -1;
 			const isMuted = channelIndex >= 0 && data.channelMuted[channelIndex];
 
 			if (isMuted) {
@@ -589,58 +625,44 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.ctx.globalAlpha = originalAlpha;
 	}
 
-	private getChannelIndexForChar(
-		data: RowRenderData,
-		currentSegment: FieldSegment | undefined,
-		charIndex: number
-	): number {
-		if (!currentSegment) return -1;
+	private buildChannelIndexByChar(rowString: string): Int16Array {
+		const indices = new Int16Array(rowString.length);
+		indices.fill(-1);
 
-		const field =
-			this.schema.fields[currentSegment.fieldKey] ||
-			this.schema.globalFields?.[currentSegment.fieldKey];
-		if (!field) return -1;
-
-		const isGlobal = !!this.schema.globalFields?.[currentSegment.fieldKey];
-		if (isGlobal) return -1;
-
-		let pos = PatternTemplateParser.skipRowNumber(data.rowString, 0);
-		pos = PatternTemplateParser.parseGlobalTemplate(data.rowString, pos, this.schema);
+		let pos = PatternTemplateParser.skipRowNumber(rowString, 0);
+		pos = PatternTemplateParser.parseGlobalTemplate(rowString, pos, this.schema);
 
 		let channelIndex = 0;
 		const template = this.schema.template;
 
-		while (pos < charIndex && pos < data.rowString.length) {
-			pos = PatternTemplateParser.skipSpaces(data.rowString, pos);
-			if (pos >= data.rowString.length || pos >= charIndex) break;
+		while (pos < rowString.length) {
+			pos = PatternTemplateParser.skipSpaces(rowString, pos);
+			if (pos >= rowString.length) break;
 
-			let channelStart = pos;
+			const channelStart = pos;
 			PatternTemplateParser.parseTemplate(
 				template,
 				this.schema.fields,
-				(key, field, isSpace) => {
+				(_key, field, isSpace) => {
 					if (isSpace) {
-						if (pos < data.rowString.length && data.rowString[pos] === ' ') {
+						if (pos < rowString.length && rowString[pos] === ' ') {
 							pos++;
 						}
 					} else {
-						if (pos < charIndex) {
-							pos += field.length;
+						const end = Math.min(pos + field.length, rowString.length);
+						for (let i = pos; i < end; i++) {
+							indices[i] = channelIndex;
 						}
+						pos = end;
 					}
 				}
 			);
 
 			if (pos === channelStart) break;
-
-			if (pos < charIndex) {
-				channelIndex++;
-			} else {
-				break;
-			}
+			channelIndex++;
 		}
 
-		return channelIndex;
+		return indices;
 	}
 
 	private getEmptyFieldColor(data: RowRenderData): string {

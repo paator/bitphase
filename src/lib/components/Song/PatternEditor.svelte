@@ -1123,7 +1123,40 @@
 		);
 	}
 
-	function draw() {
+	function getHeaderRowContext(patternToDraw: Pattern): {
+		rowString: string;
+		channelLabels: string[];
+		channelMuted: boolean[];
+		vcGroups: ReturnType<typeof getVirtualChannelGroups> | undefined;
+	} | null {
+		if (patternToDraw.length <= 0) return null;
+
+		const visibleRows = getVisibleRows(patternToDraw);
+		const firstVisibleRow = visibleRows.find((r) => !r.isEmpty);
+		const rowToUse =
+			firstVisibleRow &&
+			firstVisibleRow.rowIndex >= 0 &&
+			firstVisibleRow.rowIndex < patternToDraw.length
+				? firstVisibleRow.rowIndex
+				: 0;
+
+		if (rowToUse < 0 || rowToUse >= patternToDraw.length) return null;
+
+		const song = projectStore.songs[songIndex];
+		return {
+			rowString: getPatternRowData(patternToDraw, rowToUse),
+			channelLabels: patternToDraw.channels.map((ch) => ch.label),
+			channelMuted: getChannelMutedState(patternToDraw),
+			vcGroups: song
+				? getVirtualChannelGroups(
+						schema.channelLabels ?? ['A', 'B', 'C'],
+						song.virtualChannelMap ?? {}
+					)
+				: undefined
+		};
+	}
+
+	function drawPatternGrid(): void {
 		if (!ctx || !renderer || !textParser) return;
 		if (document.hidden) return;
 
@@ -1200,48 +1233,61 @@
 
 		ctx.globalAlpha = 1.0;
 
-		if (patternToDraw && patternToDraw.length > 0) {
-			let rowToUse: number | null = null;
-			const firstVisibleRow = visibleRows.find((r) => !r.isEmpty);
-
-			if (
-				firstVisibleRow &&
-				firstVisibleRow.rowIndex >= 0 &&
-				firstVisibleRow.rowIndex < patternToDraw.length
-			) {
-				rowToUse = firstVisibleRow.rowIndex;
-			} else {
-				rowToUse = 0;
-			}
-
-			if (rowToUse !== null && rowToUse >= 0 && rowToUse < patternToDraw.length) {
-				const rowString = getPatternRowData(patternToDraw, rowToUse);
-
-				const song = projectStore.songs[songIndex];
-				const vcGroups = song
-					? getVirtualChannelGroups(
-							schema.channelLabels ?? ['A', 'B', 'C'],
-							song.virtualChannelMap ?? {}
-						)
-					: undefined;
-
-				renderer.drawChannelSeparators(rowString, canvasHeight, vcGroups);
-
-				const channelLabels = patternToDraw.channels.map((ch) => ch.label);
-				const channelMuted = getCachedChannelMuted(patternToDraw);
-
-				renderer.drawChannelLabels({
-					rowString,
-					channelLabels,
-					channelMuted,
-					virtualChannelGroups: vcGroups,
-					channelLevels:
-						settingsStore.showChannelVolumeBars && channelLevels.length > 0
-							? channelLevels
-							: undefined
-				});
-			}
+		const header = getHeaderRowContext(patternToDraw);
+		if (header) {
+			renderer.drawChannelSeparators(header.rowString, canvasHeight, header.vcGroups);
 		}
+
+		renderer.captureStripBackground();
+	}
+
+	function drawHeaderOverlay(): void {
+		if (!ctx || !renderer || !textParser) return;
+		if (document.hidden) return;
+
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const patternToDraw = findOrCreatePattern(patternId);
+		if (!patternToDraw) return;
+
+		const header = getHeaderRowContext(patternToDraw);
+		if (!header) return;
+
+		renderer.drawChannelLabels({
+			rowString: header.rowString,
+			channelLabels: header.channelLabels,
+			channelMuted: header.channelMuted,
+			virtualChannelGroups: header.vcGroups,
+			channelLevels:
+				settingsStore.showChannelVolumeBars && channelLevels.length > 0
+					? channelLevels
+					: undefined
+		});
+	}
+
+	function drawChannelLevelStripOverlay(): void {
+		if (!ctx || !renderer || !textParser) return;
+		if (document.hidden) return;
+		if (!settingsStore.showChannelVolumeBars || channelLevels.length === 0) return;
+
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const patternToDraw = findOrCreatePattern(patternId);
+		if (!patternToDraw) return;
+
+		const header = getHeaderRowContext(patternToDraw);
+		if (!header) return;
+
+		renderer.drawChannelLevelStripOnly({
+			rowString: header.rowString,
+			channelLabels: header.channelLabels,
+			channelMuted: header.channelMuted,
+			virtualChannelGroups: header.vcGroups,
+			channelLevels
+		});
+	}
+
+	function draw() {
+		drawPatternGrid();
+		drawHeaderOverlay();
 	}
 
 	$effect(() => {
@@ -1289,7 +1335,7 @@
 
 			if (changed) {
 				channelLevels = levels;
-				draw();
+				drawChannelLevelStripOverlay();
 			}
 		};
 
