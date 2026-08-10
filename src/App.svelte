@@ -242,7 +242,10 @@
 			songView?.resetEditorState?.();
 			patternEditor?.resetToBeginning?.();
 		},
-		syncChipProcessors
+		syncChipProcessors,
+		toggleExpandPanel: () => {
+			songView?.toggleExpandPanel?.();
+		}
 	};
 
 	const baseHandleMenuAction = createMenuActionHandler(menuActionContext);

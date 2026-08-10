@@ -17,7 +17,8 @@ import {
 	ACTION_PLAY_PATTERN,
 	ACTION_TOGGLE_AUTO_ENVELOPE,
 	ACTION_TOGGLE_ENVELOPE_AS_NOTE,
-	ACTION_TOGGLE_PLAYBACK
+	ACTION_TOGGLE_PLAYBACK,
+	ACTION_TOGGLE_EXPAND_PANEL
 } from '../../config/keybindings';
 import { autoEnvStore } from '../../stores/auto-env.svelte';
 import { editorStateStore } from '../../stores/editor-state.svelte';
@@ -279,6 +280,11 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 
 			if (data.action === ACTION_TOGGLE_ENVELOPE_AS_NOTE) {
 				editorStateStore.setEnvelopeAsNote(!editorStateStore.envelopeAsNote);
+				return;
+			}
+
+			if (data.action === ACTION_TOGGLE_EXPAND_PANEL) {
+				ctx.toggleExpandPanel();
 				return;
 			}
 

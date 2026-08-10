@@ -123,6 +123,16 @@
 		});
 	}
 
+	export function toggleExpandPanel(): void {
+		if (rightPanelActiveTabId === 'details') return;
+		isRightPanelExpanded = !isRightPanelExpanded;
+		if (!isRightPanelExpanded) {
+			tick().then(() => {
+				patternEditor?.focusCanvas?.();
+			});
+		}
+	}
+
 	$effect(() => {
 		const activeEditor = patternEditors[activeEditorIndex];
 		if (activeEditor) {

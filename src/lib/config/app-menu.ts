@@ -73,6 +73,11 @@ export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
 					label: 'Appearance',
 					type: 'normal',
 					action: 'appearance'
+				},
+				{
+					label: 'Toggle expand panel',
+					type: 'normal',
+					action: 'toggle-expand-panel'
 				}
 			]
 		},

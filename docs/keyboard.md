@@ -53,6 +53,14 @@ Shortcuts are customizable under **Settings → Keyboard**. Defaults below use `
 | Toggle auto envelope    | `Mod+E`       |
 | Toggle envelope as note | `Mod+Shift+E` |
 
+## Panels
+
+| Action               | Default |
+| -------------------- | ------- |
+| Toggle expand panel  | `Mod+\` |
+
+Works from the pattern editor too. Expands/collapses the instruments & tables side panel. `Escape` also collapses when expanded.
+
 ## Note entry (piano keyboard)
 
 With the pattern editor focused on a note field, keys map like a tracker piano layout. Octaves are relative to the editor octave setting.

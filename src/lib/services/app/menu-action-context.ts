@@ -31,4 +31,5 @@ export interface MenuActionContext {
 	clearAutobackup: () => Promise<void>;
 	resetPatternEditor: () => void;
 	syncChipProcessors: () => void;
+	toggleExpandPanel: () => void;
 }

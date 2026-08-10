@@ -37,6 +37,7 @@ export const ACTION_OCTAVE_UP = 'octave-up';
 export const ACTION_OCTAVE_DOWN = 'octave-down';
 export const ACTION_SELECT_INSTRUMENT_OR_TABLE_IN_EDITOR = 'select-instrument-or-table-in-editor';
 export const ACTION_PLAY_SOLO = 'play-solo';
+export const ACTION_TOGGLE_EXPAND_PANEL = 'toggle-expand-panel';
 
 export interface BindableAction {
 	id: string;
@@ -123,7 +124,12 @@ export const BINDABLE_ACTIONS: BindableAction[] = [
 		label: 'Select instrument or table in editor',
 		defaultShortcut: 'Mod+LMB'
 	},
-	{ id: ACTION_PLAY_SOLO, label: 'Play solo / Unmute all', defaultShortcut: 'F8' }
+	{ id: ACTION_PLAY_SOLO, label: 'Play solo / Unmute all', defaultShortcut: 'F8' },
+	{
+		id: ACTION_TOGGLE_EXPAND_PANEL,
+		label: 'Toggle expand panel',
+		defaultShortcut: 'Mod+\\'
+	}
 ];
 
 export const GLOBAL_ACTION_IDS = new Set([
@@ -136,7 +142,8 @@ export const GLOBAL_ACTION_IDS = new Set([
 	ACTION_TOGGLE_AUTO_ENVELOPE,
 	ACTION_TOGGLE_ENVELOPE_AS_NOTE,
 	ACTION_OCTAVE_UP,
-	ACTION_OCTAVE_DOWN
+	ACTION_OCTAVE_DOWN,
+	ACTION_TOGGLE_EXPAND_PANEL
 ]);
 
 export const PATTERN_EDITOR_ACTION_IDS = new Set(
@@ -146,7 +153,8 @@ export const PATTERN_EDITOR_ACTION_IDS = new Set(
 			a.id !== ACTION_PLAY_FROM_ROW &&
 			a.id !== ACTION_PLAY_FROM_CURSOR &&
 			a.id !== ACTION_PLAY_FROM_BEGINNING &&
-			a.id !== ACTION_PLAY_PATTERN
+			a.id !== ACTION_PLAY_PATTERN &&
+			a.id !== ACTION_TOGGLE_EXPAND_PANEL
 	).map((a) => a.id)
 );
 
