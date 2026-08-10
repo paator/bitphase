@@ -1,3 +1,9 @@
+import {
+	MAX_TABLE_ID,
+	tableDisplayCharToId,
+	tableIdToDisplayChar
+} from '../../../utils/table-id';
+
 export type EffectLikeObject = {
 	effect: number;
 	delay: number;
@@ -131,22 +137,10 @@ export class PatternEffectHandling {
 
 	private static tableIndexToChar(index: number): string {
 		if (index < 0) return '.';
-		const displayNum = index + 1;
-		if (displayNum < 10) return displayNum.toString();
-		if (displayNum < 32) return String.fromCharCode('A'.charCodeAt(0) + displayNum - 10);
-		return 'V';
+		return tableIdToDisplayChar(Math.min(index, MAX_TABLE_ID)) || '.';
 	}
 
 	private static charToTableIndex(char: string): number {
-		const upper = char.toUpperCase();
-		if (upper === '.' || upper === '0') return -1;
-		const code = upper.charCodeAt(0);
-		if (code >= '1'.charCodeAt(0) && code <= '9'.charCodeAt(0)) {
-			return code - '0'.charCodeAt(0) - 1;
-		}
-		if (code >= 'A'.charCodeAt(0) && code <= 'V'.charCodeAt(0)) {
-			return 10 + (code - 'A'.charCodeAt(0)) - 1;
-		}
-		return -1;
+		return tableDisplayCharToId(char);
 	}
 }

@@ -7,7 +7,7 @@ They can also use tables as a source of parameter values: **`AXTY`** (`T` + tabl
 For example, rather than manually alternating `S.03`, `S.05`, `S.03` to create a groove tempo,
 you can put the tempo values in table 1 and simply use `S.T1`.
 
-All values used in effects are hexadecimal (`0`-`9`, `A`-`F`).
+Effect parameters are hexadecimal (`0`-`9`, `A`-`F`). Table ids in `T` syntax use `0`-`9` and `A`-`Z` (for example `S.TZ`).
 
 ## General
 

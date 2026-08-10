@@ -243,7 +243,9 @@
 				<code class="font-mono">S.T1</code>.
 			</p>
 			<p>
-				All values used in effects are hexadecimal (0-9, A-F). Use
+				Effect parameters are hexadecimal (0-9, A-F). Table ids in
+				<code class="font-mono">T</code> syntax use 0-9 and A-Z (for example
+				<code class="font-mono">S.TZ</code>). Use
 				<code class="rounded bg-[var(--color-app-surface-secondary)] px-1 py-0.5 font-mono">.</code>
 				for 0.
 			</p>

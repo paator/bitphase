@@ -111,6 +111,22 @@ describe('PatternEffectHandling', () => {
 			expect(formatted).toBe('D.TG');
 		});
 
+		it('Speed with table S.TW parses table W', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('S.TW');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe('S'.charCodeAt(0));
+			expect(parsed!.tableIndex).toBe(31);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('S.TW');
+		});
+
+		it('Speed with table S.TZ parses table Z', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('S.TZ');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe('S'.charCodeAt(0));
+			expect(parsed!.tableIndex).toBe(34);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('S.TZ');
+		});
+
 		it('effect 6 (on/off) ignores delay digit and formats with dot delay', () => {
 			const parsed = PatternEffectHandling.parseEffectFromString('6124');
 			expect(parsed).not.toBeNull();

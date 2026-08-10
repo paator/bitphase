@@ -33,7 +33,7 @@ export class PatternFieldInput {
 		const isEffectField = EffectField.isEffectField(fieldInfo.fieldKey);
 
 		if (isEffectField) {
-			if (!/^[0-9A-V\.]$/i.test(key)) {
+			if (!/^[0-9A-Z\.]$/i.test(key)) {
 				return null;
 			}
 		} else {

@@ -191,4 +191,41 @@ describe('PatternFieldInput', () => {
 			tableIndex: 1
 		});
 	});
+
+	it('accepts W-Z when typing effect table ids', () => {
+		const pattern = new Pattern(0, 1, AY_CHIP_SCHEMA);
+		pattern.channels[0].rows[0].effects = [
+			{ effect: 'S'.charCodeAt(0), delay: 0, parameter: 0, tableIndex: 0 }
+		];
+
+		const result = PatternFieldInput.handleHexInput(
+			createContext(pattern),
+			createFieldInfo('effect', 'hex', false, 3),
+			'Z',
+			'KeyZ'
+		);
+
+		expect(result).not.toBeNull();
+		expect(result?.updatedPattern.channels[0].rows[0].effects[0]).toEqual(
+			expect.objectContaining({
+				effect: 'S'.charCodeAt(0),
+				tableIndex: 34
+			})
+		);
+	});
+
+	it('clamps effect table id increments at Z', () => {
+		const result = PatternValueUpdates.incrementEffectParameterValue(
+			{ effect: 'S'.charCodeAt(0), delay: 0, parameter: 0, tableIndex: 34 },
+			1,
+			createFieldInfo('effect', 'hex', false, 3)
+		);
+
+		expect(result).toEqual({
+			effect: 'S'.charCodeAt(0),
+			delay: 0,
+			parameter: 0,
+			tableIndex: 34
+		});
+	});
 });

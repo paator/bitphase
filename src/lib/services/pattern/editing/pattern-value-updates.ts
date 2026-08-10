@@ -13,6 +13,7 @@ import {
 	noteToEnvelopePeriod
 } from '../../../utils/envelope-note-conversion';
 import type { GenericPattern } from '../../../models/song/generic';
+import { MAX_TABLE_ID } from '../../../utils/table-id';
 import type { EditingContext, FieldInfo } from './editing-context';
 import { EffectField } from './effect-field';
 import { PatternEffectHandling } from './pattern-effect-handling';
@@ -30,7 +31,7 @@ type EffectValue = {
 	tableIndex?: number;
 };
 
-const MAX_EFFECT_TABLE_INDEX = 30;
+const MAX_EFFECT_TABLE_INDEX = MAX_TABLE_ID;
 
 export class PatternValueUpdates {
 	static updateFieldValue(
