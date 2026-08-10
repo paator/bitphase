@@ -103,6 +103,34 @@ describe('PatternFieldInput', () => {
 		expect(result?.updatedPattern.patternRows[0].noiseValue).toBe(-1);
 	});
 
+	it('commits displayed zero for empty volume as mute', () => {
+		const pattern = new Pattern(0, 1, AY_CHIP_SCHEMA);
+
+		const result = PatternFieldInput.handleHexInput(
+			createContext(pattern),
+			createFieldInfo('volume', 'hex'),
+			'0',
+			'Digit0'
+		);
+
+		expect(result).not.toBeNull();
+		expect(result?.updatedPattern.channels[0].rows[0].volume).toBe(-1);
+	});
+
+	it('enters volume F as level 15', () => {
+		const pattern = new Pattern(0, 1, AY_CHIP_SCHEMA);
+
+		const result = PatternFieldInput.handleHexInput(
+			createContext(pattern),
+			createFieldInfo('volume', 'hex'),
+			'F',
+			'KeyF'
+		);
+
+		expect(result).not.toBeNull();
+		expect(result?.updatedPattern.channels[0].rows[0].volume).toBe(15);
+	});
+
 	it('commits displayed zero for empty table values', () => {
 		const pattern = new Pattern(0, 1, AY_CHIP_SCHEMA);
 
@@ -127,23 +155,6 @@ describe('PatternFieldInput', () => {
 
 		expect(result).not.toBeNull();
 		expect(result?.updatedPattern.channels[0].rows[0].table).toBe(10);
-	});
-
-	it('does not commit zero for empty volume values', () => {
-		const pattern = new Pattern(0, 1, AY_CHIP_SCHEMA);
-
-		const result = PatternFieldInput.handleHexInput(
-			createContext(pattern),
-			createFieldInfo('volume', 'hex'),
-			'0',
-			'Digit0'
-		);
-
-		expect(result).toEqual({
-			updatedPattern: pattern,
-			shouldMoveNext: false,
-			didChange: false
-		});
 	});
 
 	it('decrements zero-capable fields to their displayed zero value', () => {

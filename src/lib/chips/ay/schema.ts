@@ -80,6 +80,7 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			length: 1,
 			color: 'patternText',
 			selectable: 'character',
+			allowZeroValue: true,
 			usedForBacktracking: true,
 			backtrackWhen: 'nonZero'
 		},

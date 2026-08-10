@@ -275,4 +275,39 @@ describe('TrackerPatternProcessor', () => {
 			expect(state.channelSoundEnabled[0]).toBe(true);
 		});
 	});
+
+	describe('_processVolume', () => {
+		it('keeps previous pattern volume when volume is empty (0)', () => {
+			const state = createMockState();
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			state.channelPatternVolumes[0] = 12;
+
+			proc._processVolume(0, { volume: 0 });
+
+			expect(state.channelPatternVolumes[0]).toBe(12);
+		});
+
+		it('sets pattern volume to mute when volume is -1', () => {
+			const state = createMockState();
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			state.channelPatternVolumes[0] = 12;
+
+			proc._processVolume(0, { volume: -1 });
+
+			expect(state.channelPatternVolumes[0]).toBe(0);
+		});
+
+		it('sets pattern volume when volume is 1-F', () => {
+			const state = createMockState();
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			state.channelPatternVolumes[0] = 12;
+
+			proc._processVolume(0, { volume: 10 });
+
+			expect(state.channelPatternVolumes[0]).toBe(10);
+		});
+	});
 });

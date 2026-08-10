@@ -38,7 +38,7 @@ AY songs look close to Vortex Tracker / ProTracker 3: globals on the left, then 
 | Instrument     | `01`-`ZZ`, or `..`                 | Which instrument voice to use (base-36 id)       |
 | Envelope shape | `1`-`F`, or `.`                    | Sets hardware envelope shape                     |
 | Table          | `0`-`9` / `A`-`Z`, or `.`          | Ornament / arpeggio table (quick pitch patterns) |
-| Volume         | `1`-`F`, or `.`                    | Channel volume for this step                     |
+| Volume         | `0`-`F`, or `.`                    | Channel volume. `0` = mute, `.` = keep previous  |
 | Effect         | 4 chars, or `....`                 | Pattern effect - see [Effects](/effects)         |
 
 ::: tip Empty cells

@@ -840,7 +840,7 @@ class VT2Converter {
 			instrument = this.parseBase36Digit(sampleAndVol[0]);
 			envelopeShape = this.parseHexDigit(sampleAndVol[1]);
 			table = this.parseHexDigit(sampleAndVol[2]);
-			volume = this.parseHexDigit(sampleAndVol[3]);
+			volume = this.parsePatternVolumeDigit(sampleAndVol[3]);
 		}
 
 		return {
@@ -1033,6 +1033,12 @@ class VT2Converter {
 		if (char >= 'A' && char <= 'F') return char.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
 		if (char >= 'a' && char <= 'f') return char.charCodeAt(0) - 'a'.charCodeAt(0) + 10;
 		return 0;
+	}
+
+	private parsePatternVolumeDigit(char: string): number {
+		if (!char || char === '.') return 0;
+		if (char === '0') return -1;
+		return this.parseHexDigit(char);
 	}
 
 	private convertTableValue(table: number, envelopeShape: number): number {

@@ -86,7 +86,7 @@
 		}
 
 		if (selectedFieldKey === 'volume') {
-			return 'Volume: Set channel volume. Hex: (1-F).';
+			return 'Volume: Set channel volume (1-F), 0 = mute, . = keep previous.';
 		}
 
 		if (selectedFieldKey === 'effect') {

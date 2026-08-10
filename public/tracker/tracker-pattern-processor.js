@@ -216,7 +216,9 @@ class TrackerPatternProcessor {
 	}
 
 	_processVolume(channelIndex, row) {
-		if (row.volume > 0) {
+		if (row.volume === -1) {
+			this.state.channelPatternVolumes[channelIndex] = 0;
+		} else if (row.volume > 0) {
 			this.state.channelPatternVolumes[channelIndex] = row.volume;
 		}
 	}
