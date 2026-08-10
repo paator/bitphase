@@ -21,6 +21,7 @@ Rapidly alternates between the current note and two additional notes.
 | **Steps length** | `X` - ticks between arpeggio steps (`0`-`F`)                             |
 | **Parameter**    | `Y` / `Z` - semitone offsets (`0`-`F`)                                   |
 | **With table**   | `AXTY` - `Y` is table id (`0`-`9`, `A`-`Z`); offsets come from the table |
+| **Stop**         | `A000` (or any `Ax00`) stops a running arpeggio                         |
 | **Example**      | `A137` - steps length 1, offsets +3 and +7 (minor chord)                 |
 
 ### V - Vibrato

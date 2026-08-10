@@ -291,6 +291,15 @@ class TrackerPatternProcessor {
 	}
 
 	_initChannelArpeggio(channelIndex, effect, hasTableIndex) {
+		if (!hasTableIndex && (effect.parameter ?? 0) === 0) {
+			this.state.channelArpeggioCounter[channelIndex] = 0;
+			this.state.channelArpeggioSemitone1[channelIndex] = 0;
+			this.state.channelArpeggioSemitone2[channelIndex] = 0;
+			this.state.channelArpeggioPosition[channelIndex] = 0;
+			this.state.channelCurrentNotes[channelIndex] = this.state.channelBaseNotes[channelIndex];
+			return;
+		}
+
 		if (hasTableIndex) {
 			const arpeggioState = EffectAlgorithms.initArpeggio(0, effect.delay);
 			this.state.channelArpeggioSemitone1[channelIndex] = 0;

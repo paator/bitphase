@@ -527,6 +527,15 @@ class AYAudioDriver {
 	}
 
 	_initEnvelopeArpeggio(state, effect, hasTableIndex) {
+		if (!hasTableIndex && (effect.parameter ?? 0) === 0) {
+			state.envelopeArpeggioCounter = 0;
+			state.envelopeArpeggioSemitone1 = 0;
+			state.envelopeArpeggioSemitone2 = 0;
+			state.envelopeArpeggioPosition = 0;
+			state.envelopeArpeggioBaseValue = 0;
+			return;
+		}
+
 		if (hasTableIndex) {
 			const arpeggioState = EffectAlgorithms.initArpeggio(0, effect.delay);
 			state.envelopeArpeggioSemitone1 = 0;

@@ -49,7 +49,7 @@
 			formatWithTable: 'AXTY',
 			delayLabel: 'Steps length',
 			delay: 'X - ticks between arpeggio steps (0-F)',
-			parameter: 'Y / Z - semitone offsets (0-F)',
+			parameter: 'Y / Z - semitone offsets (0-F). A000 (or Ax00) stops arpeggio',
 			tableDescription: 'Y is table id (0-9, A-Z); offsets come from the table',
 			example: 'A137 - steps length 1, offsets +3 and +7 (minor chord)'
 		},

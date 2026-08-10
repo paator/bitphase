@@ -371,6 +371,24 @@ describe('Channel effect interactions', () => {
 			expect(state.channelArpeggioSemitone1[0]).toBe(0);
 			expect(state.channelArpeggioSemitone2[0]).toBe(0xc);
 		});
+
+		it('A000 stops a running arpeggio and restores the base note', () => {
+			state.channelBaseNotes[0] = 12;
+			state.channelCurrentNotes[0] = 19;
+			state.channelArpeggioCounter[0] = 3;
+			state.channelArpeggioSemitone1[0] = 3;
+			state.channelArpeggioSemitone2[0] = 7;
+
+			const stopRow = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.ARPEGGIO, delay: 0, parameter: 0 }
+			]);
+			proc._processEffects(0, stopRow);
+
+			expect(state.channelArpeggioCounter[0]).toBe(0);
+			expect(state.channelArpeggioSemitone1[0]).toBe(0);
+			expect(state.channelArpeggioSemitone2[0]).toBe(0);
+			expect(state.channelCurrentNotes[0]).toBe(12);
+		});
 	});
 });
 
