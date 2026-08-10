@@ -226,14 +226,17 @@ class TrackerPatternProcessor {
 
 		const effect = row.effects[0];
 		const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
-
-		if (
-			hasTableIndex &&
+		const usesChannelEffectTable =
 			effect.effect !== EffectAlgorithms.SPEED &&
 			effect.effect !== EffectAlgorithms.SAMPLE_POSITION &&
-			effect.effect !== EffectAlgorithms.ORNAMENT_POSITION
-		) {
-			this._initEffectTable(channelIndex, effect);
+			effect.effect !== EffectAlgorithms.ORNAMENT_POSITION;
+
+		if (usesChannelEffectTable) {
+			if (hasTableIndex) {
+				this._initEffectTable(channelIndex, effect);
+			} else {
+				this.state.channelEffectTables[channelIndex] = -1;
+			}
 		}
 
 		const resets = EffectAlgorithms.getEffectActivationResets(effect.effect);

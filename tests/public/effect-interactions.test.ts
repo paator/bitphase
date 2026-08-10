@@ -354,6 +354,23 @@ describe('Channel effect interactions', () => {
 
 			expect(state.channelEffectTables[0]).toBe(1);
 		});
+
+		it('parameter arpeggio after table arpeggio clears effect table', () => {
+			const tableRow = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.ARPEGGIO, delay: 0, parameter: 0, tableIndex: 0 }
+			]);
+			proc._processEffects(0, tableRow);
+			expect(state.channelEffectTables[0]).toBe(0);
+
+			const parameterRow = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.ARPEGGIO, delay: 0, parameter: 0x0c }
+			]);
+			proc._processEffects(0, parameterRow);
+
+			expect(state.channelEffectTables[0]).toBe(-1);
+			expect(state.channelArpeggioSemitone1[0]).toBe(0);
+			expect(state.channelArpeggioSemitone2[0]).toBe(0xc);
+		});
 	});
 });
 
