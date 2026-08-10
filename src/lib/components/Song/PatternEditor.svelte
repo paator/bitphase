@@ -535,6 +535,94 @@
 		draw();
 	}
 
+	function resolveSchemaForSong(forSongIndex: number) {
+		const song = projectStore.songs[forSongIndex];
+		return (
+			song?.getSchema() ??
+			(forSongIndex === songIndex
+				? schema
+				: services.audioService.chipProcessors[forSongIndex]?.chip?.schema)
+		);
+	}
+
+	function insertPatternRow(): void {
+		if (playbackStore.isPlaying) return;
+
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const rowIndex = selectedRow;
+		const beforePatterns = projectStore.patterns.map((songPatterns) => [...songPatterns]);
+		let changed = false;
+
+		for (let j = 0; j < projectStore.patterns.length; j++) {
+			const songPatterns = projectStore.patterns[j];
+			const pattern = songPatterns.find((p) => p.id === patternId);
+			if (!pattern) continue;
+			const next = PatternService.insertRowAt(pattern, rowIndex, resolveSchemaForSong(j));
+			if (!next) continue;
+			changed = true;
+			projectStore.updatePatterns(j, PatternService.updatePatternInArray(songPatterns, next));
+		}
+
+		if (!changed) return;
+
+		projectStore.recordHistory(
+			{
+				type: 'pattern.insertRow',
+				label: `Insert row in pattern ${patternId}`,
+				affectedDomains: ['patterns'],
+				beforeSelection: getCursorPosition(),
+				afterSelection: getCursorPosition()
+			},
+			[projectStore.createSetDiff(['patterns'], beforePatterns, projectStore.patterns)]
+		);
+
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		clearAllCaches();
+		draw();
+	}
+
+	function removePatternRow(): void {
+		if (playbackStore.isPlaying) return;
+
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const rowIndex = selectedRow;
+		const beforePatterns = projectStore.patterns.map((songPatterns) => [...songPatterns]);
+		let changed = false;
+
+		for (let j = 0; j < projectStore.patterns.length; j++) {
+			const songPatterns = projectStore.patterns[j];
+			const pattern = songPatterns.find((p) => p.id === patternId);
+			if (!pattern) continue;
+			const next = PatternService.removeRowAt(pattern, rowIndex, resolveSchemaForSong(j));
+			if (!next) continue;
+			changed = true;
+			projectStore.updatePatterns(j, PatternService.updatePatternInArray(songPatterns, next));
+		}
+
+		if (!changed) return;
+
+		projectStore.recordHistory(
+			{
+				type: 'pattern.removeRow',
+				label: `Remove row in pattern ${patternId}`,
+				affectedDomains: ['patterns'],
+				beforeSelection: getCursorPosition(),
+				afterSelection: getCursorPosition()
+			},
+			[projectStore.createSetDiff(['patterns'], beforePatterns, projectStore.patterns)]
+		);
+
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		clearAllCaches();
+		draw();
+	}
+
 	export function hasSelection(): boolean {
 		return (
 			selectionStartRow !== null &&
@@ -1516,6 +1604,8 @@
 			},
 			onSwapChannelLeft: swapChannelLeft,
 			onSwapChannelRight: swapChannelRight,
+			onInsertPatternRow: insertPatternRow,
+			onRemovePatternRow: removePatternRow,
 			onToggleSolo: () => {
 				const chipIdx = getChipIndex();
 				if (chipIdx < 0) return;

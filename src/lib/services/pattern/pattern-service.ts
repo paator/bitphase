@@ -561,4 +561,81 @@ export class PatternService {
 
 		return resizedPattern;
 	}
+
+	private static copyChannelRow(
+		sourceRow: Pattern['channels'][number]['rows'][number],
+		targetRow: Pattern['channels'][number]['rows'][number]
+	): void {
+		targetRow.note = new Note(sourceRow.note.name, sourceRow.note.octave);
+		targetRow.effects = sourceRow.effects.map((effect) =>
+			effect && !PatternEffectHandling.isEmptyEffect(effect)
+				? new Effect(effect.effect, effect.delay, effect.parameter, effect.tableIndex)
+				: null
+		);
+		this.copyRowFields(sourceRow, targetRow);
+	}
+
+	static insertRowAt(pattern: Pattern, rowIndex: number, schema?: ChipSchema): Pattern | null {
+		if (rowIndex < 0 || rowIndex >= pattern.length) {
+			return null;
+		}
+
+		const channelLabels = pattern.channels.map((c) => c.label);
+		const result = new Pattern(pattern.id, pattern.length, schema, channelLabels);
+
+		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
+			const sourceChannel = pattern.channels[channelIndex];
+			const targetChannel = result.channels[channelIndex];
+
+			for (let i = 0; i < rowIndex; i++) {
+				this.copyChannelRow(sourceChannel.rows[i], targetChannel.rows[i]);
+			}
+
+			for (let i = rowIndex; i < pattern.length - 1; i++) {
+				this.copyChannelRow(sourceChannel.rows[i], targetChannel.rows[i + 1]);
+			}
+		}
+
+		for (let i = 0; i < rowIndex; i++) {
+			this.copyPatternRowFields(pattern.patternRows[i], result.patternRows[i]);
+		}
+
+		for (let i = rowIndex; i < pattern.length - 1; i++) {
+			this.copyPatternRowFields(pattern.patternRows[i], result.patternRows[i + 1]);
+		}
+
+		return result;
+	}
+
+	static removeRowAt(pattern: Pattern, rowIndex: number, schema?: ChipSchema): Pattern | null {
+		if (rowIndex < 0 || rowIndex >= pattern.length) {
+			return null;
+		}
+
+		const channelLabels = pattern.channels.map((c) => c.label);
+		const result = new Pattern(pattern.id, pattern.length, schema, channelLabels);
+
+		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
+			const sourceChannel = pattern.channels[channelIndex];
+			const targetChannel = result.channels[channelIndex];
+
+			for (let i = 0; i < rowIndex; i++) {
+				this.copyChannelRow(sourceChannel.rows[i], targetChannel.rows[i]);
+			}
+
+			for (let i = rowIndex + 1; i < pattern.length; i++) {
+				this.copyChannelRow(sourceChannel.rows[i], targetChannel.rows[i - 1]);
+			}
+		}
+
+		for (let i = 0; i < rowIndex; i++) {
+			this.copyPatternRowFields(pattern.patternRows[i], result.patternRows[i]);
+		}
+
+		for (let i = rowIndex + 1; i < pattern.length; i++) {
+			this.copyPatternRowFields(pattern.patternRows[i], result.patternRows[i - 1]);
+		}
+
+		return result;
+	}
 }

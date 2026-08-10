@@ -24,6 +24,8 @@ import {
 	ACTION_CYCLE_CHANNEL_REVERSE,
 	ACTION_SWAP_CHANNEL_LEFT,
 	ACTION_SWAP_CHANNEL_RIGHT,
+	ACTION_INSERT_PATTERN_ROW,
+	ACTION_REMOVE_PATTERN_ROW,
 	ACTION_PLAY_SOLO,
 	ACTION_PAGE_UP,
 	ACTION_PAGE_DOWN,
@@ -71,6 +73,8 @@ export interface PatternKeyboardShortcutsContext {
 	) => void;
 	onSwapChannelLeft: () => void;
 	onSwapChannelRight: () => void;
+	onInsertPatternRow: () => void;
+	onRemovePatternRow: () => void;
 	onToggleSolo?: () => void;
 	selectionStartRow: number | null;
 	selectionStartColumn: number | null;
@@ -217,6 +221,16 @@ function dispatchCommandAction(
 		case ACTION_SWAP_CHANNEL_RIGHT:
 			if (!ctx.isPlaying) {
 				ctx.onSwapChannelRight();
+			}
+			return true;
+		case ACTION_INSERT_PATTERN_ROW:
+			if (!ctx.isPlaying) {
+				ctx.onInsertPatternRow();
+			}
+			return true;
+		case ACTION_REMOVE_PATTERN_ROW:
+			if (!ctx.isPlaying) {
+				ctx.onRemovePatternRow();
 			}
 			return true;
 		case ACTION_PLAY_SOLO:

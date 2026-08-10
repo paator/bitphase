@@ -37,6 +37,8 @@ function createContext(
 		onIncrementFieldValue: vi.fn(),
 		onSwapChannelLeft: vi.fn(),
 		onSwapChannelRight: vi.fn(),
+		onInsertPatternRow: vi.fn(),
+		onRemovePatternRow: vi.fn(),
 		selectionStartRow: null,
 		selectionStartColumn: null,
 		selectionEndRow: null,
@@ -103,5 +105,38 @@ describe('PatternKeyboardShortcutsService selection navigation', () => {
 		expect(ctx.onClearSelection).toHaveBeenCalled();
 		expect(ctx.onExtendSelection).not.toHaveBeenCalled();
 		expect(ctx.onSetSelectedRow).toHaveBeenCalledWith(63);
+	});
+
+	it('inserts a pattern row with Mod+I', () => {
+		const ctx = createContext();
+		const result = PatternKeyboardShortcutsService.handleKeyDown(
+			keyEvent('i', { ctrlKey: true }),
+			ctx
+		);
+
+		expect(result.handled).toBe(true);
+		expect(result.shouldPreventDefault).toBe(true);
+		expect(ctx.onInsertPatternRow).toHaveBeenCalledOnce();
+	});
+
+	it('removes a pattern row with Mod+R', () => {
+		const ctx = createContext();
+		const result = PatternKeyboardShortcutsService.handleKeyDown(
+			keyEvent('r', { ctrlKey: true }),
+			ctx
+		);
+
+		expect(result.handled).toBe(true);
+		expect(result.shouldPreventDefault).toBe(true);
+		expect(ctx.onRemovePatternRow).toHaveBeenCalledOnce();
+	});
+
+	it('does not insert or remove pattern rows while playing', () => {
+		const ctx = createContext({ isPlaying: true });
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('i', { ctrlKey: true }), ctx);
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('r', { ctrlKey: true }), ctx);
+
+		expect(ctx.onInsertPatternRow).not.toHaveBeenCalled();
+		expect(ctx.onRemovePatternRow).not.toHaveBeenCalled();
 	});
 });

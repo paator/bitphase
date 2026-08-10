@@ -30,6 +30,8 @@ Shortcuts are customizable under **Settings → Keyboard**. Defaults below use `
 | Transpose octave down | `Shift+-`     |
 | Swap channels left    | `Mod+Alt+←`   |
 | Swap channels right   | `Mod+Alt+→`   |
+| Insert pattern row    | `Mod+I`       |
+| Remove pattern row    | `Mod+R`       |
 | Apply script...       | `Mod+Shift+S` |
 
 ## Navigation

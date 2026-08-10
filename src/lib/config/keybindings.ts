@@ -23,6 +23,8 @@ export const ACTION_CYCLE_CHANNEL = 'cycle-channel';
 export const ACTION_CYCLE_CHANNEL_REVERSE = 'cycle-channel-reverse';
 export const ACTION_SWAP_CHANNEL_LEFT = 'swap-channel-left';
 export const ACTION_SWAP_CHANNEL_RIGHT = 'swap-channel-right';
+export const ACTION_INSERT_PATTERN_ROW = 'insert-pattern-row';
+export const ACTION_REMOVE_PATTERN_ROW = 'remove-pattern-row';
 export const ACTION_TOGGLE_AUTO_ENVELOPE = 'toggle-auto-envelope';
 export const ACTION_TOGGLE_ENVELOPE_AS_NOTE = 'toggle-envelope-as-note';
 export const ACTION_PAGE_UP = 'page-up';
@@ -80,6 +82,16 @@ export const BINDABLE_ACTIONS: BindableAction[] = [
 		id: ACTION_SWAP_CHANNEL_RIGHT,
 		label: 'Swap channels right',
 		defaultShortcut: 'Mod+Alt+ArrowRight'
+	},
+	{
+		id: ACTION_INSERT_PATTERN_ROW,
+		label: 'Insert pattern row',
+		defaultShortcut: 'Mod+I'
+	},
+	{
+		id: ACTION_REMOVE_PATTERN_ROW,
+		label: 'Remove pattern row',
+		defaultShortcut: 'Mod+R'
 	},
 	{ id: ACTION_APPLY_SCRIPT, label: 'Apply Script...', defaultShortcut: 'Mod+Shift+S' },
 	{
@@ -156,6 +168,8 @@ const EDIT_MENU_ACTION_IDS = [
 	ACTION_TRANSPOSE_OCTAVE_DOWN,
 	ACTION_SWAP_CHANNEL_LEFT,
 	ACTION_SWAP_CHANNEL_RIGHT,
+	ACTION_INSERT_PATTERN_ROW,
+	ACTION_REMOVE_PATTERN_ROW,
 	ACTION_APPLY_SCRIPT
 ] as const;
 

@@ -138,6 +138,16 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				return;
 			}
 
+			if (data.action === 'insert-pattern-row') {
+				dispatchEditorKey(ctx.getPatternEditor, 'i', { ctrlKey: true, code: 'KeyI' });
+				return;
+			}
+
+			if (data.action === 'remove-pattern-row') {
+				dispatchEditorKey(ctx.getPatternEditor, 'r', { ctrlKey: true, code: 'KeyR' });
+				return;
+			}
+
 			if (data.action === 'playFromBeginning' || data.action === ACTION_PLAY_FROM_BEGINNING) {
 				if (ctx.playbackStore.isPlaying) {
 					ctx.playbackStore.isPlaying = false;

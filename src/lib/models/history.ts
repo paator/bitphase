@@ -2,6 +2,8 @@ export type ProjectActionType =
 	| 'pattern.edit'
 	| 'pattern.bulkEdit'
 	| 'pattern.resize'
+	| 'pattern.insertRow'
+	| 'pattern.removeRow'
 	| 'patternOrder.add'
 	| 'patternOrder.remove'
 	| 'patternOrder.move'

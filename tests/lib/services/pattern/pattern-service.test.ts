@@ -417,4 +417,67 @@ describe('PatternService', () => {
 			expect(result).toBe(patterns);
 		});
 	});
+
+	describe('insertRowAt', () => {
+		it('inserts an empty row at the cursor and shifts following rows down without changing length', () => {
+			const source = new Pattern(0, 4);
+			source.channels[0].rows[1].note = new Note(NoteName.C, 4);
+			source.channels[0].rows[1].instrument = 3;
+			source.channels[0].rows[2].note = new Note(NoteName.D, 4);
+			source.channels[0].rows[3].note = new Note(NoteName.E, 4);
+			source.patternRows[1].envelopeValue = 12;
+
+			const result = PatternService.insertRowAt(source, 1);
+
+			expect(result).not.toBeNull();
+			expect(result!.length).toBe(4);
+			expect(result!.channels[0].rows[1].note.name).toBe(NoteName.None);
+			expect(result!.channels[0].rows[2].note.name).toBe(NoteName.C);
+			expect(result!.channels[0].rows[2].instrument).toBe(3);
+			expect(result!.channels[0].rows[3].note.name).toBe(NoteName.D);
+			expect(result!.patternRows[2].envelopeValue).toBe(12);
+		});
+
+		it('returns null for out of range row index', () => {
+			const source = new Pattern(0, 4);
+			expect(PatternService.insertRowAt(source, -1)).toBeNull();
+			expect(PatternService.insertRowAt(source, 4)).toBeNull();
+		});
+	});
+
+	describe('removeRowAt', () => {
+		it('removes the cursor row and shifts following rows up without changing length', () => {
+			const source = new Pattern(0, 4);
+			source.channels[0].rows[1].note = new Note(NoteName.C, 4);
+			source.channels[0].rows[2].note = new Note(NoteName.D, 4);
+			source.channels[0].rows[3].note = new Note(NoteName.E, 4);
+			source.patternRows[2].noiseValue = 7;
+
+			const result = PatternService.removeRowAt(source, 1);
+
+			expect(result).not.toBeNull();
+			expect(result!.length).toBe(4);
+			expect(result!.channels[0].rows[1].note.name).toBe(NoteName.D);
+			expect(result!.channels[0].rows[2].note.name).toBe(NoteName.E);
+			expect(result!.channels[0].rows[3].note.name).toBe(NoteName.None);
+			expect(result!.patternRows[1].noiseValue).toBe(7);
+		});
+
+		it('clears the only row when pattern length is 1', () => {
+			const source = new Pattern(0, 1);
+			source.channels[0].rows[0].note = new Note(NoteName.C, 4);
+
+			const result = PatternService.removeRowAt(source, 0);
+
+			expect(result).not.toBeNull();
+			expect(result!.length).toBe(1);
+			expect(result!.channels[0].rows[0].note.name).toBe(NoteName.None);
+		});
+
+		it('returns null for out of range row index', () => {
+			const source = new Pattern(0, 4);
+			expect(PatternService.removeRowAt(source, -1)).toBeNull();
+			expect(PatternService.removeRowAt(source, 4)).toBeNull();
+		});
+	});
 });
