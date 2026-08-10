@@ -375,6 +375,120 @@ describe('PatternNoteInput', () => {
 				expect(mockUpdateFieldValue.mock.calls[1][2]).toBe(1);
 			});
 
+			it('overwrites the instrument when re-entering the same note', () => {
+				settingsStore.autoEnterInstrument = true;
+				vi.mocked(editorStateStore.getCurrentInstrument).mockReturnValue('02');
+				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+				pattern.channels[DEFAULT_CHANNEL_INDEX].rows[DEFAULT_ROW_INDEX].note = new Note(
+					NoteName.C,
+					FIXED_OCTAVE
+				);
+				pattern.channels[DEFAULT_CHANNEL_INDEX].rows[DEFAULT_ROW_INDEX].instrument = 1;
+				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
+					schema: AY_CHIP_SCHEMA,
+					instruments: [
+						new Instrument('01', [], 0, 'AY 01', 'ay'),
+						new Instrument('02', [], 0, 'AY 02', 'ay')
+					]
+				});
+				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+				mockGetFieldValue.mockImplementation(
+					(ctx: EditingContext, info: FieldInfo) => {
+						if (info.fieldKey === 'instrument') {
+							return ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow]
+								.instrument;
+						}
+						const row =
+							ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow];
+						if (row.note.name === NoteName.None) return '---';
+						if (row.note.name === NoteName.Off) return 'OFF';
+						const noteNames = [
+							'',
+							'',
+							'C-',
+							'C#',
+							'D-',
+							'D#',
+							'E-',
+							'F-',
+							'F#',
+							'G-',
+							'G#',
+							'A-',
+							'A#',
+							'B-'
+						];
+						return noteNames[row.note.name] + row.note.octave;
+					}
+				);
+
+				const result = PatternNoteInput.handleNoteInput(context, fieldInfo, 'q', 'KeyQ');
+
+				expect(result).not.toBeNull();
+				expect(result?.didChange).not.toBe(false);
+				expect(mockUpdateFieldValue).toHaveBeenCalledTimes(1);
+				expect(mockUpdateFieldValue).toHaveBeenCalledWith(
+					expect.objectContaining({ pattern }),
+					expect.objectContaining({ fieldKey: 'instrument' }),
+					2
+				);
+			});
+
+			it('does not mutate when the same note and instrument are already present', () => {
+				settingsStore.autoEnterInstrument = true;
+				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+				pattern.channels[DEFAULT_CHANNEL_INDEX].rows[DEFAULT_ROW_INDEX].note = new Note(
+					NoteName.C,
+					FIXED_OCTAVE
+				);
+				pattern.channels[DEFAULT_CHANNEL_INDEX].rows[DEFAULT_ROW_INDEX].instrument = 1;
+				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
+					schema: AY_CHIP_SCHEMA,
+					instruments: [new Instrument('01', [], 0, 'AY 01', 'ay')]
+				});
+				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+				mockGetFieldValue.mockImplementation(
+					(ctx: EditingContext, info: FieldInfo) => {
+						if (info.fieldKey === 'instrument') {
+							return ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow]
+								.instrument;
+						}
+						const row =
+							ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow];
+						if (row.note.name === NoteName.None) return '---';
+						if (row.note.name === NoteName.Off) return 'OFF';
+						const noteNames = [
+							'',
+							'',
+							'C-',
+							'C#',
+							'D-',
+							'D#',
+							'E-',
+							'F-',
+							'F#',
+							'G-',
+							'G#',
+							'A-',
+							'A#',
+							'B-'
+						];
+						return noteNames[row.note.name] + row.note.octave;
+					}
+				);
+
+				const result = PatternNoteInput.handleNoteInput(context, fieldInfo, 'q', 'KeyQ');
+
+				expect(result).toEqual({
+					updatedPattern: pattern,
+					shouldMoveNext: false,
+					didChange: false
+				});
+				expect(mockUpdateFieldValue).not.toHaveBeenCalled();
+			});
+
 			it('skips stale selected instruments that are missing from the active chip list', () => {
 				settingsStore.autoEnterInstrument = true;
 				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);

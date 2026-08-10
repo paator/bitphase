@@ -120,11 +120,16 @@ export class PatternNoteInput {
 		if (!isTrackerNoteStringInTuningTable(noteStr)) {
 			return null;
 		}
-		if (PatternValueUpdates.getFieldValue(context, fieldInfo) === noteStr) {
+		const noteUnchanged = PatternValueUpdates.getFieldValue(context, fieldInfo) === noteStr;
+		let updatedPattern = noteUnchanged
+			? context.pattern
+			: PatternValueUpdates.updateFieldValue(context, fieldInfo, noteStr);
+		const patternBeforeInstrument = updatedPattern;
+		updatedPattern = this.autoEnterInstrument(context, fieldInfo, updatedPattern);
+		const instrumentChanged = updatedPattern !== patternBeforeInstrument;
+		if (noteUnchanged && !instrumentChanged) {
 			return { updatedPattern: context.pattern, shouldMoveNext: false, didChange: false };
 		}
-		let updatedPattern = PatternValueUpdates.updateFieldValue(context, fieldInfo, noteStr);
-		updatedPattern = this.autoEnterInstrument(context, fieldInfo, updatedPattern);
 		return { updatedPattern, shouldMoveNext: false };
 	}
 
@@ -167,6 +172,14 @@ export class PatternNoteInput {
 		};
 
 		const updatedContext = { ...context, pattern };
+		const currentInstrumentValue = PatternValueUpdates.getFieldValue(
+			updatedContext,
+			instrumentFieldInfo
+		);
+		if (currentInstrumentValue === instrumentValue) {
+			return pattern;
+		}
+
 		return PatternValueUpdates.updateFieldValue(
 			updatedContext,
 			instrumentFieldInfo,
