@@ -160,16 +160,47 @@
 		return (songsOfType[0] as unknown as Record<string, unknown>)[key];
 	}
 
+	function sanitizeChipSettingValue(setting: ChipSetting, value: unknown): unknown {
+		if (setting.type === 'select') {
+			if (
+				value === null ||
+				value === undefined ||
+				value === '' ||
+				(typeof value === 'number' && !Number.isFinite(value))
+			) {
+				return setting.defaultValue;
+			}
+			if (typeof value === 'number') {
+				if (setting.min !== undefined && value < setting.min) return setting.defaultValue;
+				if (setting.max !== undefined && value > setting.max) return setting.defaultValue;
+			}
+			return value;
+		}
+		if (setting.type === 'number') {
+			const n = Number(value);
+			if (!Number.isFinite(n)) return setting.defaultValue ?? setting.min ?? 0;
+			if (setting.min !== undefined && setting.max !== undefined) {
+				return Math.min(setting.max, Math.max(setting.min, n));
+			}
+			if (setting.min !== undefined) return Math.max(setting.min, n);
+			if (setting.max !== undefined) return Math.min(setting.max, n);
+			return n;
+		}
+		return value;
+	}
+
 	function buildChipContext(
 		chipType: string,
 		chipSettings: ChipSetting[]
 	): Record<string, unknown> {
 		const values: Record<string, unknown> = {};
 		for (const setting of chipSettings) {
-			values[setting.key] =
+			values[setting.key] = sanitizeChipSettingValue(
+				setting,
 				chipSettingOverrides[chipType]?.[setting.key] ??
-				getChipSettingValue(chipType, setting.key) ??
-				setting.defaultValue;
+					getChipSettingValue(chipType, setting.key) ??
+					setting.defaultValue
+			);
 		}
 		return buildChipSettingsContext(chipSettings, values);
 	}
@@ -179,10 +210,12 @@
 		setting: ChipSetting,
 		context: Record<string, unknown>
 	): unknown {
-		const baseValue =
+		const baseValue = sanitizeChipSettingValue(
+			setting,
 			chipSettingOverrides[chipType]?.[setting.key] ??
-			getChipSettingValue(chipType, setting.key) ??
-			setting.defaultValue;
+				getChipSettingValue(chipType, setting.key) ??
+				setting.defaultValue
+		);
 		return resolveChipSettingDisplayValue(setting, baseValue, context);
 	}
 
@@ -236,10 +269,10 @@
 		const updates: Record<string, unknown> = {};
 
 		for (const setting of chipSettings.filter((s) => s.notifyAudioService)) {
-			const value = normalized[setting.key];
-			if (value !== undefined) {
-				updates[setting.key] = value;
-			}
+			updates[setting.key] = sanitizeChipSettingValue(
+				setting,
+				normalized[setting.key] ?? sourceRecord[setting.key]
+			);
 		}
 
 		applyChipSettingValues(chipType, updates, chipSettings, processors);
@@ -252,11 +285,7 @@
 		setting: ChipSetting
 	) {
 		const beforeSongs = projectStore.cloneForHistory(projectStore.songs);
-		let normalized = setting.type === 'number' ? Number(value) || setting.defaultValue : value;
-		if (setting.type === 'number' && setting.min !== undefined && setting.max !== undefined) {
-			const n = Number(normalized);
-			normalized = Math.min(setting.max, Math.max(setting.min, n));
-		}
+		const normalized = sanitizeChipSettingValue(setting, value);
 		const songsOfType = songs.filter((s) => s.chipType === chipType);
 		for (const song of songsOfType) {
 			(song as unknown as Record<string, unknown>)[key] = normalized;

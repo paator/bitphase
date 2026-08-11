@@ -137,6 +137,8 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 				{ label: 'NTSC (60 Hz)', value: 60 }
 			],
 			defaultValue: 50,
+			min: 1,
+			max: 1000,
 			group: 'chip',
 			notifyAudioService: true
 		},

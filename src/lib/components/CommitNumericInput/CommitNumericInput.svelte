@@ -11,7 +11,9 @@
 		min,
 		max,
 		maxDigits,
+		allowDecimal = false,
 		live = true,
+		disabled = false,
 		class: className = '',
 		id,
 		title,
@@ -25,7 +27,9 @@
 		min?: number;
 		max?: number;
 		maxDigits?: number;
+		allowDecimal?: boolean;
 		live?: boolean;
+		disabled?: boolean;
 		class?: string;
 		id?: string;
 		title?: string;
@@ -37,11 +41,9 @@
 
 	let draft = $state<string | null>(null);
 
-	const resolvedInputMode = $derived(inputmode ?? (asHex ? 'text' : 'numeric'));
-	const limits = $derived({ min, max, maxDigits });
-	const text = $derived(
-		draft !== null ? draft : formatRowEditorNumber(value, asHex)
-	);
+	const resolvedInputMode = $derived(inputmode ?? (asHex || allowDecimal ? 'decimal' : 'numeric'));
+	const limits = $derived({ min, max, maxDigits, allowDecimal });
+	const text = $derived(draft !== null ? draft : formatRowEditorNumber(value, asHex));
 
 	function setValue(next: number): void {
 		if (next !== value) {
@@ -104,7 +106,7 @@
 			!event.ctrlKey &&
 			!event.metaKey &&
 			!event.altKey &&
-			shouldBlockRowEditorNumericKey(event.key, asHex)
+			shouldBlockRowEditorNumericKey(event.key, asHex, allowDecimal)
 		) {
 			event.preventDefault();
 		}
@@ -115,6 +117,7 @@
 	type="text"
 	{id}
 	{title}
+	{disabled}
 	inputmode={resolvedInputMode}
 	class={className}
 	value={text}

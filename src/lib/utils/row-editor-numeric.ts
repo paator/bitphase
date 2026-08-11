@@ -10,6 +10,7 @@ export type NumericFieldLimits = {
 	min?: number;
 	max?: number;
 	maxDigits?: number;
+	allowDecimal?: boolean;
 };
 
 export function parseRowEditorNumericText(
@@ -18,8 +19,18 @@ export function parseRowEditorNumericText(
 	limits?: NumericFieldLimits
 ): number | null {
 	let normalized = text.trim().replace(/\+/g, '');
-	const allowedPattern = asHex ? /[^0-9a-fA-F-]/g : /[^0-9-]/g;
+	const allowDecimal = Boolean(limits?.allowDecimal) && !asHex;
+	const allowedPattern = asHex ? /[^0-9a-fA-F-]/g : allowDecimal ? /[^0-9.-]/g : /[^0-9-]/g;
 	normalized = normalized.replace(allowedPattern, '');
+
+	if (allowDecimal) {
+		const sign = normalized.startsWith('-') ? '-' : '';
+		const unsigned = sign ? normalized.slice(1) : normalized;
+		const dot = unsigned.indexOf('.');
+		const whole = dot === -1 ? unsigned : unsigned.slice(0, dot);
+		const fraction = dot === -1 ? '' : unsigned.slice(dot + 1).replace(/\./g, '');
+		normalized = sign + whole + (dot === -1 ? '' : `.${fraction}`);
+	}
 
 	if (limits?.maxDigits !== undefined && asHex && normalized.replace('-', '').length > limits.maxDigits) {
 		normalized = normalized.startsWith('-')
@@ -27,7 +38,7 @@ export function parseRowEditorNumericText(
 			: normalized.slice(0, limits.maxDigits);
 	}
 
-	if (!asHex && limits?.max !== undefined) {
+	if (!asHex && !allowDecimal && limits?.max !== undefined) {
 		const num = parseInt(normalized, 10);
 		if (!Number.isNaN(num) && num > limits.max) {
 			normalized = String(limits.max);
@@ -44,6 +55,11 @@ export function parseRowEditorNumericText(
 		}
 		if (/^[0-9a-fA-F]+$/.test(temp)) {
 			parsed = sign * parseInt(temp, 16);
+		}
+	} else if (allowDecimal) {
+		if (/^-?(?:\d+\.?\d*|\.\d+)$/.test(normalized)) {
+			const num = Number(normalized);
+			if (Number.isFinite(num)) parsed = num;
 		}
 	} else if (/^-?\d+$/.test(normalized)) {
 		parsed = parseInt(normalized, 10);
@@ -91,8 +107,12 @@ export function focusRowEditorInputInRow(
 	}
 }
 
-export function shouldBlockRowEditorNumericKey(key: string, asHex: boolean): boolean {
+export function shouldBlockRowEditorNumericKey(
+	key: string,
+	asHex: boolean,
+	allowDecimal = false
+): boolean {
 	if (key.length > 1) return false;
-	const pattern = asHex ? /^[0-9a-fA-F-]$/ : /^[0-9-]$/;
+	const pattern = asHex ? /^[0-9a-fA-F-]$/ : allowDecimal ? /^[0-9.-]$/ : /^[0-9-]$/;
 	return !pattern.test(key);
 }

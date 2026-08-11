@@ -14,6 +14,12 @@ describe('row-editor-numeric', () => {
 		expect(parseRowEditorNumericText('-', false)).toBeNull();
 	});
 
+	it('parses fractional values when allowDecimal is set', () => {
+		expect(parseRowEditorNumericText('48.828', false, { allowDecimal: true })).toBe(48.828);
+		expect(parseRowEditorNumericText('48.', false, { allowDecimal: true })).toBe(48);
+		expect(parseRowEditorNumericText('.', false, { allowDecimal: true })).toBeNull();
+	});
+
 	it('restores the committed value when blur text is empty or invalid', () => {
 		const input = { value: '' } as HTMLInputElement;
 		expect(commitRowEditorNumericInput(input, 15, false)).toBe(15);
