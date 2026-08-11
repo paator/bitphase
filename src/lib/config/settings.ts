@@ -1,5 +1,22 @@
 import type { SettingsItem } from '../components/Settings/types';
 
+const MONOSPACE_FONTS = [
+	{ value: 'monospace', label: 'System Default' },
+	{ value: 'Fira Code', label: 'Fira Code' },
+	{ value: 'JetBrains Mono', label: 'JetBrains Mono' },
+	{ value: 'IBM Plex Mono', label: 'IBM Plex Mono' },
+	{ value: 'Source Code Pro', label: 'Source Code Pro' },
+	{ value: 'Iosevka Charon Mono', label: 'Iosevka Charon Mono' },
+	{ value: 'Press Start 2P', label: 'Press Start 2P' }
+] as const;
+
+const SANS_FONTS = [
+	{ value: 'sans-serif', label: 'System Default' },
+	{ value: 'Inter', label: 'Inter' },
+	{ value: 'Roboto', label: 'Roboto' },
+	{ value: 'Open Sans', label: 'Open Sans' }
+] as const;
+
 export const settingsItems: SettingsItem[] = [
 	{
 		label: 'Volume',
@@ -77,14 +94,7 @@ export const settingsItems: SettingsItem[] = [
 		defaultValue: 'monospace',
 		setting: 'patternEditorFontFamily',
 		category: 'appearance',
-		options: [
-			{ value: 'monospace', label: 'System Default' },
-			{ value: 'Fira Code', label: 'Fira Code' },
-			{ value: 'JetBrains Mono', label: 'JetBrains Mono' },
-			{ value: 'IBM Plex Mono', label: 'IBM Plex Mono' },
-			{ value: 'Source Code Pro', label: 'Source Code Pro' },
-			{ value: 'Press Start 2P', label: 'Press Start 2P' }
-		]
+		options: [...MONOSPACE_FONTS]
 	},
 	{
 		label: 'UI Font Family',
@@ -94,11 +104,14 @@ export const settingsItems: SettingsItem[] = [
 		setting: 'uiFontFamily',
 		category: 'appearance',
 		options: [
-			{ value: 'Fira Code', label: 'Fira Code (Monospace)' },
-			{ value: 'JetBrains Mono', label: 'JetBrains Mono (Monospace)' },
-			{ value: 'Inter', label: 'Inter (Sans-serif)' },
-			{ value: 'Roboto', label: 'Roboto (Sans-serif)' },
-			{ value: 'Open Sans', label: 'Open Sans (Sans-serif)' }
+			...MONOSPACE_FONTS.map((font) => ({
+				value: font.value,
+				label: `${font.label} (Monospace)`
+			})),
+			...SANS_FONTS.map((font) => ({
+				value: font.value,
+				label: `${font.label} (Sans-serif)`
+			}))
 		]
 	},
 	{

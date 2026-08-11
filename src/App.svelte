@@ -98,13 +98,15 @@
 	$effect(() => {
 		const uiFontFamily = settingsStore.uiFontFamily;
 		if (uiFontFamily) {
+			const isGeneric = uiFontFamily === 'monospace' || uiFontFamily === 'sans-serif';
+			const fontStack = isGeneric ? uiFontFamily : `"${uiFontFamily}"`;
 			document.documentElement.style.setProperty(
 				'--font-sans',
-				`"${uiFontFamily}", sans-serif`
+				`${fontStack}, sans-serif`
 			);
 			document.documentElement.style.setProperty(
 				'--font-mono',
-				`"${uiFontFamily}", monospace`
+				`${fontStack}, monospace`
 			);
 		}
 	});

@@ -1,12 +1,12 @@
 <script lang="ts">
 	import type { Pattern } from '../../models/song';
 	import { getPatternOrderColors } from '../../utils/pattern-order-colors';
-	import { getFonts } from '../../utils/fonts';
 	import { setupCanvas as setupCanvasUtil } from '../../utils/canvas-utils';
 	import { PatternService } from '../../services/pattern/pattern-service';
 	import { PatternOrderRenderer } from '../../ui-rendering/pattern-order-renderer';
 	import { playbackStore } from '../../stores/playback.svelte';
 	import { themeService } from '../../services/theme/theme-service';
+	import { settingsStore } from '../../stores/settings.svelte';
 	import IconCarbonUnlink from '~icons/carbon/unlink';
 	import IconCarbonCopy from '~icons/carbon/copy';
 	import IconCarbonSubtract from '~icons/carbon/subtract';
@@ -67,7 +67,15 @@
 	let canvasHeight = $state(PATTERN_EDITOR_CONSTANTS.DEFAULT_CANVAS_HEIGHT);
 
 	let COLORS = $state(getPatternOrderColors());
-	let FONTS = getFonts();
+	let FONTS = $derived.by(() => {
+		const family = settingsStore.uiFontFamily;
+		const isGeneric = family === 'monospace' || family === 'sans-serif';
+		const fontStack = isGeneric ? family : `"${family}"`;
+		return {
+			mono: `${fontStack}, monospace`,
+			sans: `${fontStack}, sans-serif`
+		};
+	});
 	let renderer: PatternOrderRenderer | null = null;
 
 	let lastDrawnOrderIndex = -1;
@@ -184,6 +192,34 @@
 			}
 		});
 		return unsubscribe;
+	});
+
+	$effect(() => {
+		const family = settingsStore.uiFontFamily;
+		FONTS;
+		if (!ctx || !canvas) return;
+
+		setupCanvas();
+		draw();
+
+		if (!family || family === 'monospace' || family === 'sans-serif') return;
+
+		const fontSpec = `${FONT_SIZE}px "${family}"`;
+		if (document.fonts.check(fontSpec)) return;
+
+		let cancelled = false;
+		document.fonts
+			.load(fontSpec)
+			.then(() => {
+				if (cancelled || !ctx || !canvas) return;
+				setupCanvas();
+				draw();
+			})
+			.catch(() => {});
+
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	function shiftColorsAfterRemove(removedIndex: number): void {
