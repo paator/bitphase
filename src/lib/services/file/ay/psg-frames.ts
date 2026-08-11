@@ -1,4 +1,9 @@
-import { TaymFormatError } from './taym-spec';
+export class PsgFormatError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'PsgFormatError';
+	}
+}
 
 export const PSG_REGISTER_COUNT = 14;
 
@@ -18,15 +23,23 @@ const PSG_REGISTER_SLOTS = 16;
 const PSG_ENVELOPE_SHAPE_REGISTER = 13;
 const PSG_NO_WRITE = 0xff;
 
+export function hasPsgMagic(buffer: ArrayBuffer): boolean {
+	if (buffer.byteLength < PSG_HEADER_SIZE) {
+		return false;
+	}
+	const bytes = new Uint8Array(buffer, 0, PSG_MAGIC.length);
+	return PSG_MAGIC.every((value, index) => bytes[index] === value);
+}
+
 export function decodePsgFrames(
 	data: Uint8Array,
 	repeatUnit: number = PSG_BULBA_REPEAT_UNIT
 ): PsgFrame[] {
 	if (data.length < PSG_HEADER_SIZE) {
-		throw new TaymFormatError('Frame data is smaller than the PSG header');
+		throw new PsgFormatError('Frame data is smaller than the PSG header');
 	}
 	if (PSG_MAGIC.some((value, index) => data[index] !== value)) {
-		throw new TaymFormatError('Frame data is not a Bulba PSG stream');
+		throw new PsgFormatError('Frame data is not a Bulba PSG stream');
 	}
 
 	const frames: PsgFrame[] = [];
@@ -57,7 +70,7 @@ export function decodePsgFrames(
 
 		if (marker === PSG_MULTIPLE_FRAMES) {
 			if (offset >= data.length) {
-				throw new TaymFormatError('Truncated PSG multiple-frame marker');
+				throw new PsgFormatError('Truncated PSG multiple-frame marker');
 			}
 			const repeats = data[offset++]! * repeatUnit;
 			if (frameOpen) {
@@ -72,10 +85,10 @@ export function decodePsgFrames(
 		}
 
 		if (marker >= PSG_REGISTER_SLOTS) {
-			throw new TaymFormatError(`Invalid PSG register index ${marker}`);
+			throw new PsgFormatError(`Invalid PSG register index ${marker}`);
 		}
 		if (offset >= data.length) {
-			throw new TaymFormatError('Truncated PSG register write');
+			throw new PsgFormatError('Truncated PSG register write');
 		}
 		const value = data[offset++]!;
 		frameOpen = true;
@@ -91,7 +104,7 @@ export function decodePsgFrames(
 	}
 
 	if (frames.length === 0) {
-		throw new TaymFormatError('PSG stream decoded to zero frames');
+		throw new PsgFormatError('PSG stream decoded to zero frames');
 	}
 
 	return frames;

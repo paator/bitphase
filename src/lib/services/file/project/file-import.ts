@@ -1,6 +1,7 @@
 import type { Chip } from '../../../chips/types';
 import { loadVT2File, loadPT3File } from '../modules/vt-converter';
 import { isTaymBuffer, loadTaymFile } from '../taym/taym-import';
+import { isPsgBuffer, loadPsgFile } from '../ay/psg-import';
 import { Project, Table } from '../../../models/project';
 import {
 	Song,
@@ -302,7 +303,8 @@ function reconstructInstrument(data: any): Instrument {
 					timerRow.envFmWaveformLoop = row.envFmWaveformLoop;
 				}
 				if (row.timerPwmDuty !== undefined) timerRow.timerPwmDuty = row.timerPwmDuty;
-				if (row.timerPwmSweepMin !== undefined) timerRow.timerPwmSweepMin = row.timerPwmSweepMin;
+				if (row.timerPwmSweepMin !== undefined)
+					timerRow.timerPwmSweepMin = row.timerPwmSweepMin;
 				if (row.timerPwmSweep !== undefined) timerRow.timerPwmSweep = row.timerPwmSweep;
 				return timerRow;
 			}
@@ -450,7 +452,7 @@ export class FileImportService {
 		try {
 			const input = document.createElement('input');
 			input.type = 'file';
-			input.accept = '.pt3,.vt2,.taym';
+			input.accept = '.pt3,.vt2,.taym,.psg';
 			input.style.display = 'none';
 
 			document.body.appendChild(input);
@@ -478,16 +480,19 @@ export class FileImportService {
 							header.startsWith('Vortex Tracker II');
 						const isVT2 = header.startsWith('[Module]');
 						const isTaym = isTaymBuffer(buffer);
-						if (!isPT3 && !isVT2 && !isTaym) {
+						const isPsg = isPsgBuffer(buffer);
+						if (!isPT3 && !isVT2 && !isTaym && !isPsg) {
 							throw new Error(
-								'Unknown format. Expected PT3, VT2 or TAYM module (.pt3, .vt2, .taym).'
+								'Unknown format. Expected PT3, VT2, TAYM or PSG module (.pt3, .vt2, .taym, .psg).'
 							);
 						}
 						const project = isTaym
 							? await loadTaymFile(file)
-							: isPT3
-								? await loadPT3File(file)
-								: await loadVT2File(file);
+							: isPsg
+								? await loadPsgFile(file)
+								: isPT3
+									? await loadPT3File(file)
+									: await loadVT2File(file);
 						resolve(project);
 					} catch (error) {
 						console.error('Error loading module file:', error);

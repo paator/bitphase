@@ -1,6 +1,6 @@
-import { Project, Table } from '../../../models/project';
-import { Instrument, InstrumentRow, type Song } from '../../../models/song';
-import { numberToInstrumentId } from '../../../utils/instrument-id';
+import type { Project } from '../../../models/project';
+import type { Instrument, Song } from '../../../models/song';
+import { assembleAyProject } from '../ay/ay-register-project';
 import { TaymFormatError } from './taym-spec';
 import { hasTaymMagic, readTaymFile } from './taym-reader';
 import { resolveTimerTimeline } from './taym-timers';
@@ -60,16 +60,14 @@ export function importTaymBuffer(buffer: ArrayBuffer, fallbackName = ''): TaymIm
 		throw new TaymFormatError('The TAYM file contains no chip Bitphase can import');
 	}
 
-	const project = new Project(
-		file.info.title?.trim() || fallbackName,
-		file.info.author?.trim() || '',
+	const project = assembleAyProject({
+		title: file.info.title?.trim() || fallbackName,
+		author: file.info.author?.trim() || '',
 		songs,
-		loopPatternIndex,
-		patternOrder.length > 0 ? patternOrder : [0],
-		[new Table(0, [], 0, 'Table 1')],
-		{},
-		instruments.length > 0 ? instruments : [createPlaceholderInstrument()]
-	);
+		instruments,
+		patternOrder,
+		loopPatternIndex
+	});
 
 	return { project, warnings };
 }
@@ -82,31 +80,4 @@ export async function loadTaymFile(file: File): Promise<Project> {
 		console.warn(`TAYM import: ${warning}`);
 	}
 	return project;
-}
-
-function createPlaceholderInstrument(): Instrument {
-	const id = numberToInstrumentId(1);
-	return new Instrument(
-		id,
-		[
-			new InstrumentRow({
-				tone: true,
-				noise: false,
-				envelope: false,
-				retriggerEnvelope: false,
-				toneAdd: 0,
-				noiseAdd: 0,
-				envelopeAdd: 0,
-				volume: 15,
-				loop: true,
-				amplitudeSliding: false,
-				amplitudeSlideUp: false,
-				toneAccumulation: false,
-				noiseAccumulation: false,
-				envelopeAccumulation: false
-			})
-		],
-		0,
-		`Instrument ${id}`
-	);
 }

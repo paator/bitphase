@@ -13,7 +13,7 @@ Bitphase can open projects, import classic AY modules, and export audio or hardw
 
 Save always downloads a file named from the project title (browsers do not overwrite a path on disk the way a desktop app would). There is no separate **Save As** in the menu.
 
-## Import modules (`.pt3` / `.vt2` / `.taym`)
+## Import modules (`.pt3` / `.vt2` / `.taym` / `.psg`)
 
 **File → Import Module** opens a picker for:
 
@@ -22,6 +22,7 @@ Save always downloads a file named from the project title (browsers do not overw
 | `.pt3`  | ProTracker 3.4 AY modules         |
 | `.vt2`  | Vortex Tracker 2 AY modules       |
 | `.taym` | Register-level timer-trick tracks |
+| `.psg`  | AY register dumps                 |
 
 `.pt3` and `.vt2` bring in classic AY tracker songs.
 
