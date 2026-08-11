@@ -1,9 +1,12 @@
 <script lang="ts">
+	import type { HTMLInputAttributes } from 'svelte/elements';
 	import {
 		formatRowEditorNumber,
 		parseRowEditorNumericText,
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
+
+	type InputMode = HTMLInputAttributes['inputmode'];
 
 	let {
 		value = $bindable<number>(),
@@ -33,7 +36,7 @@
 		class?: string;
 		id?: string;
 		title?: string;
-		inputmode?: string;
+		inputmode?: InputMode;
 		onkeydown?: (e: KeyboardEvent) => void;
 		oncommit?: (value: number) => void;
 		onValueChange?: (value: number) => void;
@@ -41,7 +44,9 @@
 
 	let draft = $state<string | null>(null);
 
-	const resolvedInputMode = $derived(inputmode ?? (asHex || allowDecimal ? 'decimal' : 'numeric'));
+	const resolvedInputMode: InputMode = $derived(
+		inputmode ?? (asHex || allowDecimal ? 'decimal' : 'numeric')
+	);
 	const limits = $derived({ min, max, maxDigits, allowDecimal });
 	const text = $derived(draft !== null ? draft : formatRowEditorNumber(value, asHex));
 
