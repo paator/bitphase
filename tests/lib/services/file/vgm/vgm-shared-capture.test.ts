@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { captureVgmProject } from '@/lib/services/file/vgm/vgm-shared-capture';
+import {
+	captureSharedAyProject,
+	captureVgmProject
+} from '@/lib/services/file/vgm/vgm-shared-capture';
 import type { Project } from '@/lib/models/project';
 
 function songStub(overrides: Record<string, unknown> = {}) {
@@ -29,6 +32,24 @@ describe('vgm-shared-capture validation', () => {
 		} as unknown as Project;
 
 		await expect(captureVgmProject(project, [0], [1])).rejects.toThrow(
+			/same interrupt frequency/
+		);
+	});
+
+	it('applies the interrupt-frequency check to shared AY captures', async () => {
+		const project = {
+			name: 'test',
+			patternOrder: [0],
+			loopPointId: 0,
+			songs: [
+				songStub({ interruptFrequency: 50 }),
+				songStub({ interruptFrequency: 60 })
+			],
+			instruments: [],
+			tables: []
+		} as unknown as Project;
+
+		await expect(captureSharedAyProject(project, [0, 1])).rejects.toThrow(
 			/same interrupt frequency/
 		);
 	});
