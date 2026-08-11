@@ -1,5 +1,6 @@
 import type { Chip } from '../../../chips/types';
 import { loadVT2File, loadPT3File } from '../modules/vt-converter';
+import { isTaymBuffer, loadTaymFile } from '../taym/taym-import';
 import { Project, Table } from '../../../models/project';
 import {
 	Song,
@@ -449,7 +450,7 @@ export class FileImportService {
 		try {
 			const input = document.createElement('input');
 			input.type = 'file';
-			input.accept = '.pt3,.vt2';
+			input.accept = '.pt3,.vt2,.taym';
 			input.style.display = 'none';
 
 			document.body.appendChild(input);
@@ -476,12 +477,17 @@ export class FileImportService {
 							header.startsWith('ProTracker 3.') ||
 							header.startsWith('Vortex Tracker II');
 						const isVT2 = header.startsWith('[Module]');
-						if (!isPT3 && !isVT2) {
+						const isTaym = isTaymBuffer(buffer);
+						if (!isPT3 && !isVT2 && !isTaym) {
 							throw new Error(
-								'Unknown format. Expected PT3 or VT2 module (.pt3, .vt2).'
+								'Unknown format. Expected PT3, VT2 or TAYM module (.pt3, .vt2, .taym).'
 							);
 						}
-						const project = isPT3 ? await loadPT3File(file) : await loadVT2File(file);
+						const project = isTaym
+							? await loadTaymFile(file)
+							: isPT3
+								? await loadPT3File(file)
+								: await loadVT2File(file);
 						resolve(project);
 					} catch (error) {
 						console.error('Error loading module file:', error);
