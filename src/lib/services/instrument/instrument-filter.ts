@@ -1,5 +1,5 @@
 import type { Instrument, Song } from '../../models/song';
-import { getAllChips } from '../../chips/registry';
+import { CHIP_TYPES } from '../../chips/chip-registration';
 
 export function resolveInstrumentChipType(instrument: Instrument): string {
 	return instrument.chipType ?? 'ay';
@@ -39,7 +39,5 @@ export function getOrderedProjectChipTypes(
 	for (const processor of chipProcessors) {
 		types.add(processor.chip.type);
 	}
-	return getAllChips()
-		.map((chip) => chip.type)
-		.filter((type) => types.has(type));
+	return CHIP_TYPES.filter((type) => types.has(type));
 }

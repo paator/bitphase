@@ -13,7 +13,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest",
     "test:run": "vitest run",
-    "btp-to-wav": "tsx cli/btp-to-wav.ts"
+    "btp-to-wav": "tsx cli/btp-to-wav.ts",
+    "btp-to-tmr": "tsx cli/btp-to-tmr.ts"
   },
   "devDependencies": {
     "@iconify/json": "^2.2.380",
