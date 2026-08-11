@@ -10,17 +10,43 @@ import {
 	getPanSettingsForLayout
 } from '../../public/ay/ayumi-constants.js';
 
+async function instantiateAyumiWasm() {
+	const fs = await import('node:fs');
+	const path = await import('node:path');
+	const wasmPath = path.join(process.cwd(), 'public/ay/ayumi.wasm');
+	const wasm = fs.readFileSync(wasmPath);
+	return WebAssembly.instantiate(wasm, {
+		env: { emscripten_notify_memory_growth: () => {} }
+	});
+}
+
 describe('ayumi-constants', () => {
 	describe('constants', () => {
 		it('AYUMI_STRUCT_SIZE matches ayumi.wasm', async () => {
-			const fs = await import('node:fs');
-			const path = await import('node:path');
-			const wasmPath = path.join(process.cwd(), 'public/ay/ayumi.wasm');
-			const wasm = fs.readFileSync(wasmPath);
-			const { instance } = await WebAssembly.instantiate(wasm, {
-				env: { emscripten_notify_memory_growth: () => {} }
-			});
+			const { instance } = await instantiateAyumiWasm();
 			expect(instance.exports.ayumi_struct_size()).toBe(AYUMI_STRUCT_SIZE);
+		});
+
+		it('native SID timer volume uses DAC-space scaling', async () => {
+			const { instance } = await instantiateAyumiWasm();
+			const wasm = instance.exports as any;
+			const ay = wasm.malloc(AYUMI_STRUCT_SIZE);
+			const regs = wasm.malloc(14);
+			const waveform = wasm.malloc(4);
+			try {
+				new Int32Array(wasm.memory.buffer, waveform, 1)[0] = 7;
+				wasm.ayumi_configure(ay, 0, DEFAULT_AYM_FREQUENCY, 44100, 0);
+				wasm.ayumi_set_timer_effect(ay, 0, 1, 1, 0, 1, 1, 10, 1, 0);
+				wasm.ayumi_set_timer_effect_waveform(ay, 0, 0, waveform, 1, 0);
+				wasm.ayumi_get_registers(ay, regs);
+
+				const out = new Uint8Array(wasm.memory.buffer, regs, 14);
+				expect(out[8]).toBe(4);
+			} finally {
+				wasm.free(waveform);
+				wasm.free(regs);
+				wasm.free(ay);
+			}
 		});
 
 		it('AYUMI_STRUCT_LEFT_OFFSET is struct size minus 40', () => {

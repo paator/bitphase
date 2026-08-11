@@ -43,6 +43,13 @@ export type VgmProjectCapture = {
 	orderIndices: number[];
 };
 
+export type VgmProjectCaptureOptions = {
+	onProgress?: (progress: number, message: string) => void;
+	abortSignal?: AbortSignal;
+	ayModules?: PsgExportModules;
+	nesModules?: NesExportModules;
+};
+
 function getPatterns(song: { patterns: Array<{ id: number }> }, patternOrder: number[]) {
 	const patterns: Array<{ id: number; length: number }> = [];
 	for (const patternId of patternOrder) {
@@ -84,7 +91,7 @@ function resolveAyIsYm(song: {
 	);
 }
 
-function assertCompatibleExportSongs(
+function assertCompatibleInterruptFrequencies(
 	project: Project,
 	ayIndices: number[],
 	nesIndices: number[]
@@ -100,9 +107,19 @@ function assertCompatibleExportSongs(
 	const interruptFrequency = resolveInterruptFrequency(songs[0]!);
 	for (const song of songs) {
 		if (resolveInterruptFrequency(song) !== interruptFrequency) {
-			throw new Error('VGM export requires all songs to use the same interrupt frequency');
+			throw new Error('Shared export requires all songs to use the same interrupt frequency');
 		}
 	}
+
+	return interruptFrequency;
+}
+
+function assertCompatibleExportSongs(
+	project: Project,
+	ayIndices: number[],
+	nesIndices: number[]
+): number {
+	const interruptFrequency = assertCompatibleInterruptFrequencies(project, ayIndices, nesIndices);
 
 	if (ayIndices.length > 1) {
 		const first = project.songs[ayIndices[0]!]!;
@@ -468,20 +485,20 @@ function createNesCaptureSlot(
 	};
 }
 
-export async function captureVgmProject(
+async function captureSharedProject(
 	project: Project,
 	ayIndices: number[],
 	nesIndices: number[],
-	options?: {
-		onProgress?: (progress: number, message: string) => void;
-		abortSignal?: AbortSignal;
-	}
+	options: VgmProjectCaptureOptions | undefined,
+	requireVgmChipCompatibility: boolean
 ): Promise<VgmProjectCapture> {
 	if (ayIndices.length === 0 && nesIndices.length === 0) {
 		throw new Error('No AY or NES songs to export');
 	}
 
-	const interruptFrequency = assertCompatibleExportSongs(project, ayIndices, nesIndices);
+	const interruptFrequency = requireVgmChipCompatibility
+		? assertCompatibleExportSongs(project, ayIndices, nesIndices)
+		: assertCompatibleInterruptFrequencies(project, ayIndices, nesIndices);
 	const patternOrder = project.patternOrder || [0];
 	const samplesPerInterrupt = Math.max(
 		1,
@@ -489,8 +506,9 @@ export async function captureVgmProject(
 	);
 
 	options?.onProgress?.(10, 'Loading capture modules...');
-	const ayModules = ayIndices.length > 0 ? await loadAyModules() : null;
-	const nesModules = nesIndices.length > 0 ? await loadNesModules() : null;
+	const ayModules = ayIndices.length > 0 ? (options?.ayModules ?? (await loadAyModules())) : null;
+	const nesModules =
+		nesIndices.length > 0 ? (options?.nesModules ?? (await loadNesModules())) : null;
 
 	if (options?.abortSignal?.aborted) {
 		throw new Error('Export cancelled');
@@ -647,4 +665,21 @@ export async function captureVgmProject(
 		interruptFrequency,
 		orderIndices
 	};
+}
+
+export function captureSharedAyProject(
+	project: Project,
+	ayIndices: number[],
+	options?: VgmProjectCaptureOptions
+): Promise<VgmProjectCapture> {
+	return captureSharedProject(project, ayIndices, [], options, false);
+}
+
+export function captureVgmProject(
+	project: Project,
+	ayIndices: number[],
+	nesIndices: number[],
+	options?: VgmProjectCaptureOptions
+): Promise<VgmProjectCapture> {
+	return captureSharedProject(project, ayIndices, nesIndices, options, true);
 }

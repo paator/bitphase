@@ -1,23 +1,26 @@
 import {
 	AY_REGISTER_COUNT,
-	ENVELOPE_SHAPE_REGISTER,
-	envelopeShapeRegisterApplyMask,
-	envelopePeriodRegisterApplyMask,
-	registerApplyMask,
 	registersChangedMask,
-	sidVolumeLevel,
-	timerPwmStepPeriod,
-	toneRegisterApplyMask,
-	volumeRegisterIndex,
-	writeEnvelopePeriodToPsgData,
-	writeTonePeriodToPsgData,
 	type HardwareEnvFmState,
 	type HardwareFmState,
 	type HardwareSidState,
 	type HardwareSyncBuzzerState,
 	type SongCaptureFrame
 } from '../ay/ay-export-utils';
-import { computeEnvFmEnvelopePeriod, computeFmTonePeriod } from '../../../chips/ay/instrument';
+import {
+	envFmStepSource,
+	fmStepSource,
+	normalizePwmPeriods,
+	previousWaveformStepIndex,
+	pwmStartPeriod,
+	pwmStepPeriod,
+	resolveNextWaveformIndex,
+	sidStartPeriod,
+	sidStepPeriod,
+	sidStepSource,
+	syncBuzzerStepSource,
+	type TimerEffectStepSource
+} from '../ay/ay-timer-effects';
 import { encodeEventList } from './tmr-event-list';
 import {
 	encodeEventPsgApplyMask,
@@ -28,6 +31,7 @@ import {
 	TMR_TIMER_EVENT_STOP,
 	type TmrEventItemRecord
 } from './tmr-format';
+import type { AyChipVariant } from '../../../chips/ay/ay-sample-lut';
 
 export {
 	encodeEventPsgApplyMask,
@@ -53,6 +57,10 @@ export type TmrEncodeOptions = {
 	chipIndex?: number;
 };
 
+function chipVariantFromOptions(options: Pick<TmrEncodeOptions, 'isYm'>): AyChipVariant {
+	return options.isYm ? 'YM' : 'AY';
+}
+
 function encodeExportTimerFrequencyHz(ymPeriod: number, options: TmrEncodeOptions): number {
 	return exportTimerFrequencyStoredFromYmPeriod(ymPeriod, options.chipFrequency);
 }
@@ -67,13 +75,6 @@ type PwmTimerState = WaveformChainState & {
 	period: number;
 	periodLow: number;
 };
-
-function normalizePwmPeriods<T extends PwmTimerState>(state: T): T {
-	return {
-		...state,
-		periodLow: state.periodLow > 0 ? state.periodLow : state.period
-	};
-}
 
 function isPwmActive(state: PwmTimerState): boolean {
 	const normalized = normalizePwmPeriods(state);
@@ -95,45 +96,24 @@ function isPwmDutySweep(prev: PwmTimerState, next: PwmTimerState): boolean {
 	if (previous.period === current.period && previous.periodLow === current.periodLow) {
 		return false;
 	}
-	return pwmDutyRatioFromPeriods(previous.period, previous.periodLow) !==
-		pwmDutyRatioFromPeriods(current.period, current.periodLow);
+	return (
+		pwmDutyRatioFromPeriods(previous.period, previous.periodLow) !==
+		pwmDutyRatioFromPeriods(current.period, current.periodLow)
+	);
 }
 
-function pwmEventStepPeriod(state: PwmTimerState, stepIndex: number): number {
-	const normalized = normalizePwmPeriods(state);
-	if (isPwmActive(normalized) && normalized.waveform.length >= 2) {
-		return stepIndex % 2 === 0 ? normalized.period : normalized.periodLow;
-	}
-	return normalized.period;
-}
-
-function previousWaveformStepIndex(stepIndex: number, state: WaveformChainState): number {
-	if (stepIndex > 0) {
-		return stepIndex - 1;
-	}
-	for (let index = state.waveform.length - 1; index >= 0; index--) {
-		if (resolveNextWaveformIndex(index, state) === stepIndex) {
-			return index;
-		}
-	}
-	return state.waveform.length - 1;
-}
-
-function encodePwmEventTimerFrequency(
+function stepFrequencyFromPeriod(
+	source: TimerEffectStepSource,
 	stepIndex: number,
-	state: PwmTimerState,
 	options: TmrEncodeOptions
 ): number {
-	const currentPeriod = pwmEventStepPeriod(state, stepIndex);
-	const previousPeriod = pwmEventStepPeriod(state, previousWaveformStepIndex(stepIndex, state));
+	const state = { waveform: new Array(source.length), waveformLoop: source.loop };
+	const currentPeriod = source.stepPeriod(stepIndex);
+	const previousPeriod = source.stepPeriod(previousWaveformStepIndex(stepIndex, state));
 	if (currentPeriod === previousPeriod) {
 		return 0;
 	}
 	return encodeExportTimerFrequencyHz(currentPeriod, options);
-}
-
-function sidStartPeriod(sid: HardwareSidState): number {
-	return timerPwmStepPeriod(sid.waveform[0] ?? 0, sid.period, sid.periodLow);
 }
 
 export function isSidPwmDutySweep(prev: HardwareSidState, next: HardwareSidState): boolean {
@@ -146,147 +126,10 @@ export function isSidPwmDutySweep(prev: HardwareSidState, next: HardwareSidState
 	return isPwmDutySweep(prev, next);
 }
 
-function sidEventStepPeriod(sid: HardwareSidState, stepIndex: number): number {
-	return timerPwmStepPeriod(sid.waveform[stepIndex] ?? 0, sid.period, sid.periodLow);
-}
-
-export function encodeSidEventTimerFrequency(
-	stepIndex: number,
-	sid: HardwareSidState,
-	options: TmrEncodeOptions
-): number {
-	const currentPeriod = sidEventStepPeriod(sid, stepIndex);
-	const previousPeriod = sidEventStepPeriod(sid, previousWaveformStepIndex(stepIndex, sid));
-	if (currentPeriod === previousPeriod) {
-		return 0;
-	}
-	return encodeExportTimerFrequencyHz(currentPeriod, options);
-}
-
-export function encodeSyncBuzzerEventTimerFrequency(
-	stepIndex: number,
-	syncbuzzer: HardwareSyncBuzzerState,
-	options: TmrEncodeOptions
-): number {
-	// A duty sync-buzzer skews its retrigger period per waveform step (high vs
-	// low phase), exactly like FM/SID PWM. Without duty (period == periodLow)
-	// every step resolves to the same period, so all but the entry inherit (0).
-	return encodePwmEventTimerFrequency(stepIndex, syncbuzzer, options);
-}
-
-function syncBuzzerStartPeriod(syncbuzzer: HardwareSyncBuzzerState): number {
-	return pwmEventStepPeriod(syncbuzzer, 0);
-}
-
-function fmStartPeriod(fm: HardwareFmState): number {
-	return pwmEventStepPeriod(fm, 0);
-}
-
-function envFmStartPeriod(envFm: HardwareEnvFmState): number {
-	return pwmEventStepPeriod(envFm, 0);
-}
-
-type StepRegisterWrite = { register: number; value: number };
-
-type TimerEffectStepSource = {
-	registerMask: number;
-	length: number;
-	loop: number;
-	writesAtStep(stepIndex: number): StepRegisterWrite[];
-	stepTimerFrequency(stepIndex: number): number;
-};
-
 type EffectChainStep = {
 	sourceSteps: number[];
 	nextIndex: number;
 };
-
-function sidStepSource(
-	channelIndex: number,
-	sid: HardwareSidState,
-	options: TmrEncodeOptions
-): TimerEffectStepSource {
-	const volumeReg = volumeRegisterIndex(channelIndex);
-	return {
-		registerMask: registerApplyMask(volumeReg),
-		length: sid.waveform.length,
-		loop: sid.waveformLoop,
-		writesAtStep: (stepIndex) => [
-			{ register: volumeReg, value: sidVolumeLevel(sid.waveform[stepIndex]!, sid.baseVolume) }
-		],
-		stepTimerFrequency: (stepIndex) => encodeSidEventTimerFrequency(stepIndex, sid, options)
-	};
-}
-
-function fmStepSource(
-	channelIndex: number,
-	fm: HardwareFmState,
-	options: TmrEncodeOptions
-): TimerEffectStepSource {
-	const toneReg = channelIndex * 2;
-	return {
-		registerMask: toneRegisterApplyMask(channelIndex),
-		length: fm.waveform.length,
-		loop: fm.waveformLoop,
-		writesAtStep: (stepIndex) => {
-			const psgData = new Array(AY_REGISTER_COUNT).fill(0);
-			const tonePeriod = computeFmTonePeriod(
-				fm.baseTonePeriod,
-				fm.waveform[stepIndex]!,
-				fm.fmOffsetMode
-			);
-			writeTonePeriodToPsgData(psgData, channelIndex, tonePeriod);
-			return [
-				{ register: toneReg, value: psgData[toneReg]! },
-				{ register: toneReg + 1, value: psgData[toneReg + 1]! }
-			];
-		},
-		stepTimerFrequency: (stepIndex) => encodePwmEventTimerFrequency(stepIndex, fm, options)
-	};
-}
-
-function envFmStepSource(
-	_channelIndex: number,
-	envFm: HardwareEnvFmState,
-	options: TmrEncodeOptions
-): TimerEffectStepSource {
-	return {
-		registerMask: envelopePeriodRegisterApplyMask(),
-		length: envFm.waveform.length,
-		loop: envFm.waveformLoop,
-		writesAtStep: (stepIndex) => {
-			const psgData = new Array(AY_REGISTER_COUNT).fill(0);
-			const envelopePeriod = computeEnvFmEnvelopePeriod(
-				envFm.baseEnvelopePeriod,
-				envFm.waveform[stepIndex]!,
-				envFm.fmOffsetMode
-			);
-			writeEnvelopePeriodToPsgData(psgData, envelopePeriod);
-			return [
-				{ register: 11, value: psgData[11]! },
-				{ register: 12, value: psgData[12]! }
-			];
-		},
-		stepTimerFrequency: (stepIndex) => encodePwmEventTimerFrequency(stepIndex, envFm, options)
-	};
-}
-
-function syncBuzzerStepSource(
-	_channelIndex: number,
-	syncbuzzer: HardwareSyncBuzzerState,
-	options: TmrEncodeOptions
-): TimerEffectStepSource {
-	return {
-		registerMask: envelopeShapeRegisterApplyMask(),
-		length: syncbuzzer.waveform.length,
-		loop: syncbuzzer.waveformLoop,
-		writesAtStep: (stepIndex) => [
-			{ register: ENVELOPE_SHAPE_REGISTER, value: (syncbuzzer.waveform[stepIndex] ?? 0) & 0xf }
-		],
-		stepTimerFrequency: (stepIndex) =>
-			encodeSyncBuzzerEventTimerFrequency(stepIndex, syncbuzzer, options)
-	};
-}
 
 function sourceNextStepIndex(stepIndex: number, source: TimerEffectStepSource): number {
 	return resolveNextWaveformIndex(stepIndex, {
@@ -336,7 +179,8 @@ function buildEffectChainSteps(sources: TimerEffectStepSource[]): EffectChainSte
 function appendEffectStepSources(
 	eventItems: EventItem[],
 	channelIndex: number,
-	sources: TimerEffectStepSource[]
+	sources: TimerEffectStepSource[],
+	options: TmrEncodeOptions
 ): number {
 	const startIndex = eventItems.length;
 	const chainSteps = buildEffectChainSteps(sources);
@@ -353,7 +197,7 @@ function appendEffectStepSources(
 			for (const write of source.writesAtStep(sourceStep)) {
 				psgData[write.register] = write.value;
 			}
-			const stepFrequency = source.stepTimerFrequency(sourceStep);
+			const stepFrequency = stepFrequencyFromPeriod(source, sourceStep, options);
 			if (timerFrequency === 0 && stepFrequency !== 0) {
 				timerFrequency = stepFrequency;
 			}
@@ -376,9 +220,12 @@ function appendSidEventChain(
 	sid: HardwareSidState,
 	options: TmrEncodeOptions
 ): number {
-	return appendEffectStepSources(eventItems, channelIndex, [
-		sidStepSource(channelIndex, sid, options)
-	]);
+	return appendEffectStepSources(
+		eventItems,
+		channelIndex,
+		[sidStepSource(channelIndex, sid, chipVariantFromOptions(options))],
+		options
+	);
 }
 
 function appendFmEventChain(
@@ -387,9 +234,12 @@ function appendFmEventChain(
 	fm: HardwareFmState,
 	options: TmrEncodeOptions
 ): number {
-	return appendEffectStepSources(eventItems, channelIndex, [
-		fmStepSource(channelIndex, fm, options)
-	]);
+	return appendEffectStepSources(
+		eventItems,
+		channelIndex,
+		[fmStepSource(channelIndex, fm)],
+		options
+	);
 }
 
 function appendEnvFmEventChain(
@@ -398,9 +248,7 @@ function appendEnvFmEventChain(
 	envFm: HardwareEnvFmState,
 	options: TmrEncodeOptions
 ): number {
-	return appendEffectStepSources(eventItems, channelIndex, [
-		envFmStepSource(channelIndex, envFm, options)
-	]);
+	return appendEffectStepSources(eventItems, channelIndex, [envFmStepSource(envFm)], options);
 }
 
 type ChannelEffect = {
@@ -428,13 +276,13 @@ function eventChainHasTimerFrequencies(
 }
 
 function sidEventChainTimingKey(sid: HardwareSidState): string {
-	return eventChainHasTimerFrequencies(sid, (stepIndex) => sidEventStepPeriod(sid, stepIndex))
+	return eventChainHasTimerFrequencies(sid, (stepIndex) => sidStepPeriod(sid, stepIndex))
 		? timerPeriodKey(sid)
 		: '';
 }
 
 function pwmEventChainTimingKey(state: PwmTimerState): string {
-	return eventChainHasTimerFrequencies(state, (stepIndex) => pwmEventStepPeriod(state, stepIndex))
+	return eventChainHasTimerFrequencies(state, (stepIndex) => pwmStepPeriod(state, stepIndex))
 		? timerPeriodKey(state)
 		: '';
 }
@@ -462,7 +310,10 @@ function fmEventChainCacheKey(channelIndex: number, fm: HardwareFmState): string
 }
 
 function envFmEventChainCacheKey(channelIndex: number, envFm: HardwareEnvFmState): string {
-	return eventChainCacheKey(envFmEventChainKey(channelIndex, envFm), pwmEventChainTimingKey(envFm));
+	return eventChainCacheKey(
+		envFmEventChainKey(channelIndex, envFm),
+		pwmEventChainTimingKey(envFm)
+	);
 }
 
 function buildChannelEffects(
@@ -479,16 +330,16 @@ function buildChannelEffects(
 	const { syncbuzzer, sid, fm, envFm } = states;
 	if (syncbuzzer.enabled) {
 		effects.push({
-			source: syncBuzzerStepSource(channelIndex, syncbuzzer, options),
+			source: syncBuzzerStepSource(syncbuzzer),
 			configKey: syncBuzzerEventChainKey(channelIndex, syncbuzzer),
-			startPeriod: syncBuzzerStartPeriod(syncbuzzer),
+			startPeriod: pwmStartPeriod(syncbuzzer),
 			periodKey: timerPeriodKey(syncbuzzer),
 			timingKey: pwmEventChainTimingKey(syncbuzzer)
 		});
 	}
 	if (sid.enabled) {
 		effects.push({
-			source: sidStepSource(channelIndex, sid, options),
+			source: sidStepSource(channelIndex, sid, chipVariantFromOptions(options)),
 			configKey: sidEventChainKey(channelIndex, sid),
 			startPeriod: sidStartPeriod(sid),
 			periodKey: timerPeriodKey(sid),
@@ -497,18 +348,18 @@ function buildChannelEffects(
 	}
 	if (fm.enabled) {
 		effects.push({
-			source: fmStepSource(channelIndex, fm, options),
+			source: fmStepSource(channelIndex, fm),
 			configKey: fmEventChainKey(channelIndex, fm),
-			startPeriod: fmStartPeriod(fm),
+			startPeriod: pwmStartPeriod(fm),
 			periodKey: timerPeriodKey(fm),
 			timingKey: pwmEventChainTimingKey(fm)
 		});
 	}
 	if (envFm.enabled) {
 		effects.push({
-			source: envFmStepSource(channelIndex, envFm, options),
+			source: envFmStepSource(envFm),
 			configKey: envFmEventChainKey(channelIndex, envFm),
-			startPeriod: envFmStartPeriod(envFm),
+			startPeriod: pwmStartPeriod(envFm),
 			periodKey: timerPeriodKey(envFm),
 			timingKey: pwmEventChainTimingKey(envFm)
 		});
@@ -536,7 +387,8 @@ function getOrCreateMergedEventChain(
 	eventItems: EventItem[],
 	chainStartByKey: Map<string, number>,
 	channelIndex: number,
-	effects: ChannelEffect[]
+	effects: ChannelEffect[],
+	options: TmrEncodeOptions
 ): number {
 	const key = channelEffectCacheKey(effects);
 	const existing = chainStartByKey.get(key);
@@ -546,7 +398,8 @@ function getOrCreateMergedEventChain(
 	const startIndex = appendEffectStepSources(
 		eventItems,
 		channelIndex,
-		effects.map((effect) => effect.source)
+		effects.map((effect) => effect.source),
+		options
 	);
 	chainStartByKey.set(key, startIndex);
 	return startIndex;
@@ -565,10 +418,7 @@ export type EncodedTmrFiles = {
 	eventItems: EventItem[];
 };
 
-export function encodeTMR(
-	frames: SongCaptureFrame[],
-	options: TmrEncodeOptions
-): EncodedTmrFiles {
+export function encodeTMR(frames: SongCaptureFrame[], options: TmrEncodeOptions): EncodedTmrFiles {
 	const eventItems: EventItem[] = [];
 	const chainStartByKey = new Map<string, number>();
 	const tmrFrames: Array<{ psgMask: number; timers: TimerCommand[] }> = [];
@@ -611,11 +461,7 @@ export function encodeTMR(
 	}));
 	const previousMerged: Array<
 		{ setKey: string; timingKey: string; periodKey: string } | undefined
-	> = [
-		undefined,
-		undefined,
-		undefined
-	];
+	> = [undefined, undefined, undefined];
 	let previousRegisters = new Array(AY_REGISTER_COUNT).fill(0);
 
 	for (const frame of frames) {
@@ -625,13 +471,7 @@ export function encodeTMR(
 
 		for (let channelIndex = 0; channelIndex < 3; channelIndex++) {
 			const sid = frame.sid[channelIndex]!;
-			const effectiveSid: HardwareSidState = sid.enabled
-				? {
-						...sid,
-						pwm: true,
-						periodLow: sid.periodLow > 0 ? sid.periodLow : sid.period
-					}
-				: sid;
+			const effectiveSid: HardwareSidState = sid.enabled ? normalizePwmPeriods(sid) : sid;
 			const syncbuzzer: HardwareSyncBuzzerState = frame.syncbuzzer?.[channelIndex] ?? {
 				enabled: false,
 				pwm: false,
@@ -668,7 +508,8 @@ export function encodeTMR(
 			const prevFm = previousFm[channelIndex]!;
 			const prevEnvFm = previousEnvFm[channelIndex]!;
 
-			const effectiveFm: HardwareFmState = fm.enabled && fm.pwm ? normalizePwmPeriods(fm) : fm;
+			const effectiveFm: HardwareFmState =
+				fm.enabled && fm.pwm ? normalizePwmPeriods(fm) : fm;
 			const effectiveEnvFm: HardwareEnvFmState =
 				envFm.enabled && envFm.pwm ? normalizePwmPeriods(envFm) : envFm;
 
@@ -704,7 +545,8 @@ export function encodeTMR(
 						eventItems,
 						chainStartByKey,
 						channelIndex,
-						effects
+						effects,
+						options
 					);
 					timers.push({
 						frequency: encodeExportTimerFrequencyHz(effects[0]!.startPeriod, options),
@@ -732,12 +574,15 @@ export function encodeTMR(
 					);
 					timers.push({
 						frequency: encodeExportTimerFrequencyHz(
-							syncBuzzerStartPeriod(effectiveSyncbuzzer),
+							pwmStartPeriod(effectiveSyncbuzzer),
 							options
 						),
 						eventIndex
 					});
-				} else if (syncbuzzerPeriodChanged && isPwmDutySweep(prevSyncbuzzer, effectiveSyncbuzzer)) {
+				} else if (
+					syncbuzzerPeriodChanged &&
+					isPwmDutySweep(prevSyncbuzzer, effectiveSyncbuzzer)
+				) {
 					const eventIndex = appendSyncBuzzerEventChain(
 						eventItems,
 						channelIndex,
@@ -746,7 +591,7 @@ export function encodeTMR(
 					);
 					timers.push({
 						frequency: encodeExportTimerFrequencyHz(
-							syncBuzzerStartPeriod(effectiveSyncbuzzer),
+							pwmStartPeriod(effectiveSyncbuzzer),
 							options
 						),
 						eventIndex
@@ -760,7 +605,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(effectiveSyncbuzzer.period, options),
+						frequency: encodeExportTimerFrequencyHz(
+							effectiveSyncbuzzer.period,
+							options
+						),
 						eventIndex
 					});
 				} else {
@@ -768,7 +616,9 @@ export function encodeTMR(
 				}
 			} else if (sid.enabled) {
 				const sidWaveformChanged =
-					!!prevMergedState || !prevSid.enabled || !sidWaveformConfigEqual(prevSid, effectiveSid);
+					!!prevMergedState ||
+					!prevSid.enabled ||
+					!sidWaveformConfigEqual(prevSid, effectiveSid);
 				const sidPeriodChanged =
 					prevSid.period !== effectiveSid.period ||
 					prevSid.periodLow !== effectiveSid.periodLow;
@@ -781,7 +631,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(sidStartPeriod(effectiveSid), options),
+						frequency: encodeExportTimerFrequencyHz(
+							sidStartPeriod(effectiveSid),
+							options
+						),
 						eventIndex
 					});
 				} else if (sidPeriodChanged && isSidPwmDutySweep(prevSid, effectiveSid)) {
@@ -792,7 +645,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(sidStartPeriod(effectiveSid), options),
+						frequency: encodeExportTimerFrequencyHz(
+							sidStartPeriod(effectiveSid),
+							options
+						),
 						eventIndex
 					});
 				} else if (sidPeriodChanged) {
@@ -812,9 +668,12 @@ export function encodeTMR(
 				}
 			} else if (fm.enabled) {
 				const fmWaveformChanged =
-					!!prevMergedState || !prevFm.enabled || !fmWaveformConfigEqual(prevFm, effectiveFm);
+					!!prevMergedState ||
+					!prevFm.enabled ||
+					!fmWaveformConfigEqual(prevFm, effectiveFm);
 				const fmPeriodChanged =
-					prevFm.period !== effectiveFm.period || prevFm.periodLow !== effectiveFm.periodLow;
+					prevFm.period !== effectiveFm.period ||
+					prevFm.periodLow !== effectiveFm.periodLow;
 				if (fmWaveformChanged) {
 					const eventIndex = getOrCreateFmEventChain(
 						eventItems,
@@ -824,7 +683,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(fmStartPeriod(effectiveFm), options),
+						frequency: encodeExportTimerFrequencyHz(
+							pwmStartPeriod(effectiveFm),
+							options
+						),
 						eventIndex
 					});
 				} else if (fmPeriodChanged && isPwmDutySweep(prevFm, effectiveFm)) {
@@ -835,7 +697,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(fmStartPeriod(effectiveFm), options),
+						frequency: encodeExportTimerFrequencyHz(
+							pwmStartPeriod(effectiveFm),
+							options
+						),
 						eventIndex
 					});
 				} else if (fmPeriodChanged) {
@@ -856,7 +721,8 @@ export function encodeTMR(
 			} else if (envFm.enabled) {
 				const envFmWaveformChanged =
 					!!prevMergedState ||
-					!prevEnvFm.enabled || !envFmWaveformConfigEqual(prevEnvFm, effectiveEnvFm);
+					!prevEnvFm.enabled ||
+					!envFmWaveformConfigEqual(prevEnvFm, effectiveEnvFm);
 				const envFmPeriodChanged =
 					prevEnvFm.period !== effectiveEnvFm.period ||
 					prevEnvFm.periodLow !== effectiveEnvFm.periodLow;
@@ -869,7 +735,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(envFmStartPeriod(effectiveEnvFm), options),
+						frequency: encodeExportTimerFrequencyHz(
+							pwmStartPeriod(effectiveEnvFm),
+							options
+						),
 						eventIndex
 					});
 				} else if (envFmPeriodChanged && isPwmDutySweep(prevEnvFm, effectiveEnvFm)) {
@@ -880,7 +749,10 @@ export function encodeTMR(
 						options
 					);
 					timers.push({
-						frequency: encodeExportTimerFrequencyHz(envFmStartPeriod(effectiveEnvFm), options),
+						frequency: encodeExportTimerFrequencyHz(
+							pwmStartPeriod(effectiveEnvFm),
+							options
+						),
 						eventIndex
 					});
 				} else if (envFmPeriodChanged) {
@@ -1059,9 +931,12 @@ function appendSyncBuzzerEventChain(
 	syncbuzzer: HardwareSyncBuzzerState,
 	options: TmrEncodeOptions
 ): number {
-	return appendEffectStepSources(eventItems, channelIndex, [
-		syncBuzzerStepSource(channelIndex, syncbuzzer, options)
-	]);
+	return appendEffectStepSources(
+		eventItems,
+		channelIndex,
+		[syncBuzzerStepSource(syncbuzzer)],
+		options
+	);
 }
 
 function getOrCreateSidEventChain(
@@ -1116,17 +991,6 @@ function getOrCreateEnvFmEventChain(
 	const startIndex = appendEnvFmEventChain(eventItems, channelIndex, envFm, options);
 	chainStartByKey.set(key, startIndex);
 	return startIndex;
-}
-
-function resolveNextWaveformIndex(stepIndex: number, state: WaveformChainState): number {
-	const nextStep = stepIndex + 1;
-	if (nextStep < state.waveform.length) {
-		return nextStep;
-	}
-	if (state.waveformLoop >= 0 && state.waveformLoop < state.waveform.length) {
-		return state.waveformLoop;
-	}
-	return 0;
 }
 
 function writeHeader(view: DataView, frameCount: number, options: TmrEncodeOptions): void {

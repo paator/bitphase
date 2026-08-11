@@ -13,15 +13,18 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
 
 function printUsage(): void {
-	console.error(`Usage: btp-to-wav <input.btp> [output.wav]
+	console.error(`Usage: btp-to-wav <input.btp> [output.wav] [--no-dc]
 Converts a Bitphase project (.btp) to WAV format.
 
   input.btp   Path to the BTP file to convert
-  output.wav  Optional output path (default: input name with .wav extension)`);
+  output.wav  Optional output path (default: input name with .wav extension)
+  --no-dc     Bypass Ayumi's DC-blocking filter (raw DAC output)`);
 }
 
 async function main(): Promise<void> {
-	const args = process.argv.slice(2);
+	const allArgs = process.argv.slice(2);
+	const disableDcFilter = allArgs.includes('--no-dc');
+	const args = allArgs.filter((arg) => arg !== '--no-dc');
 	if (args.length < 1) {
 		printUsage();
 		process.exit(1);
@@ -59,6 +62,7 @@ async function main(): Promise<void> {
 		}, undefined, {
 			resourceLoader,
 			getChip: getChipByType,
+			disableDcFilter,
 			onOutput: (buffer, filename) => {
 				const outPath = filename.endsWith('.zip')
 					? path.join(path.dirname(outputPath), filename)

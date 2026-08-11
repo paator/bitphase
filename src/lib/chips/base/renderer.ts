@@ -4,6 +4,7 @@ export interface RenderOptions {
 	separateChannels?: boolean;
 	startPatternOrderIndex?: number;
 	loopCount?: number;
+	disableDcFilter?: boolean;
 }
 
 export type SharedTimelineExportSlot = {

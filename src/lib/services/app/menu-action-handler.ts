@@ -324,6 +324,14 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				return;
 			}
 
+			if (data.action === 'export-taym' || data.action === 'export-taym-zip') {
+				await ctx.open(ProgressModal, {
+					project: ctx.getCurrentProject(),
+					exportType: 'taym'
+				});
+				return;
+			}
+
 			if (data.action === 'export-psg-zip') {
 				await ctx.open(ProgressModal, {
 					project: ctx.getCurrentProject(),

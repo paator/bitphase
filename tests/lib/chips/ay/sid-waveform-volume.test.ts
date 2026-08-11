@@ -16,7 +16,8 @@ describe('sid waveform volume curve', () => {
 	});
 
 	it('uses the same register volume formula as hardware export', () => {
-		expect(sidRegisterVolume(7, 10)).toBe(5);
+		expect(sidRegisterVolume(7, 10, 'AY')).toBe(4);
+		expect(sidRegisterVolume(7, 10, 'YM')).toBe(2);
 		expect(sidRegisterVolume(15, 15)).toBe(15);
 	});
 
