@@ -32,10 +32,10 @@
 	import {
 		formatRowEditorNumber,
 		focusRowEditorInputInRow,
-		parseRowEditorNumericText,
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
 	import { compactTableInputClass } from '../../utils/compact-table-input';
+	import { CommitNumericInput } from '../../components/CommitNumericInput';
 	import {
 		createDefaultNesInstrumentRow,
 		cyclePulseWidth,
@@ -116,23 +116,6 @@
 	) {
 		if (Boolean(editorSync.rows[index][field]) === value) return;
 		updateRow(index, { [field]: value });
-	}
-
-	function updateNumericField(
-		index: number,
-		field: 'toneAdd' | 'sweepRate' | 'sweepShift' | 'soundLength' | 'volumeOrRate',
-		event: Event,
-		limits?: { min?: number; max?: number }
-	) {
-		const inputEl = event.target as HTMLInputElement;
-		const parsed = parseRowEditorNumericText(inputEl.value, asHex, limits);
-		if (parsed !== null) {
-			const normalized = formatRowEditorNumber(parsed, asHex);
-			if (inputEl.value !== normalized) {
-				inputEl.value = normalized;
-			}
-			updateRow(index, { [field]: parsed });
-		}
 	}
 
 	function handleNumericKeyDown(index: number, event: KeyboardEvent) {
@@ -318,13 +301,12 @@
 									pulseWidth: cyclePulseWidth(row.pulseWidth)
 								})} />
 						<td class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5'}>
-							<input
-								type="text"
+							<CommitNumericInput
+								value={row.toneAdd}
+								{asHex}
 								class={compactTableInputClass({ selected, isExpanded })}
-								value={formatRowEditorNumber(row.toneAdd, asHex)}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
-								onfocus={(e) => (e.target as HTMLInputElement).select()}
-								oninput={(e) => updateNumericField(index, 'toneAdd', e)} />
+								onValueChange={(v) => updateRow(index, { toneAdd: v })} />
 						</td>
 						<BooleanPaintableCell
 							active={row.toneAccumulation}
@@ -357,43 +339,34 @@
 									updateBooleanRow(index, 'sweep', value)
 								)} />
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
-							<input
-								type="text"
+							<CommitNumericInput
+								value={row.sweepRate}
+								{asHex}
+								min={0}
+								max={7}
 								class={compactTableInputClass({ selected, isExpanded })}
-								value={formatRowEditorNumber(row.sweepRate, asHex)}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
-								onfocus={(e) => (e.target as HTMLInputElement).select()}
-								oninput={(e) =>
-									updateNumericField(index, 'sweepRate', e, {
-										min: 0,
-										max: 7
-									})} />
+								onValueChange={(v) => updateRow(index, { sweepRate: v })} />
 						</td>
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
-							<input
-								type="text"
+							<CommitNumericInput
+								value={row.sweepShift}
+								{asHex}
+								min={-7}
+								max={7}
 								class={compactTableInputClass({ selected, isExpanded })}
-								value={formatRowEditorNumber(row.sweepShift, asHex)}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
-								onfocus={(e) => (e.target as HTMLInputElement).select()}
-								oninput={(e) =>
-									updateNumericField(index, 'sweepShift', e, {
-										min: -7,
-										max: 7
-									})} />
+								onValueChange={(v) => updateRow(index, { sweepShift: v })} />
 						</td>
 						<td class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 px-0.5'}>
-							<input
-								type="text"
+							<CommitNumericInput
+								value={row.soundLength}
+								{asHex}
+								min={0}
+								max={511}
 								class={compactTableInputClass({ selected, isExpanded })}
-								value={formatRowEditorNumber(row.soundLength, asHex)}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
-								onfocus={(e) => (e.target as HTMLInputElement).select()}
-								oninput={(e) =>
-									updateNumericField(index, 'soundLength', e, {
-										min: 0,
-										max: 511
-									})} />
+								onValueChange={(v) => updateRow(index, { soundLength: v })} />
 						</td>
 						<BooleanPaintableCell
 							active={row.envelope}
@@ -410,20 +383,17 @@
 									updateBooleanRow(index, 'envelope', value)
 								)} />
 						<td class={isExpanded ? 'w-10 min-w-10 px-1' : 'w-10 px-0.5'}>
-							<input
-								type="text"
-								class={compactTableInputClass({ selected, isExpanded })}
-								value={formatRowEditorNumber(row.volumeOrRate, asHex)}
+							<CommitNumericInput
+								value={row.volumeOrRate}
+								{asHex}
+								min={0}
+								max={15}
 								title={isNesVolumeField(row.envelope)
 									? 'Volume (0–15)'
 									: 'Envelope rate (0–15)'}
+								class={compactTableInputClass({ selected, isExpanded })}
 								onkeydown={(e) => handleNumericKeyDown(index, e)}
-								onfocus={(e) => (e.target as HTMLInputElement).select()}
-								oninput={(e) =>
-									updateNumericField(index, 'volumeOrRate', e, {
-										min: 0,
-										max: 15
-									})} />
+								onValueChange={(v) => updateRow(index, { volumeOrRate: v })} />
 						</td>
 					</tr>
 				{/each}

@@ -29,10 +29,10 @@
 	import {
 		formatRowEditorNumber,
 		focusRowEditorInputInRow,
-		parseRowEditorNumericText,
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
 	import { compactTableInputClass } from '../../utils/compact-table-input';
+	import { CommitNumericInput } from '../../components/CommitNumericInput';
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import {
@@ -247,20 +247,6 @@
 			nextRows[index] = { ...row, amplitudeSliding: false, amplitudeSlideUp: false };
 		}
 		mixerSync.applyRowChange(nextRows);
-	}
-
-	function updateNumericField(index: number, field: string, event: Event) {
-		const inputEl = event.target as HTMLInputElement;
-		const limits =
-			field === 'volume' ? { min: 0, max: 15, maxDigits: asHex ? 1 : undefined } : undefined;
-		const parsed = parseRowEditorNumericText(inputEl.value, asHex, limits);
-		if (parsed !== null) {
-			const normalized = formatRowEditorNumber(parsed, asHex);
-			if (inputEl.value !== normalized) {
-				inputEl.value = normalized;
-			}
-			updateRow(index, field, parsed);
-		}
 	}
 
 	function handleNumericKeyDown(index: number, event: KeyboardEvent) {
@@ -805,20 +791,16 @@
 											onPaintOver={() =>
 												booleanDrag.dragOver((value) =>
 													updateBooleanRow(index, 'retriggerEnvelope', value))} />
-										<!-- ToneAdd -->
 										<td
 											class={isExpanded
 												? 'w-16 min-w-16 px-1.5'
 												: 'w-12 px-0.5'}>
-											<input
-												type="text"
+											<CommitNumericInput
+												value={row.toneAdd}
+												{asHex}
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatRowEditorNumber(row.toneAdd, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
-												onfocus={(e) =>
-													(e.target as HTMLInputElement).select()}
-												oninput={(e) =>
-													updateNumericField(index, 'toneAdd', e)} />
+												onValueChange={(v) => updateRow(index, 'toneAdd', v)} />
 										</td>
 										<BooleanPaintableCell
 											active={row.toneAccumulation}
@@ -836,20 +818,16 @@
 											onPaintOver={() =>
 												booleanDrag.dragOver((value) =>
 													updateBooleanRow(index, 'toneAccumulation', value))} />
-										<!-- NoiseAdd -->
 										<td
 											class={isExpanded
 												? 'w-16 min-w-16 px-1.5'
 												: 'w-12 px-0.5'}>
-											<input
-												type="text"
+											<CommitNumericInput
+												value={row.noiseAdd}
+												{asHex}
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatRowEditorNumber(row.noiseAdd, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
-												onfocus={(e) =>
-													(e.target as HTMLInputElement).select()}
-												oninput={(e) =>
-													updateNumericField(index, 'noiseAdd', e)} />
+												onValueChange={(v) => updateRow(index, 'noiseAdd', v)} />
 										</td>
 										<BooleanPaintableCell
 											active={row.noiseAccumulation}
@@ -867,20 +845,16 @@
 											onPaintOver={() =>
 												booleanDrag.dragOver((value) =>
 													updateBooleanRow(index, 'noiseAccumulation', value))} />
-										<!-- EnvelopeAdd -->
 										<td
 											class={isExpanded
 												? 'w-16 min-w-16 px-1.5'
 												: 'w-12 px-0.5'}>
-											<input
-												type="text"
+											<CommitNumericInput
+												value={row.envelopeAdd ?? 0}
+												{asHex}
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatRowEditorNumber(row.envelopeAdd ?? 0, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
-												onfocus={(e) =>
-													(e.target as HTMLInputElement).select()}
-												oninput={(e) =>
-													updateNumericField(index, 'envelopeAdd', e)} />
+												onValueChange={(v) => updateRow(index, 'envelopeAdd', v)} />
 										</td>
 										<BooleanPaintableCell
 											active={row.envelopeAccumulation}
@@ -898,20 +872,19 @@
 											onPaintOver={() =>
 												booleanDrag.dragOver((value) =>
 													updateBooleanRow(index, 'envelopeAccumulation', value))} />
-										<!-- Volume -->
 										<td
 											class={isExpanded
 												? 'w-12 min-w-12 px-1.5'
 												: 'w-12 px-0.5'}>
-											<input
-												type="text"
+											<CommitNumericInput
+												value={row.volume}
+												{asHex}
+												min={0}
+												max={15}
+												maxDigits={asHex ? 1 : undefined}
 												class={compactTableInputClass({ selected, isExpanded })}
-												value={formatRowEditorNumber(row.volume, asHex)}
 												onkeydown={(e) => handleNumericKeyDown(index, e)}
-												onfocus={(e) =>
-													(e.target as HTMLInputElement).select()}
-												oninput={(e) =>
-													updateNumericField(index, 'volume', e)} />
+												onValueChange={(v) => updateRow(index, 'volume', v)} />
 										</td>
 										<!-- Amplitude Slide (merged: off/up/down) -->
 										<td

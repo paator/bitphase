@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
-	import Input from '../Input/Input.svelte';
+	import { CommitNumericInput } from '../CommitNumericInput';
 	import IconCarbonChevronUp from '~icons/carbon/chevron-up';
 	import IconCarbonChevronDown from '~icons/carbon/chevron-down';
 
@@ -45,15 +45,15 @@
 	{/if}
 	<div
 		class="flex items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)]">
-		<Input
-			bind:value
+		<CommitNumericInput
 			{id}
-			type="number"
+			bind:value
 			{min}
 			{max}
+			live={false}
 			class="h-6 w-10 border-0 bg-transparent text-center font-mono text-xs focus:ring-0"
-			onblur={onCommit}
-			onkeydown={onKeyDown} />
+			onkeydown={onKeyDown}
+			oncommit={() => onCommit()} />
 		<div class="flex flex-col border-l border-[var(--color-app-border)]">
 			<button
 				type="button"

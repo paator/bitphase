@@ -17,6 +17,7 @@
 	} from '../RowEditorTable';
 	import { ROW_SELECTION_STYLES } from '../../utils/row-selection';
 	import { compactTableInputClass } from '../../utils/compact-table-input';
+	import { CommitNumericInput } from '../CommitNumericInput';
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import {
@@ -29,7 +30,6 @@
 	import {
 		formatRowEditorNumber,
 		focusRowEditorInputInRow,
-		parseRowEditorNumericText,
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
 
@@ -49,7 +49,6 @@
 
 	let editorContainerRef: HTMLDivElement | null = $state(null);
 	let tableRef: HTMLTableElement | null = $state(null);
-	let offsetInputRefs: (HTMLInputElement | null)[] = $state([]);
 	let pitches = $state<number[]>([]);
 	let shifts = $state<number[]>([]);
 
@@ -124,17 +123,6 @@
 		syncPitchShiftFromRows(editorSync.rows);
 	});
 
-	$effect(() => {
-		const rowCount = editorSync.rows.length;
-		if (offsetInputRefs.length !== rowCount) {
-			const newRefs = new Array(rowCount).fill(null);
-			for (let i = 0; i < Math.min(offsetInputRefs.length, rowCount); i++) {
-				newRefs[i] = offsetInputRefs[i];
-			}
-			offsetInputRefs = newRefs;
-		}
-	});
-
 	function setValue(mode: 'pitch' | 'shift', index: number, value: number): void {
 		if (mode === 'pitch' && pitches[index] === value) return;
 		if (mode === 'shift' && shifts[index] === value) return;
@@ -165,18 +153,6 @@
 			nextRows[index] = nextRows[index] + delta;
 		}
 		editorSync.applyRowChange(nextRows);
-	}
-
-	function onOffsetInput(index: number, event: Event): void {
-		const inputEl = event.target as HTMLInputElement;
-		const parsed = parseRowEditorNumericText(inputEl.value, asHex);
-		if (parsed !== null) {
-			const normalized = formatRowEditorNumber(parsed, asHex);
-			if (inputEl.value !== normalized) {
-				inputEl.value = normalized;
-			}
-			adjustRowOffset(index, parsed);
-		}
 	}
 
 	function handleOffsetKeyDown(index: number, event: KeyboardEvent): void {
@@ -348,14 +324,12 @@
 								isExpanded={true}
 								onSelect={() => editorSync.setLoop(index)} />
 							<td class="w-14 px-1.5">
-								<input
-									type="text"
-									bind:this={offsetInputRefs[index]}
+								<CommitNumericInput
+									value={offset}
+									{asHex}
 									class={compactTableInputClass({ selected })}
-									value={formatRowEditorNumber(offset, asHex)}
 									onkeydown={(e) => handleOffsetKeyDown(index, e)}
-									onfocus={(e) => (e.target as HTMLInputElement).select()}
-									oninput={(e) => onOffsetInput(index, e)} />
+									onValueChange={(v) => adjustRowOffset(index, v)} />
 							</td>
 							{#if showOffsetGrid}
 								{#each PITCH_VALUES as p}

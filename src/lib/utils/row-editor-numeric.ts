@@ -55,6 +55,21 @@ export function parseRowEditorNumericText(
 	return parsed;
 }
 
+export function commitRowEditorNumericInput(
+	inputEl: HTMLInputElement,
+	committedValue: number,
+	asHex: boolean,
+	limits?: NumericFieldLimits
+): number {
+	const parsed = parseRowEditorNumericText(inputEl.value, asHex, limits);
+	const next = parsed ?? committedValue;
+	const normalized = formatRowEditorNumber(next, asHex);
+	if (inputEl.value !== normalized) {
+		inputEl.value = normalized;
+	}
+	return next;
+}
+
 export function focusRowEditorInputInRow(
 	row: HTMLTableRowElement | null,
 	currentInput?: HTMLInputElement

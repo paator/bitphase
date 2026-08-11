@@ -16,9 +16,9 @@
 	import IconCarbonMusic from '~icons/carbon/music';
 	import { settingsStore } from '../../stores/settings.svelte';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
-	import Input from '../Input/Input.svelte';
 	import Checkbox from '../Checkbox/Checkbox.svelte';
 	import { NumberStepper } from '../NumberStepper';
+	import { CommitNumericInput } from '../CommitNumericInput';
 	import { IconButton } from '../IconButton';
 	import { autoEnvStore, AUTO_ENV_PRESETS } from '../../stores/auto-env.svelte';
 	import { projectStore } from '../../stores/project.svelte';
@@ -55,18 +55,20 @@
 	}
 
 	function commitOctave() {
-		const octave = parseInt(editorStateStore.octave.toString(), 10);
-		if (!isNaN(octave) && octave >= 1 && octave <= 8) {
-			editorStateStore.setOctave(octave);
+		const raw = editorStateStore.octave;
+		const parsed = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+		if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 8) {
+			editorStateStore.setOctave(parsed);
 		} else {
-			editorStateStore.setOctave(1);
+			editorStateStore.setOctave(4);
 		}
 	}
 
 	function commitStep() {
-		const step = parseInt(editorStateStore.step.toString(), 10);
-		if (!isNaN(step) && step >= 0 && step <= 255) {
-			editorStateStore.setStep(step);
+		const raw = editorStateStore.step;
+		const parsed = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+		if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 255) {
+			editorStateStore.setStep(parsed);
 		} else {
 			editorStateStore.setStep(0);
 		}
@@ -91,24 +93,6 @@
 	function decrementStep() {
 		if (editorStateStore.step > 0) {
 			editorStateStore.setStep(editorStateStore.step - 1);
-		}
-	}
-
-	function commitAutoEnvNumerator() {
-		const num = parseInt(autoEnvStore.numerator.toString(), 10);
-		if (!isNaN(num) && num > 0 && num <= 999) {
-			autoEnvStore.setNumerator(num);
-		} else {
-			autoEnvStore.setNumerator(1);
-		}
-	}
-
-	function commitAutoEnvDenominator() {
-		const denom = parseInt(autoEnvStore.denominator.toString(), 10);
-		if (!isNaN(denom) && denom > 0 && denom <= 999) {
-			autoEnvStore.setDenominator(denom);
-		} else {
-			autoEnvStore.setDenominator(1);
 		}
 	}
 
@@ -152,36 +136,25 @@
 			max={8}
 			onCommit={commitOctave}
 			onIncrement={incrementOctave}
-			onDecrement={decrementOctave}
-			onKeyDown={(e: KeyboardEvent) => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
-					commitOctave();
-					(e.target as HTMLInputElement)?.blur();
-				}
-			}} />
+			onDecrement={decrementOctave} />
 		<NumberStepper
 			id="step-input"
 			label="Step"
 			icon={IconCarbonArrowDown}
 			title="Step"
 			bind:value={editorStateStore.step}
+			min={0}
+			max={255}
 			onCommit={commitStep}
 			onIncrement={incrementStep}
 			onDecrement={decrementStep}
 			onKeyDown={(e: KeyboardEvent) => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
-					commitStep();
-					(e.target as HTMLInputElement)?.blur();
-				} else if (e.key === 'ArrowUp') {
+				if (e.key === 'ArrowUp') {
 					e.preventDefault();
 					incrementStep();
-					commitStep();
 				} else if (e.key === 'ArrowDown') {
 					e.preventDefault();
 					decrementStep();
-					commitStep();
 				}
 			}} />
 		{#if hasAYSong}
@@ -205,43 +178,23 @@
 				{#if autoEnvStore.enabled}
 					<div
 						class="flex items-center gap-0.5 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)]">
-						<Input
+						<CommitNumericInput
 							bind:value={autoEnvStore.numerator}
-							type="number"
+							live={false}
 							min={1}
 							max={999}
 							class="h-6 w-10 cursor-pointer border-0 bg-transparent text-center font-mono text-xs focus:ring-0"
-							onblur={commitAutoEnvNumerator}
-							onfocus={(e: FocusEvent) => {
-								(e.target as HTMLInputElement)?.select();
-							}}
-							onkeydown={(e: KeyboardEvent) => {
-								if (e.key === 'Enter') {
-									e.preventDefault();
-									commitAutoEnvNumerator();
-									(e.target as HTMLInputElement)?.blur();
-								}
-							}}
-							title="Auto Env Numerator" />
+							title="Auto Env Numerator"
+							oncommit={(v) => autoEnvStore.setNumerator(v)} />
 						<span class="text-xs text-[var(--color-app-text-muted)]">:</span>
-						<Input
+						<CommitNumericInput
 							bind:value={autoEnvStore.denominator}
-							type="number"
+							live={false}
 							min={1}
 							max={999}
 							class="h-6 w-10 cursor-pointer border-0 bg-transparent text-center font-mono text-xs focus:ring-0"
-							onblur={commitAutoEnvDenominator}
-							onfocus={(e: FocusEvent) => {
-								(e.target as HTMLInputElement)?.select();
-							}}
-							onkeydown={(e: KeyboardEvent) => {
-								if (e.key === 'Enter') {
-									e.preventDefault();
-									commitAutoEnvDenominator();
-									(e.target as HTMLInputElement)?.blur();
-								}
-							}}
-							title="Auto Env Denominator" />
+							title="Auto Env Denominator"
+							oncommit={(v) => autoEnvStore.setDenominator(v)} />
 						<button
 							type="button"
 							class="cursor-pointer border-l border-[var(--color-app-border)] px-1.5 py-1 text-xs text-[var(--color-app-text-muted)] transition-colors hover:bg-[var(--color-app-surface-hover)]"
