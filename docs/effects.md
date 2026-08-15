@@ -111,6 +111,58 @@ Automatically calculates the envelope period from channel notes using a ratio. W
 
 Persists across rows until another envelope effect replaces it or a new envelope shape is written. Follows note changes in real time.
 
+### E1 - Timer PWM min %
+
+Sets the PWM sweep minimum duty for SID / syncbuzzer / FM timer effects that use exactly two waveform steps (for example `15 0`). Hex `00`-`FF` maps to `0`-`100`%. While sweep is `0`, min is unused; max sets the static pulse width.
+
+|               |                                              |
+| ------------- | -------------------------------------------- |
+| **Format**    | `E1XY`                                       |
+| **Parameter** | `XY` - duty percent mapped from `00`-`FF`    |
+| **Example**   | `E180` - about 50% min                       |
+
+Persists until a new note, note off, or a new `E1`.
+
+### E2 - Timer PWM max %
+
+Sets the PWM maximum duty (static pulse width when sweep is `0`). Same eligibility and mapping as `E1`.
+
+|               |                                              |
+| ------------- | -------------------------------------------- |
+| **Format**    | `E2XY`                                       |
+| **Parameter** | `XY` - duty percent mapped from `00`-`FF`    |
+| **Example**   | `E29E` - about 62% max                       |
+
+### E3 - Timer PWM sweep
+
+Sets PWM sweep speed between min and max. Same eligibility and mapping as `E1`. `E300` disables sweep so max acts as static pulse width.
+
+|               |                                              |
+| ------------- | -------------------------------------------- |
+| **Format**    | `E3XY`                                       |
+| **Parameter** | `XY` - sweep speed mapped from `00`-`FF`     |
+| **Example**   | `E310` - slow sweep                          |
+
+### E4 - Timer PWM sweep shape
+
+Selects the PWM sweep automation curve. Same eligibility as `E1`.
+
+|               |                                                                 |
+| ------------- | --------------------------------------------------------------- |
+| **Format**    | `E4XY`                                                          |
+| **Parameter** | `XY` - shape index: `00` triangle, `01` sine, `02` saw up, `03` saw down, `04` square (wraps) |
+| **Example**   | `E401` - sine                                                   |
+
+### E5 - Timer PWM sweep start
+
+Sets the start position on the PWM sweep automation curve (`0`-`1000`, shown as `0%`-`100%` in the editor). Hex `00`-`FF` maps onto that range. Same eligibility as `E1`. Also jumps the live sweep to that position.
+
+|               |                                                          |
+| ------------- | -------------------------------------------------------- |
+| **Format**    | `E5XY`                                                   |
+| **Parameter** | `XY` - start phase mapped from `00`-`FF` → `0`-`1000`    |
+| **Example**   | `E580` - about halfway (`50%`)                           |
+
 ## 2A03 / 2A07 (NES)
 
 ### E1 - Pulse width

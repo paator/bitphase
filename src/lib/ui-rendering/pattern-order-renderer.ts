@@ -212,13 +212,10 @@ export class PatternOrderRenderer extends BaseCanvasRenderer {
 	private drawCellSelectionIndicator(cell: PatternCell): void {
 		if (!cell.isSelected) return;
 
-		const indicatorColor = cell.orderIndexColor
-			? getContrastingTextColor(cell.orderIndexColor)
-			: this.orderColors.orderText;
 		this.save();
 		this.setTextAlign('left');
 		this.setTextBaseline('middle');
-		this.fillText('►', 2, cell.y, indicatorColor);
+		this.fillText('►', 2, cell.y, this.orderColors.orderText);
 		this.restore();
 		this.setTextAlign('center');
 		this.setTextBaseline('middle');

@@ -316,6 +316,183 @@
 			</div>
 		</div>
 
+		<div
+			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E1
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Min %</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Sets PWM sweep minimum duty for SID, syncbuzzer, or FM timer effects with exactly two
+				waveform steps (for example 15 0). Hex 00-FF maps to 0-100%. While sweep is 0, min is
+				unused; max sets the static pulse width. Resets on a new note or note off.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">1</span
+						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
+							>Y</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - duty percent mapped from 00-FF → 0-100</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E180 - about 50% min</code>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E2
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Max %</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Sets PWM maximum duty (static pulse width when sweep is 0). Same eligibility and mapping as
+				E1.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">2</span
+						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
+							>Y</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - duty percent mapped from 00-FF → 0-100</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E29E - about 62% max</code>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E3
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Sweep</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Sets PWM sweep speed between min and max. Same eligibility and mapping as E1. E300 disables
+				sweep so max acts as static pulse width.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">3</span
+						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
+							>Y</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - sweep speed mapped from 00-FF → 0-100</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E310 - slow sweep</code>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E4
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Sweep Shape</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Selects the PWM sweep automation curve (triangle, sine, saw up, saw down, square). Same
+				eligibility as E1.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">4</span
+						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
+							>Y</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - 00 triangle, 01 sine, 02 saw up, 03 saw down, 04 square (wraps)</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E401 - sine</code>
+				</div>
+			</div>
+		</div>
+
+		<div
+			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E5
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Sweep Start</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Sets the start position on the PWM sweep automation curve (0-1000, shown as 0%-100% in the
+				editor). Hex 00-FF maps onto that range. Also jumps the live sweep to that position. Same
+				eligibility as E1.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">5</span
+						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
+							>Y</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY - start phase mapped from 00-FF → 0-1000</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E580 - about halfway (50%)</code>
+				</div>
+			</div>
+		</div>
+
 		{@render effectSection('2A03 / 2A07 (NES)')}
 
 		<div class="space-y-4">

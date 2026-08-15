@@ -597,7 +597,7 @@ describe('Envelope effect interactions', () => {
 			state.envelopeArpeggioCounter = 4;
 
 			const patternRow = {
-				envelopeEffect: { effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 0, parameter: 0x32 }
+				envelopeEffect: { effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 0xa, parameter: 0x32 }
 			};
 			driver._processEnvelopeEffects(state, 0, {}, patternRow);
 
@@ -608,7 +608,7 @@ describe('Envelope effect interactions', () => {
 			state.envelopeVibratoCounter = 5;
 
 			const patternRow = {
-				envelopeEffect: { effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 0, parameter: 0x32 }
+				envelopeEffect: { effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 0xa, parameter: 0x32 }
 			};
 			driver._processEnvelopeEffects(state, 0, {}, patternRow);
 
@@ -619,7 +619,7 @@ describe('Envelope effect interactions', () => {
 			state.envelopeSlideDelta = 5;
 
 			const patternRow = {
-				envelopeEffect: { effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 0, parameter: 0x32 }
+				envelopeEffect: { effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 0xa, parameter: 0x32 }
 			};
 			driver._processEnvelopeEffects(state, 0, {}, patternRow);
 

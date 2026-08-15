@@ -124,6 +124,25 @@ describe('AYAudioDriver - Auto Envelope (EA)', () => {
 			expect(state.autoEnvelopeActive).toBe(false);
 		});
 
+		it('does not activate for E1-E5 channel-style subcommands', () => {
+			for (const delay of [1, 2, 3, 4, 5]) {
+				state.autoEnvelopeActive = false;
+				driver._processEnvelopeEffects(
+					state,
+					0,
+					{},
+					{
+						envelopeEffect: {
+							effect: 'E'.charCodeAt(0),
+							delay,
+							parameter: 0x32
+						}
+					}
+				);
+				expect(state.autoEnvelopeActive).toBe(false);
+			}
+		});
+
 		it('keeps auto-envelope active when arpeggio effect is set', () => {
 			state.autoEnvelopeActive = true;
 

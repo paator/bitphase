@@ -1104,4 +1104,223 @@ describe('AYAudioDriver', () => {
 			expect(state.envelopeBaseValue).toBe(Math.round((600 * 3) / (2 * 16)));
 		});
 	});
+
+	describe('timer PWM E1/E2/E3 overrides', () => {
+		function createSidPwmState() {
+			const state = new AyumiState();
+			state.setInstruments([
+				{
+					id: '01',
+					rows: [{ tone: true, volume: 15, noise: false, envelope: false }],
+					loop: 0,
+					timerRows: [{ sid: true, timerWaveform: [15, 0] }],
+					timerPwmDuty: 50,
+					timerPwmSweepMin: 0,
+					timerPwmSweep: 0
+				}
+			]);
+			state.setTuningTable([100]);
+			state.channelInstruments = [0, -1, -1];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelEnvelopeEnabled = [false, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.envelopeOnOffCounter = 0;
+			state.envelopeEffectTable = -1;
+			state.channelCurrentNotes = [0, 0, 0];
+			state.channelToneAccumulator = [0, 0, 0];
+			state.channelNoiseAccumulator = [0, 0, 0];
+			state.channelEnvelopeAccumulator = [0, 0, 0];
+			state.channelTimerPwmSweep = [-1, -1, -1];
+			state.channelTimerEffectReset = [false, false, false];
+			return state;
+		}
+
+		function createRegisterState() {
+			return {
+				channels: [
+					{
+						tone: 100,
+						volume: 15,
+						mixer: { tone: true, noise: false, envelope: false },
+						timerEffects: undefined
+					},
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } }
+				],
+				noise: 0,
+				envelopePeriod: 0,
+				envelopeShape: 0,
+				forceEnvelopeShapeWrite: false
+			};
+		}
+
+		it('E2 sets static pulse width when sweep is 0', () => {
+			const driver = new AYAudioDriver();
+			const state = createSidPwmState();
+			const registerState = createRegisterState();
+			const emptyRow = { note: { name: 0, octave: 0 }, effects: [null] };
+			const pattern = {
+				channels: [
+					{
+						rows: [
+							{
+								note: { name: 0, octave: 0 },
+								effects: [{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0x9e }]
+							}
+						]
+					},
+					{ rows: [emptyRow] },
+					{ rows: [emptyRow] }
+				]
+			};
+
+			driver.processPatternRow(state, pattern, 0, { noiseValue: null }, registerState);
+			driver.processInstruments(state, registerState);
+
+			const sid = registerState.channels[0].timerEffects.sid;
+			expect(sid.enabled).toBe(true);
+			expect(sid.pwmMode).toBe(2);
+			expect(sid.period).toBe(124);
+			expect(sid.periodLow).toBe(76);
+		});
+
+		it('resets PWM overrides on new note', () => {
+			const driver = new AYAudioDriver();
+			const state = createSidPwmState();
+			const registerState = createRegisterState();
+			const emptyRow = { note: { name: 0, octave: 0 }, effects: [null] };
+
+			driver.processPatternRow(
+				state,
+				{
+					channels: [
+						{
+							rows: [
+								{
+									note: { name: 0, octave: 0 },
+									effects: [{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0xff }]
+								}
+							]
+						},
+						{ rows: [emptyRow] },
+						{ rows: [emptyRow] }
+					]
+				},
+				0,
+				{ noiseValue: null },
+				registerState
+			);
+			expect(state.channelTimerPwmDutyOverride[0]).toBe(100);
+
+			driver.processPatternRow(
+				state,
+				{
+					channels: [
+						{
+							rows: [
+								{
+									note: { name: 2, octave: 1 },
+									effects: [null]
+								}
+							]
+						},
+						{ rows: [emptyRow] },
+						{ rows: [emptyRow] }
+					]
+				},
+				0,
+				{ noiseValue: null },
+				registerState
+			);
+			expect(state.channelTimerPwmDutyOverride[0]).toBe(-1);
+		});
+
+		it('applies PWM override on the same row as a new note', () => {
+			const driver = new AYAudioDriver();
+			const state = createSidPwmState();
+			const registerState = createRegisterState();
+			const emptyRow = { note: { name: 0, octave: 0 }, effects: [null] };
+
+			state.channelTimerPwmDutyOverride[0] = 40;
+
+			driver.processPatternRow(
+				state,
+				{
+					channels: [
+						{
+							rows: [
+								{
+									note: { name: 2, octave: 1 },
+									effects: [{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0xff }]
+								}
+							]
+						},
+						{ rows: [emptyRow] },
+						{ rows: [emptyRow] }
+					]
+				},
+				0,
+				{ noiseValue: null },
+				registerState
+			);
+			expect(state.channelTimerPwmDutyOverride[0]).toBe(100);
+		});
+
+		it('resets PWM overrides on note off', () => {
+			const driver = new AYAudioDriver();
+			const state = createSidPwmState();
+			const registerState = createRegisterState();
+			const emptyRow = { note: { name: 0, octave: 0 }, effects: [null] };
+
+			driver.processPatternRow(
+				state,
+				{
+					channels: [
+						{
+							rows: [
+								{
+									note: { name: 0, octave: 0 },
+									effects: [{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0xff }]
+								}
+							]
+						},
+						{ rows: [emptyRow] },
+						{ rows: [emptyRow] }
+					]
+				},
+				0,
+				{ noiseValue: null },
+				registerState
+			);
+			expect(state.channelTimerPwmDutyOverride[0]).toBe(100);
+
+			driver.processPatternRow(
+				state,
+				{
+					channels: [
+						{
+							rows: [
+								{
+									note: { name: 1, octave: 0 },
+									effects: [null]
+								}
+							]
+						},
+						{ rows: [emptyRow] },
+						{ rows: [emptyRow] }
+					]
+				},
+				0,
+				{ noiseValue: null },
+				registerState
+			);
+			expect(state.channelTimerPwmDutyOverride[0]).toBe(-1);
+		});
+	});
 });
