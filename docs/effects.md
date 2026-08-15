@@ -8,6 +8,7 @@ Each channel starts with one effect column. Use **+** / **−** on the channel h
 They can also use tables as a source of parameter values: **`AXTY`** (`T` + table id (`Y`)).
 For example, rather than manually alternating `S.03`, `S.05`, `S.03` to create a groove tempo,
 you can put the tempo values in table 1 and simply use `S.T1`.
+Commands that can run together on the same row can each use their own table (`V1T1` next to `A0T2`).
 
 Effect parameters are hexadecimal (`0`-`9`, `A`-`F`). Table ids in `T` syntax use `0`-`9` and `A`-`Z` (for example `S.TZ`).
 
@@ -119,9 +120,10 @@ Sets the PWM sweep minimum duty for SID / syncbuzzer / FM timer effects that use
 
 |               |                                              |
 | ------------- | -------------------------------------------- |
-| **Format**    | `E1XY`                                       |
+| **Format**    | `E1XY` or `E1TX`                             |
 | **Parameter** | `XY` - duty percent mapped from `00`-`FF`    |
-| **Example**   | `E180` - about 50% min                       |
+| **With table** | `E1TX` - min duty from table `X` each tick  |
+| **Example**   | `E180` - about 50% min; `E1T1` - table 1     |
 
 Persists until a new note, note off, or a new `E1`.
 
@@ -131,9 +133,10 @@ Sets the PWM maximum duty (static pulse width when sweep is `0`). Same eligibili
 
 |               |                                              |
 | ------------- | -------------------------------------------- |
-| **Format**    | `E2XY`                                       |
+| **Format**    | `E2XY` or `E2TX`                             |
 | **Parameter** | `XY` - duty percent mapped from `00`-`FF`    |
-| **Example**   | `E29E` - about 62% max                       |
+| **With table** | `E2TX` - max duty from table `X` each tick  |
+| **Example**   | `E29E` - about 62% max; `E2T1` - table 1     |
 
 ### E3 - Timer PWM sweep
 
@@ -141,9 +144,10 @@ Sets PWM sweep speed between min and max. Same eligibility and mapping as `E1`. 
 
 |               |                                              |
 | ------------- | -------------------------------------------- |
-| **Format**    | `E3XY`                                       |
+| **Format**    | `E3XY` or `E3TX`                             |
 | **Parameter** | `XY` - sweep speed mapped from `00`-`FF`     |
-| **Example**   | `E310` - slow sweep                          |
+| **With table** | `E3TX` - sweep speed from table `X` each tick |
+| **Example**   | `E310` - slow sweep; `E3T1` - table 1        |
 
 ### E4 - Timer PWM sweep shape
 
@@ -151,9 +155,10 @@ Selects the PWM sweep automation curve. Same eligibility as `E1`.
 
 |               |                                                                 |
 | ------------- | --------------------------------------------------------------- |
-| **Format**    | `E4XY`                                                          |
+| **Format**    | `E4XY` or `E4TX`                                                    |
 | **Parameter** | `XY` - shape index: `00` triangle, `01` sine, `02` saw up, `03` saw down, `04` square (wraps) |
-| **Example**   | `E401` - sine                                                   |
+| **With table** | `E4TX` - shape index from table `X` each tick                      |
+| **Example**   | `E401` - sine; `E4T1` - table 1                                     |
 
 ### E5 - Timer PWM sweep start
 
@@ -161,9 +166,10 @@ Sets the start position on the PWM sweep automation curve (`0`-`1000`, shown as 
 
 |               |                                                          |
 | ------------- | -------------------------------------------------------- |
-| **Format**    | `E5XY`                                                   |
+| **Format**    | `E5XY` or `E5TX`                                             |
 | **Parameter** | `XY` - start phase mapped from `00`-`FF` → `0`-`1000`    |
-| **Example**   | `E580` - about halfway (`50%`)                           |
+| **With table** | `E5TX` - start phase from table `X` each tick (also jumps live sweep) |
+| **Example**   | `E580` - about halfway (`50%`); `E5T1` - table 1             |
 
 ## 2A03 / 2A07 (NES)
 

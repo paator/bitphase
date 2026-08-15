@@ -45,6 +45,7 @@ import {
 } from './ay-sample-playback.js';
 import {
 	isAyAutoEnvelopeEffect,
+	advanceAyTimerPwmTables,
 	processAyTimerPwmEffect,
 	resetAyChannelTimerPwmOverrides,
 	resolveChannelTimerPwmDuty,
@@ -1277,6 +1278,7 @@ class AYAudioDriver {
 		registerState.noise = (state.noiseBaseValue + state.noiseAddValue) & 0x1f;
 
 		this.updateEnvelopeWithSlide(state, registerState);
+		advanceAyTimerPwmTables(state);
 	}
 
 	getEffectiveTone(state, channelIndex) {

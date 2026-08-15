@@ -15,7 +15,6 @@ function createState(tables = []) {
 		channelPulseWidthTableMode: [false, false, false, false, false],
 		channelPulseWidthTableIndex: [-1, -1, -1, -1, -1],
 		channelPulseWidthTablePosition: [0, 0, 0, 0, 0],
-		channelEffectTables: [-1, -1, -1, -1, -1],
 		getTable(id) {
 			return tables[id] ?? null;
 		}
@@ -90,7 +89,6 @@ describe('nes-pulse-width-cycle', () => {
 		expect(state.channelPulseWidthTableIndex[0]).toBe(0);
 		expect(state.channelPulseWidthTablePosition[0]).toBe(0);
 		expect(state.channelPulseWidthCurrent[0]).toBe(0);
-		expect(state.channelEffectTables[0]).toBe(-1);
 	});
 
 	it('advances table pulse width each tick with loop', () => {

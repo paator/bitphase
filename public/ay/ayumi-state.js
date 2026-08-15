@@ -6,6 +6,12 @@ import {
 	resetChipChannelArrays,
 	resizeChipChannelArrays
 } from '../tracker/tracker-chip-state.js';
+import {
+	createAyTimerPwmTableIndex,
+	createAyTimerPwmTablePosition,
+	resetAyTimerPwmTableState,
+	resizeAyTimerPwmTableState
+} from './ay-timer-pwm-effect.js';
 
 const AY_CHANNEL_ARRAY_SPECS = [
 	['channelInstruments', -1],
@@ -45,6 +51,8 @@ class AyumiState extends TrackerState {
 		this.instrumentIdToIndex = new Map();
 
 		initChipChannelArrays(this, channelCount, AY_CHANNEL_ARRAY_SPECS);
+		this.channelTimerPwmTableIndex = createAyTimerPwmTableIndex(channelCount);
+		this.channelTimerPwmTablePosition = createAyTimerPwmTablePosition(channelCount);
 
 		this.envelopeSlideDelay = 0;
 		this.envelopeSlideDelayCounter = 0;
@@ -119,12 +127,14 @@ class AyumiState extends TrackerState {
 	resizeChannels(newCount) {
 		super.resizeChannels(newCount);
 		resizeChipChannelArrays(this, newCount, AY_CHANNEL_ARRAY_SPECS);
+		resizeAyTimerPwmTableState(this, newCount);
 	}
 
 	reset(opts = {}) {
 		super.reset(opts);
 
 		resetChipChannelArrays(this, AY_CHANNEL_ARRAY_SPECS);
+		resetAyTimerPwmTableState(this);
 
 		this.envelopeSlideDelay = 0;
 		this.envelopeSlideDelayCounter = 0;

@@ -85,9 +85,6 @@ export function processNesPulseWidthCycleEffect(state, channelIndex, row) {
 				readNesPulseWidthTableValue(state, effect.tableIndex, 0),
 				true
 			);
-			if (state.channelEffectTables) {
-				state.channelEffectTables[channelIndex] = -1;
-			}
 		} else {
 			state.channelPulseWidthTableMode[channelIndex] = false;
 			state.channelPulseWidthTableIndex[channelIndex] = -1;

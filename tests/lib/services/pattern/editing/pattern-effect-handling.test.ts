@@ -200,18 +200,18 @@ describe('PatternEffectHandling', () => {
 			expect(PatternEffectHandling.formatEffectAsString(down!)).toBe('E317');
 		});
 
-		it('E2TX and E3TX sweep table effects parse and format', () => {
-			const up = PatternEffectHandling.parseEffectFromString('E2T1');
-			expect(up).not.toBeNull();
-			expect(up!.delay).toBe(2);
-			expect(up!.tableIndex).toBe(0);
-			expect(PatternEffectHandling.formatEffectAsString(up!)).toBe('E2T1');
+		it('E4TX and E5TX timer pwm table effects parse and format', () => {
+			const shape = PatternEffectHandling.parseEffectFromString('E4T1');
+			expect(shape).not.toBeNull();
+			expect(shape!.delay).toBe(4);
+			expect(shape!.tableIndex).toBe(0);
+			expect(PatternEffectHandling.formatEffectAsString(shape!)).toBe('E4T1');
 
-			const down = PatternEffectHandling.parseEffectFromString('E3T2');
-			expect(down).not.toBeNull();
-			expect(down!.delay).toBe(3);
-			expect(down!.tableIndex).toBe(1);
-			expect(PatternEffectHandling.formatEffectAsString(down!)).toBe('E3T2');
+			const start = PatternEffectHandling.parseEffectFromString('E5T2');
+			expect(start).not.toBeNull();
+			expect(start!.delay).toBe(5);
+			expect(start!.tableIndex).toBe(1);
+			expect(PatternEffectHandling.formatEffectAsString(start!)).toBe('E5T2');
 		});
 	});
 });

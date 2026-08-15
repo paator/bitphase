@@ -1,4 +1,9 @@
 import SongTimeline from './song-timeline.js';
+import {
+	createChannelEffectTableSlots,
+	resetChannelEffectTableSlots,
+	resizeChannelEffectTableSlots
+} from './tracker-effect-tables.js';
 
 const CHANNEL_ARRAY_SPECS = [
 	['channelPatternVolumes', 15],
@@ -32,12 +37,7 @@ const CHANNEL_ARRAY_SPECS = [
 	['channelVibratoDelay', 0],
 	['channelVibratoCounter', 0],
 	['channelVibratoPosition', 0],
-	['channelDetune', 0],
-	['channelEffectTables', -1],
-	['channelEffectTablePositions', 0],
-	['channelEffectTableCounters', 0],
-	['channelEffectTableDelays', 1],
-	['channelEffectTypes', 0]
+	['channelDetune', 0]
 ];
 
 class TrackerState {
@@ -49,6 +49,8 @@ class TrackerState {
 		for (const [name, defaultVal] of CHANNEL_ARRAY_SPECS) {
 			this[name] = Array(channelCount).fill(defaultVal);
 		}
+
+		this.channelEffectTableSlots = createChannelEffectTableSlots(channelCount);
 
 		this.tables = [];
 		this.tablesById = {};
@@ -63,6 +65,7 @@ class TrackerState {
 			while (arr.length < newCount) arr.push(defaultVal);
 			if (arr.length > newCount) arr.length = newCount;
 		}
+		resizeChannelEffectTableSlots(this.channelEffectTableSlots, newCount);
 	}
 
 	reset(opts = {}) {
@@ -74,6 +77,8 @@ class TrackerState {
 		for (const [name, defaultVal] of CHANNEL_ARRAY_SPECS) {
 			this[name].fill(defaultVal);
 		}
+
+		resetChannelEffectTableSlots(this.channelEffectTableSlots);
 
 		this.speedTable = -1;
 		this.speedTablePosition = 0;

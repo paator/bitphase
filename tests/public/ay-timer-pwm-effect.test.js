@@ -9,10 +9,12 @@ import {
 	isAyTimerPwmShapeEffect,
 	isAyTimerPwmStartEffect,
 	isAyTimerPwmSweepEffect,
+	isAyTimerPwmTableEffect,
 	mapHexParameterToTimerPwmPercent,
 	mapHexParameterToTimerPwmSweepShape,
 	mapHexParameterToTimerPwmSweepStartPhase,
 	mapTimerPwmPercentToHexParameter,
+	advanceAyTimerPwmTables,
 	processAyTimerPwmEffect,
 	resetAyChannelTimerPwmOverrides,
 	resolveChannelTimerPwmDuty,
@@ -22,14 +24,17 @@ import {
 	resolveChannelTimerPwmSweepStartPhase
 } from '../../public/ay/ay-timer-pwm-effect.js';
 
-function createState() {
+function createState(tables = []) {
 	return {
 		channelTimerPwmDutyOverride: [AY_TIMER_PWM_OVERRIDE_INACTIVE],
 		channelTimerPwmSweepMinOverride: [AY_TIMER_PWM_OVERRIDE_INACTIVE],
 		channelTimerPwmSweepOverride: [AY_TIMER_PWM_OVERRIDE_INACTIVE],
 		channelTimerPwmSweepShapeOverride: [AY_TIMER_PWM_SHAPE_OVERRIDE_INACTIVE],
 		channelTimerPwmSweepStartPhaseOverride: [AY_TIMER_PWM_OVERRIDE_INACTIVE],
-		channelTimerPwmSweep: [-1]
+		channelTimerPwmSweep: [-1],
+		getTable(id) {
+			return tables[id] ?? null;
+		}
 	};
 }
 
@@ -145,5 +150,84 @@ describe('ay-timer-pwm-effect', () => {
 		expect(state.channelTimerPwmSweepOverride[0]).toBe(AY_TIMER_PWM_OVERRIDE_INACTIVE);
 		expect(state.channelTimerPwmSweepShapeOverride[0]).toBe(AY_TIMER_PWM_SHAPE_OVERRIDE_INACTIVE);
 		expect(state.channelTimerPwmSweepStartPhaseOverride[0]).toBe(AY_TIMER_PWM_OVERRIDE_INACTIVE);
+	});
+
+	it('recognizes E1TX-E5TX table effects', () => {
+		const tableEffect = {
+			effect: 'E'.charCodeAt(0),
+			delay: 1,
+			parameter: 0,
+			tableIndex: 0
+		};
+		expect(isAyTimerPwmTableEffect(tableEffect)).toBe(true);
+		expect(isAyTimerPwmTableEffect({ ...tableEffect, delay: 5 })).toBe(true);
+		expect(isAyTimerPwmTableEffect({ ...tableEffect, tableIndex: -1 })).toBe(false);
+		expect(isAyTimerPwmTableEffect({ ...tableEffect, delay: 0xa })).toBe(false);
+	});
+
+	it('initializes table mode from E1TX and advances each tick', () => {
+		const state = createState([{ rows: [0x80, 0xff, 0x00], loop: 1 }]);
+		processAyTimerPwmEffect(state, 0, {
+			effects: [{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0, tableIndex: 0 }]
+		});
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(50);
+		expect(state.channelTimerPwmTableIndex[0][0]).toBe(0);
+		expect(state.channelTimerPwmTablePosition[0][0]).toBe(0);
+
+		advanceAyTimerPwmTables(state);
+		expect(state.channelTimerPwmTablePosition[0][0]).toBe(1);
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(100);
+
+		advanceAyTimerPwmTables(state);
+		expect(state.channelTimerPwmTablePosition[0][0]).toBe(2);
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(0);
+
+		advanceAyTimerPwmTables(state);
+		expect(state.channelTimerPwmTablePosition[0][0]).toBe(1);
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(100);
+	});
+
+	it('automates E2-E5 independently from separate tables', () => {
+		const state = createState([
+			{ rows: [0x9e, 0xff], loop: 0 },
+			{ rows: [0x10, 0x20], loop: 0 }
+		]);
+		processAyTimerPwmEffect(state, 0, {
+			effects: [
+				{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0, tableIndex: 0 },
+				{ effect: 'E'.charCodeAt(0), delay: 3, parameter: 0, tableIndex: 1 }
+			]
+		});
+		expect(state.channelTimerPwmDutyOverride[0]).toBe(62);
+		expect(state.channelTimerPwmSweepOverride[0]).toBe(6);
+
+		advanceAyTimerPwmTables(state);
+		expect(state.channelTimerPwmDutyOverride[0]).toBe(100);
+		expect(state.channelTimerPwmSweepOverride[0]).toBe(13);
+	});
+
+	it('fixed E1XY stops min table mode without touching other slots', () => {
+		const state = createState([{ rows: [0x80, 0xff], loop: 0 }]);
+		processAyTimerPwmEffect(state, 0, {
+			effects: [
+				{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0, tableIndex: 0 },
+				{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0, tableIndex: 0 }
+			]
+		});
+		processAyTimerPwmEffect(state, 0, {
+			effects: [{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x40 }]
+		});
+		expect(state.channelTimerPwmTableIndex[0][0]).toBe(-1);
+		expect(state.channelTimerPwmTableIndex[0][1]).toBe(0);
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(25);
+	});
+
+	it('does not advance fixed E1XY', () => {
+		const state = createState();
+		processAyTimerPwmEffect(state, 0, {
+			effects: [{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x80 }]
+		});
+		advanceAyTimerPwmTables(state);
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(50);
 	});
 });

@@ -1,4 +1,12 @@
 import EffectAlgorithms from './effect-algorithms.js';
+import {
+	clearAllEffectTableSlots,
+	clearEffectTableSlot,
+	clearEffectTableSlotsExcept,
+	clearOtherSlideGroupTables,
+	getEffectTableSlot,
+	initEffectTableSlot
+} from './tracker-effect-tables.js';
 
 class TrackerPatternProcessor {
 	constructor(state, chipAudioDriver, port) {
@@ -150,14 +158,11 @@ class TrackerPatternProcessor {
 		if (this.state.channelVibratoSliding) {
 			this.state.channelVibratoSliding[channelIndex] = 0;
 		}
-		this.state.channelEffectTables[channelIndex] = -1;
+		clearAllEffectTableSlots(this.state.channelEffectTableSlots, channelIndex);
 	}
 
 	_resetChannelEffectsOnNewNote(channelIndex, effects) {
 		const hasEffectOfType = (type) => effects.some((e) => e && e.effect === type);
-		const hasEffectWithTable = effects.some(
-			(e) => e && e.tableIndex !== undefined && e.tableIndex >= 0
-		);
 		const rowHasExplicitEffect = effects.some((e) => e != null && e.effect !== 0);
 
 		if (!hasEffectOfType(EffectAlgorithms.ARPEGGIO)) {
@@ -172,9 +177,17 @@ class TrackerPatternProcessor {
 
 		if (!rowHasExplicitEffect) return;
 
-		if (!hasEffectWithTable) {
-			this.state.channelEffectTables[channelIndex] = -1;
+		const keepTableTypes = new Set();
+		for (const effect of effects) {
+			if (effect && effect.tableIndex !== undefined && effect.tableIndex >= 0) {
+				keepTableTypes.add(effect.effect);
+			}
 		}
+		clearEffectTableSlotsExcept(
+			this.state.channelEffectTableSlots,
+			channelIndex,
+			keepTableTypes
+		);
 	}
 
 	_processTable(channelIndex, row) {
@@ -237,14 +250,26 @@ class TrackerPatternProcessor {
 		const usesChannelEffectTable =
 			effect.effect !== EffectAlgorithms.SPEED &&
 			effect.effect !== EffectAlgorithms.SAMPLE_POSITION &&
-			effect.effect !== EffectAlgorithms.ORNAMENT_POSITION;
+			effect.effect !== EffectAlgorithms.ORNAMENT_POSITION &&
+			effect.effect !== EffectAlgorithms.AUTO_ENVELOPE;
 
 		if (usesChannelEffectTable) {
 			if (hasTableIndex) {
 				this._initEffectTable(channelIndex, effect);
 			} else {
-				this.state.channelEffectTables[channelIndex] = -1;
+				clearEffectTableSlot(
+					this.state.channelEffectTableSlots,
+					channelIndex,
+					effect.effect
+				);
 			}
+		}
+		if (EffectAlgorithms.isSlideGroupEffect(effect.effect)) {
+			clearOtherSlideGroupTables(
+				this.state.channelEffectTableSlots,
+				channelIndex,
+				effect.effect
+			);
 		}
 
 		const resets = EffectAlgorithms.getEffectActivationResets(effect.effect);
@@ -327,7 +352,9 @@ class TrackerPatternProcessor {
 	}
 
 	_initChannelVibrato(channelIndex, effect, hasTableIndex) {
-		const param = hasTableIndex ? this._getEffectTableValue(channelIndex) : effect.parameter;
+		const param = hasTableIndex
+			? this._getEffectTableValue(channelIndex, effect.effect)
+			: effect.parameter;
 		const vibratoState = EffectAlgorithms.initVibrato(param, effect.delay);
 		this.state.channelVibratoSpeed[channelIndex] = vibratoState.speed;
 		this.state.channelVibratoDepth[channelIndex] = vibratoState.depth;
@@ -351,7 +378,9 @@ class TrackerPatternProcessor {
 	}
 
 	_initChannelSlide(channelIndex, effect, hasTableIndex, direction) {
-		const param = hasTableIndex ? this._getEffectTableValue(channelIndex) : effect.parameter;
+		const param = hasTableIndex
+			? this._getEffectTableValue(channelIndex, effect.effect)
+			: effect.parameter;
 		const slideState = EffectAlgorithms.initSlide(direction * param, effect.delay);
 		this.state.channelSlideStep[channelIndex] = slideState.step;
 		this.state.channelSlideDelay[channelIndex] = slideState.delay;
@@ -388,7 +417,9 @@ class TrackerPatternProcessor {
 		this.state.channelBaseNotes[channelIndex] = previousNote;
 		this.state.channelCurrentNotes[channelIndex] = previousNote;
 
-		const param = hasTableIndex ? this._getEffectTableValue(channelIndex) : effect.parameter;
+		const param = hasTableIndex
+			? this._getEffectTableValue(channelIndex, effect.effect)
+			: effect.parameter;
 		this.state.channelSlideStep[channelIndex] = param;
 		if (delta - currentSliding < 0) {
 			this.state.channelSlideStep[channelIndex] = -param;
@@ -405,7 +436,9 @@ class TrackerPatternProcessor {
 	}
 
 	_initChannelOnOff(channelIndex, effect, hasTableIndex) {
-		const param = hasTableIndex ? this._getEffectTableValue(channelIndex) : effect.parameter;
+		const param = hasTableIndex
+			? this._getEffectTableValue(channelIndex, effect.effect)
+			: effect.parameter;
 		const onOffState = EffectAlgorithms.initOnOff(param);
 		this.state.channelOffDuration[channelIndex] = onOffState.offDuration;
 		this.state.channelOnDuration[channelIndex] = onOffState.onDuration;
@@ -414,7 +447,9 @@ class TrackerPatternProcessor {
 	}
 
 	_initChannelDetune(channelIndex, effect, hasTableIndex) {
-		const param = hasTableIndex ? this._getEffectTableValue(channelIndex) : effect.parameter;
+		const param = hasTableIndex
+			? this._getEffectTableValue(channelIndex, effect.effect)
+			: effect.parameter;
 		this.state.channelDetune[channelIndex] = (param & 0xff) - 0x80;
 	}
 
@@ -430,22 +465,21 @@ class TrackerPatternProcessor {
 	}
 
 	_initEffectTable(channelIndex, effect) {
-		this.state.channelEffectTables[channelIndex] = effect.tableIndex;
-		this.state.channelEffectTablePositions[channelIndex] = 0;
-		this.state.channelEffectTableCounters[channelIndex] = effect.delay || 1;
-		this.state.channelEffectTableDelays[channelIndex] = effect.delay || 1;
-		this.state.channelEffectTypes[channelIndex] = effect.effect;
+		initEffectTableSlot(this.state.channelEffectTableSlots, channelIndex, effect);
 	}
 
-	_getEffectTableValue(channelIndex) {
-		const tableIndex = this.state.channelEffectTables[channelIndex];
-		if (tableIndex < 0) return 0;
+	_getEffectTableValue(channelIndex, effectType) {
+		const slot = getEffectTableSlot(
+			this.state.channelEffectTableSlots,
+			channelIndex,
+			effectType
+		);
+		if (!slot || slot.tableIndex < 0) return 0;
 
-		const table = this.state.getTable(tableIndex);
+		const table = this.state.getTable(slot.tableIndex);
 		if (!table || !table.rows || table.rows.length === 0) return 0;
 
-		const position = this.state.channelEffectTablePositions[channelIndex];
-		return table.rows[position] || 0;
+		return table.rows[slot.position] || 0;
 	}
 
 	_getSpeedTableValue() {
@@ -503,40 +537,42 @@ class TrackerPatternProcessor {
 	}
 
 	processEffectTables() {
-		for (
-			let channelIndex = 0;
-			channelIndex < this.state.channelEffectTables.length;
-			channelIndex++
-		) {
-			const tableIndex = this.state.channelEffectTables[channelIndex];
-			if (tableIndex < 0) continue;
-			if (this.state.channelEffectTypes[channelIndex] === EffectAlgorithms.ARPEGGIO) continue;
+		const slotsByChannel = this.state.channelEffectTableSlots;
+		if (!slotsByChannel) return;
 
-			const table = this.state.getTable(tableIndex);
-			if (!table || !table.rows || table.rows.length === 0) continue;
+		for (let channelIndex = 0; channelIndex < slotsByChannel.length; channelIndex++) {
+			const channelSlots = slotsByChannel[channelIndex];
+			if (!channelSlots) continue;
 
-			this.state.channelEffectTableCounters[channelIndex]--;
-			if (this.state.channelEffectTableCounters[channelIndex] <= 0) {
-				this.state.channelEffectTableCounters[channelIndex] =
-					this.state.channelEffectTableDelays[channelIndex];
-				this.state.channelEffectTablePositions[channelIndex]++;
+			for (const key of Object.keys(channelSlots)) {
+				const effectType = Number(key);
+				if (effectType === EffectAlgorithms.ARPEGGIO) continue;
 
-				if (this.state.channelEffectTablePositions[channelIndex] >= table.rows.length) {
-					if (table.loop >= 0 && table.loop < table.rows.length) {
-						this.state.channelEffectTablePositions[channelIndex] = table.loop;
-					} else {
-						this.state.channelEffectTablePositions[channelIndex] = 0;
+				const slot = channelSlots[key];
+				const table = this.state.getTable(slot.tableIndex);
+				if (!table || !table.rows || table.rows.length === 0) continue;
+
+				slot.counter--;
+				if (slot.counter <= 0) {
+					slot.counter = slot.delay;
+					slot.position++;
+
+					if (slot.position >= table.rows.length) {
+						if (table.loop >= 0 && table.loop < table.rows.length) {
+							slot.position = table.loop;
+						} else {
+							slot.position = 0;
+						}
 					}
-				}
 
-				this._applyEffectTableParameter(channelIndex);
+					this._applyEffectTableParameter(channelIndex, effectType);
+				}
 			}
 		}
 	}
 
-	_applyEffectTableParameter(channelIndex) {
-		const effectType = this.state.channelEffectTypes[channelIndex];
-		const param = this._getEffectTableValue(channelIndex);
+	_applyEffectTableParameter(channelIndex, effectType) {
+		const param = this._getEffectTableValue(channelIndex, effectType);
 
 		switch (effectType) {
 			case EffectAlgorithms.VIBRATO: {
@@ -628,10 +664,13 @@ class TrackerPatternProcessor {
 			channelIndex++
 		) {
 			if (this.state.channelArpeggioCounter[channelIndex] > 0) {
-				const tableIndex = this.state.channelEffectTables[channelIndex];
-				const isArpeggioTable =
-					tableIndex >= 0 &&
-					this.state.channelEffectTypes[channelIndex] === EffectAlgorithms.ARPEGGIO;
+				const arpeggioSlot = getEffectTableSlot(
+					this.state.channelEffectTableSlots,
+					channelIndex,
+					EffectAlgorithms.ARPEGGIO
+				);
+				const tableIndex = arpeggioSlot?.tableIndex ?? -1;
+				const isArpeggioTable = tableIndex >= 0;
 
 				let result;
 				let semitoneOffset;

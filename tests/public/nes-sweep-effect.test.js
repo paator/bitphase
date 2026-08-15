@@ -22,7 +22,6 @@ function createState(tables = []) {
 		channelSweepTablePosition: [0, 0, 0, 0, 0],
 		channelSweepDown: [false, false, false, false, false],
 		channelSweepTableTick: [false, false, false, false, false],
-		channelEffectTables: [-1, -1, -1, -1, -1],
 		getTable(id) {
 			return tables[id] ?? null;
 		}
@@ -87,7 +86,6 @@ describe('nes-sweep-effect', () => {
 		expect(state.channelSweepTableMode[0]).toBe(true);
 		expect(state.channelSweepDown[0]).toBe(false);
 		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 2, 3));
-		expect(state.channelEffectTables[0]).toBe(-1);
 	});
 
 	it('advances sweep table each tick with loop', () => {

@@ -45,6 +45,14 @@ describe('TrackerState', () => {
 			const state = new TrackerState(3);
 			expect(state.channelTables).toEqual([-1, -1, -1]);
 		});
+
+		it('gives each channel its own effect table slot map', () => {
+			const state = new TrackerState(3);
+			expect(state.channelEffectTableSlots).toHaveLength(3);
+			state.channelEffectTableSlots[0].V = { tableIndex: 1 };
+			expect(state.channelEffectTableSlots[1]).toEqual({});
+			expect(state.channelEffectTableSlots[2]).toEqual({});
+		});
 	});
 
 	describe('setTuningTable', () => {
@@ -240,6 +248,7 @@ describe('TrackerState', () => {
 			expect(state.timeline.currentTick).toBe(0);
 			expect(state.channelPatternVolumes).toEqual([15, 15, 15]);
 			expect(state.channelTables).toEqual([-1, -1, -1]);
+			expect(state.channelEffectTableSlots).toEqual([{}, {}, {}]);
 			expect(state.currentPattern).not.toBeNull();
 			expect(state.tables).toHaveLength(1);
 		});

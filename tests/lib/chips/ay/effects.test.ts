@@ -7,6 +7,7 @@ import {
 	isAyTimerPwmShapeEffect,
 	isAyTimerPwmStartEffect,
 	isAyTimerPwmSweepEffect,
+	isAyTimerPwmTableEffect,
 	mapHexParameterToTimerPwmPercent,
 	mapHexParameterToTimerPwmSweepShape,
 	mapHexParameterToTimerPwmSweepStartPhase,
@@ -22,6 +23,14 @@ describe('ay effects helpers', () => {
 		expect(isAyTimerPwmStartEffect({ effect: 'E'.charCodeAt(0), delay: 5 })).toBe(true);
 		expect(isAyTimerPwmEffect({ effect: 'E'.charCodeAt(0), delay: 0xa })).toBe(false);
 		expect(isAyAutoEnvelopeEffect({ effect: 'E'.charCodeAt(0), delay: 0xa })).toBe(true);
+		expect(
+			isAyTimerPwmTableEffect({
+				effect: 'E'.charCodeAt(0),
+				delay: 1,
+				tableIndex: 0
+			})
+		).toBe(true);
+		expect(isAyTimerPwmTableEffect({ effect: 'E'.charCodeAt(0), delay: 1 })).toBe(false);
 	});
 
 	it('maps hex parameters onto percents, shapes, and start phase', () => {

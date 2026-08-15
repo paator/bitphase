@@ -119,9 +119,6 @@ function applyNesSweepEffect(state, channelIndex, effect) {
 				readNesSweepTableValue(state, effect.tableIndex, 0),
 				false
 			);
-			if (state.channelEffectTables) {
-				state.channelEffectTables[channelIndex] = -1;
-			}
 		} else {
 			const { rate, shift } = parseNesSweepEffectParameter(effect.parameter);
 			state.channelSweepTableMode[channelIndex] = false;
@@ -151,9 +148,6 @@ function applyNesSweepEffect(state, channelIndex, effect) {
 				readNesSweepTableValue(state, effect.tableIndex, 0),
 				true
 			);
-			if (state.channelEffectTables) {
-				state.channelEffectTables[channelIndex] = -1;
-			}
 		} else {
 			const { rate, shift } = parseNesSweepEffectParameter(effect.parameter);
 			state.channelSweepTableMode[channelIndex] = false;

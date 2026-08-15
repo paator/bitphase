@@ -286,9 +286,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			: 0;
 		const textAreaWidth = Math.max(0, buttonWidth - controlsWidth);
 		const textX = buttonX + Math.max(0, (textAreaWidth - labelWidth) / 2);
-		const textColor = isMuted
-			? this.patternColors.patternEmpty
-			: this.patternColors.patternRowNum || this.patternColors.patternText;
+		const headerColor = this.patternColors.patternRowNum || this.patternColors.patternText;
+		const textColor = isMuted ? this.patternColors.patternEmpty : headerColor;
 		const borderColor = isMuted
 			? this.patternColors.patternEmpty
 			: this.patternColors.patternCellSelected ||
@@ -311,7 +310,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				buttonWidth,
 				buttonY,
 				buttonHeight,
-				textColor,
+				headerColor,
 				centerY
 			);
 		}

@@ -71,6 +71,18 @@ export function isAyTimerPwmEffect(effect: { effect: number; delay: number }): b
 	);
 }
 
+export function isAyTimerPwmTableEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): boolean {
+	return (
+		isAyTimerPwmEffect(effect) &&
+		effect.tableIndex !== undefined &&
+		effect.tableIndex >= 0
+	);
+}
+
 export function isAyAutoEnvelopeEffect(effect: {
 	effect: number;
 	delay: number;

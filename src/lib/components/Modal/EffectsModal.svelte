@@ -241,6 +241,9 @@
 				<code class="font-mono">S.03</code> to create a groove tempo, you can put the tempo values in
 				table 1 and simply use
 				<code class="font-mono">S.T1</code>.
+				Commands that can run together on the same row can each use their own table
+				(<code class="font-mono">V1T1</code> next to
+				<code class="font-mono">A0T2</code>).
 			</p>
 			<p>
 				Effect parameters are hexadecimal (0-9, A-F). Table ids in
@@ -338,6 +341,11 @@
 						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
 							>Y</span>
 					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">1</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+					</code>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
@@ -345,9 +353,14 @@
 						>XY - duty percent mapped from 00-FF → 0-100</span>
 				</div>
 				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - min duty from table X each tick</span>
+				</div>
+				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E180 - about 50% min</code>
+						>E180 - about 50% min; E1T1 - table 1</code>
 				</div>
 			</div>
 		</div>
@@ -373,6 +386,11 @@
 						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
 							>Y</span>
 					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">2</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+					</code>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
@@ -380,9 +398,14 @@
 						>XY - duty percent mapped from 00-FF → 0-100</span>
 				</div>
 				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - max duty from table X each tick</span>
+				</div>
+				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E29E - about 62% max</code>
+						>E29E - about 62% max; E2T1 - table 1</code>
 				</div>
 			</div>
 		</div>
@@ -408,6 +431,11 @@
 						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
 							>Y</span>
 					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">3</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+					</code>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
@@ -415,9 +443,14 @@
 						>XY - sweep speed mapped from 00-FF → 0-100</span>
 				</div>
 				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - sweep speed from table X each tick</span>
+				</div>
+				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E310 - slow sweep</code>
+						>E310 - slow sweep; E3T1 - table 1</code>
 				</div>
 			</div>
 		</div>
@@ -443,6 +476,11 @@
 						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
 							>Y</span>
 					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">4</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+					</code>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
@@ -450,9 +488,14 @@
 						>XY - 00 triangle, 01 sine, 02 saw up, 03 saw down, 04 square (wraps)</span>
 				</div>
 				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - shape index from table X each tick</span>
+				</div>
+				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E401 - sine</code>
+						>E401 - sine; E4T1 - table 1</code>
 				</div>
 			</div>
 		</div>
@@ -479,6 +522,11 @@
 						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
 							>Y</span>
 					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">5</span
+						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+					</code>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
@@ -486,9 +534,14 @@
 						>XY - start phase mapped from 00-FF → 0-1000</span>
 				</div>
 				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - start phase from table X each tick (also jumps the live sweep)</span>
+				</div>
+				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>E580 - about halfway (50%)</code>
+						>E580 - about halfway (50%); E5T1 - table 1</code>
 				</div>
 			</div>
 		</div>

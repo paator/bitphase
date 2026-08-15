@@ -4,6 +4,8 @@ import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
 import AyumiState from '../../public/ay/ayumi-state.js';
 import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 import EffectAlgorithms from '../../public/tracker/effect-algorithms.js';
+import { getEffectTableSlot } from '../../public/tracker/tracker-effect-tables.js';
+import { processAyTimerPwmEffect } from '../../public/ay/ay-timer-pwm-effect.js';
 
 function createState() {
 	const state = new AyumiState();
@@ -216,6 +218,124 @@ describe('Channel effect interactions', () => {
 			expect(state.channelVibratoSpeed[0]).toBe(4);
 			expect(state.channelVibratoDepth[0]).toBe(4);
 		});
+
+		it('keeps independent T-tables for effects that coexist', () => {
+			state.setTables([
+				{ id: 0, rows: [0x12, 0x34], loop: 0 },
+				{ id: 1, rows: [0x44, 0x22], loop: 0 },
+				{ id: 2, rows: [0x85, 0x90], loop: 0 }
+			]);
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.ARPEGGIO, delay: 1, parameter: 0, tableIndex: 0 },
+				{ effect: EffectAlgorithms.VIBRATO, delay: 1, parameter: 0, tableIndex: 1 },
+				{ effect: EffectAlgorithms.DETUNE, delay: 0, parameter: 0, tableIndex: 2 }
+			]);
+			proc._processEffects(0, row);
+
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.ARPEGGIO)
+					?.tableIndex
+			).toBe(0);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.VIBRATO)
+					?.tableIndex
+			).toBe(1);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.DETUNE)
+					?.tableIndex
+			).toBe(2);
+			expect(state.channelVibratoSpeed[0]).toBe(4);
+			expect(state.channelVibratoDepth[0]).toBe(4);
+			expect(state.channelDetune[0]).toBe(0x85 - 0x80);
+
+			proc.processEffectTables();
+			expect(state.channelVibratoSpeed[0]).toBe(2);
+			expect(state.channelVibratoDepth[0]).toBe(2);
+			expect(state.channelDetune[0]).toBe(0x90 - 0x80);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.ARPEGGIO)
+					?.tableIndex
+			).toBe(0);
+		});
+
+		it('hex effect on the same row does not clear another effect table', () => {
+			state.setTables([{ id: 0, rows: [0x44, 0x22], loop: 0 }]);
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.VIBRATO, delay: 1, parameter: 0, tableIndex: 0 },
+				{ effect: EffectAlgorithms.ARPEGGIO, delay: 1, parameter: 0x37 }
+			]);
+			proc._processEffects(0, row);
+
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.VIBRATO)
+					?.tableIndex
+			).toBe(0);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.ARPEGGIO)
+			).toBeNull();
+			expect(state.channelArpeggioSemitone1[0]).toBe(3);
+			expect(state.channelVibratoSpeed[0]).toBe(4);
+		});
+
+		it('speed table and vibrato table run independently', () => {
+			state.setTables([
+				{ id: 0, rows: [3, 5], loop: 0 },
+				{ id: 1, rows: [0x44, 0x22], loop: 0 }
+			]);
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.SPEED, delay: 0, parameter: 0, tableIndex: 0 },
+				{ effect: EffectAlgorithms.VIBRATO, delay: 1, parameter: 0, tableIndex: 1 }
+			]);
+			proc._processEffects(0, row);
+
+			expect(state.speedTable).toBe(0);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.VIBRATO)
+					?.tableIndex
+			).toBe(1);
+			expect(state.channelVibratoSpeed[0]).toBe(4);
+		});
+
+		it('AY E1TX does not steal a vibrato table on the same row', () => {
+			state.setTables([
+				{ id: 0, rows: [0x44, 0x22], loop: 0 },
+				{ id: 1, rows: [0x80, 0x40], loop: 0 }
+			]);
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.VIBRATO, delay: 1, parameter: 0, tableIndex: 0 },
+				{ effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 1, parameter: 0, tableIndex: 1 }
+			]);
+			proc._processEffects(0, row);
+			processAyTimerPwmEffect(state, 0, row);
+
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.VIBRATO)
+					?.tableIndex
+			).toBe(0);
+			expect(state.channelTimerPwmTableIndex[0][0]).toBe(1);
+			expect(state.channelVibratoSpeed[0]).toBe(4);
+		});
+
+		it('slide-group tables last-win and clear the other slide table', () => {
+			state.setTables([
+				{ id: 0, rows: [5, 8], loop: 0 },
+				{ id: 1, rows: [3, 6], loop: 0 }
+			]);
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.SLIDE_UP, delay: 1, parameter: 0, tableIndex: 0 },
+				{ effect: EffectAlgorithms.SLIDE_DOWN, delay: 1, parameter: 0, tableIndex: 1 }
+			]);
+			proc._processEffects(0, row);
+
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.SLIDE_UP)
+			).toBeNull();
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.SLIDE_DOWN)
+					?.tableIndex
+			).toBe(1);
+			expect(state.channelSlideStep[0]).toBe(-3);
+		});
 	});
 
 	describe('sample position and ornament position', () => {
@@ -250,7 +370,12 @@ describe('Channel effect interactions', () => {
 			state.channelSlideStep[0] = 10;
 			state.channelPortamentoActive[0] = true;
 			state.channelToneSliding[0] = 50;
-			state.channelEffectTables[0] = 1;
+			state.channelEffectTableSlots[0][EffectAlgorithms.VIBRATO] = {
+				tableIndex: 1,
+				position: 0,
+				counter: 1,
+				delay: 1
+			};
 
 			const row = makeRow(1, 0, [null]);
 			proc._processNote(0, row);
@@ -261,7 +386,7 @@ describe('Channel effect interactions', () => {
 			expect(state.channelSlideStep[0]).toBe(0);
 			expect(state.channelPortamentoActive[0]).toBe(false);
 			expect(state.channelToneSliding[0]).toBe(0);
-			expect(state.channelEffectTables[0]).toBe(-1);
+			expect(state.channelEffectTableSlots[0]).toEqual({});
 		});
 
 		it('new note with explicit arpeggio resets vibrato and on/off but keeps arpeggio', () => {
@@ -359,32 +484,53 @@ describe('Channel effect interactions', () => {
 			expect(state.channelSlideAlreadyApplied[0]).toBe(false);
 		});
 
-		it('new note with effect table keeps effect table', () => {
-			state.channelEffectTables[0] = 1;
+		it('new note with effect table keeps that effect table slot', () => {
+			state.channelEffectTableSlots[0][EffectAlgorithms.VIBRATO] = {
+				tableIndex: 1,
+				position: 3,
+				counter: 2,
+				delay: 1
+			};
 
 			const row = makeRow(4, 2, [
 				{ effect: EffectAlgorithms.VIBRATO, delay: 1, parameter: 0x44, tableIndex: 0 }
 			]);
 			proc._processNote(0, row);
 
-			expect(state.channelEffectTables[0]).toBe(1);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.VIBRATO)
+					?.tableIndex
+			).toBe(1);
 		});
 
-		it('parameter arpeggio after table arpeggio clears effect table', () => {
+		it('parameter arpeggio after table arpeggio clears arpeggio table', () => {
 			const tableRow = makeRow(0, 0, [
 				{ effect: EffectAlgorithms.ARPEGGIO, delay: 0, parameter: 0, tableIndex: 0 }
 			]);
 			proc._processEffects(0, tableRow);
-			expect(state.channelEffectTables[0]).toBe(0);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.ARPEGGIO)
+					?.tableIndex
+			).toBe(0);
 
 			const parameterRow = makeRow(0, 0, [
 				{ effect: EffectAlgorithms.ARPEGGIO, delay: 0, parameter: 0x0c }
 			]);
 			proc._processEffects(0, parameterRow);
 
-			expect(state.channelEffectTables[0]).toBe(-1);
+			expect(
+				getEffectTableSlot(state.channelEffectTableSlots, 0, EffectAlgorithms.ARPEGGIO)
+			).toBeNull();
 			expect(state.channelArpeggioSemitone1[0]).toBe(0);
 			expect(state.channelArpeggioSemitone2[0]).toBe(0xc);
+		});
+
+		it('E1TX does not occupy a generic channel effect table slot', () => {
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.AUTO_ENVELOPE, delay: 1, parameter: 0, tableIndex: 0 }
+			]);
+			proc._processEffects(0, row);
+			expect(state.channelEffectTableSlots[0]).toEqual({});
 		});
 
 		it('A000 stops a running arpeggio and restores the base note', () => {
