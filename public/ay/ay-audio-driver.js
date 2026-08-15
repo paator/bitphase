@@ -248,22 +248,25 @@ class AYAudioDriver {
 	}
 
 	_applySamplePosition(state, channelIndex, row) {
-		const effect = row.effects?.[0];
-		if (effect?.effect !== EffectAlgorithms.SAMPLE_POSITION) {
-			return;
-		}
-		const instrumentIndex = state.channelInstruments[channelIndex];
-		const instrument = instrumentIndex >= 0 ? state.instruments[instrumentIndex] : null;
-		if (!instrumentHasSample(instrument)) {
-			return;
-		}
-		if (state.channelSamplePositions) {
-			state.channelSamplePositions[channelIndex] = clampSamplePlaybackPosition(
-				instrument,
-				effect.parameter & 0xffffff
-			);
-			if (state.channelSamplePhase) {
-				state.channelSamplePhase[channelIndex] = 0;
+		const effects = row.effects;
+		if (!effects) return;
+		for (const effect of effects) {
+			if (effect?.effect !== EffectAlgorithms.SAMPLE_POSITION) {
+				continue;
+			}
+			const instrumentIndex = state.channelInstruments[channelIndex];
+			const instrument = instrumentIndex >= 0 ? state.instruments[instrumentIndex] : null;
+			if (!instrumentHasSample(instrument)) {
+				continue;
+			}
+			if (state.channelSamplePositions) {
+				state.channelSamplePositions[channelIndex] = clampSamplePlaybackPosition(
+					instrument,
+					effect.parameter & 0xffffff
+				);
+				if (state.channelSamplePhase) {
+					state.channelSamplePhase[channelIndex] = 0;
+				}
 			}
 		}
 	}

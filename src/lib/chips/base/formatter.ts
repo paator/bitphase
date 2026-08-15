@@ -6,6 +6,11 @@ import { NoteName } from '../../models/song';
 import { formatNoteFromEnum } from '../../utils/note-utils';
 import { EffectField } from '../../services/pattern/editing/effect-field';
 import { isPrimitive } from '../../utils/type-guards';
+import {
+	getChannelLayout,
+	getEffectColumnCountFromGenericRow,
+	resolveSchemaField
+} from './channel-effect-columns';
 
 export abstract class BaseFormatter implements PatternFormatter {
 	decimalRowNumbers?: boolean;
@@ -28,7 +33,11 @@ export abstract class BaseFormatter implements PatternFormatter {
 			}
 
 			for (const channel of channels) {
-				result += this.formatTemplate(schema.template, channel, schema.fields) + ' ';
+				const layout = getChannelLayout(
+					schema,
+					getEffectColumnCountFromGenericRow(channel)
+				);
+				result += this.formatTemplate(layout.template, channel, layout.fields) + ' ';
 			}
 
 			return result.trim();
@@ -284,7 +293,7 @@ export abstract class BaseFormatter implements PatternFormatter {
 	}
 
 	getColorForField(fieldKey: string, schema: ChipSchema): string {
-		const field = schema.fields[fieldKey] || schema.globalFields?.[fieldKey];
+		const field = resolveSchemaField(schema, fieldKey);
 		if (field?.color) {
 			return field.color;
 		}

@@ -108,4 +108,79 @@ describe('FileImportService', () => {
 		expect(row?.toneAdd).toBe(-2);
 		expect(row?.toneAccumulation).toBe(true);
 	});
+
+	it('defaults old patterns to one effect column', async () => {
+		const json = JSON.stringify({
+			name: 'old',
+			songs: [
+				{
+					patterns: [
+						{
+							id: 0,
+							length: 1,
+							channels: [
+								{
+									label: 'A',
+									rows: [
+										{
+											note: { name: 0, octave: 0 },
+											effects: [null]
+										}
+									]
+								}
+							],
+							patternRows: [{}]
+						}
+					]
+				}
+			],
+			instruments: [],
+			tables: []
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+		const channel = project.songs[0]?.patterns[0]?.channels[0];
+		expect(channel?.effectColumnCount).toBe(1);
+		expect(channel?.rows[0]?.effects).toHaveLength(1);
+	});
+
+	it('reconstructs extra effect columns from effects arrays', async () => {
+		const json = JSON.stringify({
+			name: 'extra',
+			songs: [
+				{
+					patterns: [
+						{
+							id: 0,
+							length: 1,
+							channels: [
+								{
+									label: 'A',
+									rows: [
+										{
+											note: { name: 0, octave: 0 },
+											effects: [
+												{ effect: 65, delay: 1, parameter: 0x37 },
+												{ effect: 86, delay: 4, parameter: 0x44 }
+											]
+										}
+									]
+								}
+							],
+							patternRows: [{}]
+						}
+					]
+				}
+			],
+			instruments: [],
+			tables: []
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+		const channel = project.songs[0]?.patterns[0]?.channels[0];
+		expect(channel?.effectColumnCount).toBe(2);
+		expect(channel?.rows[0]?.effects).toHaveLength(2);
+		expect(channel?.rows[0]?.effects[1]?.effect).toBe(86);
+		expect(channel?.rows[0]?.effects[1]?.parameter).toBe(0x44);
+	});
 });

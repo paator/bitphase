@@ -98,7 +98,14 @@ export function resetNesChannelSweepOverride(state, channelIndex) {
 }
 
 export function processNesSweepEffect(state, channelIndex, row) {
-	const effect = row.effects?.[0];
+	const effects = row.effects;
+	if (!effects) return;
+	for (const effect of effects) {
+		applyNesSweepEffect(state, channelIndex, effect);
+	}
+}
+
+function applyNesSweepEffect(state, channelIndex, effect) {
 	if (isNesSweepUpEffect(effect)) {
 		if (isNesSweepUpTableEffect(effect)) {
 			state.channelSweepOverrideActive[channelIndex] = true;

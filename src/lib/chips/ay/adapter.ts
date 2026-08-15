@@ -3,8 +3,13 @@ import type { PatternConverter } from '../base/adapter';
 import type { Pattern } from '../../models/song';
 import type { GenericPattern, GenericRow, GenericPatternRow } from '../../models/song/generic';
 import { formatNoteFromEnum, parseNoteFromString } from '../../utils/note-utils';
-import { isEffectLike, isNumber, isString, toNumber } from '../../utils/type-guards';
+import { isEffectLike, isString, toNumber } from '../../utils/type-guards';
 import { PatternEffectHandling } from '../../services/pattern/editing/pattern-effect-handling';
+import {
+	assignEffectsToGenericRow,
+	readEffectsFromGenericRow,
+	resolveChannelEffectColumnCount
+} from '../base/channel-effect-columns';
 
 export class AYConverter implements PatternConverter {
 	toGeneric(chipPattern: Pattern): GenericPattern {
@@ -17,7 +22,12 @@ export class AYConverter implements PatternConverter {
 		};
 
 		for (let i = 0; i < ayPattern.channels.length; i++) {
-			generic.channels.push({ rows: [], label: ayPattern.channels[i].label });
+			const channel = ayPattern.channels[i];
+			generic.channels.push({
+				rows: [],
+				label: channel.label,
+				effectColumnCount: resolveChannelEffectColumnCount(channel)
+			});
 		}
 
 		for (let rowIndex = 0; rowIndex < ayPattern.length; rowIndex++) {
@@ -41,26 +51,17 @@ export class AYConverter implements PatternConverter {
 			generic.patternRows.push(genericPatternRow);
 
 			for (let channelIndex = 0; channelIndex < ayPattern.channels.length; channelIndex++) {
-				const ayRow = ayPattern.channels[channelIndex].rows[rowIndex];
-				const effectValue = ayRow.effects[0];
-				const effect = isEffectLike(effectValue) ? effectValue : null;
-				const effectForGeneric =
-					effect && !PatternEffectHandling.isEmptyEffect(effect)
-						? ({
-								effect: effect.effect,
-								delay: effect.delay,
-								parameter: effect.parameter,
-								tableIndex: effect.tableIndex
-							} as Record<string, unknown>)
-						: null;
+				const channel = ayPattern.channels[channelIndex];
+				const ayRow = channel.rows[rowIndex];
+				const effectCount = resolveChannelEffectColumnCount(channel);
 				const genericRow: GenericRow = {
 					note: formatNoteFromEnum(ayRow.note.name, ayRow.note.octave),
 					instrument: toNumber(ayRow.instrument),
 					volume: toNumber(ayRow.volume),
 					table: toNumber(ayRow.table),
-					envelopeShape: toNumber(ayRow.envelopeShape),
-					effect: effectForGeneric
+					envelopeShape: toNumber(ayRow.envelopeShape)
 				};
+				assignEffectsToGenericRow(genericRow, ayRow.effects, effectCount);
 				generic.channels[channelIndex].rows.push(genericRow);
 			}
 		}
@@ -110,20 +111,12 @@ export class AYConverter implements PatternConverter {
 				ayRow.table = toNumber(genericRow.table);
 				ayRow.envelopeShape = toNumber(genericRow.envelopeShape);
 
-				if (
-					genericRow.effect &&
-					isEffectLike(genericRow.effect) &&
-					!PatternEffectHandling.isEmptyEffect(genericRow.effect)
-				) {
-					ayRow.effects[0] = new Effect(
-						genericRow.effect.effect,
-						genericRow.effect.delay,
-						genericRow.effect.parameter,
-						genericRow.effect.tableIndex
-					);
-				} else {
-					ayRow.effects[0] = null;
-				}
+				const effectCount = resolveChannelEffectColumnCount({
+					effectColumnCount: genericChannel.effectColumnCount,
+					rows: genericChannel.rows
+				});
+				ayPattern.channels[channelIndex].effectColumnCount = effectCount;
+				ayRow.effects = readEffectsFromGenericRow(genericRow, effectCount);
 			}
 		}
 

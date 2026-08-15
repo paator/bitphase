@@ -71,8 +71,10 @@ export function resetNesChannelPulseWidthCycle(state, channelIndex) {
 }
 
 export function processNesPulseWidthCycleEffect(state, channelIndex, row) {
-	const effect = row.effects?.[0];
-	if (isNesPulseWidthCycleEffect(effect)) {
+	const effects = row.effects;
+	if (!effects) return;
+	for (const effect of effects) {
+		if (!isNesPulseWidthCycleEffect(effect)) continue;
 		if (isNesPulseWidthTableEffect(effect)) {
 			state.channelPulseWidthTableMode[channelIndex] = true;
 			state.channelPulseWidthTableIndex[channelIndex] = effect.tableIndex;
@@ -92,7 +94,6 @@ export function processNesPulseWidthCycleEffect(state, channelIndex, row) {
 			state.channelPulseWidthTablePosition[channelIndex] = 0;
 			applyNesPulseWidthEffectParameter(state, channelIndex, effect.parameter);
 		}
-		return;
 	}
 }
 

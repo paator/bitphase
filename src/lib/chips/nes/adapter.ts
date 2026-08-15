@@ -1,10 +1,14 @@
-import { Pattern as NesPattern, Note, Effect } from '../../models/song';
+import { Pattern as NesPattern, Note } from '../../models/song';
 import type { PatternConverter } from '../base/adapter';
 import type { Pattern } from '../../models/song';
 import type { GenericPattern, GenericRow, GenericPatternRow } from '../../models/song/generic';
 import { formatNoteFromEnum, parseNoteFromString } from '../../utils/note-utils';
-import { isEffectLike, isString, toNumber } from '../../utils/type-guards';
-import { PatternEffectHandling } from '../../services/pattern/editing/pattern-effect-handling';
+import { isString, toNumber } from '../../utils/type-guards';
+import {
+	assignEffectsToGenericRow,
+	readEffectsFromGenericRow,
+	resolveChannelEffectColumnCount
+} from '../base/channel-effect-columns';
 import { NES_CHIP_SCHEMA } from './schema';
 
 export class NESConverter implements PatternConverter {
@@ -18,32 +22,28 @@ export class NESConverter implements PatternConverter {
 		};
 
 		for (let i = 0; i < nesPattern.channels.length; i++) {
-			generic.channels.push({ rows: [], label: nesPattern.channels[i].label });
+			const channel = nesPattern.channels[i];
+			generic.channels.push({
+				rows: [],
+				label: channel.label,
+				effectColumnCount: resolveChannelEffectColumnCount(channel)
+			});
 		}
 
 		for (let rowIndex = 0; rowIndex < nesPattern.length; rowIndex++) {
 			generic.patternRows.push({});
 
 			for (let channelIndex = 0; channelIndex < nesPattern.channels.length; channelIndex++) {
-				const nesRow = nesPattern.channels[channelIndex].rows[rowIndex];
-				const effectValue = nesRow.effects[0];
-				const effect = isEffectLike(effectValue) ? effectValue : null;
-				const effectForGeneric =
-					effect && !PatternEffectHandling.isEmptyEffect(effect)
-						? ({
-								effect: effect.effect,
-								delay: effect.delay,
-								parameter: effect.parameter,
-								tableIndex: effect.tableIndex
-							} as Record<string, unknown>)
-						: null;
+				const channel = nesPattern.channels[channelIndex];
+				const nesRow = channel.rows[rowIndex];
+				const effectCount = resolveChannelEffectColumnCount(channel);
 				const genericRow: GenericRow = {
 					note: formatNoteFromEnum(nesRow.note.name, nesRow.note.octave),
 					instrument: toNumber(nesRow.instrument),
 					volume: toNumber(nesRow.volume),
-					table: toNumber(nesRow.table),
-					effect: effectForGeneric
+					table: toNumber(nesRow.table)
 				};
+				assignEffectsToGenericRow(genericRow, nesRow.effects, effectCount);
 				generic.channels[channelIndex].rows.push(genericRow);
 			}
 		}
@@ -87,20 +87,12 @@ export class NESConverter implements PatternConverter {
 				nesRow.volume = toNumber(genericRow.volume);
 				nesRow.table = toNumber(genericRow.table);
 
-				if (
-					genericRow.effect &&
-					isEffectLike(genericRow.effect) &&
-					!PatternEffectHandling.isEmptyEffect(genericRow.effect)
-				) {
-					nesRow.effects[0] = new Effect(
-						genericRow.effect.effect,
-						genericRow.effect.delay,
-						genericRow.effect.parameter,
-						genericRow.effect.tableIndex
-					);
-				} else {
-					nesRow.effects[0] = null;
-				}
+				const effectCount = resolveChannelEffectColumnCount({
+					effectColumnCount: genericChannel.effectColumnCount,
+					rows: genericChannel.rows
+				});
+				nesPattern.channels[channelIndex].effectColumnCount = effectCount;
+				nesRow.effects = readEffectsFromGenericRow(genericRow, effectCount);
 			}
 
 			if (genericPatternRow) {

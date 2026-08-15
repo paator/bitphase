@@ -135,10 +135,12 @@ class PatternRow {
 class Channel {
 	rows: Row[];
 	label: string;
+	effectColumnCount: number;
 
 	constructor(rowCount: number, label: string, fields?: Record<string, ChipField>) {
 		this.rows = Array.from({ length: rowCount }, () => new Row(fields));
 		this.label = label;
+		this.effectColumnCount = 1;
 	}
 }
 
@@ -208,6 +210,18 @@ class Song {
 		const newId = this.patterns.length;
 		const effectiveLabels = this.getEffectiveChannelLabels();
 		const pattern = new Pattern(newId, this.defaultPatternLength, this.schema, effectiveLabels);
+		const source = this.patterns[0];
+		if (source) {
+			const channelCount = Math.min(source.channels.length, pattern.channels.length);
+			for (let index = 0; index < channelCount; index++) {
+				const count = source.channels[index].effectColumnCount ?? 1;
+				pattern.channels[index].effectColumnCount = count;
+				for (const row of pattern.channels[index].rows) {
+					while (row.effects.length < count) row.effects.push(null);
+					if (row.effects.length > count) row.effects.length = count;
+				}
+			}
+		}
 		this.patterns.push(pattern);
 		return pattern;
 	}

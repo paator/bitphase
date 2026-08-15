@@ -1,8 +1,9 @@
+import { isEffectFieldKey } from '../../../chips/base/channel-effect-columns';
 import { PatternEffectHandling } from './pattern-effect-handling';
 
 export class EffectField {
 	static isEffectField(fieldKey: string): boolean {
-		return fieldKey === 'effect' || fieldKey === 'envelopeEffect';
+		return isEffectFieldKey(fieldKey);
 	}
 
 	static formatValue(value: unknown): string | null {

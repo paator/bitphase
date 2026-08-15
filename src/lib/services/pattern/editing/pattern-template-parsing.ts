@@ -1,4 +1,5 @@
 import type { Chip } from '../../../chips/types';
+import { getChannelLayout, MIN_CHANNEL_EFFECT_COLUMNS } from '../../../chips/base/channel-effect-columns';
 
 export class PatternTemplateParser {
 	static skipSpaces(rowString: string, pos: number): number {
@@ -73,20 +74,26 @@ export class PatternTemplateParser {
 		fieldKey: string,
 		charIndex: number,
 		rowString: string,
-		schema: Chip['schema']
+		schema: Chip['schema'],
+		effectColumnCounts?: number[]
 	): number {
 		let pos = this.skipRowNumber(rowString, 0);
 		pos = this.parseGlobalTemplate(rowString, pos, schema);
 
 		let channelIndex = 0;
-		const template = schema.template;
+		const counts = effectColumnCounts ?? [];
+		const channelCount = counts.length;
 
 		while (pos < rowString.length && pos < charIndex) {
 			pos = this.skipSpaces(rowString, pos);
 			if (pos >= rowString.length || pos >= charIndex) break;
 
+			const layout = getChannelLayout(
+				schema,
+				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS
+			);
 			const channelStart = pos;
-			this.parseTemplate(template, schema.fields, (key, field, isSpace) => {
+			this.parseTemplate(layout.template, layout.fields, (key, field, isSpace) => {
 				if (isSpace) {
 					if (pos < rowString.length && rowString[pos] === ' ') {
 						pos++;
@@ -102,6 +109,7 @@ export class PatternTemplateParser {
 
 			if (pos < charIndex) {
 				channelIndex++;
+				if (channelCount > 0 && channelIndex >= channelCount) break;
 			} else {
 				break;
 			}
@@ -114,7 +122,8 @@ export class PatternTemplateParser {
 		rowString: string,
 		fieldKey: string,
 		charIndex: number,
-		schema: Chip['schema']
+		schema: Chip['schema'],
+		effectColumnCounts?: number[]
 	): number {
 		const segments: Array<{ start: number; end: number; fieldKey: string }> = [];
 		let pos = this.skipRowNumber(rowString, 0);
@@ -128,12 +137,18 @@ export class PatternTemplateParser {
 			return currentPos + field.length;
 		});
 
+		const counts = effectColumnCounts ?? [];
+		let channelIndex = 0;
 		while (pos < rowString.length) {
 			pos = this.skipSpaces(rowString, pos);
 			if (pos >= rowString.length) break;
 
+			const layout = getChannelLayout(
+				schema,
+				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS
+			);
 			let channelStart = pos;
-			this.parseTemplate(schema.template, schema.fields, (key, field, isSpace) => {
+			this.parseTemplate(layout.template, layout.fields, (key, field, isSpace) => {
 				if (isSpace) {
 					if (pos < rowString.length && rowString[pos] === ' ') {
 						pos++;
@@ -149,6 +164,8 @@ export class PatternTemplateParser {
 			});
 
 			if (pos === channelStart) break;
+			channelIndex++;
+			if (counts.length > 0 && channelIndex >= counts.length) break;
 		}
 
 		const segment = segments.find(

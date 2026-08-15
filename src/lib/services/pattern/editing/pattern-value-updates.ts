@@ -17,6 +17,7 @@ import { MAX_TABLE_ID } from '../../../utils/table-id';
 import type { EditingContext, FieldInfo } from './editing-context';
 import { EffectField } from './effect-field';
 import { PatternEffectHandling } from './pattern-effect-handling';
+import { resolveSchemaField } from '../../../chips/base/channel-effect-columns';
 
 export interface GenericFieldUpdate {
 	row: number;
@@ -103,7 +104,7 @@ export class PatternValueUpdates {
 		context: EditingContext,
 		fieldKey: string
 	): { key: string; type: string; length: number; allowZeroValue?: boolean } | null {
-		const field = context.schema.fields[fieldKey] || context.schema.globalFields?.[fieldKey];
+		const field = resolveSchemaField(context.schema, fieldKey);
 		return field
 			? { key: fieldKey, type: field.type, length: field.length, allowZeroValue: field.allowZeroValue }
 			: null;

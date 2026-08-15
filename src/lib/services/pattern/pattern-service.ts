@@ -2,6 +2,12 @@ import { Pattern, Note, Effect, DEFAULT_PATTERN_LENGTH } from '../../models/song
 import { isEffectLike, toNumber } from '../../utils/type-guards';
 import type { ChipSchema } from '../../chips/base/schema';
 import { PatternEffectHandling } from './editing/pattern-effect-handling';
+import {
+	clampChannelEffectColumnCount,
+	padEffectsArray,
+	resolveChannelEffectColumnCount
+} from '../../chips/base/channel-effect-columns';
+import { HistoryClone } from '../history/history-clone';
 
 export class PatternService {
 	/**
@@ -41,13 +47,18 @@ export class PatternService {
 		const clonedPattern = new Pattern(newId, sourcePattern.length, schema, channelLabels);
 
 		sourcePattern.channels.forEach((channel, channelIndex) => {
+			clonedPattern.channels[channelIndex].effectColumnCount =
+				resolveChannelEffectColumnCount(channel);
 			channel.rows.forEach((row, rowIndex) => {
 				const newRow = clonedPattern.channels[channelIndex].rows[rowIndex];
 				newRow.note = new Note(row.note.name, row.note.octave);
-				newRow.effects = row.effects.map((effect) =>
-					effect && !PatternEffectHandling.isEmptyEffect(effect)
-						? new Effect(effect.effect, effect.delay, effect.parameter, effect.tableIndex)
-						: null
+				newRow.effects = padEffectsArray(
+					row.effects.map((effect) =>
+						effect && !PatternEffectHandling.isEmptyEffect(effect)
+							? new Effect(effect.effect, effect.delay, effect.parameter, effect.tableIndex)
+							: null
+					),
+					clonedPattern.channels[channelIndex].effectColumnCount
 				);
 				this.copyRowFields(row, newRow);
 			});
@@ -59,6 +70,37 @@ export class PatternService {
 		});
 
 		return clonedPattern;
+	}
+
+	static copyChannelEffectColumnLayout(source: Pattern, target: Pattern): void {
+		const channelCount = Math.min(source.channels.length, target.channels.length);
+		for (let index = 0; index < channelCount; index++) {
+			const count = resolveChannelEffectColumnCount(source.channels[index]);
+			target.channels[index].effectColumnCount = count;
+			for (const row of target.channels[index].rows) {
+				row.effects = padEffectsArray(row.effects, count);
+			}
+		}
+	}
+
+	static setChannelEffectColumnCount(
+		patterns: Pattern[],
+		channelIndex: number,
+		nextCount: number
+	): Pattern[] {
+		const count = clampChannelEffectColumnCount(nextCount);
+		return patterns.map((pattern) => {
+			const cloned = HistoryClone.pattern(pattern);
+			const channel = cloned.channels[channelIndex];
+			if (!channel) {
+				return cloned;
+			}
+			channel.effectColumnCount = count;
+			for (const row of channel.rows) {
+				row.effects = padEffectsArray(row.effects, count);
+			}
+			return cloned;
+		});
 	}
 
 	private static copyRowFields(source: Record<string, unknown>, target: Record<string, unknown>): void {

@@ -4,6 +4,7 @@ import type { PatternFormatter } from '../../chips/base/formatter-interface';
 import type { PatternConverter } from '../../chips/base/adapter';
 import type { GenericChannel } from '../../models/song/generic';
 import { PatternTemplateParser } from './editing/pattern-template-parsing';
+import { getPatternEffectColumnCounts } from '../../chips/base/channel-effect-columns';
 
 export interface NavigationState {
 	selectedRow: number;
@@ -176,6 +177,7 @@ export class PatternNavigationService {
 		const totalSlots = (hasGlobal ? 1 : 0) + channelCount;
 		if (totalSlots <= 1) return state;
 
+		const effectColumnCounts = getPatternEffectColumnCounts(currentPattern);
 		const slotForColumn: number[] = [];
 		for (let col = 0; col < cellPositions.length; col++) {
 			const cell = cellPositions[col];
@@ -191,7 +193,8 @@ export class PatternNavigationService {
 					cell.fieldKey,
 					cell.charIndex,
 					rowString,
-					schema
+					schema,
+					effectColumnCounts
 				);
 				slotForColumn[col] = (hasGlobal ? 1 : 0) + channelIndex;
 			}

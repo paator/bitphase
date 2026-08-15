@@ -1,6 +1,10 @@
 import type { FieldSegment } from '../../../ui-rendering/pattern-editor-text-parser';
 import type { EditingContext, FieldInfo } from './editing-context';
 import { PatternTemplateParser } from './pattern-template-parsing';
+import {
+	getPatternEffectColumnCounts,
+	resolveSchemaField
+} from '../../../chips/base/channel-effect-columns';
 
 export class PatternFieldDetection {
 	static detectFieldAtCursor(context: EditingContext): FieldInfo | null {
@@ -15,7 +19,7 @@ export class PatternFieldDetection {
 			return null;
 		}
 
-		const field = schema.fields[cell.fieldKey] || schema.globalFields?.[cell.fieldKey];
+		const field = resolveSchemaField(schema, cell.fieldKey);
 		if (!field) {
 			return null;
 		}
@@ -30,6 +34,7 @@ export class PatternFieldDetection {
 			context.selectedRow,
 			schema
 		);
+		const effectColumnCounts = getPatternEffectColumnCounts(context.pattern);
 
 		const channelIndex = isGlobal
 			? -1
@@ -37,7 +42,8 @@ export class PatternFieldDetection {
 					cell.fieldKey,
 					cell.charIndex,
 					rowString,
-					schema
+					schema,
+					effectColumnCounts
 				);
 
 		const fieldStart = context.segments
@@ -46,7 +52,8 @@ export class PatternFieldDetection {
 					rowString,
 					cell.fieldKey,
 					cell.charIndex,
-					schema
+					schema,
+					effectColumnCounts
 				);
 		const charOffset = cell.charIndex - fieldStart;
 

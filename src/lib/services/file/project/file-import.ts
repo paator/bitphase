@@ -21,6 +21,10 @@ import { normalizeSamplePlaybackBounds } from '../../../chips/ay/sample-region';
 import { normalizeNesInstrumentRow } from '../../../chips/nes/instrument';
 import type { ChipSchema } from '../../../chips/base/schema';
 import { computeEffectiveChannelLabels } from '../../../models/virtual-channels';
+import {
+	padEffectsArray,
+	resolveChannelEffectColumnCount
+} from '../../../chips/base/channel-effect-columns';
 
 function reconstructProject(data: any, getChip: (chipType: string) => Chip | null): Project {
 	const songs = data.songs?.map((songData: any) => reconstructSong(songData, getChip)) || [];
@@ -149,6 +153,13 @@ function reconstructChannel(data: any, label: string, schema?: ChipSchema): Chan
 	const channel = new Channel(data.rows?.length || 64, label, schema?.fields);
 	if (data.rows) {
 		channel.rows = data.rows.map((rowData: any) => reconstructRow(rowData, schema));
+	}
+	channel.effectColumnCount = resolveChannelEffectColumnCount({
+		effectColumnCount: data.effectColumnCount,
+		rows: channel.rows
+	});
+	for (const row of channel.rows) {
+		row.effects = padEffectsArray(row.effects, channel.effectColumnCount);
 	}
 	return channel;
 }

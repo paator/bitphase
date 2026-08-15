@@ -58,6 +58,13 @@
 	import { EnvelopeModeService } from '../../services/pattern/envelope-mode-service';
 	import { PatternRowDataService } from '../../services/pattern/pattern-row-data-service';
 	import {
+		MAX_CHANNEL_EFFECT_COLUMNS,
+		MIN_CHANNEL_EFFECT_COLUMNS,
+		getPatternEffectColumnCounts,
+		resolveChannelEffectColumnCount,
+		schemaHasChannelEffects
+	} from '../../chips/base/channel-effect-columns';
+	import {
 		SelectionBoundsService,
 		type SelectionBounds
 	} from '../../services/pattern/selection-bounds-service';
@@ -172,12 +179,23 @@
 			(forSongIndex === songIndex
 				? schema
 				: services.audioService.chipProcessors[forSongIndex]?.chip?.schema);
-		return PatternService.createEmptyPattern(
+		const pattern = PatternService.createEmptyPattern(
 			patternId,
 			songSchema,
 			song?.getEffectiveChannelLabels(),
 			song?.defaultPatternLength ?? projectStore.getDefaultPatternLength()
 		);
+		return copyEffectColumnLayoutOnto(pattern, forSongIndex);
+	}
+
+	function copyEffectColumnLayoutOnto(pattern: Pattern, forSongIndex: number = songIndex): Pattern {
+		const source = projectStore.patterns[forSongIndex]?.find(
+			(existing) => existing.channels.length === pattern.channels.length
+		);
+		if (source) {
+			PatternService.copyChannelEffectColumnLayout(source, pattern);
+		}
+		return pattern;
 	}
 
 	$effect(() => {
@@ -341,7 +359,15 @@
 		patternOrder;
 		clearAllCaches();
 		lastVisibleRowsCache = null;
-		if (ctx && renderer && textParser) draw();
+		untrack(() => {
+			if (!ctx || !renderer || !textParser) return;
+			const previousWidth = canvasWidth;
+			updateSize();
+			if (canvasWidth !== previousWidth) {
+				setupCanvas();
+			}
+			draw();
+		});
 	});
 
 	let lastActiveState = isActive;
@@ -396,6 +422,47 @@
 	function getPatternHistoryPath(pattern: Pattern): (string | number)[] {
 		const patternIndex = patterns.findIndex((p) => p.id === pattern.id);
 		return patternIndex >= 0 ? ['patterns', songIndex, patternIndex] : ['patterns', songIndex];
+	}
+
+	function changeChannelEffectColumnCount(channelIndex: number, delta: number): void {
+		if (playbackStore.isPlaying) return;
+		if (!schemaHasChannelEffects(schema)) return;
+		const pattern = currentPattern ?? ensurePatternExists();
+		if (!pattern) return;
+		const channel = pattern.channels[channelIndex];
+		if (!channel) return;
+		const currentCount = resolveChannelEffectColumnCount(channel);
+		const nextCount = currentCount + delta;
+		if (
+			nextCount < MIN_CHANNEL_EFFECT_COLUMNS ||
+			nextCount > MAX_CHANNEL_EFFECT_COLUMNS ||
+			nextCount === currentCount
+		) {
+			return;
+		}
+		const oldPatterns = patterns;
+		const newPatterns = PatternService.setChannelEffectColumnCount(
+			patterns,
+			channelIndex,
+			nextCount
+		);
+		projectStore.recordHistory(
+			{
+				type: 'pattern.edit',
+				label: delta > 0 ? 'Add effect column' : 'Remove effect column',
+				affectedDomains: ['patterns']
+			},
+			[projectStore.createSetDiff(['patterns', songIndex], oldPatterns, newPatterns)]
+		);
+		updatePatterns(newPatterns);
+		const updatedCurrent = newPatterns.find((item) => item.id === pattern.id) ?? newPatterns[0];
+		if (updatedCurrent && chipProcessor && chipProcessor.isAudioNodeAvailable()) {
+			chipProcessor.sendInitPattern(updatedCurrent, currentPatternOrderIndex);
+		}
+		clearAllCaches();
+		updateSize();
+		setupCanvas();
+		draw();
 	}
 
 	function recordPatternEdit(oldPattern: Pattern, newPattern: Pattern, bulk = false): void {
@@ -675,7 +742,8 @@
 				cell.fieldKey,
 				cell.charIndex,
 				rowString,
-				schema
+				schema,
+				getPatternEffectColumnCounts(pattern)
 			);
 			channels.add(channelIndex);
 		}
@@ -1192,11 +1260,18 @@
 		};
 	}
 
+	function applyChannelEffectColumnCounts(pattern: Pattern): void {
+		const counts = getPatternEffectColumnCounts(pattern);
+		textParser?.setChannelEffectColumnCounts(counts);
+		renderer?.setChannelEffectColumnCounts(counts);
+	}
+
 	function getPatternRowData(
 		pattern: Pattern,
 		rowIndex: number,
 		options?: { debug?: boolean }
 	): string {
+		applyChannelEffectColumnCounts(pattern);
 		return PatternRowDataService.getRowData(
 			{
 				pattern,
@@ -1281,6 +1356,7 @@
 			}
 
 			const patternToRender = findOrCreatePattern(row.patternIndex);
+			applyChannelEffectColumnCounts(patternToRender);
 			if (row.rowIndex >= 0 && row.rowIndex < patternToRender.length) {
 				const rowString = getPatternRowData(patternToRender, row.rowIndex);
 
@@ -1340,6 +1416,7 @@
 		const header = getHeaderRowContext(patternToDraw);
 		if (!header) return;
 
+		applyChannelEffectColumnCounts(patternToDraw);
 		renderer.drawChannelLabels({
 			rowString: header.rowString,
 			channelLabels: header.channelLabels,
@@ -1348,7 +1425,8 @@
 			channelLevels:
 				settingsStore.showChannelVolumeBars && channelLevels.length > 0
 					? channelLevels
-					: undefined
+					: undefined,
+			effectColumnControlsEnabled: !playbackStore.isPlaying
 		});
 	}
 
@@ -1377,6 +1455,15 @@
 		drawPatternGrid();
 		drawHeaderOverlay();
 	}
+
+	$effect(() => {
+		playbackStore.isPlaying;
+		untrack(() => {
+			if (ctx && renderer && textParser && fontReady && !document.hidden) {
+				drawHeaderOverlay();
+			}
+		});
+	});
 
 	$effect(() => {
 		songIndex;
@@ -2022,6 +2109,14 @@
 				return;
 
 			const rowString = getPatternRowData(patternToRender, firstVisibleRow.rowIndex);
+			const effectControl = renderer.hitTestEffectColumnControl(x, y, rowString);
+			if (effectControl) {
+				changeChannelEffectColumnCount(
+					effectControl.channelIndex,
+					effectControl.action === 'add' ? 1 : -1
+				);
+				return;
+			}
 			const channelPositions = renderer.calculateChannelPositions(rowString);
 
 			for (let i = 0; i < channelPositions.length; i++) {

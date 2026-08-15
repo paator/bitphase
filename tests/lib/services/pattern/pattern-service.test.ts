@@ -480,4 +480,57 @@ describe('PatternService', () => {
 			expect(PatternService.removeRowAt(source, 4)).toBeNull();
 		});
 	});
+
+	describe('effect column layout', () => {
+		it('copies extra effect columns onto a new pattern', () => {
+			const source = new Pattern(0, 2);
+			source.channels[0].effectColumnCount = 3;
+			source.channels[0].rows[0].effects = [null, null, null];
+			const target = new Pattern(1, 2);
+
+			PatternService.copyChannelEffectColumnLayout(source, target);
+
+			expect(target.channels[0].effectColumnCount).toBe(3);
+			expect(target.channels[0].rows[0].effects).toHaveLength(3);
+			expect(target.channels[1].effectColumnCount).toBe(1);
+		});
+
+		it('pads and truncates effect slots across all patterns', () => {
+			const first = new Pattern(0, 1);
+			const second = new Pattern(1, 1);
+			first.channels[0].rows[0].effects = [
+				new Effect(EffectType.Arpeggio, 0, 1),
+				new Effect(EffectType.Vibrato, 0, 2)
+			];
+			first.channels[0].effectColumnCount = 2;
+			second.channels[0].effectColumnCount = 2;
+			second.channels[0].rows[0].effects = [null, null];
+
+			const expanded = PatternService.setChannelEffectColumnCount([first, second], 0, 3);
+			expect(expanded[0].channels[0].effectColumnCount).toBe(3);
+			expect(expanded[0].channels[0].rows[0].effects).toHaveLength(3);
+			expect(expanded[0].channels[0].rows[0].effects[0]?.effect).toBe(EffectType.Arpeggio);
+			expect(expanded[1].channels[0].rows[0].effects).toHaveLength(3);
+
+			const reduced = PatternService.setChannelEffectColumnCount(expanded, 0, 1);
+			expect(reduced[0].channels[0].effectColumnCount).toBe(1);
+			expect(reduced[0].channels[0].rows[0].effects).toHaveLength(1);
+			expect(reduced[0].channels[0].rows[0].effects[0]?.effect).toBe(EffectType.Arpeggio);
+		});
+
+		it('clones extra effect columns', () => {
+			const source = new Pattern(0, 1);
+			source.channels[0].effectColumnCount = 2;
+			source.channels[0].rows[0].effects = [
+				new Effect(EffectType.Arpeggio, 0, 12),
+				new Effect(EffectType.Vibrato, 1, 5)
+			];
+
+			const cloned = PatternService.clonePattern(source, 2);
+			expect(cloned.channels[0].effectColumnCount).toBe(2);
+			expect(cloned.channels[0].rows[0].effects).toHaveLength(2);
+			expect(cloned.channels[0].rows[0].effects[1]?.effect).toBe(EffectType.Vibrato);
+			expect(cloned.channels[0].rows[0].effects[1]).not.toBe(source.channels[0].rows[0].effects[1]);
+		});
+	});
 });

@@ -158,7 +158,7 @@ class TrackerPatternProcessor {
 		const hasEffectWithTable = effects.some(
 			(e) => e && e.tableIndex !== undefined && e.tableIndex >= 0
 		);
-		const rowHasExplicitEffect = effects[0] != null && effects[0].effect !== 0;
+		const rowHasExplicitEffect = effects.some((e) => e != null && e.effect !== 0);
 
 		if (!hasEffectOfType(EffectAlgorithms.ARPEGGIO)) {
 			this.state.channelArpeggioCounter[channelIndex] = 0;
@@ -224,9 +224,15 @@ class TrackerPatternProcessor {
 	}
 
 	_processEffects(channelIndex, row, skipSpeed = false) {
-		if (!row.effects[0]) return;
+		const effects = row.effects;
+		if (!effects) return;
+		for (const effect of effects) {
+			if (!effect) continue;
+			this._processOneEffect(channelIndex, row, effect, skipSpeed);
+		}
+	}
 
-		const effect = row.effects[0];
+	_processOneEffect(channelIndex, row, effect, skipSpeed = false) {
 		const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
 		const usesChannelEffectTable =
 			effect.effect !== EffectAlgorithms.SPEED &&
@@ -285,11 +291,12 @@ class TrackerPatternProcessor {
 	}
 
 	_processSpeedOnly(channelIndex, row) {
-		if (!row.effects || !row.effects[0]) return;
-		const effect = row.effects[0];
-		if (effect.effect !== EffectAlgorithms.SPEED) return;
-		const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
-		this._initSpeed(effect, hasTableIndex);
+		if (!row.effects) return;
+		for (const effect of row.effects) {
+			if (!effect || effect.effect !== EffectAlgorithms.SPEED) continue;
+			const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
+			this._initSpeed(effect, hasTableIndex);
+		}
 	}
 
 	_initChannelArpeggio(channelIndex, effect, hasTableIndex) {

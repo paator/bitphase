@@ -17,6 +17,12 @@ import type { PatternFormatter } from '../../chips/base/formatter-interface';
 import type { ChipSchema } from '../../chips/base/schema';
 import type { GenericPattern } from '../../models/song/generic';
 import { PatternTemplateParser } from './editing/pattern-template-parsing';
+import { EffectField } from './editing/effect-field';
+import {
+	getPatternEffectColumnCounts,
+	isEffectFieldKey,
+	resolveSchemaField
+} from '../../chips/base/channel-effect-columns';
 
 export interface ClipboardContext {
 	pattern: Pattern;
@@ -68,7 +74,7 @@ export class ClipboardService {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
-				const fieldInfo = this.detectFieldDirect(cell, rowString, schema);
+				const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
 				if (!fieldInfo) continue;
 
 				const field = this.getFieldDef(schema, cell.fieldKey);
@@ -103,7 +109,7 @@ export class ClipboardService {
 		const cell = cellPositions[col];
 		if (!cell.fieldKey) return;
 
-		const fieldInfo = this.detectFieldDirect(cell, rowString, schema);
+		const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
 		if (!fieldInfo) return;
 
 		const field = this.getFieldDef(schema, cell.fieldKey);
@@ -159,7 +165,7 @@ export class ClipboardService {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
-				const fieldInfo = this.detectFieldDirect(cell, rowString, schema);
+				const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
 				if (!fieldInfo) continue;
 
 				const field = this.getFieldDef(schema, cell.fieldKey);
@@ -204,7 +210,7 @@ export class ClipboardService {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
-				const fieldInfo = this.detectFieldDirect(cell, rowString, schema);
+				const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
 				if (!fieldInfo) continue;
 
 				const field = this.getFieldDef(schema, cell.fieldKey);
@@ -232,13 +238,15 @@ export class ClipboardService {
 	private static detectFieldDirect(
 		cell: { fieldKey?: string; charIndex: number },
 		rowString: string,
-		schema: ChipSchema
+		schema: ChipSchema,
+		pattern: Pattern
 	): FieldInfo | null {
 		if (!cell.fieldKey) return null;
 
-		const field = schema.fields[cell.fieldKey] || schema.globalFields?.[cell.fieldKey];
+		const field = resolveSchemaField(schema, cell.fieldKey);
 		if (!field) return null;
 
+		const effectColumnCounts = getPatternEffectColumnCounts(pattern);
 		const isGlobal = !!schema.globalFields?.[cell.fieldKey];
 		const channelIndex = isGlobal
 			? -1
@@ -246,14 +254,16 @@ export class ClipboardService {
 					cell.fieldKey,
 					cell.charIndex,
 					rowString,
-					schema
+					schema,
+					effectColumnCounts
 				);
 
 		const fieldStart = PatternTemplateParser.findFieldStartPositionInRowString(
 			rowString,
 			cell.fieldKey,
 			cell.charIndex,
-			schema
+			schema,
+			effectColumnCounts
 		);
 		const charOffset = cell.charIndex - fieldStart;
 
@@ -270,7 +280,7 @@ export class ClipboardService {
 		schema: ChipSchema,
 		fieldKey: string
 	): { type: string; length: number; allowZeroValue?: boolean } | null {
-		const field = schema.fields[fieldKey] || schema.globalFields?.[fieldKey];
+		const field = resolveSchemaField(schema, fieldKey);
 		return field ? { type: field.type, length: field.length, allowZeroValue: field.allowZeroValue } : null;
 	}
 
@@ -328,8 +338,8 @@ export class ClipboardService {
 				context.tuningTable,
 				context.getOctave
 			);
-			const isSameField = clipCell.fieldKey === cell.fieldKey;
-			if (pasteValue === null && !isSameField) continue;
+			const isCompatibleField = this.fieldsAreCompatible(clipCell.fieldKey, cell.fieldKey);
+			if (pasteValue === null && !isCompatibleField) continue;
 
 			const editingContext = createEditingContext(pattern, targetRow, targetCol);
 			const fieldInfo = PatternFieldDetection.detectFieldAtCursor(editingContext);
@@ -338,7 +348,7 @@ export class ClipboardService {
 			pattern = PatternValueUpdates.updateFieldValue(
 				{ ...editingContext, pattern },
 				fieldInfo,
-				pasteValue as string | number | null
+				pasteValue
 			);
 		}
 
@@ -347,14 +357,19 @@ export class ClipboardService {
 		}
 	}
 
+	private static fieldsAreCompatible(sourceKey: string, targetKey: string): boolean {
+		if (sourceKey === targetKey) return true;
+		return isEffectFieldKey(sourceKey) && isEffectFieldKey(targetKey);
+	}
+
 	private static getPasteValue(
 		clipCell: ClipboardCell,
 		targetFieldKey: string,
 		tuningTable: number[] | undefined,
 		getOctave: (() => number) | undefined
-	): string | number | null {
-		if (clipCell.fieldKey === targetFieldKey) {
-			return clipCell.value as string | number;
+	): string | number | null | Record<string, unknown> {
+		if (this.fieldsAreCompatible(clipCell.fieldKey, targetFieldKey)) {
+			return clipCell.value as string | number | null | Record<string, unknown>;
 		}
 		if (
 			clipCell.fieldKey === 'envelopeValue' &&
@@ -385,7 +400,7 @@ export class ClipboardService {
 			return false;
 		}
 
-		if (fieldKey === 'effect' || fieldKey === 'envelopeEffect') {
+		if (EffectField.isEffectField(fieldKey)) {
 			if (typeof value === 'object' && value !== null) {
 				const effect = value as { effect?: number; delay?: number; parameter?: number };
 				return (
@@ -457,7 +472,7 @@ export class ClipboardService {
 			pattern = PatternValueUpdates.updateFieldValue(
 				{ ...editingContext, pattern },
 				fieldInfo,
-				pasteValue as string | number
+				pasteValue
 			);
 		}
 

@@ -203,6 +203,21 @@ describe('Channel effect interactions', () => {
 		});
 	});
 
+	describe('multiple effect columns', () => {
+		it('applies every slot on the same row in order', () => {
+			const row = makeRow(0, 0, [
+				{ effect: EffectAlgorithms.ARPEGGIO, delay: 1, parameter: 0x37 },
+				{ effect: EffectAlgorithms.VIBRATO, delay: 4, parameter: 0x44 }
+			]);
+			proc._processEffects(0, row);
+
+			expect(state.channelArpeggioSemitone1[0]).toBe(3);
+			expect(state.channelArpeggioSemitone2[0]).toBe(7);
+			expect(state.channelVibratoSpeed[0]).toBe(4);
+			expect(state.channelVibratoDepth[0]).toBe(4);
+		});
+	});
+
 	describe('sample position and ornament position', () => {
 		it('effect 4 (sample position) sets instrumentPositions immediately', () => {
 			state.instrumentPositions[0] = 0;

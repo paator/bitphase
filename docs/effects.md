@@ -3,6 +3,8 @@
 Effects are written in the effect column using the format **`AXYZ`**,
 where `A` indicates the effect type and `XYZ` are its parameters.
 
+Each channel starts with one effect column. Use **+** / **−** on the channel header to add or remove extra effect columns on that channel (up to 4). Commands in the same row are applied left to right.
+
 They can also use tables as a source of parameter values: **`AXTY`** (`T` + table id (`Y`)).
 For example, rather than manually alternating `S.03`, `S.05`, `S.03` to create a groove tempo,
 you can put the tempo values in table 1 and simply use `S.T1`.

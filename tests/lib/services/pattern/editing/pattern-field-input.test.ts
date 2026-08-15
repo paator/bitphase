@@ -225,6 +225,34 @@ describe('PatternFieldInput', () => {
 		);
 	});
 
+	it('writes extra effect columns without replacing the first slot', () => {
+		const pattern = new Pattern(0, 1, AY_CHIP_SCHEMA);
+		pattern.channels[0].effectColumnCount = 2;
+		pattern.channels[0].rows[0].effects = [
+			{ effect: 'S'.charCodeAt(0), delay: 0, parameter: 3 },
+			null
+		];
+
+		const result = PatternFieldInput.handleHexInput(
+			createContext(pattern),
+			createFieldInfo('effect1', 'hex', false, 0),
+			'A',
+			'KeyA'
+		);
+
+		expect(result?.updatedPattern.channels[0].rows[0].effects[0]).toEqual(
+			expect.objectContaining({
+				effect: 'S'.charCodeAt(0),
+				parameter: 3
+			})
+		);
+		expect(result?.updatedPattern.channels[0].rows[0].effects[1]).toEqual(
+			expect.objectContaining({
+				effect: 'A'.charCodeAt(0)
+			})
+		);
+	});
+
 	it('clamps effect table id increments at Z', () => {
 		const result = PatternValueUpdates.incrementEffectParameterValue(
 			{ effect: 'S'.charCodeAt(0), delay: 0, parameter: 0, tableIndex: 34 },

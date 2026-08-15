@@ -74,6 +74,7 @@ export class HistoryClone {
 	static channel(channel: Channel): Channel {
 		const cloned = Object.create(Channel.prototype) as Channel;
 		cloned.label = channel.label;
+		cloned.effectColumnCount = channel.effectColumnCount ?? 1;
 		cloned.rows = channel.rows.map((row) => this.row(row));
 		return cloned;
 	}

@@ -112,11 +112,15 @@ export function resetAyChannelTimerPwmOverrides(state, channelIndex) {
 }
 
 export function processAyTimerPwmEffect(state, channelIndex, row) {
-	const effect = row.effects?.[0];
-	if (!isAyTimerPwmEffect(effect)) {
-		return;
+	const effects = row.effects;
+	if (!effects) return;
+	for (const effect of effects) {
+		if (!isAyTimerPwmEffect(effect)) continue;
+		applyAyTimerPwmEffect(state, channelIndex, effect);
 	}
+}
 
+function applyAyTimerPwmEffect(state, channelIndex, effect) {
 	if (isAyTimerPwmMinEffect(effect)) {
 		state.channelTimerPwmSweepMinOverride[channelIndex] = clampTimerPwmDuty(
 			mapHexParameterToTimerPwmPercent(effect.parameter)

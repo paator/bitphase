@@ -1,6 +1,7 @@
 import type { Pattern } from '../../models/song';
 import type { Chip } from '../../chips/types';
 import { PatternTemplateParser } from './editing/pattern-template-parsing';
+import { getPatternEffectColumnCounts } from '../../chips/base/channel-effect-columns';
 
 export interface ProgressiveSelectionResult {
 	startRow: number;
@@ -311,11 +312,13 @@ export class ProgressiveSelectionService {
 			return null;
 		}
 
+		const effectColumnCounts = getPatternEffectColumnCounts(pattern);
 		const channelIndex = PatternTemplateParser.calculateChannelIndexForField(
 			cell.fieldKey,
 			cell.charIndex,
 			rowString,
-			schema
+			schema,
+			effectColumnCounts
 		);
 
 		let startColumn = -1;
@@ -332,7 +335,8 @@ export class ProgressiveSelectionService {
 				currentCell.fieldKey,
 				currentCell.charIndex,
 				rowString,
-				schema
+				schema,
+				effectColumnCounts
 			);
 
 			if (currentChannelIndex === channelIndex) {

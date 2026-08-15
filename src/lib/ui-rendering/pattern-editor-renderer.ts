@@ -4,8 +4,18 @@ import { BaseCanvasRenderer, type BaseRenderOptions } from './base-canvas-render
 import { PatternTemplateParser } from '../services/pattern/editing/pattern-template-parsing';
 import type { getColors } from '../utils/colors';
 import type { VirtualChannelGroup } from '../models/virtual-channels';
+import {
+	getChannelLayout,
+	isEffectFieldKey,
+	MAX_CHANNEL_EFFECT_COLUMNS,
+	MIN_CHANNEL_EFFECT_COLUMNS,
+	resolveSchemaField,
+	schemaHasChannelEffects
+} from '../chips/base/channel-effect-columns';
 
 export const CHANNEL_LEVEL_STRIP_HEIGHT = 6;
+const EFFECT_COLUMN_CONTROL_MIN_WIDTH = 10;
+const EFFECT_COLUMN_CONTROL_MAX_WIDTH = 14;
 
 export interface PatternEditorRenderOptions extends Omit<BaseRenderOptions, 'colors'> {
 	colors: ReturnType<typeof getColors>;
@@ -34,6 +44,14 @@ export interface ChannelLabelData {
 	channelMuted: boolean[];
 	virtualChannelGroups?: VirtualChannelGroup[];
 	channelLevels?: number[];
+	effectColumnControlsEnabled?: boolean;
+}
+
+export type ChannelEffectColumnControlAction = 'add' | 'remove';
+
+export interface ChannelEffectColumnControlHit {
+	channelIndex: number;
+	action: ChannelEffectColumnControlAction;
 }
 
 export class PatternEditorRenderer extends BaseCanvasRenderer {
@@ -45,6 +63,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	private channelPositionsCacheKey = '';
 	private channelPositionsCache: number[] = [];
 	private stripBackground: ImageData | null = null;
+	private effectColumnCounts: number[] = [];
+	private effectColumnControlsEnabled = true;
 
 	constructor(options: PatternEditorRenderOptions) {
 		super(options);
@@ -55,6 +75,10 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.selectionStyle = options.selectionStyle;
 	}
 
+	setChannelEffectColumnCounts(counts: number[]): void {
+		this.effectColumnCounts = counts;
+	}
+
 	drawRow(data: RowRenderData): void {
 		this.drawRowBackground(data);
 		this.drawRowText(data);
@@ -62,8 +86,9 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	}
 
 	drawChannelLabels(data: ChannelLabelData): void {
+		this.effectColumnControlsEnabled = data.effectColumnControlsEnabled !== false;
 		const channelPositions = this.calculateChannelPositions(data.rowString);
-		const labelY = this.lineHeight / 2;
+		const centerY = this.lineHeight / 2;
 		const borderWidth = 1;
 		const hasLevels = data.channelLevels !== undefined;
 
@@ -76,6 +101,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			boldFont = currentFont.replace(/^(\d+px\s+)/, '$1bold ');
 		}
 		this.setFont(boldFont);
+		this.setTextBaseline('middle');
 
 		if (this.schema.globalColumnLabels) {
 			const globalPositions = this.calculateGlobalColumnPositions(data.rowString);
@@ -85,7 +111,12 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				if (label) {
 					const labelWidth = this.measureText(label);
 					const textX = x + (width - labelWidth) / 2;
-					this.fillText(label, textX, labelY, textColor);
+					this.fillText(
+						label,
+						textX,
+						this.getVerticallyCenteredTextY(label, centerY),
+						textColor
+					);
 				}
 			}
 		}
@@ -100,7 +131,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				data,
 				channelPositions,
 				separatorMargin,
-				labelY,
 				borderWidth
 			);
 		} else {
@@ -110,7 +140,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 					i,
 					channelPositions,
 					separatorMargin,
-					labelY,
 					borderWidth,
 					data.channelMuted[i] ?? false
 				);
@@ -153,7 +182,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		data: ChannelLabelData,
 		channelPositions: number[],
 		separatorMargin: number,
-		labelY: number,
 		borderWidth: number
 	): void {
 		const groups = data.virtualChannelGroups!;
@@ -170,7 +198,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 						idx,
 						channelPositions,
 						separatorMargin,
-						labelY,
 						borderWidth,
 						data.channelMuted[idx] ?? false
 					);
@@ -195,7 +222,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 					vchIdx,
 					channelPositions,
 					separatorMargin,
-					labelY,
 					borderWidth,
 					data.channelMuted[vchIdx] ?? false
 				);
@@ -239,7 +265,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		index: number,
 		channelPositions: number[],
 		separatorMargin: number,
-		labelY: number,
 		borderWidth: number,
 		isMuted: boolean
 	): void {
@@ -252,8 +277,15 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		const buttonWidth = buttonEnd - buttonX;
 		const buttonHeight = this.lineHeight - 4;
 		const buttonY = (this.lineHeight - buttonHeight) / 2;
+		const centerY = buttonY + buttonHeight / 2;
 		const labelWidth = this.measureText(label);
-		const textX = buttonX + (buttonWidth - labelWidth) / 2;
+		const showEffectControls = schemaHasChannelEffects(this.schema);
+		const controlLayout = this.getEffectColumnControlLayout(buttonHeight);
+		const controlsWidth = showEffectControls
+			? controlLayout.width * 2 + controlLayout.gap + controlLayout.margin * 2
+			: 0;
+		const textAreaWidth = Math.max(0, buttonWidth - controlsWidth);
+		const textX = buttonX + Math.max(0, (textAreaWidth - labelWidth) / 2);
 		const textColor = isMuted
 			? this.patternColors.patternEmpty
 			: this.patternColors.patternRowNum || this.patternColors.patternText;
@@ -271,7 +303,194 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight, borderColor, borderWidth);
 		this.restore();
 
-		this.fillText(label, textX, labelY, textColor);
+		this.fillText(label, textX, this.getVerticallyCenteredTextY(label, centerY), textColor);
+		if (showEffectControls) {
+			this.drawEffectColumnControls(
+				index,
+				buttonX,
+				buttonWidth,
+				buttonY,
+				buttonHeight,
+				textColor,
+				centerY
+			);
+		}
+	}
+
+	private getVerticallyCenteredTextY(text: string, centerY: number): number {
+		const metrics = this.ctx.measureText(text);
+		const ascent = metrics.actualBoundingBoxAscent;
+		const descent = metrics.actualBoundingBoxDescent;
+		if (!Number.isFinite(ascent) || !Number.isFinite(descent)) {
+			return centerY;
+		}
+		return centerY + (ascent - descent) / 2;
+	}
+
+	private getEffectColumnControlLayout(buttonHeight: number): {
+		width: number;
+		gap: number;
+		margin: number;
+		hitPadX: number;
+	} {
+		const compact = buttonHeight <= 12;
+		const width = Math.max(
+			EFFECT_COLUMN_CONTROL_MIN_WIDTH,
+			Math.min(EFFECT_COLUMN_CONTROL_MAX_WIDTH, Math.round(buttonHeight * 0.7))
+		);
+		return {
+			width,
+			gap: compact ? 1 : 2,
+			margin: compact ? 1 : 2,
+			hitPadX: Math.max(4, Math.round(width * 0.5))
+		};
+	}
+
+	private getEffectColumnControlRects(
+		buttonX: number,
+		buttonWidth: number,
+		buttonY: number,
+		buttonHeight: number
+	): {
+		remove: { x: number; y: number; width: number; height: number };
+		add: { x: number; y: number; width: number; height: number };
+	} {
+		const { width, gap, margin } = this.getEffectColumnControlLayout(buttonHeight);
+		const addX = buttonX + buttonWidth - margin - width;
+		const removeX = addX - gap - width;
+		return {
+			remove: { x: removeX, y: 0, width, height: this.lineHeight },
+			add: { x: addX, y: 0, width, height: this.lineHeight }
+		};
+	}
+
+	private getEffectColumnControlHitRects(
+		buttonX: number,
+		buttonWidth: number,
+		buttonY: number,
+		buttonHeight: number
+	): {
+		remove: { x: number; y: number; width: number; height: number };
+		add: { x: number; y: number; width: number; height: number };
+	} {
+		const layout = this.getEffectColumnControlLayout(buttonHeight);
+		const visual = this.getEffectColumnControlRects(buttonX, buttonWidth, buttonY, buttonHeight);
+		const splitX = visual.remove.x + visual.remove.width + layout.gap / 2;
+		const removeLeft = visual.remove.x - layout.hitPadX;
+		const addRight = visual.add.x + visual.add.width + layout.hitPadX;
+		return {
+			remove: {
+				x: removeLeft,
+				y: 0,
+				width: splitX - removeLeft,
+				height: this.lineHeight
+			},
+			add: {
+				x: splitX,
+				y: 0,
+				width: addRight - splitX,
+				height: this.lineHeight
+			}
+		};
+	}
+
+	private drawEffectColumnControls(
+		channelIndex: number,
+		buttonX: number,
+		buttonWidth: number,
+		buttonY: number,
+		buttonHeight: number,
+		textColor: string,
+		centerY: number
+	): void {
+		const count =
+			this.effectColumnCounts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS;
+		const rects = this.getEffectColumnControlRects(buttonX, buttonWidth, buttonY, buttonHeight);
+		const canRemove =
+			this.effectColumnControlsEnabled && count > MIN_CHANNEL_EFFECT_COLUMNS;
+		const canAdd = this.effectColumnControlsEnabled && count < MAX_CHANNEL_EFFECT_COLUMNS;
+		this.drawEffectColumnControl(rects.remove, 'remove', textColor, canRemove, centerY);
+		this.drawEffectColumnControl(rects.add, 'add', textColor, canAdd, centerY);
+	}
+
+	private drawEffectColumnControl(
+		rect: { x: number; y: number; width: number; height: number },
+		action: ChannelEffectColumnControlAction,
+		textColor: string,
+		enabled: boolean,
+		centerY: number
+	): void {
+		this.save();
+		this.ctx.globalAlpha = enabled ? 0.85 : 0.28;
+		this.ctx.lineCap = 'square';
+		const cx = Math.floor(rect.x + rect.width / 2) + 0.5;
+		const cy = centerY;
+		const iconSpan = Math.min(rect.width, 12);
+		const arm = Math.max(2, Math.round(iconSpan * 0.22));
+		this.beginPath();
+		this.moveTo(cx - arm, cy);
+		this.lineTo(cx + arm, cy);
+		if (action === 'add') {
+			this.moveTo(cx, cy - arm);
+			this.lineTo(cx, cy + arm);
+		}
+		this.stroke(textColor, 1);
+		this.restore();
+	}
+
+	hitTestEffectColumnControl(
+		x: number,
+		y: number,
+		rowString: string
+	): ChannelEffectColumnControlHit | null {
+		if (!schemaHasChannelEffects(this.schema)) return null;
+		if (y < 0 || y > this.lineHeight) return null;
+		const channelPositions = this.calculateChannelPositions(rowString);
+		const separatorMargin = 4;
+		const buttonHeight = this.lineHeight - 4;
+		const buttonY = (this.lineHeight - buttonHeight) / 2;
+
+		for (let index = 0; index < channelPositions.length; index++) {
+			const channelStart = channelPositions[index];
+			const channelEnd =
+				index < channelPositions.length - 1
+					? channelPositions[index + 1]
+					: this.canvasWidth;
+			const buttonX = Math.max(0, channelStart - separatorMargin);
+			const buttonEnd =
+				index < channelPositions.length - 1 ? channelEnd - separatorMargin : this.canvasWidth;
+			const buttonWidth = buttonEnd - buttonX;
+			const rects = this.getEffectColumnControlHitRects(
+				buttonX,
+				buttonWidth,
+				buttonY,
+				buttonHeight
+			);
+			const count =
+				this.effectColumnCounts[index] ?? MIN_CHANNEL_EFFECT_COLUMNS;
+			const controlsEnabled = this.effectColumnControlsEnabled;
+			if (
+				this.pointInControl(x, y, rects.remove) &&
+				(!controlsEnabled || count > MIN_CHANNEL_EFFECT_COLUMNS)
+			) {
+				return { channelIndex: index, action: 'remove' };
+			}
+			if (
+				this.pointInControl(x, y, rects.add) &&
+				(!controlsEnabled || count < MAX_CHANNEL_EFFECT_COLUMNS)
+			) {
+				return { channelIndex: index, action: 'add' };
+			}
+		}
+		return null;
+	}
+
+	private pointInControl(
+		x: number,
+		y: number,
+		rect: { x: number; y: number; width: number; height: number }
+	): boolean {
+		return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
 	}
 
 	private drawChannelLevelStrip(
@@ -409,7 +628,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	}
 
 	calculateChannelPositions(rowString: string): number[] {
-		const cacheKey = `${this.ctx.font}\0${rowString}`;
+		const cacheKey = `${this.ctx.font}\0${rowString}\0${this.effectColumnCounts.join(',')}`;
 		if (cacheKey === this.channelPositionsCacheKey) {
 			return this.channelPositionsCache;
 		}
@@ -459,17 +678,23 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			skipSpaces();
 		}
 
-		const template = this.schema.template;
+		const counts = this.effectColumnCounts;
+		let channelIndex = 0;
 		while (i < rowString.length) {
 			skipSpaces();
 			if (i >= rowString.length) break;
+			if (counts.length > 0 && channelIndex >= counts.length) break;
 
+			const layout = getChannelLayout(
+				this.schema,
+				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS
+			);
 			const channelStart = x;
 			let foundField = false;
 
 			PatternTemplateParser.parseTemplate(
-				template,
-				this.schema.fields,
+				layout.template,
+				layout.fields,
 				(key, field, isSpace) => {
 					if (isSpace) {
 						if (i < rowString.length && rowString[i] === ' ') {
@@ -486,6 +711,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 
 			if (foundField) {
 				positions.push(channelStart);
+				channelIndex++;
 			} else {
 				break;
 			}
@@ -633,16 +859,21 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		pos = PatternTemplateParser.parseGlobalTemplate(rowString, pos, this.schema);
 
 		let channelIndex = 0;
-		const template = this.schema.template;
+		const counts = this.effectColumnCounts;
 
 		while (pos < rowString.length) {
 			pos = PatternTemplateParser.skipSpaces(rowString, pos);
 			if (pos >= rowString.length) break;
+			if (counts.length > 0 && channelIndex >= counts.length) break;
 
+			const layout = getChannelLayout(
+				this.schema,
+				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS
+			);
 			const channelStart = pos;
 			PatternTemplateParser.parseTemplate(
-				template,
-				this.schema.fields,
+				layout.template,
+				layout.fields,
 				(_key, field, isSpace) => {
 					if (isSpace) {
 						if (pos < rowString.length && rowString[pos] === ' ') {
@@ -689,10 +920,9 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			? data.rowString.substring(currentSegment.start, currentSegment.end)
 			: '';
 
-		const field =
-			currentSegment &&
-			(this.schema.fields[currentSegment.fieldKey] ||
-				this.schema.globalFields?.[currentSegment.fieldKey]);
+		const field = currentSegment
+			? resolveSchemaField(this.schema, currentSegment.fieldKey)
+			: undefined;
 
 		const isEmptyField = fieldText && fieldText.split('').every((c) => c === '.' || c === '-');
 
@@ -711,9 +941,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 
 		if (currentSegment && !isEmptyField) {
 			const isNoteField = field?.type === 'note';
-			const isEffectField =
-				currentSegment.fieldKey === 'effect' ||
-				currentSegment.fieldKey === 'envelopeEffect';
+			const isEffectField = isEffectFieldKey(currentSegment.fieldKey);
 
 			if (char === '.' && isEffectField) {
 				return this.getEmptyFieldColor(data);

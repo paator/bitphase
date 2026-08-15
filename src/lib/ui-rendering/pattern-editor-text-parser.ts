@@ -3,6 +3,11 @@ import type { PatternFormatter } from '../chips/base/formatter-interface';
 import type { getColors } from '../utils/colors';
 import { Cache } from '../utils/memoize';
 import { PatternTemplateParser } from '../services/pattern/editing/pattern-template-parsing';
+import {
+	getChannelLayout,
+	MIN_CHANNEL_EFFECT_COLUMNS,
+	resolveSchemaField
+} from '../chips/base/channel-effect-columns';
 
 export interface FieldSegment {
 	start: number;
@@ -25,6 +30,7 @@ export class PatternEditorTextParser {
 	private ctx: CanvasRenderingContext2D;
 	private rowSegmentsCache: Cache<string, FieldSegment[]>;
 	private cellPositionsCache: Cache<string, CellPosition[]>;
+	private effectColumnCounts: number[] = [];
 
 	constructor(
 		schema: Chip['schema'],
@@ -42,8 +48,12 @@ export class PatternEditorTextParser {
 		this.cellPositionsCache = cellPositionsCache;
 	}
 
+	setChannelEffectColumnCounts(counts: number[]): void {
+		this.effectColumnCounts = counts;
+	}
+
 	parseRowString(rowString: string, rowIndex: number): FieldSegment[] {
-		const cacheKey = `${rowString}:${rowIndex}`;
+		const cacheKey = `${rowString}:${rowIndex}:${this.effectColumnCounts.join(',')}`;
 		const cached = this.rowSegmentsCache.get(cacheKey);
 		if (cached) return cached;
 
@@ -98,17 +108,23 @@ export class PatternEditorTextParser {
 			skipSpaces();
 		}
 
-		const template = this.schema.template;
+		const counts = this.effectColumnCounts;
+		let channelIndex = 0;
 		while (pos < rowString.length) {
 			skipSpaces();
 			if (pos >= rowString.length) break;
+			if (counts.length > 0 && channelIndex >= counts.length) break;
 
+			const layout = getChannelLayout(
+				this.schema,
+				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS
+			);
 			const channelStart = pos;
 			let foundField = false;
 
 			PatternTemplateParser.parseTemplate(
-				template,
-				this.schema.fields,
+				layout.template,
+				layout.fields,
 				(key, field, isSpace) => {
 					if (isSpace) {
 						if (pos < rowString.length && rowString[pos] === ' ') {
@@ -131,7 +147,8 @@ export class PatternEditorTextParser {
 				}
 			);
 
-			if (!foundField) break;
+			if (!foundField || pos === channelStart) break;
+			channelIndex++;
 		}
 		this.rowSegmentsCache.set(cacheKey, segments);
 		return segments;
@@ -139,7 +156,7 @@ export class PatternEditorTextParser {
 
 	getCellPositions(rowString: string, rowIndex: number): CellPosition[] {
 		const fontInfo = this.ctx.font;
-		const cacheKey = `${rowString}:${rowIndex}:${fontInfo}`;
+		const cacheKey = `${rowString}:${rowIndex}:${fontInfo}:${this.effectColumnCounts.join(',')}`;
 		const cached = this.cellPositionsCache.get(cacheKey);
 		if (cached) return cached;
 
@@ -165,9 +182,7 @@ export class PatternEditorTextParser {
 				continue;
 			}
 
-			const field =
-				this.schema.fields[segment.fieldKey] ||
-				this.schema.globalFields?.[segment.fieldKey];
+			const field = resolveSchemaField(this.schema, segment.fieldKey);
 
 			if (segment.fieldKey === 'rowNum' || field?.skip) {
 				const skipText = rowString.substring(segment.start, segment.end);

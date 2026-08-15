@@ -4,6 +4,11 @@
 	import type { Table } from '../../models/project';
 	import { playbackStore } from '../../stores/playback.svelte';
 	import { projectStore } from '../../stores/project.svelte';
+	import {
+		getChannelEffectColumnLabel,
+		isChannelEffectFieldKey,
+		resolveSchemaField
+	} from '../../chips/base/channel-effect-columns';
 
 	let {
 		songIndex,
@@ -70,7 +75,7 @@
 			return '';
 		}
 
-		const field = schema.fields[selectedFieldKey] || schema.globalFields?.[selectedFieldKey];
+		const field = resolveSchemaField(schema, selectedFieldKey);
 		if (!field) {
 			return '';
 		}
@@ -89,8 +94,9 @@
 			return 'Volume: Set channel volume (1-F), 0 = mute, . = keep previous.';
 		}
 
-		if (selectedFieldKey === 'effect') {
-			return 'Effect: Enter effect command (e.g., A137, S.03, P30F). Check effects list for available commands.';
+		if (isChannelEffectFieldKey(selectedFieldKey)) {
+			const label = getChannelEffectColumnLabel(selectedFieldKey) ?? 'Effect';
+			return `${label}: Enter effect command (e.g., A137, S.03, P30F). Check effects list for available commands.`;
 		}
 
 		if (selectedFieldKey === 'envelopeEffect') {
@@ -147,8 +153,10 @@
 		let effect: { parameter: number; tableIndex?: number } | null = null;
 		for (const channel of pattern.channels) {
 			const row = channel.rows[rowIdx];
-			if (!row?.effects?.[0] || row.effects[0].effect !== SPEED_EFFECT_TYPE) continue;
-			effect = row.effects[0];
+			for (const slot of row?.effects ?? []) {
+				if (!slot || slot.effect !== SPEED_EFFECT_TYPE) continue;
+				effect = slot;
+			}
 		}
 		return effect;
 	}

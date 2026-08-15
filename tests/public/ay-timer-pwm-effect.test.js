@@ -104,6 +104,19 @@ describe('ay-timer-pwm-effect', () => {
 		expect(state.channelTimerPwmSweep[0]).toBe(502);
 	});
 
+	it('applies two timer pwm commands on the same row', () => {
+		const state = createState();
+		processAyTimerPwmEffect(state, 0, {
+			effects: [
+				{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x80 },
+				{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0x9e }
+			]
+		});
+
+		expect(state.channelTimerPwmSweepMinOverride[0]).toBe(50);
+		expect(state.channelTimerPwmDutyOverride[0]).toBe(62);
+	});
+
 	it('resolves instrument values when overrides are inactive', () => {
 		const state = createState();
 		expect(resolveChannelTimerPwmDuty(state, 0, 40)).toBe(40);
