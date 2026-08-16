@@ -117,6 +117,11 @@
 		selectedColumn = 0;
 		selectedFieldKey = null;
 		selectedChannelIndex = -1;
+		if (projectStore.songs.length === 0) {
+			patternEditors = [];
+			patternEditor = null;
+			return;
+		}
 		tick().then(() => {
 			const firstEditor = patternEditors[0];
 			patternEditor = firstEditor ?? null;

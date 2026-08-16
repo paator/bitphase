@@ -325,12 +325,20 @@
 
 	function findOrCreatePattern(patternId: number): Pattern {
 		const song = projectStore.songs[songIndex];
+		if (!song) {
+			return PatternService.createEmptyPattern(
+				patternId,
+				schema,
+				undefined,
+				projectStore.getDefaultPatternLength()
+			);
+		}
 		const { pattern, newPatterns } = PatternService.findOrCreatePattern(
 			patterns,
 			patternId,
-			song?.getSchema() ?? schema,
-			song?.getEffectiveChannelLabels(),
-			song?.defaultPatternLength ?? projectStore.getDefaultPatternLength()
+			song.getSchema() ?? schema,
+			song.getEffectiveChannelLabels(),
+			song.defaultPatternLength ?? projectStore.getDefaultPatternLength()
 		);
 		if (newPatterns !== patterns) {
 			updatePatterns(newPatterns);
@@ -339,6 +347,7 @@
 	}
 
 	$effect(() => {
+		if (!projectStore.songs[songIndex]) return;
 		const patternId = patternOrder[currentPatternOrderIndex];
 		if (patternId === undefined || currentPattern) return;
 		findOrCreatePattern(patternId);
@@ -1103,7 +1112,9 @@
 				lineHeight,
 				createPatternIfMissing: (patternId: number) => {
 					const newPattern = createEmptyPatternForSong(patternId);
-					updatePatterns([...patterns, newPattern]);
+					if (projectStore.songs[songIndex]) {
+						updatePatterns([...patterns, newPattern]);
+					}
 					return newPattern;
 				}
 			},

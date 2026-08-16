@@ -135,8 +135,9 @@ class ProjectStore {
 		) {
 			song.defaultPatternLength = projectDefaultPatternLength;
 		}
+		const nextIndex = this.songs.length;
 		this.songs = [...this.songs, song];
-		this.patterns = [...this.patterns, song.patterns];
+		this.patterns = [...this.patterns.slice(0, nextIndex), song.patterns];
 		this.ensureDefaultInstrumentForChip(song.chipType);
 	}
 
@@ -163,6 +164,7 @@ class ProjectStore {
 	}
 
 	updatePatterns(songIndex: number, newPatterns: Pattern[]): void {
+		if (songIndex < 0 || songIndex >= this.songs.length) return;
 		this.patterns[songIndex] = newPatterns;
 		this.patterns = [...this.patterns];
 	}

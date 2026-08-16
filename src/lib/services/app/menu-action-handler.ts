@@ -37,7 +37,7 @@ async function createNewSongFromMenu(ctx: MenuActionContext, chip: Chip): Promis
 	newSong.defaultPatternLength = projectStore.getDefaultPatternLength();
 	if (project.patternOrder.length > 0) {
 		const refPatterns = project.songs[0]?.patterns ?? [];
-		const schema = newSong.getSchema() ?? chip.schema;
+		const schema = chip.schema;
 		const uniquePatternIds = [...new Set(project.patternOrder)];
 		newSong.patterns = uniquePatternIds.map((id) => {
 			const refPattern = refPatterns.find((p) => p.id === id);
