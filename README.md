@@ -39,8 +39,8 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
 
 - Open and save Bitphase projects (`.btp`)
 - Import Pro Tracker 3 (`.pt3`) and Vortex Tracker 2 (`.vt2`) modules
-- Export WAV, PSG, TMR, and SNDH (not supporting timer effects yet)
-- Multi-chip PSG and TMR export as ZIP
+- Export WAV, PSG, TAYM, VGM, and SNDH (not supporting timer effects yet)
+- Multi-chip PSG and TAYM export as ZIP
 - Command-line `.btp` to WAV export (`pnpm btp-to-wav`)
 
 ### Workflow
@@ -158,7 +158,7 @@ bitphase/
 │       │   ├── app/         # Menu actions and app context
 │       │   ├── audio/       # Playback and AudioWorklet bridge
 │       │   ├── backup/      # Autobackup
-│       │   ├── file/        # Import/export (BTP, PT3, VT2, WAV, PSG, TMR, SNDH)
+│       │   ├── file/        # Import/export (BTP, PT3, VT2, WAV, PSG, TAYM, VGM, SNDH)
 │       │   ├── history/     # Undo/redo diff tracking
 │       │   ├── midi/        # MIDI input
 │       │   ├── modal/
@@ -177,7 +177,3 @@ bitphase/
     ├── public/              # Tests for public/ runtime scripts
     └── psg/
 ```
-
-## Documentation
-
-- [TMR format spec](docs/tmr-format.md) — Bitphase timer companion format for PSG export. In development!

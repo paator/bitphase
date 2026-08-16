@@ -99,7 +99,6 @@ export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
 				},
 				{ label: 'Documentation', type: 'normal', action: 'documentation' },
 				{ label: 'Effects', type: 'normal', action: 'effects' },
-				{ label: 'TMR Checker', type: 'normal', action: 'tmr-checker' },
 				{ label: 'About', type: 'normal', action: 'about' }
 			]
 		}

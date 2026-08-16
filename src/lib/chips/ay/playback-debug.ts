@@ -6,7 +6,23 @@ import {
 	AY_REGISTER_COUNT,
 	DEFAULT_AY_REGISTERS
 } from '../../services/file/ay/ay-export-utils';
-import { AY_REGISTER_NAMES, formatTimerFrequencyHz } from '../../services/file/tmr/tmr-parser';
+
+const AY_REGISTER_NAMES = [
+	'Tone A fine',
+	'Tone A coarse',
+	'Tone B fine',
+	'Tone B coarse',
+	'Tone C fine',
+	'Tone C coarse',
+	'Noise period',
+	'Mixer',
+	'Volume A',
+	'Volume B',
+	'Volume C',
+	'Env period fine',
+	'Env period coarse',
+	'Env shape'
+] as const;
 
 export const AY_PLAYBACK_DEBUG: ChipPlaybackDebugSpec = {
 	metrics: [
@@ -24,8 +40,7 @@ export const AY_PLAYBACK_DEBUG: ChipPlaybackDebugSpec = {
 			icon: 'sid',
 			accentClass: 'text-[var(--color-pattern-instrument)]',
 			readHz: (state, channelIndex) => state?.sidTimerHz[channelIndex] ?? null,
-			formatHz: (hz) =>
-				hz === null || hz <= 0 ? '—' : formatTimerFrequencyHz(hz)
+			formatHz: formatPlaybackFrequencyHz
 		},
 		{
 			key: 'sync',
@@ -33,8 +48,7 @@ export const AY_PLAYBACK_DEBUG: ChipPlaybackDebugSpec = {
 			icon: 'sync',
 			accentClass: 'text-[var(--color-pattern-envelope)]',
 			readHz: (state, channelIndex) => state?.syncbuzzerTimerHz[channelIndex] ?? null,
-			formatHz: (hz) =>
-				hz === null || hz <= 0 ? '—' : formatTimerFrequencyHz(hz)
+			formatHz: formatPlaybackFrequencyHz
 		}
 	],
 	registers: {
