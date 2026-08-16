@@ -2,5 +2,6 @@
 	"frozen_over.btp": { "label": "torin - Frozen Over", "group": "1xAY" },
 	"marina.btp": { "label": "Ryu Umemoto (conv. by phase-mod) - Marina", "group": "2xAY" },
 	"man.btp": { "label": "nIkO - man", "group": "1xAY" },
-	"kizuna.btp": { "label": "Pator - Kizuna", "group": "1xAY" }
+	"kizuna.btp": { "label": "Pator - Kizuna", "group": "1xAY" },
+	"bitphase_experiences.btp": { "label": "EA - Bitphase Experiences", "group": "1xAY" }
 }
