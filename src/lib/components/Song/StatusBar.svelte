@@ -135,6 +135,9 @@
 	});
 
 	const effectHint = $derived.by(() => {
+		if (playbackStore.isPlaying) {
+			return '';
+		}
 		if (
 			!pattern ||
 			selectedRow < 0 ||
