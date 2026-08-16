@@ -546,6 +546,10 @@
 		return cell?.fieldKey || null;
 	}
 
+	export function getSelectedChannelIndex(): number {
+		return getChannelIndexAtCursor();
+	}
+
 	export function getCurrentPatternLength(): number | null {
 		if (patternOrder.length === 0) return null;
 		const pattern = currentPattern;

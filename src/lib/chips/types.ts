@@ -23,4 +23,10 @@ export interface Chip {
 	previewRow?: Component<any>;
 	playbackDebug?: ChipPlaybackDebugSpec;
 	copyInstrumentFields?: (source: Instrument, target: Instrument) => void;
+	describeEffect?: (effect: {
+		effect: number;
+		delay: number;
+		parameter?: number;
+		tableIndex?: number;
+	}) => string | null;
 }

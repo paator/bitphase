@@ -66,6 +66,7 @@
 	let isRightPanelExpanded = $state(false);
 	let selectedColumn = $state(0);
 	let selectedFieldKey = $state<string | null>(null);
+	let selectedChannelIndex = $state(-1);
 
 	function clampPatternOrderIndex(index: number, patternOrderLength: number): number {
 		if (patternOrderLength <= 0) return 0;
@@ -115,6 +116,7 @@
 		sharedSelectedRow = 0;
 		selectedColumn = 0;
 		selectedFieldKey = null;
+		selectedChannelIndex = -1;
 		tick().then(() => {
 			const firstEditor = patternEditors[0];
 			patternEditor = firstEditor ?? null;
@@ -138,9 +140,11 @@
 		if (activeEditor) {
 			selectedColumn = activeEditor.getSelectedColumn();
 			selectedFieldKey = activeEditor.getSelectedFieldKey();
+			selectedChannelIndex = activeEditor.getSelectedChannelIndex();
 			const interval = setInterval(() => {
 				selectedColumn = activeEditor.getSelectedColumn();
 				selectedFieldKey = activeEditor.getSelectedFieldKey();
+				selectedChannelIndex = activeEditor.getSelectedChannelIndex();
 			}, 100);
 			return () => clearInterval(interval);
 		}
@@ -855,6 +859,7 @@
 			songIndex={activeEditorIndex}
 			selectedRow={sharedSelectedRow}
 			{selectedFieldKey}
+			{selectedChannelIndex}
 			currentPatternOrderIndex={sharedPatternOrderIndex}
 			chip={activeChipProcessor.chip} />
 	{/if}

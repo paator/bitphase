@@ -83,6 +83,43 @@ export function isAyTimerPwmTableEffect(effect: {
 	);
 }
 
+export function describeAyEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): string | null {
+	const table = effect.tableIndex !== undefined && effect.tableIndex >= 0;
+	if (isAyTimerPwmMinEffect(effect)) {
+		return table
+			? 'E1TY: PWM Min (Y: table)'
+			: 'E1XY: PWM Min (XY: duty)';
+	}
+	if (isAyTimerPwmMaxEffect(effect)) {
+		return table
+			? 'E2TY: PWM Max (Y: table)'
+			: 'E2XY: PWM Max (XY: duty)';
+	}
+	if (isAyTimerPwmSweepEffect(effect)) {
+		return table
+			? 'E3TY: PWM Sweep (Y: table)'
+			: 'E3XY: PWM Sweep (XY: speed)';
+	}
+	if (isAyTimerPwmShapeEffect(effect)) {
+		return table
+			? 'E4TY: PWM Shape (Y: table)'
+			: 'E4XY: PWM Shape (XY: shape)';
+	}
+	if (isAyTimerPwmStartEffect(effect)) {
+		return table
+			? 'E5TY: PWM Start (Y: table)'
+			: 'E5XY: PWM Start (XY: phase)';
+	}
+	if (isAyAutoEnvelopeEffect(effect)) {
+		return 'EAXY: Auto-Envelope (X: num; Y: den)';
+	}
+	return null;
+}
+
 export function isAyAutoEnvelopeEffect(effect: {
 	effect: number;
 	delay: number;

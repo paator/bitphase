@@ -63,3 +63,27 @@ export function isNesSweepDownTableEffect(effect: {
 export function isNesSweepEffect(effect: { effect: number; delay: number }): boolean {
 	return isNesSweepUpEffect(effect) || isNesSweepDownEffect(effect);
 }
+
+export function describeNesEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): string | null {
+	const table = effect.tableIndex !== undefined && effect.tableIndex >= 0;
+	if (isNesPulseWidthCycleEffect(effect)) {
+		return table
+			? 'E1TY: Pulse Width (Y: table)'
+			: 'E1XY: Pulse Width (XY: duty, 00=inst)';
+	}
+	if (isNesSweepUpEffect(effect)) {
+		return table
+			? 'E2TY: Sweep Up (Y: table)'
+			: 'E2XY: Sweep Up (X: time; Y: shift)';
+	}
+	if (isNesSweepDownEffect(effect)) {
+		return table
+			? 'E3TY: Sweep Down (Y: table)'
+			: 'E3XY: Sweep Down (X: time; Y: shift)';
+	}
+	return null;
+}

@@ -7,19 +7,23 @@
 	import {
 		getChannelEffectColumnLabel,
 		isChannelEffectFieldKey,
+		isEffectFieldKey,
 		resolveSchemaField
 	} from '../../chips/base/channel-effect-columns';
+	import { describePatternEffect, getEffectFromPattern } from '../../chips/base/effect-status';
 
 	let {
 		songIndex,
 		selectedRow,
 		selectedFieldKey,
+		selectedChannelIndex,
 		currentPatternOrderIndex,
 		chip
 	}: {
 		songIndex: number;
 		selectedRow: number;
 		selectedFieldKey: string | null;
+		selectedChannelIndex: number;
 		currentPatternOrderIndex: number;
 		chip: Chip;
 	} = $props();
@@ -128,6 +132,26 @@
 		}
 
 		return '';
+	});
+
+	const effectHint = $derived.by(() => {
+		if (
+			!pattern ||
+			selectedRow < 0 ||
+			selectedRow >= pattern.length ||
+			!selectedFieldKey ||
+			!isEffectFieldKey(selectedFieldKey)
+		) {
+			return '';
+		}
+
+		const effect = getEffectFromPattern(
+			pattern,
+			selectedRow,
+			selectedFieldKey,
+			selectedChannelIndex
+		);
+		return describePatternEffect(effect, chip) ?? '';
 	});
 
 	function patternsAtOrderIndex(
@@ -414,8 +438,15 @@
 
 <div
 	class="flex h-6 items-center gap-4 border-t border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] px-4 text-xs text-[var(--color-app-text-muted)]">
-	<div class="flex-1 truncate">
-		{helpMessage || '=== Ready ==='}
+	<div class="flex min-w-0 flex-1 items-center gap-4">
+		<div class="min-w-0 flex-1 truncate">
+			{helpMessage || '=== Ready ==='}
+		</div>
+		{#if effectHint}
+			<div class="shrink-0 text-[var(--color-app-text-secondary)]">
+				{effectHint}
+			</div>
+		{/if}
 	</div>
 	<div class="shrink-0">
 		Tick: {sampleCounter} / {maxSampleCounter}
