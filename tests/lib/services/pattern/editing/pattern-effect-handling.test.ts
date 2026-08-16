@@ -66,7 +66,7 @@ describe('PatternEffectHandling', () => {
 			expect(parsed.parameter).toBe(original.parameter);
 		});
 
-		it('effect 4 (sample position) formats as parameter even with tableIndex, ignores table syntax', () => {
+		it('effect 4 (instrument position) formats as parameter even with tableIndex, ignores table syntax', () => {
 			const result = PatternEffectHandling.formatEffectAsString({
 				effect: 4,
 				delay: 0,
@@ -76,7 +76,7 @@ describe('PatternEffectHandling', () => {
 			expect(result).toBe('4.0A');
 		});
 
-		it('effect 5 (ornament position) parses 5050 as parameter not table', () => {
+		it('effect 5 (table position) parses 5050 as parameter not table', () => {
 			const result = PatternEffectHandling.parseEffectFromString('5050');
 			expect(result.effect).toBe(5);
 			expect(result.parameter).toBe(0x50);

@@ -63,15 +63,15 @@ Smoothly slides from the previous note to the current note (`PXYZ` / `PXTY`).
 
 **Example:** `P30F` - delay 3, speed `0F`.
 
-### 4 - Sample position
+### 4 - Instrument position
 
 Sets the starting row within the instrument (`4.XY`).
 
 **Example:** `4.05` - start instrument from row 5.
 
-### 5 - Ornament position
+### 5 - Table position
 
-Sets the starting position within the table / ornament (`5.XY`).
+Sets the starting position within the table (`5.XY`).
 
 **Example:** `5.03` - start table from row 3.
 

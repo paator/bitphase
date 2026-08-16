@@ -99,7 +99,7 @@
 		},
 		{
 			code: '4',
-			name: 'Sample Position',
+			name: 'Instrument Position',
 			description: 'Sets the starting row within the instrument (4.XY).',
 			format: '4.XY',
 			parameter: 'XY - instrument row index to start from (00-FF)',
@@ -107,8 +107,8 @@
 		},
 		{
 			code: '5',
-			name: 'Ornament Position',
-			description: 'Sets the starting position within the table / ornament (5.XY).',
+			name: 'Table Position',
+			description: 'Sets the starting position within the table (5.XY).',
 			format: '5.XY',
 			parameter: 'XY - table row index to start from (00-FF)',
 			example: '5.03 - start table from row 3'

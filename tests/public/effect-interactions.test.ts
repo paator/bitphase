@@ -338,8 +338,8 @@ describe('Channel effect interactions', () => {
 		});
 	});
 
-	describe('sample position and ornament position', () => {
-		it('effect 4 (sample position) sets instrumentPositions immediately', () => {
+	describe('instrument position and table position', () => {
+		it('effect 4 (instrument position) sets instrumentPositions immediately', () => {
 			state.instrumentPositions[0] = 0;
 
 			const row = makeRow(4, 2, [
@@ -350,7 +350,7 @@ describe('Channel effect interactions', () => {
 			expect(state.instrumentPositions[0]).toBe(10);
 		});
 
-		it('effect 5 (ornament position) sets tablePositions immediately', () => {
+		it('effect 5 (table position) sets tablePositions immediately', () => {
 			state.tablePositions[0] = 0;
 
 			const row = makeRow(4, 2, [
