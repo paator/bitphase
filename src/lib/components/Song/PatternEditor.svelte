@@ -1116,7 +1116,7 @@
 	function setupCanvas(): boolean {
 		if (!canvas) return false;
 
-		ctx = canvas.getContext('2d')!;
+		ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
 		try {
 			const effectiveFontFamily =
@@ -3140,7 +3140,7 @@
 		}
 
 		if (needsSetup || !ctx || chipTypeChanged) {
-			ctx = canvas.getContext('2d')!;
+			ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 			const ready = setupCanvas();
 			needsSetup = false;
 			if (ready && !document.hidden) draw();

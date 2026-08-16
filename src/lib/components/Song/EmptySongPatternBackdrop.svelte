@@ -90,7 +90,7 @@
 		const chip = getChipByType(chipType);
 		if (!chip) return false;
 
-		ctx = canvas.getContext('2d');
+		ctx = canvas.getContext('2d', { willReadFrequently: true });
 		if (!ctx) return false;
 
 		const colors = getColors();

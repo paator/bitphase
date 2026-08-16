@@ -17,7 +17,7 @@
 	}: {
 		label: string;
 		icon: string;
-		type: 'normal' | 'expandable' | 'divider';
+		type: 'normal' | 'expandable' | 'divider' | 'header';
 		action?: string;
 		items: MenuItem[];
 		shortcut?: string;
@@ -136,6 +136,12 @@
 
 {#if type === 'divider'}
 	<div class="my-[0.2rem] h-px bg-[var(--color-app-border)]" role="separator"></div>
+{:else if type === 'header'}
+	<div
+		class="px-1.5 pt-1.5 pb-0.5 text-[10px] font-semibold tracking-wide text-[var(--color-app-text-muted)]"
+		role="presentation">
+		{label}
+	</div>
 {:else}
 	<div
 		class="menu-panel-button relative flex cursor-pointer items-center justify-between gap-3 px-1.5 py-[0.2rem] text-xs whitespace-nowrap hover:bg-[var(--color-app-surface-hover)]"

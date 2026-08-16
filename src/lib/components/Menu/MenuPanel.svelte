@@ -54,7 +54,7 @@
 	onclick={handlePanelClick}
 	role="menu">
 	{#if items && items.length > 0}
-		{#each items as item}
+		{#each items as item, index (`${item.action ?? `${item.type ?? 'normal'}:${item.label}`}:${index}`)}
 			<MenuPanelButton
 				label={item.label}
 				icon={item.icon || ''}
