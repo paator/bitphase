@@ -161,6 +161,19 @@ export const settingsItems: SettingsItem[] = [
 			{ value: 'inverted', label: 'Inverted' },
 			{ value: 'filled', label: 'Filled' }
 		]
+	},
+	{
+		label: 'Empty note alignment',
+		description:
+			'Vertical position of empty notes (`---`). Down-aligned matches empty fields that use dots',
+		type: 'select',
+		defaultValue: 'center',
+		setting: 'emptyNoteAlignment',
+		category: 'appearance',
+		options: [
+			{ value: 'center', label: 'Centered' },
+			{ value: 'baseline', label: 'Down-aligned' }
+		]
 	}
 ];
 

@@ -286,6 +286,7 @@
 	let fontFamily = $derived(settingsStore.patternEditorFontFamily);
 	let channelSeparatorWidth = $derived(settingsStore.channelSeparatorWidth);
 	let selectionStyle = $derived(settingsStore.selectionStyle);
+	let emptyNoteAlignment = $derived(settingsStore.emptyNoteAlignment);
 	let canvasWidth = $state(PATTERN_EDITOR_CONSTANTS.DEFAULT_CANVAS_WIDTH);
 	let canvasHeight = $state(PATTERN_EDITOR_CONSTANTS.DEFAULT_CANVAS_HEIGHT);
 	let lineHeight = $derived(fontSize * PATTERN_EDITOR_CONSTANTS.LINE_HEIGHT_MULTIPLIER);
@@ -1169,7 +1170,8 @@
 				lineHeight,
 				schema,
 				channelSeparatorWidth,
-				selectionStyle
+				selectionStyle,
+				emptyNoteAlignment
 			});
 
 			if (fontFamily && fontFamily !== 'monospace') {
@@ -1229,7 +1231,8 @@
 						lineHeight,
 						schema,
 						channelSeparatorWidth,
-						selectionStyle
+						selectionStyle,
+						emptyNoteAlignment
 					});
 					draw();
 				}
@@ -3118,6 +3121,7 @@
 	let lastFontFamily = '';
 	let lastChannelSeparatorWidth = -1;
 	let lastSelectionStyle: 'inverted' | 'filled' = 'inverted';
+	let lastEmptyNoteAlignment: 'center' | 'baseline' = 'center';
 	let lastChannelCount = -1;
 	let lastChipType = '';
 	let needsSetup = true;
@@ -3142,6 +3146,7 @@
 		const fontFamilyChanged = fontFamily !== lastFontFamily;
 		const channelSeparatorWidthChanged = channelSeparatorWidth !== lastChannelSeparatorWidth;
 		const selectionStyleChanged = selectionStyle !== lastSelectionStyle;
+		const emptyNoteAlignmentChanged = emptyNoteAlignment !== lastEmptyNoteAlignment;
 		const chipTypeChanged = chipType !== lastChipType;
 
 		if (chipTypeChanged) {
@@ -3166,6 +3171,7 @@
 			lastFontFamily = fontFamily;
 			lastChannelSeparatorWidth = channelSeparatorWidth;
 			lastSelectionStyle = selectionStyle;
+			lastEmptyNoteAlignment = emptyNoteAlignment;
 			lastChannelCount = currentChannelCount;
 			lastChipType = chipType;
 			requestAnimationFrame(() => {
@@ -3182,7 +3188,8 @@
 			fontSizeChanged ||
 			fontFamilyChanged ||
 			channelSeparatorWidthChanged ||
-			selectionStyleChanged
+			selectionStyleChanged ||
+			emptyNoteAlignmentChanged
 		) {
 			clearAllCaches();
 			const ready = setupCanvas();
@@ -3191,6 +3198,7 @@
 			lastFontFamily = fontFamily;
 			lastChannelSeparatorWidth = channelSeparatorWidth;
 			lastSelectionStyle = selectionStyle;
+			lastEmptyNoteAlignment = emptyNoteAlignment;
 			lastCanvasWidth = canvasWidth;
 			lastCanvasHeight = canvasHeight;
 			return;

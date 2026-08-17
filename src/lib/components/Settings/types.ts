@@ -14,6 +14,7 @@ export interface Settings {
 	previewFullRow: boolean;
 	debugMode: boolean;
 	selectionStyle: 'inverted' | 'filled';
+	emptyNoteAlignment: 'center' | 'baseline';
 }
 
 export interface SettingsItem {

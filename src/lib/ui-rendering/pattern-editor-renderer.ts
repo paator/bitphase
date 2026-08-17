@@ -12,6 +12,10 @@ import {
 	resolveSchemaField,
 	schemaHasChannelEffects
 } from '../chips/base/channel-effect-columns';
+import {
+	emptyNoteBaselineYOffset,
+	type EmptyNoteAlignment
+} from './empty-note-alignment';
 
 export const CHANNEL_LEVEL_STRIP_HEIGHT = 6;
 const EFFECT_COLUMN_CONTROL_MIN_WIDTH = 10;
@@ -23,6 +27,7 @@ export interface PatternEditorRenderOptions extends Omit<BaseRenderOptions, 'col
 	schema: Chip['schema'];
 	channelSeparatorWidth: number;
 	selectionStyle: 'inverted' | 'filled';
+	emptyNoteAlignment: EmptyNoteAlignment;
 }
 
 export interface RowRenderData {
@@ -60,6 +65,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	private patternColors: ReturnType<typeof getColors>;
 	private channelSeparatorWidth: number;
 	private selectionStyle: 'inverted' | 'filled';
+	private emptyNoteAlignment: EmptyNoteAlignment;
+	private emptyNoteBaselineOffset: number | null = null;
 	private channelPositionsCacheKey = '';
 	private channelPositionsCache: number[] = [];
 	private stripBackground: ImageData | null = null;
@@ -73,6 +80,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.patternColors = options.colors;
 		this.channelSeparatorWidth = options.channelSeparatorWidth;
 		this.selectionStyle = options.selectionStyle;
+		this.emptyNoteAlignment = options.emptyNoteAlignment;
 	}
 
 	setChannelEffectColumnCounts(counts: number[]): void {
@@ -819,6 +827,9 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		let currentSegment = data.segments[0];
 		const originalAlpha = this.ctx.globalAlpha;
 		const channelIndexByChar = this.buildChannelIndexByChar(data.rowString);
+		const baseY = data.y + this.lineHeight / 2;
+		const emptyNoteYOffset =
+			this.emptyNoteAlignment === 'baseline' ? this.getEmptyNoteBaselineOffset() : 0;
 
 		for (let i = 0; i < data.rowString.length; i++) {
 			const char = data.rowString[i];
@@ -843,11 +854,27 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			}
 
 			const color = this.determineCharColor(char, data, currentSegment, i);
-			this.fillText(char, x, data.y + this.lineHeight / 2, color);
+			const fieldText = currentSegment
+				? data.rowString.substring(currentSegment.start, currentSegment.end)
+				: '';
+			const y = fieldText === '---' ? baseY + emptyNoteYOffset : baseY;
+			this.fillText(char, x, y, color);
 			x += this.measureText(char);
 		}
 
 		this.ctx.globalAlpha = originalAlpha;
+	}
+
+	private getEmptyNoteBaselineOffset(): number {
+		if (this.emptyNoteBaselineOffset !== null) {
+			return this.emptyNoteBaselineOffset;
+		}
+		this.emptyNoteBaselineOffset = emptyNoteBaselineYOffset(
+			this.ctx.measureText('-'),
+			this.ctx.measureText('.'),
+			this.lineHeight * 0.12
+		);
+		return this.emptyNoteBaselineOffset;
 	}
 
 	private buildChannelIndexByChar(rowString: string): Int16Array {

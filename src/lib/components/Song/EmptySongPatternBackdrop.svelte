@@ -32,6 +32,7 @@
 	const lineHeight = $derived(fontSize * PATTERN_EDITOR_CONSTANTS.LINE_HEIGHT_MULTIPLIER);
 	const channelSeparatorWidth = $derived(settingsStore.channelSeparatorWidth);
 	const selectionStyle = $derived(settingsStore.selectionStyle);
+	const emptyNoteAlignment = $derived(settingsStore.emptyNoteAlignment);
 
 	const rowStringCache = new Cache<string, string>();
 	const patternGenericCache = new Cache<number, GenericPattern>();
@@ -129,7 +130,8 @@
 			lineHeight,
 			schema: chip.schema,
 			channelSeparatorWidth,
-			selectionStyle
+			selectionStyle,
+			emptyNoteAlignment
 		});
 
 		return true;
@@ -219,6 +221,7 @@
 		fontFamily;
 		channelSeparatorWidth;
 		selectionStyle;
+		emptyNoteAlignment;
 		if (!pattern || !canvas) return;
 		paint();
 	});

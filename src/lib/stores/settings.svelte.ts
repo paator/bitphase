@@ -19,6 +19,7 @@ class SettingsStore {
 	previewFullRow = $state(true);
 	debugMode = $state(false);
 	selectionStyle = $state<'inverted' | 'filled'>('inverted');
+	emptyNoteAlignment = $state<'center' | 'baseline'>('center');
 
 	init(): void {
 		const stored = localStorage.getItem(STORAGE_KEY);
