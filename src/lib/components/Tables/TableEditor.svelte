@@ -32,6 +32,7 @@
 		focusRowEditorInputInRow,
 		shouldBlockRowEditorNumericKey
 	} from '../../utils/row-editor-numeric';
+	import PianoHelper from './PianoHelper.svelte';
 
 	let {
 		table,
@@ -166,12 +167,16 @@
 			const nextIndex = index + 1;
 			if (nextIndex < editorSync.rows.length) {
 				const currentRow = inputEl.closest('tr');
-				focusRowEditorInputInRow(currentRow?.nextElementSibling as HTMLTableRowElement | null);
+				focusRowEditorInputInRow(
+					currentRow?.nextElementSibling as HTMLTableRowElement | null
+				);
 			} else if (nextIndex === editorSync.rows.length) {
 				editorSync.addRow(() => 0);
 				setTimeout(() => {
 					const currentRow = inputEl.closest('tr');
-					focusRowEditorInputInRow(currentRow?.nextElementSibling as HTMLTableRowElement | null);
+					focusRowEditorInputInRow(
+						currentRow?.nextElementSibling as HTMLTableRowElement | null
+					);
 				}, 0);
 			}
 			return;
@@ -182,7 +187,9 @@
 			const prevIndex = index - 1;
 			if (prevIndex >= 0) {
 				const currentRow = inputEl.closest('tr');
-				focusRowEditorInputInRow(currentRow?.previousElementSibling as HTMLTableRowElement | null);
+				focusRowEditorInputInRow(
+					currentRow?.previousElementSibling as HTMLTableRowElement | null
+				);
 			}
 			return;
 		}
@@ -238,11 +245,16 @@
 			const shortcut = ShortcutString.fromEvent(event);
 			const action = keybindingsStore.getActionForShortcut(shortcut);
 			const delta =
-				action === ACTION_TRANSPOSE_OCTAVE_UP || action === ACTION_TRANSPOSE_OCTAVE_DOWN ? 10 : 1;
+				action === ACTION_TRANSPOSE_OCTAVE_UP || action === ACTION_TRANSPOSE_OCTAVE_DOWN
+					? 10
+					: 1;
 			if (action === ACTION_INCREMENT_VALUE || action === ACTION_TRANSPOSE_OCTAVE_UP) {
 				event.preventDefault();
 				incrementSelectedRows(delta);
-			} else if (action === ACTION_DECREMENT_VALUE || action === ACTION_TRANSPOSE_OCTAVE_DOWN) {
+			} else if (
+				action === ACTION_DECREMENT_VALUE ||
+				action === ACTION_TRANSPOSE_OCTAVE_DOWN
+			) {
 				event.preventDefault();
 				incrementSelectedRows(-delta);
 			}
@@ -340,10 +352,13 @@
 										{selected}
 										formatValue={(v) => formatRowEditorNumber(v, asHex)}
 										onPaintBegin={(_, value) =>
-											pitchDrag.begin(value, (v) => setValue('pitch', index, v))}
+											pitchDrag.begin(value, (v) =>
+												setValue('pitch', index, v)
+											)}
 										onPaintOver={(_, value) =>
 											pitchDrag.dragOverWithValue(value, (v) =>
-												setValue('pitch', index, v))} />
+												setValue('pitch', index, v)
+											)} />
 								{/each}
 							{/if}
 						</tr>
@@ -415,7 +430,8 @@
 										shiftDrag.begin(value, (v) => setValue('shift', index, v))}
 									onPaintOver={(_, value) =>
 										shiftDrag.dragOverWithValue(value, (v) =>
-											setValue('shift', index, v))} />
+											setValue('shift', index, v)
+										)} />
 							{/each}
 						</tr>
 					{/each}
@@ -423,4 +439,9 @@
 			</table>
 		{/if}
 	</div>
+
+	<PianoHelper
+		{asHex}
+		tableRows={editorSync.rows}
+		onInsert={(rows) => editorSync.applyRowChange(rows.slice(0, ROW_EDITOR_MAX_ROWS))} />
 </div>
