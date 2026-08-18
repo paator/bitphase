@@ -885,10 +885,9 @@ export function resolveTimerRowCount(instrument: Instrument): number {
 
 export function resolveTimerLoop(instrument: Instrument): number {
 	const extended = instrument as ExtendedInstrument;
-	if (extended.timerLoop !== undefined) {
-		return extended.timerLoop;
-	}
-	return instrument.loop ?? 0;
+	const loop = extended.timerLoop !== undefined ? extended.timerLoop : (instrument.loop ?? 0);
+	const maxLoop = Math.max(resolveTimerRowCount(instrument) - 1, 0);
+	return Math.max(0, Math.min(maxLoop, loop));
 }
 
 export function normalizeAyInstrumentFields(instrument: Instrument): AyInstrumentFields {

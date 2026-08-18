@@ -1,4 +1,8 @@
-import { cloneRowValue, createNextRow } from '../../components/RowEditorTable/row-list-operations';
+import {
+	clampLoopRow,
+	cloneRowValue,
+	createNextRow
+} from '../../components/RowEditorTable/row-list-operations';
 import { Instrument } from '../../models/song';
 import {
 	createDefaultAyTimerRow,
@@ -183,9 +187,8 @@ export class AyTimerEffectsController {
 		});
 	}
 
-	private clampTimerLoop(loop: number): number {
-		const maxLoop = Math.max(this.fields.timerRows.length - 1, 0);
-		return Math.max(0, Math.min(maxLoop, loop));
+	private clampTimerLoop(loop: number, rowCount = this.fields.timerRows.length): number {
+		return Math.max(0, clampLoopRow(loop, rowCount));
 	}
 
 	setTimerLoop(loop: number): void {
@@ -222,7 +225,7 @@ export class AyTimerEffectsController {
 		this.commitFields({
 			...this.fields,
 			timerRows: nextRows,
-			timerLoop: this.clampTimerLoop(this.fields.timerLoop)
+			timerLoop: this.clampTimerLoop(this.fields.timerLoop, nextRows.length)
 		});
 	}
 
@@ -230,10 +233,11 @@ export class AyTimerEffectsController {
 		if (this.fields.timerRows.length === 1) {
 			return;
 		}
+		const nextRows = this.fields.timerRows.filter((_, rowIndex) => rowIndex !== index);
 		this.commitFields({
 			...this.fields,
-			timerRows: this.fields.timerRows.filter((_, rowIndex) => rowIndex !== index),
-			timerLoop: this.clampTimerLoop(this.fields.timerLoop)
+			timerRows: nextRows,
+			timerLoop: this.clampTimerLoop(this.fields.timerLoop, nextRows.length)
 		});
 	}
 
@@ -245,10 +249,11 @@ export class AyTimerEffectsController {
 		if (rowsToKeep >= this.fields.timerRows.length) {
 			return;
 		}
+		const nextRows = this.fields.timerRows.slice(0, rowsToKeep);
 		this.commitFields({
 			...this.fields,
-			timerRows: this.fields.timerRows.slice(0, rowsToKeep),
-			timerLoop: this.clampTimerLoop(this.fields.timerLoop)
+			timerRows: nextRows,
+			timerLoop: this.clampTimerLoop(this.fields.timerLoop, nextRows.length)
 		});
 	}
 

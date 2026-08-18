@@ -68,6 +68,39 @@ describe('AyTimerEffectsController', () => {
 		expect(controller.fields.timerRows[0]?.sid).toBe(false);
 	});
 
+	it('moves the loop marker onto the last remaining row when the loop row is removed', () => {
+		let current = createInstrument([{ sid: false }, { sid: false }, { sid: false }]);
+		(current as Instrument & { timerLoop: number }).timerLoop = 2;
+		const controller = new AyTimerEffectsController(
+			() => current,
+			(instrument) => {
+				current = instrument;
+			},
+			() => false
+		);
+
+		expect(controller.fields.timerLoop).toBe(2);
+		controller.removeTimerRow(2);
+		expect(controller.fields.timerRows).toHaveLength(2);
+		expect(controller.fields.timerLoop).toBe(1);
+	});
+
+	it('clamps the loop marker when timer rows are truncated', () => {
+		let current = createInstrument([{ sid: false }, { sid: false }, { sid: false }, { sid: false }]);
+		(current as Instrument & { timerLoop: number }).timerLoop = 3;
+		const controller = new AyTimerEffectsController(
+			() => current,
+			(instrument) => {
+				current = instrument;
+			},
+			() => false
+		);
+
+		controller.setTimerRowCount(2);
+		expect(controller.fields.timerRows).toHaveLength(2);
+		expect(controller.fields.timerLoop).toBe(1);
+	});
+
 	it('removes waveform steps for a row down to the minimum length', () => {
 		let current = createInstrument([{ sid: false, timerWaveform: [15, 0, 1] }]);
 		const controller = new AyTimerEffectsController(
