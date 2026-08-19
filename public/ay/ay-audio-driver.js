@@ -718,74 +718,18 @@ class AYAudioDriver {
 		registerState,
 		channelIndex,
 		instrument,
-		isSoundEnabled,
-		onOffHalted
+		isSoundEnabled
 	) {
-		const hasRows = instrument.rows && instrument.rows.length > 0;
-		const defaultInstrumentRow = {
-			tone: false,
-			noise: false,
-			envelope: false,
-			retriggerEnvelope: false,
-			toneAdd: 0,
-			noiseAdd: 0,
-			envelopeAdd: 0,
-			volume: 15,
-			amplitudeSliding: false,
-			amplitudeSlideUp: false,
-			toneAccumulation: false,
-			noiseAccumulation: false,
-			envelopeAccumulation: false
-		};
-		const effectiveRows = hasRows ? instrument.rows : [defaultInstrumentRow];
-		const effectiveRowsLength = effectiveRows.length;
-		const effectiveLoop = hasRows ? instrument.loop : 0;
-		const timerPlayback = this.resolveTimerRowPlayback(instrument);
-		const rowIndex = state.instrumentPositions[channelIndex] % effectiveRowsLength;
-		const instrumentRow = effectiveRows[rowIndex];
-		if (!instrumentRow) {
-			registerState.channels[channelIndex].mixer.tone = false;
-			registerState.channels[channelIndex].mixer.noise = false;
-			registerState.channels[channelIndex].mixer.envelope = false;
-			this.channelMixerState[channelIndex].tone = false;
-			this.channelMixerState[channelIndex].noise = false;
-			this.channelMixerState[channelIndex].envelope = false;
-			disableAllChannelTimerEffects(ensureChannelTimerEffects(registerState.channels[channelIndex]));
-			this.advanceChannelInstrumentRows(
-				state,
-				channelIndex,
-				effectiveRowsLength,
-				effectiveLoop,
-				timerPlayback.timerRowsLength,
-				timerPlayback.timerLoop,
-				onOffHalted
-			);
-			return;
-		}
-
-		if (instrumentRow.volume >= 0) {
-			state.channelInstrumentVolumes[channelIndex] = instrumentRow.volume;
-		}
-
-		if (instrumentRow.amplitudeSliding) {
-			if (instrumentRow.amplitudeSlideUp) {
-				if (state.channelAmplitudeSliding[channelIndex] < 15) {
-					state.channelAmplitudeSliding[channelIndex]++;
-				}
-			} else if (state.channelAmplitudeSliding[channelIndex] > -15) {
-				state.channelAmplitudeSliding[channelIndex]--;
-			}
-		}
+		state.channelInstrumentVolumes[channelIndex] = 15;
+		state.channelAmplitudeSliding[channelIndex] = 0;
 
 		const patternVolume = state.channelPatternVolumes[channelIndex];
-		const instrumentVolume = state.channelInstrumentVolumes[channelIndex];
-		const amplitudeSliding = state.channelAmplitudeSliding[channelIndex];
 		const envelopeOnOffActive = state.envelopeOnOffCounter > 0;
 		const envelopeDisabledByOnOff = envelopeOnOffActive && !state.envelopeOnOffEnabled;
 		const finalVolume = this.calculateVolume(
 			patternVolume,
-			instrumentVolume,
-			amplitudeSliding,
+			15,
+			0,
 			false,
 			false,
 			false,
@@ -801,47 +745,36 @@ class AYAudioDriver {
 			this.channelMixerState[channelIndex].tone = false;
 			this.channelMixerState[channelIndex].noise = false;
 			this.channelMixerState[channelIndex].envelope = false;
-		} else {
-			registerState.channels[channelIndex].mixer.tone = false;
-			registerState.channels[channelIndex].mixer.noise = false;
-			registerState.channels[channelIndex].mixer.envelope = false;
-			this.channelMixerState[channelIndex].tone = false;
-			this.channelMixerState[channelIndex].noise = false;
-			this.channelMixerState[channelIndex].envelope = false;
-			state.channelEnvelopeEnabled[channelIndex] = false;
-			registerState.channels[channelIndex].volume = finalVolume;
-
-			const sidPeriod = computeSampleSidPeriod(
-				state.aymFrequency,
-				resolveSamplePlaybackRate(instrument, 44100)
-			);
-			const sidBaseVolume = getAySidBaseVolume(finalVolume);
-			disableAllChannelTimerEffects(ensureChannelTimerEffects(registerState.channels[channelIndex]));
-			ensureChannelTimerEffects(registerState.channels[channelIndex]).sid = createVolumeTimerEffect({
-				enabled: true,
-				pwm: false,
-				period: sidPeriod,
-				periodLow: sidPeriod,
-				baseVolume: sidBaseVolume,
-				waveform: [15, 0],
-				waveformLoop: 0,
-				resetPhase: state.channelTimerEffectReset?.[channelIndex] ?? false
-			});
-			if (state.channelTimerEffectReset) {
-				state.channelTimerEffectReset[channelIndex] = false;
-			}
+			return;
 		}
 
-		if (!onOffHalted) {
-			this.advanceChannelInstrumentRows(
-				state,
-				channelIndex,
-				effectiveRowsLength,
-				effectiveLoop,
-				timerPlayback.timerRowsLength,
-				timerPlayback.timerLoop,
-				onOffHalted
-			);
+		registerState.channels[channelIndex].mixer.tone = false;
+		registerState.channels[channelIndex].mixer.noise = false;
+		registerState.channels[channelIndex].mixer.envelope = false;
+		this.channelMixerState[channelIndex].tone = false;
+		this.channelMixerState[channelIndex].noise = false;
+		this.channelMixerState[channelIndex].envelope = false;
+		state.channelEnvelopeEnabled[channelIndex] = false;
+		registerState.channels[channelIndex].volume = finalVolume;
+
+		const sidPeriod = computeSampleSidPeriod(
+			state.aymFrequency,
+			resolveSamplePlaybackRate(instrument, 44100)
+		);
+		const sidBaseVolume = getAySidBaseVolume(finalVolume);
+		disableAllChannelTimerEffects(ensureChannelTimerEffects(registerState.channels[channelIndex]));
+		ensureChannelTimerEffects(registerState.channels[channelIndex]).sid = createVolumeTimerEffect({
+			enabled: true,
+			pwm: false,
+			period: sidPeriod,
+			periodLow: sidPeriod,
+			baseVolume: sidBaseVolume,
+			waveform: [15, 0],
+			waveformLoop: 0,
+			resetPhase: state.channelTimerEffectReset?.[channelIndex] ?? false
+		});
+		if (state.channelTimerEffectReset) {
+			state.channelTimerEffectReset[channelIndex] = false;
 		}
 	}
 
@@ -936,8 +869,7 @@ class AYAudioDriver {
 					registerState,
 					channelIndex,
 					instrument,
-					isSoundEnabled,
-					onOffHalted
+					isSoundEnabled
 				);
 				continue;
 			}

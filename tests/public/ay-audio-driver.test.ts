@@ -879,6 +879,118 @@ describe('AYAudioDriver', () => {
 			expect(registerState.channels[0].mixer.tone).toBe(true);
 			expect(registerState.channels[0].mixer.noise).toBe(false);
 		});
+
+		it('sample instruments ignore leftover mixer volume fadeout', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setTuningTable([600]);
+			state.setInstruments([
+				{
+					id: '01',
+					rows: [
+						{ tone: true, volume: 15, noise: false, envelope: false, amplitudeSliding: false },
+						{ tone: true, volume: 10, noise: false, envelope: false, amplitudeSliding: false },
+						{ tone: true, volume: 5, noise: false, envelope: false, amplitudeSliding: false },
+						{ tone: true, volume: 0, noise: false, envelope: false, amplitudeSliding: false }
+					],
+					loop: 3,
+					sampleData: [0, 64, 128, 192],
+					sampleRate: 44100,
+					sampleStart: 0,
+					sampleEnd: 3,
+					sampleLoopStart: 0,
+					sampleLoopEnabled: true
+				}
+			]);
+			state.channelInstruments = [0, -1, -1];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.envelopeEffectTable = -1;
+			const registerState = {
+				channels: [
+					{ tone: 600, volume: 0, mixer: { tone: false, noise: false, envelope: false } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } }
+				],
+				noise: 0,
+				envelopePeriod: 0,
+				envelopeShape: 0,
+				forceEnvelopeShapeWrite: false
+			};
+
+			for (let tick = 0; tick < 8; tick++) {
+				driver.processInstruments(state, registerState);
+				expect(registerState.channels[0].volume).toBe(15);
+				expect(registerState.channels[0].mixer.tone).toBe(false);
+				expect(registerState.channels[0].mixer.noise).toBe(false);
+				expect(registerState.channels[0].timerEffects.sid.baseVolume).toBe(15);
+			}
+			expect(state.channelAmplitudeSliding[0]).toBe(0);
+		});
+
+		it('sample instruments ignore leftover mixer amplitude slide', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setTuningTable([600]);
+			state.setInstruments([
+				{
+					id: '01',
+					rows: [
+						{
+							tone: true,
+							volume: 15,
+							noise: false,
+							envelope: false,
+							amplitudeSliding: true,
+							amplitudeSlideUp: false
+						}
+					],
+					loop: 0,
+					sampleData: [255],
+					sampleRate: 44100,
+					sampleStart: 0,
+					sampleEnd: 0,
+					sampleLoopStart: 0,
+					sampleLoopEnabled: true
+				}
+			]);
+			state.channelInstruments = [0, -1, -1];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.envelopeEffectTable = -1;
+			const registerState = {
+				channels: [
+					{ tone: 600, volume: 0, mixer: { tone: false, noise: false, envelope: false } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } },
+					{ tone: 0, volume: 0, mixer: { tone: false, noise: false, envelope: false } }
+				],
+				noise: 0,
+				envelopePeriod: 0,
+				envelopeShape: 0,
+				forceEnvelopeShapeWrite: false
+			};
+
+			for (let tick = 0; tick < 16; tick++) {
+				driver.processInstruments(state, registerState);
+			}
+			expect(registerState.channels[0].volume).toBe(15);
+			expect(state.channelAmplitudeSliding[0]).toBe(0);
+			expect(registerState.channels[0].timerEffects.sid.baseVolume).toBe(15);
+		});
 	});
 
 	describe('syncbuzzer envelope shape ownership', () => {
