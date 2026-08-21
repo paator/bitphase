@@ -1,22 +1,12 @@
 <script lang="ts">
 	import type { Chip } from '../types';
 	import type { Pattern } from '../../models/song';
-	import { Pattern as PatternModel, Note } from '../../models/song';
-	import type { PreviewNoteSupport } from '../base/processor';
-	import type { AudioService } from '../../services/audio/audio-service';
-	import { getContext } from 'svelte';
-	import {
-		parseNoteFromString,
-		formatNoteFromEnum,
-		midiNoteToNoteString
-	} from '../../utils/note-utils';
-	import { PatternNoteInput } from '../../services/pattern/editing/pattern-note-input';
+	import { createChipPreviewPlayground } from '../base/preview-playground.svelte';
+	import { parseClampedHex, sanitizeHexInput } from '../base/preview-row-utils';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
-	import { settingsStore } from '../../stores/settings.svelte';
-	import { midiService } from '../../services/midi/midi-service';
-	import { instrumentIdToNumber } from '../../utils/instrument-id';
 	import { playbackStore } from '../../stores/playback.svelte';
-	import { projectStore } from '../../stores/project.svelte';
+	import { formatNoteFromEnum, midiNoteToNoteString } from '../../utils/note-utils';
+	import { PatternNoteInput } from '../../services/pattern/editing/pattern-note-input';
 	import {
 		envelopePeriodToNoteString,
 		noteStringToEnvelopePeriod
@@ -24,11 +14,6 @@
 	import IconCarbonPlay from '~icons/carbon/play';
 	import IconCarbonPauseFilled from '~icons/carbon/pause-filled';
 	import { IconButton } from '../../components/IconButton';
-	import { keybindingsStore } from '../../stores/keybindings.svelte';
-	import { ShortcutString } from '../../utils/shortcut-string';
-	import { ACTION_TOGGLE_PLAYBACK } from '../../config/keybindings';
-	import { isValidTableDisplayChar, tableDisplayCharToId } from '../../utils/table-id';
-	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
 
 	let {
 		chip,
@@ -40,26 +25,12 @@
 		tuningTable?: number[];
 	} = $props();
 
-	const ROW_INDEX = 0;
-	const containerContext: { audioService: AudioService } = getContext('container');
-	let registerPreviewSpaceHandler: ((fn: (() => void) | null) => void) | undefined;
-	try {
-		registerPreviewSpaceHandler = getContext('registerPreviewSpaceHandler');
-	} catch {
-		registerPreviewSpaceHandler = undefined;
-	}
-	const schema = $derived(chip.schema);
-
 	let envelopePeriod = $state(0);
 	let noiseValue = $state('00');
 	let envelopeShape = $state('');
-	let table = $state('');
-	let volume = $state('F');
-	let activeNotes = $state<Array<{ key: string; note: string }>>([]);
-	let lastPlayedNotes = $state<string[]>(['C-4']);
-	let isPreviewPlaying = $state(false);
-	let noteInputEl: HTMLDivElement | null = $state(null);
 	let envelopeInputEl: HTMLDivElement | null = $state(null);
+	let envelopeHexInput = $state('0000');
+	let envelopeHexFocused = $state(false);
 
 	const envelopeAsNote = $derived(editorStateStore.envelopeAsNote);
 	const canEnvelopeAsNote = $derived(envelopeAsNote && tuningTable.length > 0);
@@ -68,271 +39,55 @@
 	);
 	const envelopeDisplayValue = $derived(
 		canEnvelopeAsNote
-			? (envelopePeriodToNoteString(envelopePeriod, tuningTable) ??
-					(envelopePeriod >>> 0).toString(16).toUpperCase().padStart(4, '0'))
-			: (envelopePeriod >>> 0).toString(16).toUpperCase().padStart(4, '0')
-	);
-	let envelopeHexInput = $state('0000');
-	let envelopeHexFocused = $state(false);
-
-	const previewProcessors = $derived(
-		containerContext.audioService.chipProcessors.filter(
-			(p) => p.chip === chip && 'playPreviewRow' in p && p.isAudioNodeAvailable()
-		)
-	);
-	const maxPoly = $derived(previewProcessors.length * 3);
-
-	const isDisabled = $derived(playbackStore.isPlaying);
-
-	let hadActiveNotes = $state(false);
-	let wasPlaying = $state(false);
-
-	let prevInstruments: typeof projectStore.instruments | undefined = $state();
-	let prevTables: typeof projectStore.tables | undefined = $state();
-	let savedStereoLayout: string | undefined = undefined;
-
-	$effect(() => {
-		if (isDisabled && !wasPlaying) {
-			activeNotes = [];
-			isPreviewPlaying = false;
-		}
-		wasPlaying = isDisabled;
-	});
-
-	$effect(() => {
-		const instruments = projectStore.instruments;
-		const tables = projectStore.tables;
-		const playing = isPreviewPlaying;
-		if (!playing) {
-			prevInstruments = instruments;
-			prevTables = tables;
-			return;
-		}
-		if (prevInstruments !== instruments || prevTables !== tables) {
-			prevInstruments = instruments;
-			prevTables = tables;
-			isPreviewPlaying = false;
-			queueMicrotask(() => {
-				isPreviewPlaying = true;
-			});
-		}
-	});
-
-	const effectiveNoteStrings = $derived(
-		isPreviewPlaying ? lastPlayedNotes : activeNotes.map((n) => n.note)
+			? (envelopePeriodToNoteString(envelopePeriod, tuningTable) ?? envelopeHexValue)
+			: envelopeHexValue
 	);
 
-	$effect(() => {
-		return () => {
-			if (savedStereoLayout !== undefined) {
-				containerContext.audioService.chipSettings
-					.forChip(chip.type)
-					.set('stereoLayout', savedStereoLayout);
-				savedStereoLayout = undefined;
-			}
-		};
-	});
-
-	$effect(() => {
-		const processors = previewProcessors as unknown as PreviewNoteSupport[];
-		if (processors.length === 0) return;
-		const hasNotes = effectiveNoteStrings.length > 0;
-		const chipSettings = containerContext.audioService.chipSettings.forChip(chip.type);
-		if (!hasNotes) {
-			if (hadActiveNotes) {
-				hadActiveNotes = false;
-				processors.forEach((proc) => proc.stopPreviewNote());
-				containerContext.audioService.setPreviewActiveForChips(null);
-				if (savedStereoLayout !== undefined) {
-					chipSettings.set('stereoLayout', savedStereoLayout);
-					savedStereoLayout = undefined;
-				}
-			}
-			return;
-		}
-		if (savedStereoLayout === undefined) {
-			savedStereoLayout = (chipSettings.get('stereoLayout') as string) ?? 'ABC';
-			chipSettings.set('stereoLayout', 'mono');
-		}
-		hadActiveNotes = true;
-		const chipIndices = containerContext.audioService.chipProcessors
-			.map((p, i) => (p.chip === chip ? i : -1))
-			.filter((i) => i >= 0);
-		if (chipIndices.length > 0) {
-			containerContext.audioService.setPreviewActiveForChips(chipIndices);
-		}
-		const normalizedId = instrumentId.toUpperCase().padStart(2, '0');
-		const currentInstrument = instrumentId
-			? filterInstrumentsForChip(projectStore.instruments, chip.type).find(
-					(i) => i.id.toUpperCase().padStart(2, '0') === normalizedId
-				)
-			: undefined;
-		processors.forEach((proc, processorIndex) => {
-			const start = processorIndex * 3;
-			const channelNotes = [
-				effectiveNoteStrings[start] ?? 'OFF',
-				effectiveNoteStrings[start + 1] ?? 'OFF',
-				effectiveNoteStrings[start + 2] ?? 'OFF'
-			];
-			proc.playPreviewRow(buildPreviewPattern(channelNotes), ROW_INDEX, currentInstrument);
-		});
-	});
-
-	$effect(() => {
-		const keys = activeNotes.map((n) => n.key);
-		if (keys.length === 0) return;
-		function onWindowKeyUp(e: KeyboardEvent) {
-			const action = keybindingsStore.getActionForShortcut(ShortcutString.fromEvent(e));
-			if (action === ACTION_TOGGLE_PLAYBACK) return;
-			if (keys.includes(e.key)) {
-				const nextNotes = activeNotes.filter((n) => n.key !== e.key);
-				if (nextNotes.length === 0) {
-					lastPlayedNotes = activeNotes.map((n) => n.note);
-				}
-				activeNotes = nextNotes;
-			}
-		}
-		window.addEventListener('keyup', onWindowKeyUp);
-		return () => window.removeEventListener('keyup', onWindowKeyUp);
-	});
-
-	$effect(() => {
-		if (!settingsStore.midiInputDeviceId || isDisabled || !midiService.isSupported()) return;
-		const remove = midiService.addNoteListener((midiNote: number, velocity: number) => {
-			const noteFocused = noteInputEl && document.activeElement === noteInputEl;
-			const envelopeFocused =
-				canEnvelopeAsNote && envelopeInputEl && document.activeElement === envelopeInputEl;
-			if (noteFocused) {
-				if (velocity > 0) {
-					if (activeNotes.length >= maxPoly) return;
-					if (activeNotes.some((n) => n.key === `midi-${midiNote}`)) return;
-					const noteStr = midiNoteToNoteString(midiNote);
-					if (!noteStr) return;
-					activeNotes = [...activeNotes, { key: `midi-${midiNote}`, note: noteStr }];
-				} else {
-					const nextNotes = activeNotes.filter((n) => n.key !== `midi-${midiNote}`);
-					if (nextNotes.length === 0 && activeNotes.length > 0) {
-						lastPlayedNotes = activeNotes.map((n) => n.note);
-					}
-					activeNotes = nextNotes;
-				}
-			} else if (envelopeFocused && velocity > 0) {
-				const noteStr = midiNoteToNoteString(midiNote);
-				if (!noteStr) return;
-				const period = noteStringToEnvelopePeriod(
-					noteStr,
-					tuningTable,
-					editorStateStore.octave
-				);
-				envelopePeriod = Math.max(0, Math.min(0xffff, period));
-			}
-		});
-		return remove;
-	});
-
-	$effect(() => {
-		registerPreviewSpaceHandler?.(togglePreviewPlaying);
-		return () => registerPreviewSpaceHandler?.(null);
-	});
-
-	function togglePreviewPlaying() {
-		if (isDisabled || lastPlayedNotes.length === 0) return;
-		isPreviewPlaying = !isPreviewPlaying;
-	}
-
-	function parseHex4(s: string): number {
-		const n = parseInt(s.replace(/[^0-9a-fA-F]/g, '').slice(0, 4) || '0', 16);
-		return isNaN(n) ? 0 : Math.max(0, Math.min(0xffff, n));
-	}
-
-	function parseHex1(s: string): number {
-		const n = parseInt(s.replace(/[^0-9a-fA-F]/g, '').slice(0, 1) || '0', 16);
-		return isNaN(n) ? 0 : Math.max(0, Math.min(15, n));
-	}
-
-	function parseHex2(s: string): number {
-		const n = parseInt(s.replace(/[^0-9a-fA-F]/g, '').slice(0, 2) || '0', 16);
-		return isNaN(n) ? 0 : Math.max(0, Math.min(0x1f, n));
-	}
-
-	function parseTableChar(s: string): number {
-		if (!s || s.length === 0) return 0;
-		const c = s.toUpperCase().slice(0, 1);
-		if (c === '0') return -1;
-		const tableId = tableDisplayCharToId(c);
-		return tableId >= 0 ? tableId + 1 : 0;
-	}
-
-	function buildPreviewPattern(noteStrings: string[]): Pattern {
-		const pattern = new PatternModel(0, 1, schema) as Pattern;
+	function decoratePreviewPattern(pattern: Pattern) {
 		const pr = pattern.patternRows[0];
 		pr.envelopeValue = Math.max(0, Math.min(0xffff, envelopePeriod));
-		pr.noiseValue = parseHex2(noiseValue);
+		pr.noiseValue = parseClampedHex(noiseValue, 2, 0x1f);
 		pr.envelopeEffect = null;
-
-		const instNum = instrumentIdToNumber(instrumentId || '01') || 1;
-		const vol = volume ? Math.max(1, Math.min(15, parseHex1(volume))) : 15;
-		const shape = envelopeShape ? parseHex1(envelopeShape) : 0;
-		const tbl = parseTableChar(table);
-
-		for (let ch = 0; ch < 3; ch++) {
-			const row = pattern.channels[ch].rows[0];
-			row.instrument = instNum;
-			row.envelopeShape = shape;
-			row.table = tbl;
-			row.volume = vol;
-			row.effects = [null];
-			const noteStr = noteStrings[ch] ?? 'OFF';
-			const { noteName, octave } = parseNoteFromString(noteStr);
-			row.note = new Note(noteName, octave);
+		const shapeValue = envelopeShape ? parseClampedHex(envelopeShape, 1, 15) : 0;
+		for (const channel of pattern.channels) {
+			channel.rows[0].envelopeShape = shapeValue;
 		}
-		return pattern;
 	}
 
-	function handleNoteKeyDown(event: KeyboardEvent) {
-		if (isDisabled) return;
-		if (event.repeat) return;
-		const key = event.key;
-		if (activeNotes.some((n) => n.key === key)) return;
-		if (activeNotes.length >= maxPoly) return;
-		const keyLower = key.toLowerCase();
-		let noteStr: string;
-		const pianoNote = PatternNoteInput.mapKeyboardCodeToNote(event.code);
-		if (pianoNote) {
-			event.preventDefault();
-			noteStr = formatNoteFromEnum(pianoNote.noteName, pianoNote.octave);
-		} else if (keyLower === 'a') {
-			event.preventDefault();
-			noteStr = 'OFF';
-		} else {
-			const letterNote = PatternNoteInput.getLetterNote(event.key);
-			if (letterNote) {
-				event.preventDefault();
-				const octave = editorStateStore.octave;
-				noteStr = formatNoteFromEnum(letterNote, octave);
-			} else return;
-		}
-		activeNotes = [...activeNotes, { key, note: noteStr }];
+	function handleMidiNote(midiNote: number, velocity: number): boolean {
+		const envelopeFocused =
+			canEnvelopeAsNote && envelopeInputEl && document.activeElement === envelopeInputEl;
+		if (!envelopeFocused) return false;
+		if (velocity <= 0) return true;
+		const noteStr = midiNoteToNoteString(midiNote);
+		if (!noteStr) return true;
+		const period = noteStringToEnvelopePeriod(noteStr, tuningTable, editorStateStore.octave);
+		envelopePeriod = Math.max(0, Math.min(0xffff, period));
+		return true;
 	}
 
-	function handleNoteKeyUp(event: KeyboardEvent) {
-		if (isDisabled) return;
-		const key = event.key;
-		if (!activeNotes.some((n) => n.key === key)) return;
-		const nextNotes = activeNotes.filter((n) => n.key !== key);
-		if (nextNotes.length === 0) {
-			lastPlayedNotes = activeNotes.map((n) => n.note);
-		}
-		activeNotes = nextNotes;
-	}
+	const playground = createChipPreviewPlayground({
+		getChip: () => chip,
+		getInstrumentId: () => instrumentId,
+		decoratePreviewPattern,
+		onMidiNote: handleMidiNote
+	});
 
 	function clampEnvelopePeriod() {
 		envelopePeriod = Math.max(0, Math.min(0xffff, envelopePeriod));
 		envelopeHexInput = envelopeHexValue;
 	}
 
+	function clampNoiseValue() {
+		noiseValue = sanitizeHexInput(noiseValue, 2).padStart(2, '0') || '00';
+	}
+
+	function clampEnvelopeShape() {
+		envelopeShape = sanitizeHexInput(envelopeShape, 1);
+	}
+
 	function handleEnvelopeNoteKeyDown(event: KeyboardEvent) {
-		if (isDisabled || !canEnvelopeAsNote) return;
+		if (playbackStore.isPlaying || !canEnvelopeAsNote) return;
 		event.preventDefault();
 		const key = event.key;
 		const keyLower = key.toLowerCase();
@@ -352,50 +107,6 @@
 		const period = noteStringToEnvelopePeriod(noteStr, tuningTable, editorStateStore.octave);
 		envelopePeriod = Math.max(0, Math.min(0xffff, period));
 	}
-
-	function clampNoiseValue() {
-		const s = noiseValue
-			.replace(/[^0-9a-fA-F]/g, '')
-			.slice(0, 2)
-			.toUpperCase();
-		noiseValue = s.padStart(2, '0') || '00';
-	}
-
-	function clampEnvelopeShape() {
-		envelopeShape = envelopeShape
-			.replace(/[^0-9a-fA-F]/g, '')
-			.slice(0, 1)
-			.toUpperCase();
-	}
-
-	function clampTable() {
-		const c = table.slice(-1).toUpperCase();
-		if (c === '0' || isValidTableDisplayChar(c)) table = c;
-		else table = '';
-	}
-
-	function ensureMidiAccess() {
-		if (
-			settingsStore.midiInputDeviceId &&
-			midiService.isSupported() &&
-			!midiService.hasAccess()
-		) {
-			midiService.requestAccess();
-		}
-	}
-
-	function clampVolume() {
-		const v = volume
-			.replace(/[^0-9a-fA-F]/g, '')
-			.slice(0, 1)
-			.toUpperCase();
-		if (v) {
-			const n = parseInt(v, 16);
-			volume = n >= 1 && n <= 15 ? v : 'F';
-		} else {
-			volume = 'F';
-		}
-	}
 </script>
 
 <div class="flex flex-col gap-2">
@@ -406,18 +117,14 @@
 		<IconButton
 			variant="primary"
 			size="sm"
-			title={isPreviewPlaying
-				? `Stop preview (${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))})`
-				: `Play preview (${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))})`}
-			disabled={isDisabled || lastPlayedNotes.length === 0}
-			onclick={togglePreviewPlaying}>
-			{#snippet children()}
-				{#if isPreviewPlaying}
-					<IconCarbonPauseFilled class="h-3.5 w-3.5" />
-				{:else}
-					<IconCarbonPlay class="h-3.5 w-3.5" />
-				{/if}
-			{/snippet}
+			title={playground.playButtonTitle}
+			disabled={playground.playDisabled}
+			onclick={playground.togglePreviewPlaying}>
+			{#if playground.isPreviewPlaying}
+				<IconCarbonPauseFilled class="h-3.5 w-3.5" />
+			{:else}
+				<IconCarbonPlay class="h-3.5 w-3.5" />
+			{/if}
 		</IconButton>
 		<span>Preview playground</span>
 	</div>
@@ -435,14 +142,14 @@
 			{#if canEnvelopeAsNote}
 				<div
 					bind:this={envelopeInputEl}
-					class="flex h-7 w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
+					class="flex h-7 w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase focus:border-[var(--color-app-primary)] focus:outline-none {playground.isDisabled
 						? 'pointer-events-none cursor-not-allowed opacity-50'
 						: ''}"
 					role="textbox"
-					tabindex={isDisabled ? -1 : 0}
+					tabindex={playground.isDisabled ? -1 : 0}
 					aria-label="Envelope as note (keyboard: piano keys or letters)"
 					title="Envelope as note. Piano: Z–P, Q–I; A = OFF; letters = note with current octave."
-					onmousedown={ensureMidiAccess}
+					onmousedown={playground.ensureMidiAccess}
 					onclick={() => envelopeInputEl?.focus()}
 					onkeydown={handleEnvelopeNoteKeyDown}>
 					{envelopePeriod === 0 ? '—' : envelopeDisplayValue}
@@ -453,7 +160,7 @@
 					class="h-7 w-14 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 font-mono uppercase disabled:cursor-not-allowed disabled:opacity-50"
 					maxlength={4}
 					placeholder="0000"
-					disabled={isDisabled}
+					disabled={playground.isDisabled}
 					value={envelopeHexFocused ? envelopeHexInput : envelopeHexValue}
 					onfocus={() => {
 						envelopeHexFocused = true;
@@ -461,16 +168,13 @@
 					}}
 					onblur={() => {
 						envelopeHexFocused = false;
-						envelopePeriod = parseHex4(envelopeHexInput);
+						envelopePeriod = parseClampedHex(envelopeHexInput, 4, 0xffff);
 						clampEnvelopePeriod();
 					}}
 					oninput={(e) => {
-						const s = (e.currentTarget.value || '')
-							.replace(/[^0-9a-fA-F]/gi, '')
-							.slice(0, 4)
-							.toUpperCase();
+						const s = sanitizeHexInput(e.currentTarget.value || '', 4);
 						envelopeHexInput = s;
-						envelopePeriod = parseHex4(s);
+						envelopePeriod = parseClampedHex(s, 4, 0xffff);
 					}} />
 			{/if}
 		</label>
@@ -481,14 +185,11 @@
 				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
 				maxlength={1}
 				placeholder="0"
-				disabled={isDisabled}
+				disabled={playground.isDisabled}
 				bind:value={envelopeShape}
 				onblur={clampEnvelopeShape}
 				oninput={(e) => {
-					envelopeShape = (e.currentTarget.value || '')
-						.replace(/[^0-9a-fA-F]/gi, '')
-						.slice(0, 1)
-						.toUpperCase();
+					envelopeShape = sanitizeHexInput(e.currentTarget.value || '', 1);
 				}} />
 		</label>
 		<label class="flex flex-col gap-0.5">
@@ -498,14 +199,11 @@
 				class="h-7 w-10 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
 				maxlength={2}
 				placeholder="00"
-				disabled={isDisabled}
+				disabled={playground.isDisabled}
 				bind:value={noiseValue}
 				onblur={clampNoiseValue}
 				oninput={(e) => {
-					noiseValue = (e.currentTarget.value || '')
-						.replace(/[^0-9a-fA-F]/gi, '')
-						.slice(0, 2)
-						.toUpperCase();
+					noiseValue = sanitizeHexInput(e.currentTarget.value || '', 2);
 				}} />
 		</label>
 		<label class="flex flex-col gap-0.5">
@@ -515,13 +213,10 @@
 				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
 				maxlength={1}
 				placeholder="0"
-				disabled={isDisabled}
-				bind:value={table}
-				onblur={clampTable}
-				oninput={(e) => {
-					const v = (e.currentTarget.value || '').toUpperCase().slice(-1);
-					table = v === '0' || isValidTableDisplayChar(v) ? v : '';
-				}} />
+				disabled={playground.isDisabled}
+				bind:value={playground.table}
+				onblur={playground.clampTable}
+				oninput={playground.handleTableInput} />
 		</label>
 		<label class="flex flex-col gap-0.5">
 			<span class="text-[var(--color-app-text-muted)]">Volume</span>
@@ -530,49 +225,29 @@
 				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
 				maxlength={1}
 				placeholder="F"
-				disabled={isDisabled}
-				bind:value={volume}
-				onblur={clampVolume}
-				oninput={(e) => {
-					const v = (e.currentTarget.value || '')
-						.replace(/[^0-9a-fA-F]/gi, '')
-						.slice(0, 1)
-						.toUpperCase();
-					if (v) {
-						const n = parseInt(v, 16);
-						volume = n >= 1 && n <= 15 ? v : volume;
-					} else {
-						volume = '';
-					}
-				}} />
+				disabled={playground.isDisabled}
+				bind:value={playground.volume}
+				onblur={playground.clampVolume}
+				oninput={playground.handleVolumeInput} />
 		</label>
 		<div class="flex flex-col gap-0.5">
 			<span class="text-[var(--color-app-text-muted)]">Note</span>
 			<div
-				bind:this={noteInputEl}
-				class="flex h-7 max-w-[10rem] min-w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
+				bind:this={playground.noteInputEl}
+				class="flex h-7 max-w-[10rem] min-w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 focus:border-[var(--color-app-primary)] focus:outline-none {playground.isDisabled
 					? 'pointer-events-none cursor-not-allowed opacity-50'
 					: ''}"
 				role="textbox"
-				tabindex={isDisabled ? -1 : 0}
+				tabindex={playground.isDisabled ? -1 : 0}
 				aria-label="Note (keyboard: piano keys)"
-				aria-disabled={isDisabled}
-				title={`Click to focus, then use keyboard. Polyphony: ${maxPoly} notes (3 per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))} = toggle play.`}
-				onmousedown={ensureMidiAccess}
-				onclick={() => noteInputEl?.focus()}
-				onkeydown={handleNoteKeyDown}
-				onkeyup={handleNoteKeyUp}
-				onblur={() => {
-					if (activeNotes.length > 0) {
-						lastPlayedNotes = activeNotes.map((n) => n.note);
-					}
-					activeNotes = [];
-				}}>
-				{activeNotes.length > 0
-					? activeNotes.map((n) => n.note).join(' ')
-					: lastPlayedNotes.length > 0
-						? lastPlayedNotes.join(' ')
-						: '—'}
+				aria-disabled={playground.isDisabled}
+				title={playground.noteTitle}
+				onmousedown={playground.ensureMidiAccess}
+				onclick={playground.focusNoteInput}
+				onkeydown={playground.handleNoteKeyDown}
+				onkeyup={playground.handleNoteKeyUp}
+				onblur={playground.handleNoteBlur}>
+				{playground.noteDisplay}
 			</div>
 		</div>
 	</div>
