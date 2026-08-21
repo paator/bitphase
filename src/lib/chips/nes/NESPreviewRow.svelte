@@ -1,0 +1,408 @@
+<script lang="ts">
+	import type { Chip } from '../types';
+	import type { Pattern } from '../../models/song';
+	import { Pattern as PatternModel, Note } from '../../models/song';
+	import type { PreviewNoteSupport } from '../base/processor';
+	import type { AudioService } from '../../services/audio/audio-service';
+	import { getContext } from 'svelte';
+	import {
+		parseNoteFromString,
+		formatNoteFromEnum,
+		midiNoteToNoteString
+	} from '../../utils/note-utils';
+	import { PatternNoteInput } from '../../services/pattern/editing/pattern-note-input';
+	import { editorStateStore } from '../../stores/editor-state.svelte';
+	import { settingsStore } from '../../stores/settings.svelte';
+	import { midiService } from '../../services/midi/midi-service';
+	import { instrumentIdToNumber } from '../../utils/instrument-id';
+	import { playbackStore } from '../../stores/playback.svelte';
+	import { projectStore } from '../../stores/project.svelte';
+	import IconCarbonPlay from '~icons/carbon/play';
+	import IconCarbonPauseFilled from '~icons/carbon/pause-filled';
+	import { IconButton } from '../../components/IconButton';
+	import { keybindingsStore } from '../../stores/keybindings.svelte';
+	import { ShortcutString } from '../../utils/shortcut-string';
+	import { ACTION_TOGGLE_PLAYBACK } from '../../config/keybindings';
+	import { isValidTableDisplayChar, tableDisplayCharToId } from '../../utils/table-id';
+	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
+
+	let {
+		chip,
+		instrumentId = '01',
+		tuningTable = []
+	}: {
+		chip: Chip;
+		instrumentId?: string;
+		tuningTable?: number[];
+	} = $props();
+
+	const ROW_INDEX = 0;
+	const containerContext: { audioService: AudioService } = getContext('container');
+	let registerPreviewSpaceHandler: ((fn: (() => void) | null) => void) | undefined;
+	try {
+		registerPreviewSpaceHandler = getContext('registerPreviewSpaceHandler');
+	} catch {
+		registerPreviewSpaceHandler = undefined;
+	}
+	const schema = $derived(chip.schema);
+
+	let table = $state('');
+	let volume = $state('F');
+	let activeNotes = $state<Array<{ key: string; note: string }>>([]);
+	let lastPlayedNotes = $state<string[]>(['C-4']);
+	let isPreviewPlaying = $state(false);
+	let noteInputEl: HTMLDivElement | null = $state(null);
+
+	const previewProcessors = $derived(
+		containerContext.audioService.chipProcessors.filter(
+			(p) => p.chip === chip && 'playPreviewRow' in p && p.isAudioNodeAvailable()
+		)
+	);
+	const maxPoly = $derived(previewProcessors.length * 4);
+
+	const isDisabled = $derived(playbackStore.isPlaying);
+
+	let hadActiveNotes = $state(false);
+	let wasPlaying = $state(false);
+
+	let prevInstruments: typeof projectStore.instruments | undefined = $state();
+	let prevTables: typeof projectStore.tables | undefined = $state();
+
+	$effect(() => {
+		if (isDisabled && !wasPlaying) {
+			activeNotes = [];
+			isPreviewPlaying = false;
+		}
+		wasPlaying = isDisabled;
+	});
+
+	$effect(() => {
+		const instruments = projectStore.instruments;
+		const tables = projectStore.tables;
+		const playing = isPreviewPlaying;
+		if (!playing) {
+			prevInstruments = instruments;
+			prevTables = tables;
+			return;
+		}
+		if (prevInstruments !== instruments || prevTables !== tables) {
+			prevInstruments = instruments;
+			prevTables = tables;
+			isPreviewPlaying = false;
+			queueMicrotask(() => {
+				isPreviewPlaying = true;
+			});
+		}
+	});
+
+	const effectiveNoteStrings = $derived(
+		isPreviewPlaying ? lastPlayedNotes : activeNotes.map((n) => n.note)
+	);
+
+	$effect(() => {
+		return () => {
+		};
+	});
+
+	$effect(() => {
+		const processors = previewProcessors as unknown as PreviewNoteSupport[];
+		if (processors.length === 0) return;
+		const hasNotes = effectiveNoteStrings.length > 0;
+		const chipSettings = containerContext.audioService.chipSettings.forChip(chip.type);
+		if (!hasNotes) {
+			if (hadActiveNotes) {
+				hadActiveNotes = false;
+				processors.forEach((proc) => proc.stopPreviewNote());
+				containerContext.audioService.setPreviewActiveForChips(null);
+			}
+			return;
+		}
+		hadActiveNotes = true;
+		const chipIndices = containerContext.audioService.chipProcessors
+			.map((p, i) => (p.chip === chip ? i : -1))
+			.filter((i) => i >= 0);
+		if (chipIndices.length > 0) {
+			containerContext.audioService.setPreviewActiveForChips(chipIndices);
+		}
+		const normalizedId = instrumentId.toUpperCase().padStart(2, '0');
+		const currentInstrument = instrumentId
+			? filterInstrumentsForChip(projectStore.instruments, chip.type).find(
+					(i) => i.id.toUpperCase().padStart(2, '0') === normalizedId
+				)
+			: undefined;
+		processors.forEach((proc, processorIndex) => {
+			const start = processorIndex * 4;
+			const channelNotes = [
+				effectiveNoteStrings[start] ?? 'OFF',
+				effectiveNoteStrings[start + 1] ?? 'OFF',
+				effectiveNoteStrings[start + 2] ?? 'OFF',
+				effectiveNoteStrings[start + 3] ?? 'OFF'
+			];
+			proc.playPreviewRow(buildPreviewPattern(channelNotes), ROW_INDEX, currentInstrument);
+		});
+	});
+
+	$effect(() => {
+		const keys = activeNotes.map((n) => n.key);
+		if (keys.length === 0) return;
+		function onWindowKeyUp(e: KeyboardEvent) {
+			const action = keybindingsStore.getActionForShortcut(ShortcutString.fromEvent(e));
+			if (action === ACTION_TOGGLE_PLAYBACK) return;
+			if (keys.includes(e.key)) {
+				const nextNotes = activeNotes.filter((n) => n.key !== e.key);
+				if (nextNotes.length === 0) {
+					lastPlayedNotes = activeNotes.map((n) => n.note);
+				}
+				activeNotes = nextNotes;
+			}
+		}
+		window.addEventListener('keyup', onWindowKeyUp);
+		return () => window.removeEventListener('keyup', onWindowKeyUp);
+	});
+
+	$effect(() => {
+		if (!settingsStore.midiInputDeviceId || isDisabled || !midiService.isSupported()) return;
+		const remove = midiService.addNoteListener((midiNote: number, velocity: number) => {
+			const noteFocused = noteInputEl && document.activeElement === noteInputEl;
+			if (noteFocused) {
+				if (velocity > 0) {
+					if (activeNotes.length >= maxPoly) return;
+					if (activeNotes.some((n) => n.key === `midi-${midiNote}`)) return;
+					const noteStr = midiNoteToNoteString(midiNote);
+					if (!noteStr) return;
+					activeNotes = [...activeNotes, { key: `midi-${midiNote}`, note: noteStr }];
+				} else {
+					const nextNotes = activeNotes.filter((n) => n.key !== `midi-${midiNote}`);
+					if (nextNotes.length === 0 && activeNotes.length > 0) {
+						lastPlayedNotes = activeNotes.map((n) => n.note);
+					}
+					activeNotes = nextNotes;
+				}
+			}
+		});
+		return remove;
+	});
+
+	$effect(() => {
+		registerPreviewSpaceHandler?.(togglePreviewPlaying);
+		return () => registerPreviewSpaceHandler?.(null);
+	});
+
+	function togglePreviewPlaying() {
+		if (isDisabled || lastPlayedNotes.length === 0) return;
+		isPreviewPlaying = !isPreviewPlaying;
+	}
+
+	function parseHex4(s: string): number {
+		const n = parseInt(s.replace(/[^0-9a-fA-F]/g, '').slice(0, 4) || '0', 16);
+		return isNaN(n) ? 0 : Math.max(0, Math.min(0xffff, n));
+	}
+
+	function parseHex1(s: string): number {
+		const n = parseInt(s.replace(/[^0-9a-fA-F]/g, '').slice(0, 1) || '0', 16);
+		return isNaN(n) ? 0 : Math.max(0, Math.min(15, n));
+	}
+
+	function parseHex2(s: string): number {
+		const n = parseInt(s.replace(/[^0-9a-fA-F]/g, '').slice(0, 2) || '0', 16);
+		return isNaN(n) ? 0 : Math.max(0, Math.min(0x1f, n));
+	}
+
+	function parseTableChar(s: string): number {
+		if (!s || s.length === 0) return 0;
+		const c = s.toUpperCase().slice(0, 1);
+		if (c === '0') return -1;
+		const tableId = tableDisplayCharToId(c);
+		return tableId >= 0 ? tableId + 1 : 0;
+	}
+
+	function buildPreviewPattern(noteStrings: string[]): Pattern {
+		const pattern = new PatternModel(0, 1, schema) as Pattern;
+		const pr = pattern.patternRows[0];
+
+		const instNum = instrumentIdToNumber(instrumentId || '01') || 1;
+		const vol = volume ? Math.max(1, Math.min(15, parseHex1(volume))) : 15;
+		const tbl = parseTableChar(table);
+
+		for (let ch = 0; ch < 4; ch++) {
+			const row = pattern.channels[ch].rows[0];
+			row.instrument = instNum;
+			row.table = tbl;
+			row.volume = vol;
+			row.effects = [null];
+			const noteStr = noteStrings[ch] ?? 'OFF';
+			const { noteName, octave } = parseNoteFromString(noteStr);
+			row.note = new Note(noteName, octave);
+		}
+		return pattern;
+	}
+
+	function handleNoteKeyDown(event: KeyboardEvent) {
+		if (isDisabled) return;
+		if (event.repeat) return;
+		const key = event.key;
+		if (activeNotes.some((n) => n.key === key)) return;
+		if (activeNotes.length >= maxPoly) return;
+		const keyLower = key.toLowerCase();
+		let noteStr: string;
+		const pianoNote = PatternNoteInput.mapKeyboardCodeToNote(event.code);
+		if (pianoNote) {
+			event.preventDefault();
+			noteStr = formatNoteFromEnum(pianoNote.noteName, pianoNote.octave);
+		} else if (keyLower === 'a') {
+			event.preventDefault();
+			noteStr = 'OFF';
+		} else {
+			const letterNote = PatternNoteInput.getLetterNote(event.key);
+			if (letterNote) {
+				event.preventDefault();
+				const octave = editorStateStore.octave;
+				noteStr = formatNoteFromEnum(letterNote, octave);
+			} else return;
+		}
+		activeNotes = [...activeNotes, { key, note: noteStr }];
+	}
+
+	function handleNoteKeyUp(event: KeyboardEvent) {
+		if (isDisabled) return;
+		const key = event.key;
+		if (!activeNotes.some((n) => n.key === key)) return;
+		const nextNotes = activeNotes.filter((n) => n.key !== key);
+		if (nextNotes.length === 0) {
+			lastPlayedNotes = activeNotes.map((n) => n.note);
+		}
+		activeNotes = nextNotes;
+	}
+
+
+	function clampTable() {
+		const c = table.slice(-1).toUpperCase();
+		if (c === '0' || isValidTableDisplayChar(c)) table = c;
+		else table = '';
+	}
+
+	function ensureMidiAccess() {
+		if (
+			settingsStore.midiInputDeviceId &&
+			midiService.isSupported() &&
+			!midiService.hasAccess()
+		) {
+			midiService.requestAccess();
+		}
+	}
+
+	function clampVolume() {
+		const v = volume
+			.replace(/[^0-9a-fA-F]/g, '')
+			.slice(0, 1)
+			.toUpperCase();
+		if (v) {
+			const n = parseInt(v, 16);
+			volume = n >= 1 && n <= 15 ? v : 'F';
+		} else {
+			volume = 'F';
+		}
+	}
+</script>
+
+<div class="flex flex-col gap-2">
+    <div
+        class="flex items-center gap-1.5 text-xs text-[var(--color-app-text-muted)]"
+        role="group"
+        aria-label="Preview playground">
+        <IconButton
+            variant="primary"
+            size="sm"
+            title={isPreviewPlaying
+                ? `Stop preview (${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))})`
+                : `Play preview (${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))})`}
+            disabled={isDisabled || lastPlayedNotes.length === 0}
+            onclick={togglePreviewPlaying}>
+            {#snippet children()}
+                {#if isPreviewPlaying}
+                    <IconCarbonPauseFilled class="h-3.5 w-3.5" />
+                {:else}
+                    <IconCarbonPlay class="h-3.5 w-3.5" />
+                {/if}
+            {/snippet}
+        </IconButton>
+        <span>Preview playground</span>
+	</div>
+	<div class="flex flex-wrap items-end gap-3 font-mono text-xs">
+        <div class="flex flex-col gap-0.5">
+            <span class="text-[var(--color-app-text-muted)]">Inst</span>
+            <div
+                class="flex h-7 w-8 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase"
+                title="Current instrument (select in Instruments panel)">
+                {instrumentId}
+            </div>
+        </div>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Table</span>
+			<input
+				type="text"
+				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+				maxlength={1}
+				placeholder="0"
+				disabled={isDisabled}
+				bind:value={table}
+				onblur={clampTable}
+				oninput={(e) => {
+					const v = (e.currentTarget.value || '').toUpperCase().slice(-1);
+					table = v === '0' || isValidTableDisplayChar(v) ? v : '';
+				}} />
+		</label>
+		<label class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Volume</span>
+			<input
+				type="text"
+				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+				maxlength={1}
+				placeholder="F"
+				disabled={isDisabled}
+				bind:value={volume}
+				onblur={clampVolume}
+				oninput={(e) => {
+					const v = (e.currentTarget.value || '')
+						.replace(/[^0-9a-fA-F]/gi, '')
+						.slice(0, 1)
+						.toUpperCase();
+					if (v) {
+						const n = parseInt(v, 16);
+						volume = n >= 1 && n <= 15 ? v : volume;
+					} else {
+						volume = '';
+					}
+				}} />
+		</label>
+		<div class="flex flex-col gap-0.5">
+			<span class="text-[var(--color-app-text-muted)]">Note</span>
+			<div
+				bind:this={noteInputEl}
+				class="flex h-7 max-w-[10rem] min-w-14 items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 focus:border-[var(--color-app-primary)] focus:outline-none {isDisabled
+					? 'pointer-events-none cursor-not-allowed opacity-50'
+					: ''}"
+				role="textbox"
+				tabindex={isDisabled ? -1 : 0}
+				aria-label="Note (keyboard: piano keys)"
+				aria-disabled={isDisabled}
+				title={`Click to focus, then use keyboard. Polyphony: ${maxPoly} notes (5 per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${ShortcutString.toDisplay(keybindingsStore.getShortcut(ACTION_TOGGLE_PLAYBACK))} = toggle play.`}
+				onmousedown={ensureMidiAccess}
+				onclick={() => noteInputEl?.focus()}
+				onkeydown={handleNoteKeyDown}
+				onkeyup={handleNoteKeyUp}
+				onblur={() => {
+					if (activeNotes.length > 0) {
+						lastPlayedNotes = activeNotes.map((n) => n.note);
+					}
+					activeNotes = [];
+				}}>
+				{activeNotes.length > 0
+					? activeNotes.map((n) => n.note).join(' ')
+					: lastPlayedNotes.length > 0
+						? lastPlayedNotes.join(' ')
+						: '—'}
+			</div>
+		</div>
+	</div>
+</div>
