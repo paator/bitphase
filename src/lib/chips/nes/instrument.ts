@@ -40,6 +40,18 @@ export type NesInstrumentRow = {
 	sweepShift: number;
 };
 
+export type NESInstrumentFields = {
+
+	sampleData?: number[];
+	sampleRate?: number;
+	sampleStart?: number;
+	sampleEnd?: number;
+	sampleLoopStart?: number;
+	sampleLength?: number;
+	sampleLoopEnabled?: boolean;
+	sampleLoop?: number;
+};
+
 export function isNesVolumeField(envelope: boolean): boolean {
 	return !envelope;
 }

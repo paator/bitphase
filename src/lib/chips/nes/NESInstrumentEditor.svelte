@@ -3,6 +3,7 @@
 	import IconCarbonRepeat from '~icons/carbon/repeat';
 	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
 	import IconCarbonArrowsVertical from '~icons/carbon/arrows-vertical';
+	import IconCarbonWaveform from '~icons/carbon/waveform';
 	import IconCarbonVolumeUp from '~icons/carbon/volume-up';
 	import {
 		BooleanPaintableCell,
@@ -42,8 +43,16 @@
 		ensureNesInstrumentRows,
 		isNesVolumeField,
 		NES_PULSE_WIDTH_LABELS,
+		type NESInstrumentFields,
 		type NesInstrumentRow
 	} from './instrument';
+	import PillTabs, { type PillTab } from '../../components/PillTabs/PillTabs.svelte';
+	import { AlertBanner } from '../../components/AlertBanner';
+	import IconCarbonWarningAltFilled from '~icons/carbon/warning-alt-filled';
+	import NESInstrumentSamplePanel from './NESInstrumentSamplePanel.svelte';
+	import { instrumentHasSample } from '../ay/sample-region';
+
+	type InstrumentTab = 'apu' | 'dpcm';
 
 	let {
 		instrument,
@@ -59,9 +68,19 @@
 		selectedRowIndices?: number[];
 	} = $props();
 
+	let activeTab = $state<InstrumentTab>('apu');
+
+	const extendedInstrument = $derived(instrument as Instrument & Partial<NESInstrumentFields>);
+	const hasSample = $derived(instrumentHasSample(extendedInstrument));
+
+ 	const instrumentTabs = $derived.by((): PillTab[] => [
+		{ id: 'apu', label: 'APU', icon: IconCarbonVolumeUp, disabled: hasSample },
+		{ id: 'dpcm', label: 'DPCM', icon: IconCarbonWaveform }
+	]);
+
 	const TABLE_COLUMNS = 13;
 	const VOLUME_VALUES = Array.from({ length: 16 }, (_, i) => i);
-	const showVolumeGrid = $derived(isExpanded);
+	const showVolumeGrid = $derived(isExpanded && activeTab === 'apu');
 	let tableRef: HTMLTableElement | null = $state(null);
 	let editorContainerRef: HTMLDivElement | null = $state(null);
 
@@ -163,11 +182,47 @@
 			event.preventDefault();
 		}
 	}
+
+	$effect(() => {
+		if (hasSample && activeTab !== 'dpcm') {
+			activeTab = 'dpcm';
+		}
+	});
 </script>
 
 <RowEditorContainer bind:editorContainerRef>
 	<RowEditorNameField bind:name={editorSync.name} />
 
+	<PillTabs
+	bind:activeTabId={activeTab}
+	tabs={instrumentTabs}
+	class="mt-3 ml-2"
+	onSelect={(tabId) => {
+		activeTab = tabId as InstrumentTab;
+		}} />
+
+	{#if activeTab === 'dpcm'}
+		<AlertBanner variant="warning" class="mx-2 mt-2 px-3 py-2 text-xs">
+			<div class="flex gap-2">
+				<IconCarbonWarningAltFilled
+					class="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-pattern-note-off)]" />
+				<div class="min-w-0">
+					<p class="font-medium text-[var(--color-pattern-note-off)]">
+						Experimental — use at your own risk
+					</p>
+					<p class="mt-1 text-[var(--color-app-text-secondary)]">
+						DPCM instruments are work in progress! Breaking changes to behavior may occur in future releases. Please report any issues you encounter.
+					</p>
+				</div>
+			</div>
+		</AlertBanner>
+	{/if}
+
+	{#if activeTab === 'dpcm'}
+		<div class="mt-3 mr-2 ml-2 box-border min-w-0">
+			<NESInstrumentSamplePanel {instrument} {isExpanded} {onInstrumentChange} />
+		</div>
+	{:else}
 	<div class="mt-3 flex items-start gap-2 overflow-x-auto">
 		<div class="relative flex flex-col">
 			<LoopMarkerOverlay style={loopMarker.style} />
@@ -463,4 +518,5 @@
 			</table>
 		{/if}
 	</div>
+	{/if}
 </RowEditorContainer>
