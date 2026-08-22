@@ -220,7 +220,6 @@ export class AudioService {
 			this._previewChipIndices.clear();
 			if (!this._isPlaying) {
 				waveformStore.clear();
-				playbackToneDebugStore.clear();
 			}
 			return;
 		}
@@ -230,7 +229,6 @@ export class AudioService {
 				(p) => p.chip.schema.channelLabels?.length ?? 3
 			);
 			waveformStore.prepareLayout(layout);
-			playbackToneDebugStore.clear();
 		}
 		this._previewChipIndices = new Set(arr);
 	}
@@ -293,7 +291,6 @@ export class AudioService {
 		this._previewChipIndices.clear();
 
 		waveformStore.clear();
-		playbackToneDebugStore.clear();
 
 		this.chipProcessors.forEach((chipProcessor) => {
 			chipProcessor.stop();
@@ -348,6 +345,7 @@ export class AudioService {
 		this.unsubscribeProcessorFromSettings(this.chipProcessors[index]);
 		this._processorRevision++;
 		this.chipProcessors = this.chipProcessors.filter((_, i) => i !== index);
+		playbackToneDebugStore.clear();
 		void this._rebuildMixerAfterChipListChange();
 	}
 
@@ -361,6 +359,7 @@ export class AudioService {
 		this._processorRevision++;
 		this.chipProcessors.forEach((processor) => this.unsubscribeProcessorFromSettings(processor));
 		this.chipProcessors = [];
+		playbackToneDebugStore.clear();
 	}
 
 	async dispose() {
@@ -377,6 +376,7 @@ export class AudioService {
 
 		this._mixerNode = null;
 		this.chipProcessors = [];
+		playbackToneDebugStore.clear();
 	}
 
 	get playing() {
