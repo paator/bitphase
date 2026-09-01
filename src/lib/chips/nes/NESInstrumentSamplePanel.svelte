@@ -34,8 +34,7 @@
 	const containerContext: { audioService: AudioService } = getContext('container');
 
 	const AUDIO_ACCEPT =
-		//'audio/*,.wav,.wave,.mp3,.mpeg,.ogg,.oga,.flac,.aiff,.aif,.aac,.m4a';
-		'audio/*,.dmc';
+		'audio/*,.dmc,.wav,.aiff,.aif,.raw,.pcm';
 
 	let {
 		instrument,
@@ -363,7 +362,7 @@
 		<EmptyState
 			icon={IconCarbonWaveform}
 			message="Load an audio file to trim and loop"
-			hint=".dmc sample files; rejected if over 4 KB"
+			hint=".dmc sample files, rejected if over 4 KB; 8-bit mono PCM WAV files, rejected if over 32 kB"
 			class="min-w-0"
 			style="height: {previewHeight + 48}px" />
 	{/if}
