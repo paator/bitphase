@@ -39,7 +39,7 @@
 	const containerContext: { audioService: AudioService } = getContext('container');
 
 	const AUDIO_ACCEPT =
-		'audio/*,.wav,.wave,.mp3,.mpeg,.ogg,.oga,.flac,.aiff,.aif,.aac,.m4a,.webm';
+		'audio/*,.wav,.wave,.aiff,.aif,.raw,.pcm';
 
 	let {
 		instrument,
