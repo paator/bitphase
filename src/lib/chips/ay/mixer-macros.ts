@@ -95,8 +95,8 @@ export const AY_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		accent: 'noise',
 		group: 'Noise parameters',
 		shareSequence: true,
-		min: TONE_ADD_MIN,
-		max: TONE_ADD_MAX,
+		min: -31,
+		max: 31,
 		defaultValue: 0
 	},
 	{
@@ -127,8 +127,8 @@ export const AY_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		accent: 'envelope',
 		group: 'Envelope parameters',
 		shareSequence: true,
-		min: TONE_ADD_MIN,
-		max: TONE_ADD_MAX,
+		min: -255,
+		max: 255,
 		defaultValue: 0
 	},
 	{

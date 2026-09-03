@@ -82,6 +82,24 @@ describe('instrument row macro conversion', () => {
 		expect(sampleInstrumentRowFromMacros(macros, 4, AY_MIXER_MACRO_FIELDS).toneAdd).toBe(2);
 	});
 
+	it('clamps AY envelope offset to -255...255', () => {
+		const field = AY_MIXER_MACRO_FIELDS.find((item) => item.id === 'envelopeAdd')!;
+		expect(field.min).toBe(-255);
+		expect(field.max).toBe(255);
+		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, 400).values[0]).toBe(255);
+		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, -400).values[0]).toBe(-255);
+	});
+
+	it('clamps AY noise offset to the 5-bit period range', () => {
+		const field = AY_MIXER_MACRO_FIELDS.find((item) => item.id === 'noiseAdd')!;
+		expect(field.min).toBe(-31);
+		expect(field.max).toBe(31);
+		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, 40).values[0]).toBe(31);
+		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, -40).values[0]).toBe(
+			-31
+		);
+	});
+
 	it('maps amplitude slide draw height from down to up', () => {
 		const field = AY_MIXER_MACRO_FIELDS.find((item) => item.id === 'amplitudeSlide')!;
 		expect(macroValueToNormalized(-1, field)).toBe(0);

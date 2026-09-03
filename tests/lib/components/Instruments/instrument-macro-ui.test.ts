@@ -62,7 +62,9 @@ describe('macroFieldRowHeight', () => {
 			]
 		};
 		expect(instrumentMacroUsesBarChart(pulseField)).toBe(true);
-		expect(macroFieldRowHeight(pulseField, false)).toBe(macroFieldRowHeight(integerField, false));
+		expect(macroFieldRowHeight(pulseField, false)).toBe(
+			macroFieldRowHeight(integerField, false)
+		);
 		expect(macroFieldRowHeight(pulseField, true)).toBe(macroFieldRowHeight(integerField, true));
 	});
 
@@ -116,7 +118,9 @@ describe('macro handle keys', () => {
 		expect(applyMacroLoopKey({ key: 'Home', preventDefault() {} } as KeyboardEvent, 2, 5)).toBe(
 			0
 		);
-		expect(applyMacroLoopKey({ key: 'End', preventDefault() {} } as KeyboardEvent, 2, 5)).toBe(5);
+		expect(applyMacroLoopKey({ key: 'End', preventDefault() {} } as KeyboardEvent, 2, 5)).toBe(
+			5
+		);
 	});
 
 	it('grows and shrinks length with arrows', () => {

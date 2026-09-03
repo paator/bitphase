@@ -79,7 +79,8 @@ export function formatInstrumentMacroValue(
 	if (field.kind === 'waveform') {
 		try {
 			const steps = JSON.parse(String(value));
-			if (Array.isArray(steps)) return steps.map((s: number) => formatRowEditorNumber(s, asHex)).join(' ');
+			if (Array.isArray(steps))
+				return steps.map((s: number) => formatRowEditorNumber(s, asHex)).join(' ');
 		} catch {}
 		return 'Click to edit';
 	}

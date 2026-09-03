@@ -65,9 +65,9 @@ const AY_MIXER_FIELDS = [
 	{ id: 'retriggerEnvelope', kind: 'boolean', defaultValue: false },
 	{ id: 'toneAdd', kind: 'integer', min: -4096, max: 4095, defaultValue: 0 },
 	{ id: 'toneAccumulation', kind: 'boolean', defaultValue: false },
-	{ id: 'noiseAdd', kind: 'integer', min: -4096, max: 4095, defaultValue: 0 },
+	{ id: 'noiseAdd', kind: 'integer', min: -31, max: 31, defaultValue: 0 },
 	{ id: 'noiseAccumulation', kind: 'boolean', defaultValue: false },
-	{ id: 'envelopeAdd', kind: 'integer', min: -4096, max: 4095, defaultValue: 0 },
+	{ id: 'envelopeAdd', kind: 'integer', min: -255, max: 255, defaultValue: 0 },
 	{ id: 'envelopeAccumulation', kind: 'boolean', defaultValue: false },
 	{ id: 'amplitudeSlide', kind: 'enum', min: AY_AMPLITUDE_SLIDE_DOWN, max: AY_AMPLITUDE_SLIDE_UP, defaultValue: AY_AMPLITUDE_SLIDE_OFF }
 ];
