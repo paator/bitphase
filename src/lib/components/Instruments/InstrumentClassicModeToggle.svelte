@@ -1,5 +1,7 @@
 <script lang="ts">
-	let { classic = $bindable(false) }: { classic?: boolean } = $props();
+	import { settingsStore } from '../../stores/settings.svelte';
+
+	const classic = $derived(settingsStore.classicInstrumentEditor);
 </script>
 
 <button
@@ -9,6 +11,6 @@
 		: 'border-[var(--color-app-border)] text-[var(--color-app-text-muted)] hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)]'}"
 	aria-pressed={classic}
 	title="Use the old row-table instrument editor. Macros stay underneath."
-	onclick={() => (classic = !classic)}>
+	onclick={() => settingsStore.set('classicInstrumentEditor', !classic)}>
 	Classic
 </button>

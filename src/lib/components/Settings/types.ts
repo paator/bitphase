@@ -15,6 +15,7 @@ export interface Settings {
 	debugMode: boolean;
 	selectionStyle: 'inverted' | 'filled';
 	emptyNoteAlignment: 'center' | 'baseline';
+	classicInstrumentEditor: boolean;
 }
 
 export interface SettingsItem {

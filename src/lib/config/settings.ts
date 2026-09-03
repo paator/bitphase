@@ -35,6 +35,14 @@ export const settingsItems: SettingsItem[] = [
 		category: 'ayYm'
 	},
 	{
+		label: 'Classic Instrument Editor',
+		description: 'Use the old row-table instrument editor. Macros stay underneath.',
+		type: 'toggle',
+		defaultValue: false,
+		setting: 'classicInstrumentEditor',
+		category: 'ayYm'
+	},
+	{
 		label: 'Auto-enter Instrument',
 		description: 'Automatically insert the current instrument index when entering notes',
 		type: 'toggle',

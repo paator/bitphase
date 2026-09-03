@@ -35,7 +35,7 @@ export function instrumentMacroUsesBarChart(field: InstrumentMacroField): boolea
 }
 
 export function macroFieldRowHeight(field: InstrumentMacroField, isExpanded: boolean): number {
-	if (instrumentMacroUsesBarChart(field)) return isExpanded ? 108 : 86;
+	if (instrumentMacroUsesBarChart(field)) return isExpanded ? 124 : 100;
 	if (field.kind === 'boolean') return isExpanded ? 36 : 30;
 	if (field.kind === 'waveform') return isExpanded ? 48 : 38;
 	if (field.enumValues?.some((option) => option.icon)) return isExpanded ? 36 : 30;

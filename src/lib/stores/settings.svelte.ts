@@ -20,6 +20,7 @@ class SettingsStore {
 	debugMode = $state(false);
 	selectionStyle = $state<'inverted' | 'filled'>('inverted');
 	emptyNoteAlignment = $state<'center' | 'baseline'>('center');
+	classicInstrumentEditor = $state(false);
 
 	init(): void {
 		const stored = localStorage.getItem(STORAGE_KEY);

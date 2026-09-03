@@ -23,6 +23,7 @@
 	import { AY_TIMER_MACRO_FIELDS } from './ay-timer-macros';
 	import InstrumentMacrosEditor from '../../components/Instruments/InstrumentMacrosEditor.svelte';
 	import InstrumentClassicModeToggle from '../../components/Instruments/InstrumentClassicModeToggle.svelte';
+	import { settingsStore } from '../../stores/settings.svelte';
 	import AYInstrumentClassicMixer from './AYInstrumentClassicMixer.svelte';
 	import AYInstrumentClassicTimer from './AYInstrumentClassicTimer.svelte';
 	import {
@@ -47,10 +48,10 @@
 	} = $props();
 
 	let activeTab = $state<InstrumentTab>('mixer');
-	let classicEditor = $state(false);
 
 	const extendedInstrument = $derived(instrument as Instrument & Partial<AyInstrumentFields>);
 	const hasSample = $derived(instrumentHasSample(extendedInstrument));
+	const classicEditor = $derived(settingsStore.classicInstrumentEditor);
 
 	const instrumentTabs = $derived.by((): PillTab[] => [
 		{ id: 'mixer', label: 'Mixer', icon: IconCarbonVolumeUp, disabled: hasSample },
@@ -167,7 +168,7 @@
 					timerEffects.closeWaveformEditor();
 				}
 			}} />
-		<InstrumentClassicModeToggle bind:classic={classicEditor} />
+		<InstrumentClassicModeToggle />
 	</div>
 
 	{#if activeTab === 'timer' && timerEffects.waveformEditorRowIndex !== null}

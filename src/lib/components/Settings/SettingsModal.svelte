@@ -42,7 +42,8 @@
 		previewFullRow: settingsStore.previewFullRow,
 		debugMode: settingsStore.debugMode,
 		selectionStyle: settingsStore.selectionStyle,
-		emptyNoteAlignment: settingsStore.emptyNoteAlignment
+		emptyNoteAlignment: settingsStore.emptyNoteAlignment,
+		classicInstrumentEditor: settingsStore.classicInstrumentEditor
 	};
 	let tempSettings = $state<Settings>({ ...currentSettings });
 	let activeTabId = $state(initialTabId || 'general');
