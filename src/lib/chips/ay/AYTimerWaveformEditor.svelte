@@ -2,6 +2,8 @@
 	import IconCarbonAdd from '~icons/carbon/add';
 	import IconCarbonSubtract from '~icons/carbon/subtract';
 	import IconCarbonWaveform from '~icons/carbon/waveform';
+	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
+	import IconCarbonSettingsAdjust from '~icons/carbon/settings-adjust';
 	import AyTimerEditorPanel from './AyTimerEditorPanel.svelte';
 	import { StatusPill } from '../../components/StatusPill';
 	import { getContext } from 'svelte';
@@ -31,17 +33,23 @@
 	let {
 		rowIndex,
 		isExpanded = false,
-		onclose
+		canvasHeight: canvasHeightOverride,
+		showSaveDiscard = false,
+		onclose,
+		onsave
 	}: {
 		rowIndex: number;
 		isExpanded?: boolean;
+		canvasHeight?: number;
+		showSaveDiscard?: boolean;
 		onclose?: () => void;
+		onsave?: () => void;
 	} = $props();
 
 	const controller = getAyTimerEffectsContext();
 	const containerContext: { audioService: AudioService } = getContext('container');
 	const iconSizeClass = $derived(controller.iconSizeClass(isExpanded));
-	const canvasHeight = $derived(isExpanded ? 104 : 72);
+	const canvasHeight = $derived(canvasHeightOverride ?? (isExpanded ? 104 : 72));
 
 	const PLOT_PADDING = 10;
 	const VIEW_HEIGHT = 72;
@@ -345,6 +353,44 @@
 			activeStepIndex = length > 0 ? length - 1 : null;
 		}
 	}
+
+	let waveformText = $state('');
+	let waveformInputFocused = $state(false);
+
+	$effect(() => {
+		controller.rowTimerWaveform(rowIndex);
+		controller.timerEditPanel;
+		if (!waveformInputFocused) {
+			waveformText = controller.formatRowTimerWaveform(rowIndex);
+		}
+	});
+
+	function commitWaveformText(text: string): void {
+		const parsed = controller.parseTimerWaveform(text, rowIndex);
+		if (parsed !== null) {
+			controller.setRowTimerWaveform(rowIndex, parsed);
+		}
+	}
+
+	function handleWaveformFocus(event: FocusEvent): void {
+		waveformInputFocused = true;
+		waveformText = controller.formatRowTimerWaveform(rowIndex);
+		(event.target as HTMLInputElement).select();
+	}
+
+	function handleWaveformBlur(): void {
+		waveformInputFocused = false;
+		commitWaveformText(waveformText);
+		waveformText = controller.formatRowTimerWaveform(rowIndex);
+	}
+
+	function handleWaveformKeydown(event: KeyboardEvent): void {
+		if (event.key !== 'Enter') return;
+		event.preventDefault();
+		commitWaveformText(waveformText);
+		waveformText = controller.formatRowTimerWaveform(rowIndex);
+		(event.currentTarget as HTMLInputElement).blur();
+	}
 </script>
 
 <AyTimerEditorPanel
@@ -366,6 +412,45 @@
 		<span class="whitespace-nowrap">{stepCountLabel}</span>
 		{#if activeStepValue !== null && highlightedStepIndex !== null}
 			<StatusPill class="whitespace-nowrap">#{highlightedStepIndex + 1} = {activeStepValue}</StatusPill>
+		{/if}
+	{/snippet}
+
+	{#snippet toolbar()}
+		{#if usesFmSemitones || usesFmPeriodOffsets}
+			<button
+				type="button"
+				class="flex shrink-0 cursor-pointer items-center justify-center rounded border border-[var(--color-app-border)] px-2 py-1 text-[var(--color-app-text-secondary)] transition-colors hover:bg-[var(--color-app-surface-hover)]"
+				title={usesFmPeriodOffsets
+					? 'Period offset mode. Click for semitones.'
+					: 'Semitone mode. Click for period offsets.'}
+				aria-label={usesFmPeriodOffsets
+					? 'Switch FM to semitone mode'
+					: 'Switch FM to period offset mode'}
+				onclick={() => controller.toggleFmOffsetMode(rowIndex)}>
+				{#if usesFmPeriodOffsets}
+					<IconCarbonSettingsAdjust class={iconSizeClass} />
+				{:else}
+					<IconCarbonChartWinLoss class={iconSizeClass} />
+				{/if}
+			</button>
+		{/if}
+		<input
+			type="text"
+			class="min-w-0 flex-1 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-2 py-1 font-mono text-xs text-[var(--color-app-text)] placeholder:text-[var(--color-app-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-pattern-note)]/50"
+			value={waveformText}
+			spellcheck="false"
+			placeholder={usesFmPeriodOffsets ? '0 16 0 -16' : usesFmSemitones ? '0 7' : usesEnvelopeShapes ? '8' : '15 0'}
+			onfocus={handleWaveformFocus}
+			oninput={(e) => (waveformText = (e.currentTarget as HTMLInputElement).value)}
+			onkeydown={handleWaveformKeydown}
+			onblur={handleWaveformBlur} />
+		{#if showSaveDiscard}
+			<button
+				type="button"
+				class="shrink-0 rounded bg-[var(--color-app-primary)] px-3 py-1 text-xs font-medium text-[var(--color-app-on-primary)] transition-colors hover:opacity-90"
+				onclick={() => onsave?.()}>
+				Save
+			</button>
 		{/if}
 	{/snippet}
 

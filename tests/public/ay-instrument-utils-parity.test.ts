@@ -14,7 +14,6 @@ const SWEEP_SHAPES = ['triangle', 'sine', 'sawUp', 'sawDown', 'square'] as const
 const CURRENT_PHASES = [-1, 0, 1, 5, 250, 500, 750, 1000];
 
 const SHARED_CONSTANTS = [
-	'DEFAULT_AY_SID_PERIOD',
 	'DEFAULT_AY_SID_PERIOD_DETUNE',
 	'DEFAULT_AY_SID_PERIOD_SEMITONE_DETUNE',
 	'DEFAULT_AY_TIMER_WAVEFORM',

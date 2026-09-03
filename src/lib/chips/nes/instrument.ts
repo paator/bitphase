@@ -1,3 +1,6 @@
+import type { Instrument } from '../../models/song';
+import { copyInstrumentSampleFields } from '../ay/sample-region';
+
 export const NES_PULSE_WIDTHS = [0, 1, 2, 3] as const;
 
 export type NesPulseWidth = (typeof NES_PULSE_WIDTHS)[number];
@@ -224,4 +227,19 @@ export function cyclePulseWidth(current: NesPulseWidth): NesPulseWidth {
 	const index = NES_PULSE_WIDTHS.indexOf(current);
 	const nextIndex = index < 0 ? 0 : (index + 1) % NES_PULSE_WIDTHS.length;
 	return NES_PULSE_WIDTHS[nextIndex];
+}
+
+export function copyNesInstrumentFields(
+	source: Instrument & Partial<NESInstrumentFields>,
+	target: Instrument & Partial<NESInstrumentFields>
+): void {
+	if (source.macros) {
+		target.macros = Object.fromEntries(
+			Object.entries(source.macros).map(([id, macro]) => [
+				id,
+				{ values: [...macro.values], loop: macro.loop }
+			])
+		);
+	}
+	copyInstrumentSampleFields(source, target);
 }

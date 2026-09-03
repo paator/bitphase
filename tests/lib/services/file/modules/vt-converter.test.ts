@@ -2,6 +2,31 @@ import { describe, it, expect } from 'vitest';
 import { convertVT2String } from '@/lib/services/file/modules/vt-converter';
 
 describe('VT2Converter', () => {
+	it('translates VT2 sample rows into mixer macros', () => {
+		const vt2 = `[Module]
+Title=Sample Macros
+Author=Test
+Speed=3
+PlayOrder=0
+NoteTable=0
+ChipFreq=1773400
+IntFreq=50
+
+[Sample1]
+T 00 00 0F
+T 01 00 0C L
+[Pattern0]
+0000 00 | C-4 1000 | --- .... | --- ....
+`;
+
+		const project = convertVT2String(vt2);
+		const instrument = project.instruments.find((entry) => entry.id === '01');
+
+		expect(instrument?.macros?.volume?.values).toEqual([15, 12]);
+		expect(instrument?.macros?.tone?.values).toEqual([true, true]);
+		expect(instrument?.macros?.volume?.loop).toBe(1);
+	});
+
 	describe('TurboSound (2xAY) import', () => {
 		it('merges instruments from both chips with remapped IDs', () => {
 			const vt2 = `[Module]

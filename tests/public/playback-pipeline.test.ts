@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { legacyInstruments } from '../helpers/instrument-fixtures.ts';
 import AyumiState from '../../public/ay/ayumi-state.js';
 import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
 import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
@@ -28,13 +29,13 @@ describe('playback pipeline', () => {
 	it('processPatternRow then processInstruments: note + instrument 01 yields correct register state', () => {
 		const state = new AyumiState();
 		state.setTuningTable([1000, 900, 800]);
-		state.setInstruments([
+		state.setInstruments(legacyInstruments([
 			{
 				id: '01',
 				rows: [{ tone: true, volume: 15, noise: false, envelope: false }],
 				loop: 0
 			}
-		]);
+		]));
 		state.channelInstruments = [0, -1, -1];
 		state.channelSoundEnabled = [false, false, false];
 		state.channelMuted = [false, false, false];
@@ -80,9 +81,9 @@ describe('playback pipeline', () => {
 	it('note off then processInstruments: channel stays silent', () => {
 		const state = new AyumiState();
 		state.setTuningTable([1000]);
-		state.setInstruments([
+		state.setInstruments(legacyInstruments([
 			{ id: '01', rows: [{ tone: true, volume: 15, noise: false, envelope: false }], loop: 0 }
-		]);
+		]));
 		state.channelInstruments = [0, -1, -1];
 		state.channelSoundEnabled = [true, false, false];
 		state.channelMuted = [false, false, false];
@@ -114,9 +115,9 @@ describe('playback pipeline', () => {
 	it('muted channel: processPatternRow and processInstruments keep volume 0 and mixer off', () => {
 		const state = new AyumiState();
 		state.setTuningTable([1000]);
-		state.setInstruments([
+		state.setInstruments(legacyInstruments([
 			{ id: '01', rows: [{ tone: true, volume: 15, noise: false, envelope: false }], loop: 0 }
-		]);
+		]));
 		state.channelInstruments = [0, 0, 0];
 		state.channelSoundEnabled = [true, true, true];
 		state.channelMuted = [false, true, false];
@@ -164,13 +165,13 @@ describe('playback pipeline', () => {
 		it('advancePosition + processTables + parsePatternRow + processInstruments over several ticks', () => {
 			const state = new AyumiState();
 			state.setTuningTable([1000, 900, 800]);
-			state.setInstruments([
+			state.setInstruments(legacyInstruments([
 				{
 					id: '01',
 					rows: [{ tone: true, volume: 15, noise: false, envelope: false }],
 					loop: 0
 				}
-			]);
+			]));
 			state.setPatternOrder([0]);
 			state.channelInstruments = [0, -1, -1];
 			state.channelMuted = [false, false, false];
@@ -245,9 +246,9 @@ describe('playback pipeline', () => {
 		it('tick loop wraps to next order when advancing past last row', () => {
 			const state = new AyumiState();
 			state.setTuningTable([1000]);
-			state.setInstruments([
+			state.setInstruments(legacyInstruments([
 				{ id: '01', rows: [{ tone: true, volume: 15, noise: false, envelope: false }], loop: 0 }
-			]);
+			]));
 			state.setPatternOrder([0, 1]);
 			state.timeline.currentSpeed = 1;
 			state.timeline.currentTick = 0;
@@ -287,9 +288,9 @@ describe('playback pipeline', () => {
 		it('tick loop wraps to loop marker at song end', () => {
 			const state = new AyumiState();
 			state.setTuningTable([1000]);
-			state.setInstruments([
+			state.setInstruments(legacyInstruments([
 				{ id: '01', rows: [{ tone: true, volume: 15, noise: false, envelope: false }], loop: 0 }
-			]);
+			]));
 			state.setPatternOrder([0, 1, 2], 1);
 			state.timeline.currentSpeed = 1;
 			state.timeline.currentTick = 0;

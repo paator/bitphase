@@ -8,5 +8,7 @@ describe('demo song menu', () => {
 		expect(items).toContainEqual(['normal', 'nIkO - man']);
 		expect(items).toContainEqual(['header', '2xAY']);
 		expect(items).toContainEqual(['normal', 'Ryu Umemoto (conv. by phase-mod) - Marina']);
+		expect(items).toContainEqual(['header', 'AY with timers']);
+		expect(items).toContainEqual(['normal', 'Otomata Labs - Atarized']);
 	});
 });

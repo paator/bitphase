@@ -12,15 +12,20 @@ import type {
 import type { ChipSettings } from '../../services/audio/chip-settings';
 import type { CatchUpSegment } from '../../services/audio/play-from-position';
 import { MixerWorkletBridge } from '../../services/audio/mixer-worklet-bridge';
-import { ensureNesInstrumentRows } from './instrument';
 
-function sanitizeInstrumentForWorklet(instrument: Instrument) {
+export function sanitizeInstrumentForWorklet(instrument: Instrument) {
 	return {
 		id: instrument.id,
 		chipType: instrument.chipType,
-		rows: ensureNesInstrumentRows(instrument.rows as Record<string, unknown>[]),
-		loop: instrument.loop,
-		name: instrument.name
+		name: instrument.name,
+		macros: instrument.macros
+			? Object.fromEntries(
+					Object.entries(instrument.macros).map(([id, macro]) => [
+						id,
+						{ values: [...macro.values], loop: macro.loop }
+					])
+				)
+			: undefined
 	};
 }
 
@@ -189,7 +194,10 @@ export class NESProcessor
 		const sanitized = instruments.map((instrument) =>
 			sanitizeInstrumentForWorklet(instrument)
 		);
-		this.bridge.sendCommand({ type: 'init_instruments', instruments: sanitized });
+		this.bridge.sendCommand({
+			type: 'init_instruments',
+			instruments: sanitized as unknown as Instrument[]
+		});
 	}
 
 	sendRequestedPattern(pattern: Pattern, patternOrderIndex: number): void {
@@ -222,7 +230,7 @@ export class NESProcessor
 			type: 'preview_row',
 			pattern,
 			rowIndex,
-			instrument: sanitized,
+			instrument: sanitized as unknown as Instrument,
 			channelIndex
 		});
 	}

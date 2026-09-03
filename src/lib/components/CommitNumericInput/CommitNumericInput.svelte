@@ -20,6 +20,7 @@
 		class: className = '',
 		id,
 		title,
+		ariaLabel,
 		inputmode,
 		onkeydown,
 		oncommit,
@@ -36,6 +37,7 @@
 		class?: string;
 		id?: string;
 		title?: string;
+		ariaLabel?: string;
 		inputmode?: InputMode;
 		onkeydown?: (e: KeyboardEvent) => void;
 		oncommit?: (value: number) => void;
@@ -122,6 +124,7 @@
 	type="text"
 	{id}
 	{title}
+	aria-label={ariaLabel}
 	{disabled}
 	inputmode={resolvedInputMode}
 	class={className}

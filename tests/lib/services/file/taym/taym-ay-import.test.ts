@@ -3,7 +3,7 @@ import { importTaymBuffer, isTaymBuffer } from '@/lib/services/file/taym/taym-im
 import { readTaymFile } from '@/lib/services/file/taym/taym-reader';
 import { mapUint8SampleToVolumeLevel } from '@/lib/chips/ay/ay-sample-lut';
 import { instrumentHasSample } from '@/lib/chips/ay/sample-region';
-import type { AyTimerRow } from '@/lib/chips/ay/instrument';
+import { sampleTimerRowFromInstrument } from '@/lib/chips/ay/instrument';
 import type { Instrument } from '@/lib/models/instrument';
 import {
 	buildTaymFixture,
@@ -18,7 +18,7 @@ import {
 } from './taym-fixture';
 
 type AyInstrument = Instrument & {
-	timerRows?: AyTimerRow[];
+	timerMacros?: unknown;
 	timerPwmDuty?: number;
 	sampleData?: number[];
 	sampleRate?: number;
@@ -78,7 +78,7 @@ describe('TAYM AY import', () => {
 		expect(drum.sampleStart).toBe(0);
 		expect(drum.sampleEnd).toBe(FIXTURE_DRUM_LANE.length - 1);
 		expect(drum.sampleLoopEnabled).toBe(false);
-		expect(drum.timerRows).toBeUndefined();
+		expect(drum.timerMacros).toBeUndefined();
 	});
 
 	it('stores sample bytes that map back to the source amplitudes', () => {
@@ -98,7 +98,7 @@ describe('TAYM AY import', () => {
 	it('normalises a two-level amplitude lane into a pulse plus volume', () => {
 		const { instrumentOf, firstRow } = importFixture();
 		const sid = instrumentOf(0);
-		const timerRow = sid.timerRows![0]!;
+		const timerRow = sampleTimerRowFromInstrument(sid, 0);
 
 		expect(timerRow.sid).toBe(true);
 		expect(timerRow.timerWaveform).toEqual([FULL_VOLUME, 0]);
@@ -107,9 +107,8 @@ describe('TAYM AY import', () => {
 
 	it('derives the SID rate from the note instead of a fixed period', () => {
 		const { instrumentOf } = importFixture();
-		const timerRow = instrumentOf(0).timerRows![0]!;
+		const timerRow = sampleTimerRowFromInstrument(instrumentOf(0), 0);
 
-		expect(timerRow.sidPeriodMode).toBe('auto');
 		expect(timerRow.semitone).toBe(0);
 		expect(timerRow.detune).toBe(0);
 	});
@@ -121,7 +120,7 @@ describe('TAYM AY import', () => {
 
 	it('carries a tone period between two notes as an instrument tone offset', () => {
 		const { instrumentOf, firstRow, song } = importFixture();
-		const offset = (instrumentOf(2).rows[0] as unknown as { toneAdd: number }).toneAdd;
+		const offset = instrumentOf(2).macros?.toneAdd?.values[0] as number;
 		const noteIndex = (firstRow(2) as { note: { name: number; octave: number } }).note;
 		const notePeriod = song.tuningTable.find((period) => period === FIXTURE_TONE_C - offset);
 
@@ -135,7 +134,7 @@ describe('TAYM AY import', () => {
 	it('leaves notes that land on the tuning table without an offset', () => {
 		const { instrumentOf, song } = importFixture();
 		const sid = instrumentOf(0);
-		const offset = (sid.rows[0] as unknown as { toneAdd: number }).toneAdd;
+		const offset = sid.macros?.toneAdd?.values[0] as number;
 
 		expect(song.tuningTable).toContain(FIXTURE_TONE_A);
 		expect(offset).toBe(0);

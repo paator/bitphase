@@ -25,6 +25,10 @@ import {
 	padEffectsArray,
 	resolveChannelEffectColumnCount
 } from '../../../chips/base/channel-effect-columns';
+import {
+	migrateLegacyInstrument,
+	type LegacyInstrument
+} from '../../../services/instrument/instrument-legacy-migration';
 
 function reconstructProject(data: any, getChip: (chipType: string) => Chip | null): Project {
 	const songs = data.songs?.map((songData: any) => reconstructSong(songData, getChip)) || [];
@@ -49,7 +53,7 @@ function reconstructProject(data: any, getChip: (chipType: string) => Chip | nul
 		);
 	}
 	if (instruments.length === 0) {
-		instruments = [new Instrument('01', [], 0, 'Instrument 01')];
+		instruments = [new Instrument('01', 'Instrument 01')];
 	}
 
 	return new Project(
@@ -216,47 +220,30 @@ function reconstructInstrument(data: any): Instrument {
 	}
 	const instrument = new Instrument(
 		id,
-		[],
-		data.loop ?? 0,
 		data.name ?? '',
 		typeof data.chipType === 'string' ? data.chipType : 'ay'
 	);
+	const legacy: LegacyInstrument = { ...instrument };
 	if (data.rows) {
-		instrument.rows = data.rows.map((rowData: any) =>
+		legacy.rows = data.rows.map((rowData: any) =>
 			reconstructInstrumentRow(rowData, instrument.chipType)
 		);
 	}
+	if (typeof data.loop === 'number') {
+		legacy.loop = data.loop;
+	}
+	if (typeof data.timerLoop === 'number') {
+		legacy.timerLoop = data.timerLoop;
+	}
 	if (data.timerRows) {
-		(
-			instrument as Instrument & {
-				timerRows?: {
-					sid: boolean;
-					syncbuzzer?: boolean;
-					fm?: boolean;
-					envFm?: boolean;
-					fmOffsetMode?: 'semitone' | 'period';
-					sidPeriodMode?: 'auto' | 'manual';
-					detune?: number;
-					period?: number;
-					semitone?: number;
-					timerWaveform?: number[];
-					timerWaveformLoop?: number;
-					fmWaveform?: number[];
-					fmWaveformLoop?: number;
-					envFmWaveform?: number[];
-					envFmWaveformLoop?: number;
-				}[];
-			}
-		).timerRows = data.timerRows.map(
+		legacy.timerRows = data.timerRows.map(
 			(row: {
 				sid?: boolean;
 				syncbuzzer?: boolean;
 				fm?: boolean;
 				envFm?: boolean;
 				fmOffsetMode?: 'semitone' | 'period';
-				sidPeriodMode?: 'auto' | 'manual';
 				detune?: number;
-				period?: number;
 				semitone?: number;
 				timerWaveform?: number[];
 				timerWaveformLoop?: number;
@@ -274,9 +261,7 @@ function reconstructInstrument(data: any): Instrument {
 					fm?: boolean;
 					envFm?: boolean;
 					fmOffsetMode?: 'semitone' | 'period';
-					sidPeriodMode?: 'auto' | 'manual';
 					detune?: number;
-					period?: number;
 					semitone?: number;
 					timerWaveform?: number[];
 					timerWaveformLoop?: number;
@@ -292,14 +277,9 @@ function reconstructInstrument(data: any): Instrument {
 					syncbuzzer: row.syncbuzzer ?? false,
 					fm: row.fm ?? false,
 					envFm: row.envFm ?? false,
-					fmOffsetMode: row.fmOffsetMode === 'period' ? 'period' : 'semitone',
-					sidPeriodMode:
-						row.sidPeriodMode === 'auto' || row.sidPeriodMode === 'manual'
-							? row.sidPeriodMode
-							: 'auto'
+					fmOffsetMode: row.fmOffsetMode === 'period' ? 'period' : 'semitone'
 				};
 				if (row.detune !== undefined) timerRow.detune = row.detune;
-				if (row.period !== undefined) timerRow.period = row.period;
 				if (row.semitone !== undefined) timerRow.semitone = row.semitone;
 				if (row.timerWaveform) timerRow.timerWaveform = [...row.timerWaveform];
 				if (row.timerWaveformLoop !== undefined) {
@@ -321,14 +301,44 @@ function reconstructInstrument(data: any): Instrument {
 			}
 		);
 	}
-	if (data.timerLoop !== undefined) {
-		(
-			instrument as Instrument & {
-				timerLoop?: number;
-			}
-		).timerLoop = data.timerLoop;
+	if (data.macros && typeof data.macros === 'object') {
+		const macros: Record<string, { values: (boolean | number)[]; loop: number }> = {};
+		for (const [macroId, macro] of Object.entries(data.macros as Record<string, unknown>)) {
+			if (!macro || typeof macro !== 'object') continue;
+			const record = macro as { values?: unknown; loop?: unknown };
+			if (!Array.isArray(record.values)) continue;
+			macros[macroId] = {
+				values: record.values.map((value) =>
+					typeof value === 'boolean' || typeof value === 'number' ? value : 0
+				),
+				loop: typeof record.loop === 'number' ? record.loop : 0
+			};
+		}
+		if (Object.keys(macros).length > 0) {
+			legacy.macros = macros;
+		}
 	}
-	const extended = instrument as Instrument & {
+	if (data.timerMacros && typeof data.timerMacros === 'object') {
+		const timerMacros: Record<string, { values: (boolean | number | string)[]; loop: number }> =
+			{};
+		for (const [macroId, macro] of Object.entries(data.timerMacros as Record<string, unknown>)) {
+			if (!macro || typeof macro !== 'object') continue;
+			const record = macro as { values?: unknown; loop?: unknown };
+			if (!Array.isArray(record.values)) continue;
+			timerMacros[macroId] = {
+				values: record.values.map((value) =>
+					typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string'
+						? value
+						: 0
+				),
+				loop: typeof record.loop === 'number' ? record.loop : 0
+			};
+		}
+		if (Object.keys(timerMacros).length > 0) {
+			legacy.timerMacros = timerMacros;
+		}
+	}
+	const extended = legacy as LegacyInstrument & {
 		timerPwmDuty?: number;
 		timerPwmSweepMin?: number;
 		timerPwmSweep?: number;
@@ -352,7 +362,7 @@ function reconstructInstrument(data: any): Instrument {
 	if (data.timerPwmSweepShape !== undefined) {
 		extended.timerPwmSweepShape = data.timerPwmSweepShape as typeof extended.timerPwmSweepShape;
 	}
-	const withSample = extended as Instrument & {
+	const withSample = extended as typeof extended & {
 		sampleData?: number[];
 		sampleRate?: number;
 		sampleStart?: number;
@@ -391,7 +401,7 @@ function reconstructInstrument(data: any): Instrument {
 			withSample.sampleLoopEnabled = true;
 		}
 	}
-	return instrument;
+	return migrateLegacyInstrument(legacy);
 }
 
 function reconstructInstrumentRow(data: any, chipType?: string): InstrumentRow {

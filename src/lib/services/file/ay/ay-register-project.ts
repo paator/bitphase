@@ -1,6 +1,7 @@
 import { Project, Table } from '../../../models/project';
 import { Instrument, InstrumentRow, type Song } from '../../../models/song';
 import { numberToInstrumentId } from '../../../utils/instrument-id';
+import { instrumentFromLegacy } from '../../instrument/instrument-legacy-migration';
 
 export type AyProjectParts = {
 	title: string;
@@ -20,15 +21,16 @@ export function assembleAyProject(parts: AyProjectParts): Project {
 		parts.patternOrder.length > 0 ? parts.patternOrder : [0],
 		[new Table(0, [], 0, 'Table 1')],
 		{},
-		parts.instruments.length > 0 ? parts.instruments : [createPlaceholderInstrument()]
+		parts.instruments.length > 0
+			? parts.instruments
+			: [createPlaceholderInstrument()]
 	);
 }
 
 function createPlaceholderInstrument(): Instrument {
 	const id = numberToInstrumentId(1);
-	return new Instrument(
-		id,
-		[
+	return instrumentFromLegacy(id, `Instrument ${id}`, 'ay', {
+		rows: [
 			new InstrumentRow({
 				tone: true,
 				noise: false,
@@ -46,7 +48,6 @@ function createPlaceholderInstrument(): Instrument {
 				envelopeAccumulation: false
 			})
 		],
-		0,
-		`Instrument ${id}`
-	);
+		loop: 0
+	});
 }

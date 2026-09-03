@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Instrument } from '../../models/song';
 	import { Instrument as InstrumentModel } from '../../models/song';
-	import { InstrumentRow } from '../../models/song';
 	import IconCarbonWaveform from '~icons/carbon/waveform';
 	import IconCarbonHexagonSolid from '~icons/carbon/hexagon-solid';
 	import IconCarbonHexagonOutline from '~icons/carbon/hexagon-outline';
@@ -23,6 +22,7 @@
 	import type { AudioService } from '../../services/audio/audio-service';
 	import type { ChipProcessor } from '../../chips/base/processor';
 	import { getChipByType } from '../../chips/registry';
+	import { instrumentHasSample } from '../../chips/ay/sample-region';
 	import PillTabs, { type PillTab } from '../PillTabs/PillTabs.svelte';
 	import {
 		isValidInstrumentId,
@@ -40,6 +40,7 @@
 	import {
 		applyInstrumentPreset,
 		parseInstrumentPreset,
+		serializeInstrumentPreset,
 		type InstrumentPresetPayload
 	} from '../../services/instrument/instrument-preset';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
@@ -106,7 +107,6 @@
 
 	let asHex = $state(false);
 	let selectedInstrumentIndex = $state(0);
-	let selectedInstrumentRowIndices = $state<number[]>([]);
 	let instrumentListScrollRef: HTMLDivElement | null = $state(null);
 
 	$effect(() => {
@@ -220,19 +220,15 @@
 	}
 
 	function isInstrumentUsed(instrument: Instrument): boolean {
-		if (instrument.rows.length === 0) return false;
-		if (instrument.rows.length === 1) {
-			const row = instrument.rows[0];
-			const isEmpty =
-				!row.tone &&
-				!row.noise &&
-				!row.envelope &&
-				row.toneAdd === 0 &&
-				row.noiseAdd === 0 &&
-				row.volume === 0;
-			if (isEmpty && instrument.loop === 0) return false;
+		if (instrumentHasSample(instrument as { sampleData?: number[] })) return true;
+		const extra = instrument as Instrument & { timerMacros?: typeof instrument.macros };
+		if (extra.timerMacros && Object.values(extra.timerMacros).some((macro) => macro.values.length > 0)) {
+			return true;
 		}
-		return true;
+		if (instrument.macros) {
+			return Object.values(instrument.macros).some((macro) => macro.values.length > 0);
+		}
+		return false;
 	}
 
 	let pendingInstrumentUpdateBefore: Instrument[] | null = null;
@@ -293,7 +289,7 @@
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
 		if (!chip) return;
-		const newInstrument = new InstrumentModel(newId, [], 0, `Instrument ${newId}`, chip.type);
+		const newInstrument = new InstrumentModel(newId, `Instrument ${newId}`, chip.type);
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
 		projectStore.instruments = [...allInstruments, newInstrument];
 		sortInstrumentsAndSyncSelection(newId);
@@ -354,14 +350,24 @@
 		const existingIds = allInstruments.map((inst) => inst.id);
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
-		const copiedRows = instrument.rows.map((r) => new InstrumentRow({ ...r }));
-		const copy = new InstrumentModel(
-			newId,
-			copiedRows,
-			instrument.loop,
-			instrument.name + ' (Copy)',
-			chip.type
-		);
+		const copy = new InstrumentModel(newId, instrument.name + ' (Copy)', chip.type);
+		if (instrument.macros) {
+			copy.macros = Object.fromEntries(
+				Object.entries(instrument.macros).map(([id, macro]) => [
+					id,
+					{ values: [...macro.values], loop: macro.loop }
+				])
+			);
+		}
+		const sourceExtended = instrument as Instrument & { timerMacros?: typeof instrument.macros };
+		if (sourceExtended.timerMacros) {
+			(copy as typeof sourceExtended).timerMacros = Object.fromEntries(
+				Object.entries(sourceExtended.timerMacros).map(([id, macro]) => [
+					id,
+					{ values: [...macro.values], loop: macro.loop }
+				])
+			);
+		}
 		chip.copyInstrumentFields?.(instrument, copy);
 
 		const beforeInstruments = projectStore.cloneForHistory(projectStore.instruments);
@@ -457,12 +463,7 @@
 		if (chipInstruments.length === 0) return;
 		const inst = chipInstruments[selectedInstrumentIndex];
 		if (!inst) return;
-		downloadJson(`instrument-${inst.id}.json`, {
-			chipType: inst.chipType,
-			name: inst.name,
-			loop: inst.loop,
-			rows: inst.rows.map((r) => ({ ...r }))
-		});
+		downloadJson(`instrument-${inst.id}.json`, serializeInstrumentPreset(inst));
 	}
 
 	function replaceInstrumentFromPreset(
@@ -671,23 +672,25 @@
 				onmousedown={instrumentListResize.beginResize} />
 
 			<div
-				class="min-h-0 flex-1 overflow-auto p-4"
+				id="instrument-detail-panel"
+				class="relative min-h-0 flex-1 overflow-hidden"
 				class:pointer-events-none={!hasSongs}
 				class:opacity-50={!hasSongs}>
-				{#if chipInstruments[selectedInstrumentIndex] && InstrumentEditor}
-					{#key chipInstruments[selectedInstrumentIndex].id}
-						<InstrumentEditor
-							instrument={chipInstruments[selectedInstrumentIndex]}
-							{asHex}
-							{isExpanded}
-							onInstrumentChange={handleInstrumentChange}
-							bind:selectedRowIndices={selectedInstrumentRowIndices} />
-					{/key}
-				{:else if chipInstruments[selectedInstrumentIndex] && chip}
-					<p class="text-sm text-[var(--color-app-text-muted)]">
-						Instrument editor for {chip.name} is not available yet.
-					</p>
-				{/if}
+				<div class="h-full overflow-auto p-4">
+					{#if chipInstruments[selectedInstrumentIndex] && InstrumentEditor}
+						{#key chipInstruments[selectedInstrumentIndex].id}
+							<InstrumentEditor
+								instrument={chipInstruments[selectedInstrumentIndex]}
+								{asHex}
+								{isExpanded}
+								onInstrumentChange={handleInstrumentChange} />
+						{/key}
+					{:else if chipInstruments[selectedInstrumentIndex] && chip}
+						<p class="text-sm text-[var(--color-app-text-muted)]">
+							Instrument editor for {chip.name} is not available yet.
+						</p>
+					{/if}
+				</div>
 			</div>
 		{/snippet}
 	</Card>

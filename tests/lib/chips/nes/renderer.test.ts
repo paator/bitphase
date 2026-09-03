@@ -4,7 +4,8 @@ import { FileSystemResourceLoader } from '../../../../cli/resource-loader-node';
 import { NESChipRenderer } from '@/lib/chips/nes/renderer';
 import { NES_CHIP_SCHEMA, NES_DEFAULT_TUNING_TABLE } from '@/lib/chips/nes/schema';
 import { Project } from '@/lib/models/project';
-import { Instrument, Note, NoteName, Pattern, Song } from '@/lib/models/song';
+import { Note, NoteName, Pattern, Song } from '@/lib/models/song';
+import { instrumentFromLegacy } from '@/lib/services/instrument/instrument-legacy-migration';
 
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 
@@ -21,7 +22,9 @@ function createNesTestProject(): Project {
 	song.interruptFrequency = 50;
 	song.patterns = [pattern];
 
-	const instrument = new Instrument('01', [{ pulseWidth: 2, retrigger: false }], 0, 'Pulse', 'nes');
+	const instrument = instrumentFromLegacy('01', 'Pulse', 'nes', {
+		rows: [{ pulseWidth: 2, retrigger: false }]
+	});
 
 	return new Project('NES export test', '', [song], 0, [0], [], {}, [instrument]);
 }

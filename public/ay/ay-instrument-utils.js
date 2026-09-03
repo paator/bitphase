@@ -1,4 +1,5 @@
-export const DEFAULT_AY_SID_PERIOD = 100;
+import { resolveAyTimerMacros } from '../tracker/tracker-instrument-macros.js';
+
 export const DEFAULT_AY_SID_PERIOD_DETUNE = 1;
 export const DEFAULT_AY_SID_PERIOD_SEMITONE_DETUNE = 0;
 export const DEFAULT_AY_TIMER_WAVEFORM = [15, 0];
@@ -29,10 +30,6 @@ export const DEFAULT_AY_TIMER_PWM_SWEEP_SHAPE = 'triangle';
 export const AY_TONE_REGISTER_PRESCALER = 16;
 export const AY_AUTO_TIMER_TONE_MULTIPLIER = 16;
 
-export function resolveAyTimerRowSidPeriodMode(row) {
-	return row?.sidPeriodMode === 'manual' ? 'manual' : 'auto';
-}
-
 export function effectiveRowToneDetune(row) {
 	return row?.semitone ?? DEFAULT_AY_SID_PERIOD_SEMITONE_DETUNE;
 }
@@ -41,21 +38,14 @@ export function effectiveRowDetune(row) {
 	return row?.detune ?? DEFAULT_AY_SID_PERIOD_DETUNE;
 }
 
-export function effectiveRowPeriod(row) {
-	return Math.max(1, (row?.period ?? DEFAULT_AY_SID_PERIOD) & 0xffff);
-}
-
 export function computeTimerEffectPeriod(tonePeriod, timerRow) {
-	if (resolveAyTimerRowSidPeriodMode(timerRow) === 'manual') {
-		return effectiveRowPeriod(timerRow);
-	}
 	if (tonePeriod > 0) {
 		const detune = effectiveRowDetune(timerRow) | 0;
 		const semitone = effectiveRowToneDetune(timerRow) | 0;
 		const transposeFactor = Math.pow(2, -semitone / 12);
 		return Math.max(1, (Math.round(tonePeriod * transposeFactor) + detune) & 0xffff || 1);
 	}
-	return effectiveRowPeriod(timerRow);
+	return 1;
 }
 
 export function computeSidPeriod(tonePeriod, timerRow) {
@@ -202,6 +192,13 @@ export function resolveAyFmOffsetMode(row) {
 	return row?.fmOffsetMode === 'period' ? 'period' : 'semitone';
 }
 
+export function resolveAyEnvFmOffsetMode(row) {
+	if (row?.envFmOffsetMode === 'period' || row?.envFmOffsetMode === 'semitone') {
+		return row.envFmOffsetMode;
+	}
+	return resolveAyFmOffsetMode(row);
+}
+
 export function defaultAyFmWaveform(mode) {
 	return mode === 'period' ? [...DEFAULT_AY_FM_PERIOD_WAVEFORM] : [...DEFAULT_AY_FM_WAVEFORM];
 }
@@ -254,7 +251,7 @@ export function effectiveRowEnvFmWaveform(row) {
 	if (!rowUsesEnvFmWaveform(row)) {
 		return [...DEFAULT_AY_FM_WAVEFORM];
 	}
-	const mode = resolveAyFmOffsetMode(row);
+	const mode = resolveAyEnvFmOffsetMode(row);
 	const waveform = row?.envFmWaveform?.length
 		? row.envFmWaveform
 		: !row?.sid && !row?.syncbuzzer && row?.timerWaveform?.length
@@ -453,6 +450,7 @@ function normalizeTimerRow(row) {
 	const fm = row?.fm ?? defaults.fm;
 	const envFm = row?.envFm ?? defaults.envFm;
 	const fmOffsetMode = resolveAyFmOffsetMode(row);
+	const envFmOffsetMode = resolveAyEnvFmOffsetMode(row);
 	const sid = row?.sid ?? defaults.sid;
 	const syncbuzzer = row?.syncbuzzer ?? defaults.syncbuzzer;
 	const legacySharedWaveform = row?.timerWaveform?.length ? [...row.timerWaveform] : undefined;
@@ -466,10 +464,10 @@ function normalizeTimerRow(row) {
 			? normalizeFmWaveform(legacyForOffsetEffects, fmOffsetMode)
 			: defaultAyFmWaveform(fmOffsetMode);
 	const envFmWaveform = hasDedicatedEnvFmWaveform
-		? normalizeFmWaveform(row.envFmWaveform, fmOffsetMode)
+		? normalizeFmWaveform(row.envFmWaveform, envFmOffsetMode)
 		: envFm && legacyForOffsetEffects
-			? normalizeFmWaveform(legacyForOffsetEffects, fmOffsetMode)
-			: defaultAyFmWaveform(fmOffsetMode);
+			? normalizeFmWaveform(legacyForOffsetEffects, envFmOffsetMode)
+			: defaultAyFmWaveform(envFmOffsetMode);
 	const timerWaveform =
 		legacySharedWaveform && (sid || syncbuzzer || (!fm && !envFm))
 			? legacySharedWaveform.map((value) => value & 0xf).slice(0, 32)
@@ -483,10 +481,7 @@ function normalizeTimerRow(row) {
 		fm,
 		envFm,
 		fmOffsetMode,
-		sidPeriodMode:
-			row?.sidPeriodMode === 'auto' || row?.sidPeriodMode === 'manual'
-				? row.sidPeriodMode
-				: 'auto',
+		envFmOffsetMode,
 		timerWaveform,
 		timerWaveformLoop: row?.timerWaveformLoop ?? defaults.timerWaveformLoop,
 		fmWaveform,
@@ -500,9 +495,6 @@ function normalizeTimerRow(row) {
 	}
 	if (row?.semitone !== undefined) {
 		normalized.semitone = row.semitone;
-	}
-	if (row?.period !== undefined) {
-		normalized.period = Math.max(1, row.period & 0xffff);
 	}
 	if (fmOffsetMode === 'period') {
 		normalized.fmOffsetMode = 'period';
@@ -537,21 +529,9 @@ function resolveInstrumentTimerPwmFields(instrument, sourceRows) {
 }
 
 export function normalizeAyInstrumentFields(instrument) {
-	const rowCount =
-		instrument.timerRows?.length > 0
-			? instrument.timerRows.length
-			: Math.max(instrument.rows?.length ?? 0, 1);
-	const sourceRows = instrument.timerRows ?? [];
-	const timerRows = Array.from({ length: rowCount }, (_, index) =>
-		normalizeTimerRow(sourceRows[index])
-	);
-	const timerLoop =
-		instrument.timerLoop !== undefined ? instrument.timerLoop : (instrument.loop ?? 0);
-
 	return {
-		timerRows,
-		timerLoop,
-		...resolveInstrumentTimerPwmFields(instrument, sourceRows),
+		timerMacros: resolveAyTimerMacros(instrument),
+		...resolveInstrumentTimerPwmFields(instrument, []),
 		timerPwmPreserveOnNewNote: instrument.timerPwmPreserveOnNewNote === true,
 		timerPwmSweepStartPhase: resolveTimerPwmSweepStartPhase(instrument),
 		timerPwmSweepShape: resolveTimerPwmSweepShape(instrument.timerPwmSweepShape)

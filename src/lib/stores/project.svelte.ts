@@ -151,7 +151,7 @@ class ProjectStore {
 		if (!newId) return;
 		this.instruments = [
 			...this.instruments,
-			new InstrumentModel(newId, [], 0, `Instrument ${newId}`, chipType)
+			new InstrumentModel(newId, `Instrument ${newId}`, chipType)
 		];
 	}
 

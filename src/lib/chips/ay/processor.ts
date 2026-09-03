@@ -15,9 +15,12 @@ import { isValidInstrumentSampleByteLength } from '../../utils/audio-sample-deco
 import { normalizeSamplePlaybackBounds } from './sample-region';
 import type { AyTimerPwmSweepShape } from './instrument';
 
-type WorkletInstrument = Instrument & {
-	timerLoop?: number;
-	timerRows?: Record<string, unknown>[];
+type WorkletInstrument = {
+	id: string;
+	chipType: string;
+	name: string;
+	macros?: Record<string, { values: (boolean | number | string)[]; loop: number }>;
+	timerMacros?: Record<string, { values: (boolean | number | string)[]; loop: number }>;
 	timerPwmDuty?: number;
 	timerPwmSweepMin?: number;
 	timerPwmSweep?: number;
@@ -45,10 +48,23 @@ export function sanitizeInstrumentForWorklet(instrument: Instrument): WorkletIns
 	return {
 		id: instrument.id,
 		chipType: instrument.chipType,
-		rows: Array.from(instrument.rows).map((row) => ({ ...row })),
-		loop: instrument.loop,
 		name: instrument.name,
-		timerLoop: extended.timerLoop ?? instrument.loop,
+		macros: instrument.macros
+			? Object.fromEntries(
+					Object.entries(instrument.macros).map(([id, macro]) => [
+						id,
+						{ values: [...macro.values], loop: macro.loop }
+					])
+				)
+			: undefined,
+		timerMacros: extended.timerMacros
+			? Object.fromEntries(
+					Object.entries(extended.timerMacros).map(([id, macro]) => [
+						id,
+						{ values: [...macro.values], loop: macro.loop }
+					])
+				)
+			: undefined,
 		timerPwmDuty: extended.timerPwmDuty,
 		timerPwmSweepMin: extended.timerPwmSweepMin,
 		timerPwmSweep: extended.timerPwmSweep,
@@ -56,12 +72,6 @@ export function sanitizeInstrumentForWorklet(instrument: Instrument): WorkletIns
 		timerPwmSweepStartPhase: extended.timerPwmSweepStartPhase,
 		timerPwmSweepShape: extended.timerPwmSweepShape,
 		timerPwmReverseSweep: extended.timerPwmReverseSweep,
-		timerRows: extended.timerRows?.map((row) => ({
-			...row,
-			timerWaveform: (row as { timerWaveform?: number[] }).timerWaveform
-				? [...((row as { timerWaveform?: number[] }).timerWaveform as number[])]
-				: undefined
-		})),
 		...(sampleData?.length
 			? (() => {
 					const bounds = normalizeSamplePlaybackBounds({
@@ -274,7 +284,10 @@ export class AYProcessor
 
 	sendInitInstruments(instruments: Instrument[]): void {
 		const sanitized = instruments.map(sanitizeInstrumentForWorklet);
-		this.bridge.sendCommand({ type: 'init_instruments', instruments: sanitized });
+		this.bridge.sendCommand({
+			type: 'init_instruments',
+			instruments: sanitized as unknown as Instrument[]
+		});
 	}
 
 	sendRequestedPattern(pattern: Pattern, patternOrderIndex: number): void {
@@ -363,7 +376,7 @@ export class AYProcessor
 			type: 'preview_row',
 			pattern: patternCopy,
 			rowIndex,
-			instrument: instrumentCopy,
+			instrument: instrumentCopy as unknown as Instrument,
 			channelIndex
 		});
 	}

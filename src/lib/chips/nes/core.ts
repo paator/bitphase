@@ -5,6 +5,7 @@ import { NESChipRenderer } from './renderer';
 import { NES_CHIP_SCHEMA } from './schema';
 import { NES_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { NES_PLAYBACK_DEBUG } from './playback-debug';
+import { copyNesInstrumentFields } from './instrument';
 import { describeNesEffect } from './effects';
 import type { Chip } from '../types';
 
@@ -21,6 +22,7 @@ export const NES_CHIP: Chip = {
 	instrumentEditor: undefined,
 	previewRow: undefined,
 	playbackDebug: NES_PLAYBACK_DEBUG,
+	copyInstrumentFields: copyNesInstrumentFields,
 	describeEffect: describeNesEffect
 };
 

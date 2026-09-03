@@ -4,7 +4,8 @@ import { filterInstrumentsForChip } from '@/lib/services/instrument/instrument-f
 import {
 	applyInstrumentPreset,
 	instrumentFromPreset,
-	parseInstrumentPreset
+	parseInstrumentPreset,
+	serializeInstrumentPreset
 } from '@/lib/services/instrument/instrument-preset';
 
 const AY_PRESET = {
@@ -26,14 +27,15 @@ const NES_PRESET = {
 
 function projectInstruments(): Instrument[] {
 	return [
-		new Instrument('01', [], 0, 'Lead', 'ay'),
-		new Instrument('03', [], 0, 'Empty NES slot', 'nes')
+		new Instrument('01', 'Lead', 'ay'),
+		new Instrument('03', 'Empty NES slot', 'nes')
 	];
 }
 
 describe('parseInstrumentPreset', () => {
 	it('reads a bare instrument object', () => {
 		expect(parseInstrumentPreset(AY_PRESET)).toEqual({
+			chipType: 'ay',
 			name: 'Glass Break',
 			loop: 1,
 			rows: AY_PRESET.rows
@@ -50,7 +52,7 @@ describe('parseInstrumentPreset', () => {
 		expect(payload).toEqual({ rows: [], loop: 0, name: '' });
 	});
 
-	it('rejects payloads carrying no row array', () => {
+	it('rejects payloads carrying neither macros nor a row array', () => {
 		expect(parseInstrumentPreset(null)).toBeNull();
 		expect(parseInstrumentPreset('instrument')).toBeNull();
 		expect(parseInstrumentPreset({ name: 'No rows' })).toBeNull();
@@ -67,21 +69,22 @@ describe('instrumentFromPreset', () => {
 		expect(nesInstrument.chipType).toBe('nes');
 	});
 
-	it('tags a preset built for another chip for the slot receiving it, rows as they stand', () => {
+	it('tags a preset built for another chip for the slot receiving it, macros as they stand', () => {
 		const instrument = instrumentFromPreset(parseInstrumentPreset(AY_PRESET)!, '03', 'nes');
 
 		expect(instrument.chipType).toBe('nes');
-		expect(instrument.rows.map((row) => ({ ...row }))).toEqual(AY_PRESET.rows);
+		expect(instrument.macros?.volumeOrRate?.values[0]).toBe(15);
 	});
 
-	it('carries the id, rows, loop and name over', () => {
+	it('carries the id, macros and name over', () => {
 		const payload = parseInstrumentPreset(AY_PRESET)!;
 		const instrument = instrumentFromPreset(payload, '01', 'ay');
 
 		expect(instrument.id).toBe('01');
-		expect(instrument.loop).toBe(1);
 		expect(instrument.name).toBe('Glass Break');
-		expect(instrument.rows.map((row) => ({ ...row }))).toEqual(AY_PRESET.rows);
+		expect(instrument.macros?.volume?.values).toEqual([15, 7]);
+		expect(instrument.macros?.tone?.values).toEqual([true, false]);
+		expect(instrument.macros?.volume?.loop).toBe(1);
 	});
 
 	it('names the instrument after its slot when the preset has no name', () => {
@@ -89,11 +92,11 @@ describe('instrumentFromPreset', () => {
 		expect(instrumentFromPreset(payload, '07', 'ay').name).toBe('Instrument 07');
 	});
 
-	it('copies rows so editing the instrument leaves the payload alone', () => {
+	it('copies macros so editing the instrument leaves the payload alone', () => {
 		const payload = parseInstrumentPreset(AY_PRESET)!;
 		const instrument = instrumentFromPreset(payload, '01', 'ay');
 
-		instrument.rows[0].volume = 0;
+		instrument.macros!.volume!.values[0] = 0;
 
 		expect(AY_PRESET.rows[0].volume).toBe(15);
 	});
@@ -138,5 +141,38 @@ describe('applyInstrumentPreset', () => {
 	it('reports no slot when the project holds no instrument with that id', () => {
 		const payload = parseInstrumentPreset(AY_PRESET)!;
 		expect(applyInstrumentPreset(projectInstruments(), payload, '99', 'ay')).toBeNull();
+	});
+});
+
+describe('serializeInstrumentPreset', () => {
+	it('round-trips PWM and sample fields', () => {
+		const source = instrumentFromPreset(
+			{
+				name: 'Hit',
+				macros: { volume: { values: [15], loop: 0 } },
+				timerPwmDuty: 25,
+				timerPwmSweep: 4,
+				sampleData: [1, 2, 3, 4],
+				sampleRate: 8000,
+				sampleStart: 0,
+				sampleEnd: 3,
+				sampleLoopStart: 1,
+				sampleLoopEnabled: true
+			},
+			'01',
+			'ay'
+		);
+		const payload = parseInstrumentPreset(serializeInstrumentPreset(source))!;
+		const restored = instrumentFromPreset(payload, '01', 'ay') as Instrument & {
+			timerPwmDuty?: number;
+			sampleData?: number[];
+			sampleRate?: number;
+			sampleLoopStart?: number;
+		};
+
+		expect(restored.timerPwmDuty).toBe(25);
+		expect(restored.sampleData).toEqual([1, 2, 3, 4]);
+		expect(restored.sampleRate).toBe(8000);
+		expect(restored.sampleLoopStart).toBe(1);
 	});
 });

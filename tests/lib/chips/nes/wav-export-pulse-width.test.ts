@@ -4,7 +4,8 @@ import { FileSystemResourceLoader } from '../../../../cli/resource-loader-node';
 import { NESChipRenderer } from '@/lib/chips/nes/renderer';
 import { NES_CHIP_SCHEMA, NES_DEFAULT_TUNING_TABLE } from '@/lib/chips/nes/schema';
 import { Project, Table } from '@/lib/models/project';
-import { Effect, Instrument, Note, NoteName, Pattern, Song } from '@/lib/models/song';
+import { Effect, Note, NoteName, Pattern, Song } from '@/lib/models/song';
+import { instrumentFromLegacy } from '@/lib/services/instrument/instrument-legacy-migration';
 
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const SAMPLE_RATE = 44100;
@@ -176,13 +177,9 @@ describe('NES WAV export pulse width', () => {
 			new Effect('E'.charCodeAt(0), 1, 0x03)
 		];
 
-		const instrument = new Instrument(
-			'01',
-			[{ pulseWidth: 0, retrigger: false }],
-			0,
-			'Pulse',
-			'nes'
-		);
+		const instrument = instrumentFromLegacy('01', 'Pulse', 'nes', {
+			rows: [{ pulseWidth: 0, retrigger: false }]
+		});
 		const project = new Project('E1XY export', '', [createBaseSong(pattern)], 0, [0], [], {}, [
 			instrument
 		]);
@@ -204,13 +201,9 @@ describe('NES WAV export pulse width', () => {
 			new Effect('E'.charCodeAt(0), 1, 0, 0)
 		];
 
-		const instrument = new Instrument(
-			'01',
-			[{ pulseWidth: 3, retrigger: false }],
-			0,
-			'Pulse',
-			'nes'
-		);
+		const instrument = instrumentFromLegacy('01', 'Pulse', 'nes', {
+			rows: [{ pulseWidth: 3, retrigger: false }]
+		});
 		const pwmTable = new Table(0, [0, 2, 3], 1, 'PWM');
 		const project = new Project(
 			'E1TX export',
@@ -240,13 +233,9 @@ describe('NES WAV export pulse width', () => {
 			new Effect('E'.charCodeAt(0), 1, 0, 0)
 		];
 
-		const instrument = new Instrument(
-			'01',
-			[{ pulseWidth: 2, retrigger: false }],
-			0,
-			'Pulse',
-			'nes'
-		);
+		const instrument = instrumentFromLegacy('01', 'Pulse', 'nes', {
+			rows: [{ pulseWidth: 2, retrigger: false }]
+		});
 		const pwmTable = new Table(0, [0, 1, 2, 3], 0, 'PWM');
 		const project = new Project(
 			'E1 render',

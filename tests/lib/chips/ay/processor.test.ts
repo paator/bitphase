@@ -1,29 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeInstrumentForWorklet } from '@/lib/chips/ay/processor';
-import { Instrument } from '@/lib/models/song';
+import { decodeTimerWaveform } from '@/lib/chips/ay/ay-timer-macros';
+import { legacyInstrument } from '../../../helpers/instrument-fixtures';
 import { MAX_INSTRUMENT_SAMPLE_BYTES } from '@/lib/utils/audio-sample-decode';
 
 describe('sanitizeInstrumentForWorklet', () => {
 	it('includes pwm fields for preview playback', () => {
-		const instrument = new Instrument('01', [
-			{ tone: true, noise: false, envelope: false, volume: 15 }
-		]);
-		const extended = instrument as Instrument & {
-			timerRows?: { sid: boolean; timerWaveform?: number[] }[];
-			timerPwmDuty?: number;
-			timerPwmSweepMin?: number;
-			timerPwmSweep?: number;
-			timerPwmPreserveOnNewNote?: boolean;
-			timerPwmSweepStartPhase?: number;
-			timerPwmSweepShape?: 'sine';
-		};
-		extended.timerRows = [{ sid: true, timerWaveform: [15, 0] }];
-		extended.timerPwmDuty = 25;
-		extended.timerPwmSweepMin = 5;
-		extended.timerPwmSweep = 3;
-		extended.timerPwmPreserveOnNewNote = true;
-		extended.timerPwmSweepStartPhase = 500;
-		extended.timerPwmSweepShape = 'sine';
+		const instrument = legacyInstrument({
+			rows: [{ tone: true, noise: false, envelope: false, volume: 15 }],
+			timerRows: [{ sid: true, timerWaveform: [15, 0] }],
+			timerPwmDuty: 25,
+			timerPwmSweepMin: 5,
+			timerPwmSweep: 3,
+			timerPwmPreserveOnNewNote: true,
+			timerPwmSweepStartPhase: 500,
+			timerPwmSweepShape: 'sine'
+		});
 
 		const sanitized = sanitizeInstrumentForWorklet(instrument);
 
@@ -33,12 +25,14 @@ describe('sanitizeInstrumentForWorklet', () => {
 		expect(sanitized.timerPwmPreserveOnNewNote).toBe(true);
 		expect(sanitized.timerPwmSweepStartPhase).toBe(500);
 		expect(sanitized.timerPwmSweepShape).toBe('sine');
-		expect(sanitized.timerRows?.[0]?.timerWaveform).toEqual([15, 0]);
+		expect(decodeTimerWaveform(sanitized.timerMacros?.timerWaveform?.values[0] ?? '')).toEqual([
+			15, 0
+		]);
 	});
 
 	it('includes sample data for worklet playback', () => {
-		const instrument = new Instrument('02', []);
-		const extended = instrument as Instrument & { sampleData?: number[]; sampleRate?: number };
+		const instrument = legacyInstrument({ id: '02', rows: [] });
+		const extended = instrument as typeof instrument & { sampleData?: number[]; sampleRate?: number };
 		extended.sampleData = [0, 128, 255];
 		extended.sampleRate = 22_050;
 
@@ -53,8 +47,8 @@ describe('sanitizeInstrumentForWorklet', () => {
 	});
 
 	it('preserves sampleLoopEnabled false for the worklet', () => {
-		const instrument = new Instrument('04', []);
-		const extended = instrument as Instrument & {
+		const instrument = legacyInstrument({ id: '04', rows: [] });
+		const extended = instrument as typeof instrument & {
 			sampleData?: number[];
 			sampleLoopEnabled?: boolean;
 		};
@@ -67,8 +61,8 @@ describe('sanitizeInstrumentForWorklet', () => {
 	});
 
 	it('omits oversized 8-bit mono sample data for the worklet', () => {
-		const instrument = new Instrument('03', []);
-		const extended = instrument as Instrument & { sampleData?: number[] };
+		const instrument = legacyInstrument({ id: '03', rows: [] });
+		const extended = instrument as typeof instrument & { sampleData?: number[] };
 		extended.sampleData = Array.from({ length: MAX_INSTRUMENT_SAMPLE_BYTES + 50 }, () => 64);
 
 		const sanitized = sanitizeInstrumentForWorklet(instrument);

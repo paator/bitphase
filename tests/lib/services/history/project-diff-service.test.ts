@@ -7,9 +7,9 @@ import type { ProjectDiff } from '../../../../src/lib/models/history';
 
 describe('ProjectDiffService', () => {
 	it('applies and inverts set diffs without sharing saved values', () => {
-		const target = { instruments: [new Instrument('01', [], 0, 'One')] };
+		const target = { instruments: [new Instrument('01', 'One')] };
 		const before = target.instruments[0];
-		const after = new Instrument('02', [], 0, 'Two');
+		const after = new Instrument('02', 'Two');
 		const diff: ProjectDiff = {
 			kind: 'set',
 			path: ['instruments', 0],

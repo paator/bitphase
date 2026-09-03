@@ -11,6 +11,10 @@ import {
 } from '../../../models/song';
 import { PT3TuneTables, generate12TETTuningTable } from '../../../models/pt3/tuning-tables';
 import { numberToInstrumentId } from '../../../utils/instrument-id';
+import {
+	migrateLegacyInstrument,
+	instrumentFromLegacy
+} from '../../instrument/instrument-legacy-migration';
 import { convertPT3ToVT2, isTurboSoundPT3, splitTurboSoundPT3 } from './pt3-to-vt2';
 
 interface VT2Module {
@@ -130,28 +134,31 @@ class VT2Converter {
 					? sample.id
 					: sample.id.toString(36).toUpperCase().padStart(2, '0');
 
-			return new Instrument(
+			return instrumentFromLegacy(
 				instrumentId,
-				sample.data.map((line) => {
-					return new InstrumentRow({
-						tone: line.tone,
-						noise: line.noise,
-						envelope: line.envelope,
-						toneAdd: line.toneAdd,
-						noiseAdd: line.noiseAdd,
-						volume: line.volume,
-						loop: line.loop,
-						amplitudeSliding: line.amplitudeSliding || false,
-						amplitudeSlideUp: line.amplitudeSlideUp || false,
-						toneAccumulation: line.toneAccumulation || false,
-						noiseAccumulation: line.noiseAccumulation || false,
-						envelopeAdd: line.noiseAdd,
-						envelopeAccumulation: line.noiseAccumulation || false,
-						retriggerEnvelope: false
-					});
-				}),
-				loopPoint,
-				`Instrument ${instrumentId}`
+				`Instrument ${instrumentId}`,
+				'ay',
+				{
+					rows: sample.data.map((line) => {
+						return new InstrumentRow({
+							tone: line.tone,
+							noise: line.noise,
+							envelope: line.envelope,
+							toneAdd: line.toneAdd,
+							noiseAdd: line.noiseAdd,
+							volume: line.volume,
+							loop: line.loop,
+							amplitudeSliding: line.amplitudeSliding || false,
+							amplitudeSlideUp: line.amplitudeSlideUp || false,
+							toneAccumulation: line.toneAccumulation || false,
+							noiseAccumulation: line.noiseAccumulation || false,
+							envelopeAdd: line.noiseAdd,
+							envelopeAccumulation: line.noiseAccumulation || false,
+							retriggerEnvelope: false
+						});
+					}),
+					loop: loopPoint
+				}
 			);
 		});
 
@@ -265,28 +272,31 @@ class VT2Converter {
 			}
 			const numericId = sample.id + offset;
 			const instrumentId = numberToInstrumentId(numericId);
-			return new Instrument(
+			return instrumentFromLegacy(
 				instrumentId,
-				sample.data.map((line) => {
-					return new InstrumentRow({
-						tone: line.tone,
-						noise: line.noise,
-						envelope: line.envelope,
-						toneAdd: line.toneAdd,
-						noiseAdd: line.noiseAdd,
-						volume: line.volume,
-						loop: line.loop,
-						amplitudeSliding: line.amplitudeSliding || false,
-						amplitudeSlideUp: line.amplitudeSlideUp || false,
-						envelopeAdd: line.noiseAdd,
-						envelopeAccumulation: line.noiseAccumulation || false,
-						toneAccumulation: line.toneAccumulation || false,
-						noiseAccumulation: line.noiseAccumulation || false,
-						retriggerEnvelope: false
-					});
-				}),
-				loopPoint,
-				`Instrument ${instrumentId}`
+				`Instrument ${instrumentId}`,
+				'ay',
+				{
+					rows: sample.data.map((line) => {
+						return new InstrumentRow({
+							tone: line.tone,
+							noise: line.noise,
+							envelope: line.envelope,
+							toneAdd: line.toneAdd,
+							noiseAdd: line.noiseAdd,
+							volume: line.volume,
+							loop: line.loop,
+							amplitudeSliding: line.amplitudeSliding || false,
+							amplitudeSlideUp: line.amplitudeSlideUp || false,
+							envelopeAdd: line.noiseAdd,
+							envelopeAccumulation: line.noiseAccumulation || false,
+							toneAccumulation: line.toneAccumulation || false,
+							noiseAccumulation: line.noiseAccumulation || false,
+							retriggerEnvelope: false
+						});
+					}),
+					loop: loopPoint
+				}
 			);
 		};
 
@@ -486,28 +496,31 @@ class VT2Converter {
 					? sample.id
 					: sample.id.toString(36).toUpperCase().padStart(2, '0');
 
-			return new Instrument(
+			return instrumentFromLegacy(
 				instrumentId,
-				sample.data.map((line) => {
-					return new InstrumentRow({
-						tone: line.tone,
-						noise: line.noise,
-						envelope: line.envelope,
-						toneAdd: line.toneAdd,
-						noiseAdd: line.noiseAdd,
-						volume: line.volume,
-						loop: line.loop,
-						amplitudeSliding: line.amplitudeSliding || false,
-						amplitudeSlideUp: line.amplitudeSlideUp || false,
-						envelopeAdd: line.noiseAdd,
-						envelopeAccumulation: line.noiseAccumulation || false,
-						toneAccumulation: line.toneAccumulation || false,
-						noiseAccumulation: line.noiseAccumulation || false,
-						retriggerEnvelope: false
-					});
-				}),
-				loopPoint,
-				`Instrument ${instrumentId}`
+				`Instrument ${instrumentId}`,
+				'ay',
+				{
+					rows: sample.data.map((line) => {
+						return new InstrumentRow({
+							tone: line.tone,
+							noise: line.noise,
+							envelope: line.envelope,
+							toneAdd: line.toneAdd,
+							noiseAdd: line.noiseAdd,
+							volume: line.volume,
+							loop: line.loop,
+							amplitudeSliding: line.amplitudeSliding || false,
+							amplitudeSlideUp: line.amplitudeSlideUp || false,
+							envelopeAdd: line.noiseAdd,
+							envelopeAccumulation: line.noiseAccumulation || false,
+							toneAccumulation: line.toneAccumulation || false,
+							noiseAccumulation: line.noiseAccumulation || false,
+							retriggerEnvelope: false
+						});
+					}),
+					loop: loopPoint
+				}
 			);
 		});
 
@@ -534,9 +547,11 @@ class VT2Converter {
 	}
 
 	private initializeInstrumentsArray(convertedInstruments: Instrument[]): Instrument[] {
-		return convertedInstruments.length > 0
-			? convertedInstruments
-			: [new Instrument('01', [], 0, 'Instrument 01')];
+		const instruments =
+			convertedInstruments.length > 0
+				? convertedInstruments
+				: [new Instrument('01', 'Instrument 01')];
+		return instruments.map((instrument) => migrateLegacyInstrument(instrument));
 	}
 
 	private convertSingleChip(

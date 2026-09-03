@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { legacyInstruments } from '../helpers/instrument-fixtures.ts';
 import NesAudioDriver from '../../public/nes/nes-audio-driver.js';
 import NesChipRegisterState from '../../public/nes/nes-chip-register-state.js';
 import {
@@ -13,8 +14,9 @@ function createEnvelopeState(rowOverrides = {}) {
 		channelMuted: [false, false, false, false, false],
 		channelSoundEnabled: [true, true, true, true, false],
 		channelInstruments: [0, 0, 0, 0, -1],
-		instruments: [
+		instruments: legacyInstruments([
 			{
+				chipType: 'nes',
 				rows: [
 					{
 						pulseWidth: 2,
@@ -32,7 +34,7 @@ function createEnvelopeState(rowOverrides = {}) {
 				],
 				loop: 0
 			}
-		],
+		]),
 		instrumentPositions: [0, 0, 0, 0, 0],
 		channelPatternVolumes: [15, 15, 15, 15, 15],
 		channelCurrentNotes: [60, 60, 60, 60, 0],

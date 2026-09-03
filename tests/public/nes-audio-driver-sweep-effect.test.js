@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { legacyInstruments } from '../helpers/instrument-fixtures.ts';
 import NesAudioDriver from '../../public/nes/nes-audio-driver.js';
 import NesChipRegisterState from '../../public/nes/nes-chip-register-state.js';
 import { buildSquareSweepReg } from '../../public/nes/nes-instrument-utils.js';
@@ -8,8 +9,9 @@ function createSweepOverrideState() {
 		channelMuted: [false],
 		channelSoundEnabled: [true],
 		channelInstruments: [0],
-		instruments: [
+		instruments: legacyInstruments([
 			{
+				chipType: 'nes',
 				rows: [
 					{
 						pulseWidth: 2,
@@ -21,7 +23,7 @@ function createSweepOverrideState() {
 				],
 				loop: 0
 			}
-		],
+		]),
 		instrumentPositions: [0],
 		channelPatternVolumes: [15],
 		channelCurrentNotes: [60],

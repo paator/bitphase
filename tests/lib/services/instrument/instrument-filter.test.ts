@@ -9,14 +9,14 @@ import {
 
 describe('instrument-filter', () => {
 	it('defaults missing chipType to ay', () => {
-		const instrument = new Instrument('01', []);
+		const instrument = new Instrument('01');
 		expect(resolveInstrumentChipType(instrument)).toBe('ay');
 	});
 
 	it('filters instruments by chip type', () => {
 		const instruments = [
-			new Instrument('01', [], 0, 'AY', 'ay'),
-			new Instrument('02', [], 0, 'NES', 'nes')
+			new Instrument('01', 'AY', 'ay'),
+			new Instrument('02', 'NES', 'nes')
 		];
 
 		expect(filterInstrumentsForChip(instruments, 'ay').map((inst) => inst.id)).toEqual(['01']);
@@ -32,8 +32,8 @@ describe('instrument-filter', () => {
 
 	it('removes instruments only when no songs remain for that chip type', () => {
 		const instruments = [
-			new Instrument('01', [], 0, 'AY', 'ay'),
-			new Instrument('02', [], 0, 'NES', 'nes')
+			new Instrument('01', 'AY', 'ay'),
+			new Instrument('02', 'NES', 'nes')
 		];
 		const songsAfterRemovingLastAy = [{ chipType: 'nes' } as import('@/lib/models/song').Song];
 		const songsWithRemainingAy = [

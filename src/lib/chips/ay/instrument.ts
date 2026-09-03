@@ -1,8 +1,13 @@
 import type { Instrument } from '../../models/song';
-import { isValidInstrumentSampleByteLength } from '../../utils/audio-sample-decode';
-import { normalizeSamplePlaybackBounds } from './sample-region';
+import {
+	INSTRUMENT_MACRO_MIN_LENGTH,
+	resolveTimerInstrumentMacros,
+	sampleInstrumentRowFromMacros,
+	type InstrumentMacros
+} from '../base/instrument-macros';
+import { AY_TIMER_MACRO_FIELDS } from './ay-timer-macros';
+import { copyInstrumentSampleFields } from './sample-region';
 
-export type AySidPeriodMode = 'auto' | 'manual';
 export type AyFmOffsetMode = 'semitone' | 'period';
 
 export type AyTimerRow = {
@@ -11,9 +16,8 @@ export type AyTimerRow = {
 	fm?: boolean;
 	envFm?: boolean;
 	fmOffsetMode?: AyFmOffsetMode;
-	sidPeriodMode?: AySidPeriodMode;
+	envFmOffsetMode?: AyFmOffsetMode;
 	detune?: number;
-	period?: number;
 	semitone?: number;
 	timerWaveform?: number[];
 	timerWaveformLoop?: number;
@@ -24,8 +28,7 @@ export type AyTimerRow = {
 };
 
 export type AyInstrumentFields = {
-	timerRows: AyTimerRow[];
-	timerLoop: number;
+	timerMacros: InstrumentMacros;
 	timerPwmDuty: number;
 	timerPwmSweepMin: number;
 	timerPwmSweep: number;
@@ -42,7 +45,6 @@ export type AyInstrumentFields = {
 	sampleLoop?: number;
 };
 
-export const DEFAULT_AY_SID_PERIOD = 100;
 export const DEFAULT_AY_SID_PERIOD_DETUNE = 1;
 export const DEFAULT_AY_SID_PERIOD_SEMITONE_DETUNE = 0;
 export const DEFAULT_AY_TIMER_WAVEFORM = [15, 0];
@@ -85,8 +87,7 @@ export const AY_TONE_REGISTER_PRESCALER = 16;
 export const AY_AUTO_TIMER_TONE_MULTIPLIER = 16;
 
 type ExtendedInstrument = Instrument & {
-	timerRows?: AyTimerRow[];
-	timerLoop?: number;
+	timerMacros?: InstrumentMacros;
 	timerPwmDuty?: number;
 	timerPwmSweepMin?: number;
 	timerPwmSweep?: number;
@@ -150,6 +151,13 @@ export function rowUsesOffsetWaveform(row: AyTimerRow | undefined): boolean {
 
 export function resolveAyFmOffsetMode(row: AyTimerRow | undefined): AyFmOffsetMode {
 	return row?.fmOffsetMode === 'period' ? 'period' : 'semitone';
+}
+
+export function resolveAyEnvFmOffsetMode(row: AyTimerRow | undefined): AyFmOffsetMode {
+	if (row?.envFmOffsetMode === 'period' || row?.envFmOffsetMode === 'semitone') {
+		return row.envFmOffsetMode;
+	}
+	return resolveAyFmOffsetMode(row);
 }
 
 export function defaultAyFmWaveform(mode: AyFmOffsetMode): number[] {
@@ -257,7 +265,7 @@ export function panelRowFmWaveform(row: AyTimerRow | undefined): number[] {
 }
 
 export function panelRowEnvFmWaveform(row: AyTimerRow | undefined): number[] {
-	const mode = resolveAyFmOffsetMode(row);
+	const mode = resolveAyEnvFmOffsetMode(row);
 	const waveform = resolvePanelOffsetWaveformSource(row, 'envFmWaveform');
 	if (waveform?.length) {
 		return normalizeFmWaveform(waveform, mode);
@@ -378,10 +386,20 @@ export function rowUsesSyncbuzzerPwmDuty(row: AyTimerRow | undefined): boolean {
 }
 
 export function instrumentSupportsTimerPwm(fields: AyInstrumentFields): boolean {
-	return fields.timerRows.some(
-		(row) =>
-			(row.sid || row.syncbuzzer || rowUsesOffsetWaveform(row)) && rowSupportsTimerPwm(row)
+	const maxTick = Math.max(
+		INSTRUMENT_MACRO_MIN_LENGTH,
+		...AY_TIMER_MACRO_FIELDS.map((field) => fields.timerMacros[field.id]?.values.length ?? 0)
 	);
+	for (let tick = 0; tick < maxTick; tick++) {
+		const row = sampleTimerRowFromMacros(fields.timerMacros, tick);
+		if (
+			(row.sid || row.syncbuzzer || rowUsesOffsetWaveform(row)) &&
+			rowSupportsTimerPwm(row)
+		) {
+			return true;
+		}
+	}
+	return false;
 }
 
 export function normalizeInstrumentTimerPwmFields(
@@ -527,10 +545,6 @@ export function advanceTimerPwmSweep(
 	};
 }
 
-export function resolveAyTimerRowSidPeriodMode(row: AyTimerRow | undefined): AySidPeriodMode {
-	return row?.sidPeriodMode === 'manual' ? 'manual' : 'auto';
-}
-
 export function effectiveRowToneDetune(row: AyTimerRow | undefined): number {
 	return row?.semitone ?? DEFAULT_AY_SID_PERIOD_SEMITONE_DETUNE;
 }
@@ -539,21 +553,14 @@ export function effectiveRowDetune(row: AyTimerRow | undefined): number {
 	return row?.detune ?? DEFAULT_AY_SID_PERIOD_DETUNE;
 }
 
-export function effectiveRowPeriod(row: AyTimerRow | undefined): number {
-	return Math.max(1, (row?.period ?? DEFAULT_AY_SID_PERIOD) & 0xffff);
-}
-
 export function computeTimerEffectPeriod(tonePeriod: number, timerRow?: AyTimerRow): number {
-	if (resolveAyTimerRowSidPeriodMode(timerRow) === 'manual') {
-		return effectiveRowPeriod(timerRow);
-	}
 	if (tonePeriod > 0) {
 		const detune = effectiveRowDetune(timerRow) | 0;
 		const semitone = effectiveRowToneDetune(timerRow) | 0;
 		const transposeFactor = Math.pow(2, -semitone / 12);
 		return Math.max(1, (Math.round(tonePeriod * transposeFactor) + detune) & 0xffff || 1);
 	}
-	return effectiveRowPeriod(timerRow);
+	return 1;
 }
 
 export function computeSidPeriod(tonePeriod: number, timerRow?: AyTimerRow): number {
@@ -793,6 +800,7 @@ function normalizeTimerRow(row: LegacyTimerRow | undefined): AyTimerRow {
 	const fm = row?.fm ?? defaults.fm ?? false;
 	const envFm = row?.envFm ?? defaults.envFm ?? false;
 	const fmOffsetMode = resolveAyFmOffsetMode(row);
+	const envFmOffsetMode = resolveAyEnvFmOffsetMode(row);
 	const sid = row?.sid ?? defaults.sid;
 	const syncbuzzer = row?.syncbuzzer ?? defaults.syncbuzzer;
 	const legacySharedWaveform = row?.timerWaveform?.length ? [...row.timerWaveform] : undefined;
@@ -806,10 +814,10 @@ function normalizeTimerRow(row: LegacyTimerRow | undefined): AyTimerRow {
 			? normalizeFmWaveform(legacyForOffsetEffects, fmOffsetMode)
 			: defaultAyFmWaveform(fmOffsetMode);
 	const envFmWaveform = hasDedicatedEnvFmWaveform
-		? normalizeFmWaveform(row!.envFmWaveform!, fmOffsetMode)
+		? normalizeFmWaveform(row!.envFmWaveform!, envFmOffsetMode)
 		: envFm && legacyForOffsetEffects
-			? normalizeFmWaveform(legacyForOffsetEffects, fmOffsetMode)
-			: defaultAyFmWaveform(fmOffsetMode);
+			? normalizeFmWaveform(legacyForOffsetEffects, envFmOffsetMode)
+			: defaultAyFmWaveform(envFmOffsetMode);
 	const timerWaveform =
 		legacySharedWaveform && (sid || syncbuzzer || (!fm && !envFm))
 			? legacySharedWaveform.map((value) => value & 0xf).slice(0, AY_TIMER_WAVEFORM_MAX_LENGTH)
@@ -823,10 +831,7 @@ function normalizeTimerRow(row: LegacyTimerRow | undefined): AyTimerRow {
 		fm,
 		envFm,
 		fmOffsetMode,
-		sidPeriodMode:
-			row?.sidPeriodMode === 'auto' || row?.sidPeriodMode === 'manual'
-				? row.sidPeriodMode
-				: 'auto',
+		envFmOffsetMode,
 		timerWaveform,
 		timerWaveformLoop: row?.timerWaveformLoop ?? defaults.timerWaveformLoop!,
 		fmWaveform,
@@ -840,9 +845,6 @@ function normalizeTimerRow(row: LegacyTimerRow | undefined): AyTimerRow {
 	}
 	if (row?.semitone !== undefined) {
 		normalized.semitone = row.semitone;
-	}
-	if (row?.period !== undefined) {
-		normalized.period = Math.max(1, row.period & 0xffff);
 	}
 	if (fmOffsetMode === 'period') {
 		normalized.fmOffsetMode = 'period';
@@ -875,33 +877,31 @@ function resolveInstrumentTimerPwmFields(
 	return createDefaultInstrumentTimerPwmFields();
 }
 
-export function resolveTimerRowCount(instrument: Instrument): number {
-	const extended = instrument as ExtendedInstrument;
-	if (extended.timerRows && extended.timerRows.length > 0) {
-		return extended.timerRows.length;
-	}
-	return Math.max(instrument.rows.length, 1);
+export function sampleTimerRowFromMacros(
+	timerMacros: InstrumentMacros,
+	tick: number
+): AyTimerRow {
+	const row = sampleInstrumentRowFromMacros(timerMacros, tick, AY_TIMER_MACRO_FIELDS);
+	return resolveExclusiveTimerEffects(normalizeTimerRow(row as LegacyTimerRow | undefined));
 }
 
-export function resolveTimerLoop(instrument: Instrument): number {
+export function sampleTimerRowFromInstrument(instrument: Instrument, tick: number): AyTimerRow {
 	const extended = instrument as ExtendedInstrument;
-	const loop = extended.timerLoop !== undefined ? extended.timerLoop : (instrument.loop ?? 0);
-	const maxLoop = Math.max(resolveTimerRowCount(instrument) - 1, 0);
-	return Math.max(0, Math.min(maxLoop, loop));
+	return sampleTimerRowFromMacros(
+		resolveTimerInstrumentMacros(extended, AY_TIMER_MACRO_FIELDS),
+		tick
+	);
+}
+
+export function normalizeLegacyTimerRow(row: Record<string, unknown> | undefined): AyTimerRow {
+	return normalizeTimerRow(row as LegacyTimerRow | undefined);
 }
 
 export function normalizeAyInstrumentFields(instrument: Instrument): AyInstrumentFields {
-	const rowCount = resolveTimerRowCount(instrument);
 	const extended = instrument as ExtendedInstrument;
-	const sourceRows = extended.timerRows ?? [];
-	const timerRows = Array.from({ length: rowCount }, (_, index) =>
-		normalizeTimerRow(sourceRows[index])
-	);
-
 	return {
-		timerRows,
-		timerLoop: resolveTimerLoop(instrument),
-		...resolveInstrumentTimerPwmFields(extended, sourceRows),
+		timerMacros: resolveTimerInstrumentMacros(extended, AY_TIMER_MACRO_FIELDS),
+		...resolveInstrumentTimerPwmFields(extended, []),
 		timerPwmPreserveOnNewNote: extended.timerPwmPreserveOnNewNote === true,
 		timerPwmSweepStartPhase: resolveTimerPwmSweepStartPhase(extended),
 		timerPwmSweepShape: resolveTimerPwmSweepShape(extended.timerPwmSweepShape)
@@ -1065,42 +1065,28 @@ export function parseAyTimerWaveform(text: string, asHex: boolean): number[] | n
 	return values;
 }
 
-export function syncAyInstrumentTimerRows(instrument: Instrument, rowCount: number): AyTimerRow[] {
-	const fields = normalizeAyInstrumentFields(instrument);
-	const timerRows = [...fields.timerRows];
-	while (timerRows.length < rowCount) {
-		timerRows.push(createDefaultAyTimerRow());
-	}
-	if (timerRows.length > rowCount) {
-		timerRows.length = rowCount;
-	}
-	const extended = instrument as ExtendedInstrument;
-	extended.timerRows = timerRows;
-	extended.timerPwmDuty = fields.timerPwmDuty;
-	extended.timerPwmSweepMin = fields.timerPwmSweepMin;
-	extended.timerPwmSweep = fields.timerPwmSweep;
-	extended.timerPwmPreserveOnNewNote = fields.timerPwmPreserveOnNewNote;
-	extended.timerPwmSweepStartPhase = fields.timerPwmSweepStartPhase;
-	extended.timerPwmSweepShape = fields.timerPwmSweepShape;
-	extended.timerLoop = fields.timerLoop;
-	delete extended.timerPwmReverseSweep;
-	return timerRows;
-}
-
 export function copyAyInstrumentFields(
 	source: Instrument & Partial<AyInstrumentFields>,
 	target: Instrument & Partial<AyInstrumentFields>
 ): void {
 	const normalized = normalizeAyInstrumentFields(source as Instrument);
-	if (source.timerRows) {
-		target.timerRows = normalized.timerRows.map((row) => ({
-			...row,
-			timerWaveform: row.timerWaveform ? [...row.timerWaveform] : undefined,
-			fmWaveform: row.fmWaveform ? [...row.fmWaveform] : undefined,
-			envFmWaveform: row.envFmWaveform ? [...row.envFmWaveform] : undefined
-		}));
+	if (source.macros) {
+		target.macros = Object.fromEntries(
+			Object.entries(source.macros).map(([id, macro]) => [
+				id,
+				{ values: [...macro.values], loop: macro.loop }
+			])
+		);
 	}
-	target.timerLoop = normalized.timerLoop;
+	const sourceExtended = source as ExtendedInstrument;
+	if (sourceExtended.timerMacros) {
+		(target as ExtendedInstrument).timerMacros = Object.fromEntries(
+			Object.entries(sourceExtended.timerMacros).map(([id, macro]) => [
+				id,
+				{ values: [...macro.values], loop: macro.loop }
+			])
+		);
+	}
 	target.timerPwmDuty = normalized.timerPwmDuty;
 	target.timerPwmSweepMin = normalized.timerPwmSweepMin;
 	target.timerPwmSweep = normalized.timerPwmSweep;
@@ -1108,36 +1094,5 @@ export function copyAyInstrumentFields(
 	target.timerPwmSweepStartPhase = normalized.timerPwmSweepStartPhase;
 	target.timerPwmSweepShape = normalized.timerPwmSweepShape;
 	delete (target as unknown as Record<string, unknown>).timerPwmReverseSweep;
-	if (
-		source.sampleData?.length &&
-		isValidInstrumentSampleByteLength(source.sampleData.length)
-	) {
-		target.sampleData = source.sampleData.map((value) => value & 0xff);
-		target.sampleRate = source.sampleRate;
-		const bounds = normalizeSamplePlaybackBounds({
-			sampleData: target.sampleData,
-			sampleStart: source.sampleStart,
-			sampleEnd: source.sampleEnd,
-			sampleLoopStart: source.sampleLoopStart,
-			sampleLength: source.sampleLength,
-			sampleLoop: source.sampleLoop
-		});
-		if (bounds) {
-			target.sampleStart = bounds.start;
-			target.sampleEnd = bounds.end;
-			target.sampleLoopStart = bounds.loopStart;
-		}
-		target.sampleLoopEnabled = source.sampleLoopEnabled !== false;
-		delete target.sampleLength;
-		delete target.sampleLoop;
-	} else {
-		delete target.sampleData;
-		delete target.sampleRate;
-		delete target.sampleStart;
-		delete target.sampleEnd;
-		delete target.sampleLoopStart;
-		delete target.sampleLength;
-		delete target.sampleLoopEnabled;
-		delete target.sampleLoop;
-	}
+	copyInstrumentSampleFields(source, target);
 }

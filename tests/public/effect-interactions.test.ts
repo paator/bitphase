@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { legacyInstruments } from '../helpers/instrument-fixtures.ts';
 import TrackerPatternProcessor from '../../public/tracker/tracker-pattern-processor.js';
 import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
 import AyumiState from '../../public/ay/ayumi-state.js';
@@ -801,7 +802,7 @@ describe('Envelope effect interactions', () => {
 			state.channelInstruments = [0, -1, -1];
 			state.channelMuted = [false, false, false];
 			state.channelEnvelopeEnabled = [false, false, false];
-			state.setInstruments([{ id: '01', rows: [], loop: 0 }]);
+			state.setInstruments(legacyInstruments([{ id: '01', rows: [], loop: 0 }]));
 
 			const registerState = createEnvRegisterState();
 			const row = { envelopeShape: 12 };
@@ -827,7 +828,7 @@ describe('Envelope effect interactions', () => {
 			state.channelInstruments = [0, -1, -1];
 			state.channelMuted = [false, false, false];
 			state.channelEnvelopeEnabled = [false, false, false];
-			state.setInstruments([{ id: '01', rows: [], loop: 0 }]);
+			state.setInstruments(legacyInstruments([{ id: '01', rows: [], loop: 0 }]));
 
 			const registerState = createEnvRegisterState();
 			const row = { envelopeShape: 0 };
@@ -847,7 +848,7 @@ describe('Envelope effect interactions', () => {
 			state.channelInstruments = [0, -1, -1];
 			state.channelMuted = [false, false, false];
 			state.channelEnvelopeEnabled = [false, false, false];
-			state.setInstruments([{ id: '01', rows: [], loop: 0 }]);
+			state.setInstruments(legacyInstruments([{ id: '01', rows: [], loop: 0 }]));
 
 			const registerState = createEnvRegisterState();
 			const row = { envelopeShape: 12 };
@@ -887,7 +888,7 @@ describe('Processing order', () => {
 	it('envelope: arpeggio runs before effect table, slide runs before vibrato', () => {
 		const state = createState();
 		const driver = new AYAudioDriver();
-		state.setInstruments([]);
+		state.setInstruments(legacyInstruments([]));
 		state.channelInstruments = [-1, -1, -1];
 
 		const callOrder: string[] = [];

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { legacyInstruments } from '../helpers/instrument-fixtures.ts';
 import NesAudioDriver from '../../public/nes/nes-audio-driver.js';
 import NesChipRegisterState from '../../public/nes/nes-chip-register-state.js';
 import { buildSquareSweepReg } from '../../public/nes/nes-instrument-utils.js';
@@ -8,8 +9,9 @@ function createLoopingSweepState() {
 		channelMuted: [false],
 		channelSoundEnabled: [true],
 		channelInstruments: [0],
-		instruments: [
+		instruments: legacyInstruments([
 			{
+				chipType: 'nes',
 				rows: [
 					{
 						pulseWidth: 2,
@@ -28,7 +30,7 @@ function createLoopingSweepState() {
 				],
 				loop: 0
 			}
-		],
+		]),
 		instrumentPositions: [0],
 		channelPatternVolumes: [15],
 		channelCurrentNotes: [60],
@@ -58,10 +60,10 @@ describe('NesAudioDriver hardware sweep macro', () => {
 
 		driver.processInstruments(state, registerState);
 		expect(registerState.channels[0].sweepReg).toBe(row1Sweep);
-		expect(state.instrumentPositions[0]).toBe(0);
+		expect(state.instrumentPositions[0]).toBe(2);
 
 		driver.processInstruments(state, registerState);
 		expect(registerState.channels[0].sweepReg).toBe(row0Sweep);
-		expect(state.instrumentPositions[0]).toBe(1);
+		expect(state.instrumentPositions[0]).toBe(3);
 	});
 });

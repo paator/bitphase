@@ -1,3 +1,5 @@
+import { isValidInstrumentSampleByteLength } from '../../utils/audio-sample-decode';
+
 export const SAMPLE_PITCH_REFERENCE_HZ = 261.63;
 export const MIN_INSTRUMENT_SAMPLE_RATE = 1_000;
 export const MAX_INSTRUMENT_SAMPLE_RATE = 65_535;
@@ -139,6 +141,49 @@ export function formatSampleRegionDuration(
 		return `${minutes}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
 	}
 	return `${secs}.${millis.toString().padStart(3, '0')}s`;
+}
+
+export function copyInstrumentSampleFields(
+	source: SampleBoundsSource & {
+		sampleRate?: number;
+		sampleLoopEnabled?: boolean;
+	},
+	target: SampleBoundsSource & {
+		sampleRate?: number;
+		sampleLoopEnabled?: boolean;
+		sampleLength?: number;
+		sampleLoop?: number;
+	}
+): void {
+	if (source.sampleData?.length && isValidInstrumentSampleByteLength(source.sampleData.length)) {
+		target.sampleData = source.sampleData.map((value) => value & 0xff);
+		target.sampleRate = source.sampleRate;
+		const bounds = normalizeSamplePlaybackBounds({
+			sampleData: target.sampleData,
+			sampleStart: source.sampleStart,
+			sampleEnd: source.sampleEnd,
+			sampleLoopStart: source.sampleLoopStart,
+			sampleLength: source.sampleLength,
+			sampleLoop: source.sampleLoop
+		});
+		if (bounds) {
+			target.sampleStart = bounds.start;
+			target.sampleEnd = bounds.end;
+			target.sampleLoopStart = bounds.loopStart;
+		}
+		target.sampleLoopEnabled = source.sampleLoopEnabled !== false;
+		delete target.sampleLength;
+		delete target.sampleLoop;
+		return;
+	}
+	delete target.sampleData;
+	delete target.sampleRate;
+	delete target.sampleStart;
+	delete target.sampleEnd;
+	delete target.sampleLoopStart;
+	delete target.sampleLength;
+	delete target.sampleLoopEnabled;
+	delete target.sampleLoop;
 }
 
 export function formatLoopRegionDuration(

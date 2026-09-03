@@ -1,8 +1,5 @@
-import {
-	advanceInstrumentRowPosition,
-	calculatePt3Volume,
-	getEffectiveTuningPeriod
-} from '../tracker/tracker-audio-utils.js';
+import { calculatePt3Volume, getEffectiveTuningPeriod } from '../tracker/tracker-audio-utils.js';
+import { sampleNesApuRow } from '../tracker/tracker-instrument-macros.js';
 import {
 	assignPatternRowInstrument,
 	channelHasAssignedInstrument,
@@ -18,11 +15,9 @@ import {
 	buildSquareSweepReg,
 	buildTriangleLinearReg,
 	buildTriangleSilentLinearReg,
-	ensureNesInstrumentRows,
 	isChannelAudible,
 	NES_REGISTER_UNCHANGED,
 	NES_SQUARE_SWEEP_DISABLED,
-	normalizeNesInstrumentRow,
 	resolveEnvelopeVolumeOrRate,
 	usesTriangleLinearCounter
 } from './nes-instrument-utils.js';
@@ -222,14 +217,7 @@ class NesAudioDriver {
 	resolveInstrumentRow(state, channelIndex) {
 		const instrumentIndex = state.channelInstruments[channelIndex];
 		const instrument = state.instruments[instrumentIndex];
-		const rows = ensureNesInstrumentRows(instrument.rows);
-		const loop = instrument.loop ?? 0;
-		const rowIndex = state.instrumentPositions[channelIndex] % rows.length;
-		return {
-			row: normalizeNesInstrumentRow(rows[rowIndex]),
-			rowsLength: rows.length,
-			loop
-		};
+		return sampleNesApuRow(instrument, state.instrumentPositions[channelIndex]);
 	}
 
 	processInstruments(state, registerState) {
@@ -253,7 +241,7 @@ class NesAudioDriver {
 				continue;
 			}
 
-			const { row, rowsLength, loop } = this.resolveInstrumentRow(state, channelIndex);
+			const row = this.resolveInstrumentRow(state, channelIndex);
 			const patternVolume = state.channelPatternVolumes[channelIndex] ?? 15;
 			const combinedVolume = this.calculateVolume(patternVolume, row.volumeOrRate);
 			const basePeriod = this.getEffectivePeriod(state, channelIndex);
@@ -291,11 +279,8 @@ class NesAudioDriver {
 			}
 
 			if (!onOffHalted) {
-				state.instrumentPositions[channelIndex] = advanceInstrumentRowPosition(
-					state.instrumentPositions[channelIndex],
-					rowsLength,
-					loop
-				);
+				state.instrumentPositions[channelIndex] =
+					(state.instrumentPositions[channelIndex] | 0) + 1;
 			}
 		}
 

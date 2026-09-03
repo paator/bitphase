@@ -361,7 +361,7 @@ describe('PatternNoteInput', () => {
 				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
 				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
 					schema: AY_CHIP_SCHEMA,
-					instruments: [new Instrument('01', [], 0, 'AY 01', 'ay')]
+					instruments: [new Instrument('01', 'AY 01', 'ay')]
 				});
 				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
 
@@ -387,8 +387,8 @@ describe('PatternNoteInput', () => {
 				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
 					schema: AY_CHIP_SCHEMA,
 					instruments: [
-						new Instrument('01', [], 0, 'AY 01', 'ay'),
-						new Instrument('02', [], 0, 'AY 02', 'ay')
+						new Instrument('01', 'AY 01', 'ay'),
+						new Instrument('02', 'AY 02', 'ay')
 					]
 				});
 				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
@@ -445,7 +445,7 @@ describe('PatternNoteInput', () => {
 				pattern.channels[DEFAULT_CHANNEL_INDEX].rows[DEFAULT_ROW_INDEX].instrument = 1;
 				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
 					schema: AY_CHIP_SCHEMA,
-					instruments: [new Instrument('01', [], 0, 'AY 01', 'ay')]
+					instruments: [new Instrument('01', 'AY 01', 'ay')]
 				});
 				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
 
@@ -494,7 +494,7 @@ describe('PatternNoteInput', () => {
 				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
 				const context = createMockContext(pattern, DEFAULT_ROW_INDEX, {
 					schema: AY_CHIP_SCHEMA,
-					instruments: [new Instrument('02', [], 0, 'AY 02', 'ay')]
+					instruments: [new Instrument('02', 'AY 02', 'ay')]
 				});
 				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
 

@@ -1,6 +1,8 @@
 import { Instrument, InstrumentRow, Note, NoteName, Pattern, Song } from '../../../models/song';
 import type { Row } from '../../../models/song';
 import { generate12TETTuningTable } from '../../../models/pt3/tuning-tables';
+import { migrateLegacyInstrument } from '../../instrument/instrument-legacy-migration';
+import type { LegacyInstrument } from '../../instrument/instrument-legacy-migration';
 import { MAX_INSTRUMENT_ID_NUM, numberToInstrumentId } from '../../../utils/instrument-id';
 import {
 	AY_TIMER_WAVEFORM_MAX_LENGTH,
@@ -86,8 +88,6 @@ const AY_TARGET = {
 
 const AY_SAMPLE_MIN_LANE_LENGTH = 8;
 const AY_AMPLITUDE_LEVEL_MASK = 0x0f;
-const AY_SID_AUTO_MAX_SEMITONE = 24;
-const AY_SID_AUTO_MAX_DETUNE = 4;
 
 const AY_STEREO_LAYOUTS: Record<number, string> = {
 	0: 'mono',
@@ -405,8 +405,7 @@ class AyRegisterSongBuilder {
 		if (timer?.sample || channel.tonePeriod <= 0) {
 			return 0;
 		}
-		const drivesTimerRate = timer?.row?.sidPeriodMode === 'auto';
-		if (!channel.toneEnabled && !drivesTimerRate) {
+		if (!channel.toneEnabled && !timer?.row) {
 			return 0;
 		}
 		return channel.tonePeriod - (this.tuningTable[noteIndex] ?? channel.tonePeriod);
@@ -455,7 +454,11 @@ class AyRegisterSongBuilder {
 		}
 		const instrument = new Instrument(
 			numberToInstrumentId(numericId),
-			[
+			describeInstrument(shape, numericId)
+		);
+		const legacy: LegacyInstrument = {
+			...instrument,
+			rows: [
 				new InstrumentRow({
 					tone: shape.tone,
 					noise: shape.noise,
@@ -473,11 +476,10 @@ class AyRegisterSongBuilder {
 					envelopeAccumulation: false
 				})
 			],
-			0,
-			describeInstrument(shape, numericId)
-		);
+			loop: 0
+		};
 
-		const extended = instrument as Instrument & {
+		const extended = legacy as LegacyInstrument & {
 			timerRows?: AyTimerRow[];
 			timerLoop?: number;
 			timerPwmDuty?: number;
@@ -507,7 +509,7 @@ class AyRegisterSongBuilder {
 			extended.sampleLoopEnabled = sample.loopStart !== null;
 		}
 
-		this.instruments.push(instrument);
+		this.instruments.push(migrateLegacyInstrument(legacy));
 		this.instrumentIdsByShape.set(key, numericId);
 		return numericId;
 	}
@@ -558,10 +560,13 @@ class AyRegisterSongBuilder {
 					row: {
 						sid: false,
 						syncbuzzer: true,
-						sidPeriodMode: 'manual',
-						period: timing.period,
 						timerWaveform: waveform.values,
-						timerWaveformLoop: waveform.loop
+						timerWaveformLoop: waveform.loop,
+						...this.resolveSidPeriod(
+							segment,
+							this.resolveEnvelopeChannel(segment),
+							timing.period
+						)
 					}
 				};
 			}
@@ -582,10 +587,9 @@ class AyRegisterSongBuilder {
 						sid: false,
 						fm: true,
 						fmOffsetMode: 'period',
-						sidPeriodMode: 'manual',
-						period: timing.period,
 						fmWaveform: offsets.values,
-						fmWaveformLoop: offsets.loop
+						fmWaveformLoop: offsets.loop,
+						...this.resolveSidPeriod(segment, toneChannel, timing.period)
 					}
 				};
 			}
@@ -609,10 +613,13 @@ class AyRegisterSongBuilder {
 						sid: false,
 						envFm: true,
 						fmOffsetMode: 'period',
-						sidPeriodMode: 'manual',
-						period: timing.period,
 						envFmWaveform: offsets.values,
-						envFmWaveformLoop: offsets.loop
+						envFmWaveformLoop: offsets.loop,
+						...this.resolveSidPeriod(
+							segment,
+							this.resolveEnvelopeChannel(segment),
+							timing.period
+						)
 					}
 				};
 			}
@@ -672,19 +679,14 @@ class AyRegisterSongBuilder {
 		segment: AyTimerSegment,
 		channelIndex: number,
 		period: number
-	): Pick<AyTimerRow, 'sidPeriodMode' | 'period' | 'semitone' | 'detune'> {
+	): Pick<AyTimerRow, 'semitone' | 'detune'> {
 		const tonePeriod = this.frameState(segment.startFrame).channels[channelIndex]!.tonePeriod;
 		if (tonePeriod > 0) {
 			const semitone = Math.round(12 * Math.log2(tonePeriod / period));
 			const detune = period - Math.round(tonePeriod * Math.pow(2, -semitone / 12));
-			if (
-				Math.abs(semitone) <= AY_SID_AUTO_MAX_SEMITONE &&
-				Math.abs(detune) <= AY_SID_AUTO_MAX_DETUNE
-			) {
-				return { sidPeriodMode: 'auto', semitone, detune };
-			}
+			return { semitone, detune };
 		}
-		return { sidPeriodMode: 'manual', period };
+		return { semitone: 0, detune: 0 };
 	}
 
 	private isSampleLane(length: number, loopIndex: number | null): boolean {
@@ -860,8 +862,6 @@ function instrumentShapeKey(shape: InstrumentShape): string {
 		timer.syncbuzzer ? 'buzz' : '',
 		timer.fm ? 'fm' : '',
 		timer.envFm ? 'envfm' : '',
-		timer.sidPeriodMode ?? 'auto',
-		timer.period ?? 0,
 		timer.semitone ?? 0,
 		timer.detune ?? 0,
 		shape.timer.pwmDuty ?? DEFAULT_AY_TIMER_PWM_DUTY,

@@ -5,6 +5,7 @@ import {
 	buildSquareEnvelopeVolumeReg,
 	buildSquareSweepReg,
 	buildTriangleLinearReg,
+	copyNesInstrumentFields,
 	createDefaultNesInstrumentRow,
 	cyclePulseWidth,
 	ensureNesInstrumentRows,
@@ -15,6 +16,7 @@ import {
 	resolveLengthCounterIndex,
 	usesTriangleLinearCounter
 } from '@/lib/chips/nes/instrument';
+import { Instrument } from '@/lib/models/song';
 
 describe('nes instrument', () => {
 	it('creates a default macro row with constant volume and retrigger off', () => {
@@ -119,5 +121,21 @@ describe('nes instrument', () => {
 		expect(buildTriangleLinearReg(64)).toBe(64);
 		expect(usesTriangleLinearCounter(64)).toBe(true);
 		expect(usesTriangleLinearCounter(200)).toBe(false);
+	});
+
+	it('copies DPCM sample data onto the destination instrument', () => {
+		const source = Object.assign(new Instrument('01', 'Kick', 'nes'), {
+			sampleData: [4, 5, 6],
+			sampleRate: 33144,
+			sampleStart: 0,
+			sampleEnd: 2,
+			sampleLoopStart: 1
+		});
+		const target = new Instrument('02', 'Copy', 'nes');
+		copyNesInstrumentFields(source, target);
+		expect((target as Instrument & { sampleData?: number[] }).sampleData).toEqual([4, 5, 6]);
+		expect((target as Instrument & { sampleData?: number[] }).sampleData).not.toBe(
+			source.sampleData
+		);
 	});
 });
