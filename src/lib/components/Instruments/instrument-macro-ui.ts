@@ -1,22 +1,26 @@
 import {
+	clampInstrumentMacroLength,
+	clampInstrumentMacroLoop,
+	clampMacroValue,
 	INSTRUMENT_MACRO_MAX_LENGTH,
 	INSTRUMENT_MACRO_MIN_LENGTH,
 	macroValueToNormalized,
+	setSharedSequenceLength,
+	setSharedSequenceLoop,
 	type InstrumentMacroField,
-	type InstrumentMacroValue
+	type InstrumentMacroValue,
+	type InstrumentMacros
 } from '../../chips/base/instrument-macros';
-import { formatRowEditorNumber } from '../../utils/row-editor-numeric';
+import { formatRowEditorNumber, parseRowEditorNumericText } from '../../utils/row-editor-numeric';
 
 export const MACRO_LOOP_HANDLE_WIDTH = 12;
 export const MACRO_LENGTH_HANDLE_WIDTH = 16;
-export const MACRO_VALUE_LABEL_HEIGHT = 16;
 export const MACRO_BAR_INSET = 3;
 
-export const MACRO_STEP_INPUT_CLASS =
-	'h-full w-full min-w-0 cursor-pointer border-0 bg-transparent px-0 text-center font-mono text-[0.55rem] leading-none text-[var(--color-app-text-muted)] transition-colors duration-150 outline-none hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)] focus:cursor-text focus:bg-[var(--color-app-surface-hover)] focus:text-[var(--color-app-text-primary)] focus:outline-none';
-
-export const MACRO_STEP_LABEL_CLASS =
-	'flex h-full w-full select-none items-center justify-center font-mono text-[0.55rem] leading-none text-[var(--color-app-text-muted)]';
+export type ParsedMacroSequenceText = {
+	values: InstrumentMacroValue[];
+	loop: number;
+};
 
 export function macroStepWidthPx(isExpanded: boolean): number {
 	return isExpanded ? 36 : 30;
@@ -139,6 +143,107 @@ export function applyMacroLengthKey(event: KeyboardEvent, length: number): numbe
 		return length + 1;
 	}
 	return null;
+}
+
+export function formatMacroSequenceText(
+	values: readonly InstrumentMacroValue[],
+	loop: number,
+	field: InstrumentMacroField,
+	asHex: boolean
+): string {
+	const tokens =
+		values.length > 0
+			? values.map((value) => formatRowEditorNumber(Number(value), asHex))
+			: [formatRowEditorNumber(Number(field.defaultValue), asHex)];
+	const loopAt = clampInstrumentMacroLoop(loop, tokens.length);
+	const tail = tokens.slice(loopAt).join(' ');
+	if (loopAt === 0) return `| ${tail}`;
+	return `${tokens.slice(0, loopAt).join(' ')} | ${tail}`;
+}
+
+function parseMacroSequenceToken(
+	token: string,
+	field: InstrumentMacroField,
+	asHex: boolean
+): number | null {
+	if (field.kind === 'enum' && field.enumValues?.length) {
+		const labelMatch = field.enumValues.find(
+			(option) => option.label.length > 0 && option.label.toLowerCase() === token.toLowerCase()
+		);
+		if (labelMatch) return labelMatch.value;
+	}
+	const parsed = parseRowEditorNumericText(token, asHex, { min: field.min, max: field.max });
+	if (parsed === null) return null;
+	if (field.kind === 'enum' && field.enumValues?.length) {
+		return field.enumValues.some((option) => option.value === parsed) ? parsed : null;
+	}
+	return parsed;
+}
+
+export function parseMacroSequenceText(
+	text: string,
+	field: InstrumentMacroField,
+	asHex: boolean
+): ParsedMacroSequenceText | null {
+	const tokens = text
+		.trim()
+		.replace(/\|/g, ' | ')
+		.split(/\s+/)
+		.filter((token) => token.length > 0);
+	if (tokens.length === 0) return null;
+	const values: number[] = [];
+	let loop: number | null = null;
+	for (const token of tokens) {
+		if (token === '|') {
+			if (loop !== null) return null;
+			loop = values.length;
+			continue;
+		}
+		const value = parseMacroSequenceToken(token, field, asHex);
+		if (value === null) return null;
+		values.push(value);
+	}
+	if (values.length === 0) return null;
+	const clampedValues = values
+		.slice(0, clampInstrumentMacroLength(values.length))
+		.map((value) => clampMacroValue(value, field));
+	return {
+		values: clampedValues,
+		loop: clampInstrumentMacroLoop(loop ?? 0, clampedValues.length)
+	};
+}
+
+export function instrumentMacroSequenceEquals(
+	values: readonly InstrumentMacroValue[],
+	loop: number,
+	parsed: ParsedMacroSequenceText
+): boolean {
+	if (parsed.loop !== loop || parsed.values.length !== values.length) return false;
+	return parsed.values.every((value, index) => value === values[index]);
+}
+
+export function applyInstrumentMacroSequenceText(
+	macros: InstrumentMacros,
+	fields: readonly InstrumentMacroField[],
+	field: InstrumentMacroField,
+	text: string,
+	asHex: boolean
+): InstrumentMacros | null {
+	const parsed = parseMacroSequenceText(text, field, asHex);
+	if (!parsed) return null;
+	const current = macros[field.id];
+	if (
+		current &&
+		instrumentMacroSequenceEquals(current.values, current.loop, parsed)
+	) {
+		return macros;
+	}
+	const resized = setSharedSequenceLength(macros, fields, parsed.values.length);
+	return setSharedSequenceLoop(
+		{ ...resized, [field.id]: { values: parsed.values, loop: parsed.loop } },
+		fields,
+		parsed.loop
+	);
 }
 
 export function scrollMacroHandleIntoView(

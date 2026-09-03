@@ -9,16 +9,12 @@
 		type InstrumentMacroField,
 		type InstrumentMacroValue
 	} from '../../chips/base/instrument-macros';
-	import { CommitNumericInput } from '../CommitNumericInput';
 	import {
 		instrumentMacroEnumIsActive,
 		instrumentMacroEnumOption,
 		instrumentMacroEnumLabel,
 		instrumentMacroUsesBarChart,
 		integerMacroBarStyle,
-		MACRO_VALUE_LABEL_HEIGHT,
-		MACRO_STEP_INPUT_CLASS,
-		MACRO_STEP_LABEL_CLASS,
 		macroIconClass
 	} from './instrument-macro-ui';
 
@@ -27,10 +23,8 @@
 		values,
 		stepWidthPx,
 		rowHeight,
-		asHex = false,
 		isExpanded = false,
 		onPaintStart,
-		onCommitValue,
 		onStepClick,
 		isStepEnabled
 	}: {
@@ -38,10 +32,8 @@
 		values: InstrumentMacroValue[];
 		stepWidthPx: number;
 		rowHeight: number;
-		asHex?: boolean;
 		isExpanded?: boolean;
 		onPaintStart: (index: number, event: PointerEvent, fromY: boolean) => void;
-		onCommitValue: (index: number, value: InstrumentMacroValue) => void;
 		onStepClick?: (fieldId: string, index: number) => void;
 		isStepEnabled?: (fieldId: string, index: number) => boolean;
 	} = $props();
@@ -59,39 +51,19 @@
 	data-shared-row={field.id}>
 	{#each values as value, index (index)}
 		{#if usesBarChart}
-			<div
-				class="flex flex-col border-r border-[var(--color-app-border)]/60 last:border-r-0"
-				style="width: {stepWidthPx}px; height: {rowHeight}px">
-				<button
-					type="button"
-					class="relative min-h-0 flex-1 cursor-crosshair border-0 bg-[var(--color-app-surface-secondary)] p-0"
-					aria-label="{field.kind === 'enum'
-						? `${field.label} ${instrumentMacroEnumLabel(field, value)} step ${index}`
-						: `${field.label} step ${index}`}"
-					onpointerdown={(event) => onPaintStart(index, event, true)}>
-					<div
-						class="absolute rounded-sm"
-						style={integerMacroBarStyle(field, value, accent)}>
-					</div>
-				</button>
+			<button
+				type="button"
+				class="relative cursor-crosshair border-0 border-r border-[var(--color-app-border)]/60 bg-[var(--color-app-surface-secondary)] p-0 last:border-r-0"
+				style="width: {stepWidthPx}px; height: {rowHeight}px"
+				aria-label="{field.kind === 'enum'
+					? `${field.label} ${instrumentMacroEnumLabel(field, value)} step ${index}`
+					: `${field.label} step ${index}`}"
+				onpointerdown={(event) => onPaintStart(index, event, true)}>
 				<div
-					class="flex shrink-0 items-center justify-center"
-					style="height: {MACRO_VALUE_LABEL_HEIGHT}px">
-					{#if field.kind === 'enum'}
-						<span class={MACRO_STEP_LABEL_CLASS}>{instrumentMacroEnumLabel(field, value)}</span>
-					{:else}
-						<CommitNumericInput
-							value={Number(value)}
-							{asHex}
-							min={field.min}
-							max={field.max}
-							live={false}
-							class={MACRO_STEP_INPUT_CLASS}
-							ariaLabel="{field.label} step {index}"
-							oncommit={(next) => onCommitValue(index, next)} />
-					{/if}
+					class="absolute rounded-sm"
+					style={integerMacroBarStyle(field, value, accent)}>
 				</div>
-			</div>
+			</button>
 		{:else if field.kind === 'enum'}
 			{@const option = instrumentMacroEnumOption(field, value)}
 			{@const optionLabel = option?.label ?? ''}

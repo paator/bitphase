@@ -15,14 +15,15 @@
 		type InstrumentMacros
 	} from '../../chips/base/instrument-macros';
 	import {
+		applyInstrumentMacroSequenceText,
 		applyMacroLengthKey,
 		applyMacroLoopKey,
 		cycleInstrumentMacroEnum,
 		formatInstrumentMacroValue,
+		instrumentMacroUsesBarChart,
 		MACRO_BAR_INSET,
 		MACRO_LENGTH_HANDLE_WIDTH,
 		MACRO_LOOP_HANDLE_WIDTH,
-		MACRO_VALUE_LABEL_HEIGHT,
 		macroFieldRowHeight,
 		macroStepWidthPx,
 		scrollMacroHandleIntoView
@@ -32,6 +33,7 @@
 	import InstrumentMacroLengthHandle from './InstrumentMacroLengthHandle.svelte';
 	import InstrumentMacroLoopHandle from './InstrumentMacroLoopHandle.svelte';
 	import InstrumentMacroSequenceHeader from './InstrumentMacroSequenceHeader.svelte';
+	import InstrumentMacroSequenceText from './InstrumentMacroSequenceText.svelte';
 
 	let {
 		label,
@@ -85,6 +87,7 @@
 		}
 		return offsets;
 	});
+	const textFields = $derived(fields.filter(instrumentMacroUsesBarChart));
 	const sequenceWidth = $derived(stepWidthPx * sequenceLength);
 	const loopHandleLeft = $derived(stepWidthPx * loopIndex - MACRO_LOOP_HANDLE_WIDTH / 2);
 	const lengthHandleLeft = $derived(sequenceWidth);
@@ -187,7 +190,7 @@
 		const row = sequenceEl?.querySelector(`[data-shared-row="${CSS.escape(field.id)}"]`);
 		if (!(row instanceof HTMLElement)) return field.defaultValue;
 		const rect = row.getBoundingClientRect();
-		const plotHeight = rect.height - MACRO_VALUE_LABEL_HEIGHT;
+		const plotHeight = rect.height;
 		if (plotHeight <= 0) return field.defaultValue;
 		const innerHeight = Math.max(1, plotHeight - MACRO_BAR_INSET * 2);
 		const normalized = Math.max(
@@ -383,6 +386,11 @@
 		const next = applyMacroLengthKey(event, sequenceLength);
 		if (next !== null) setLength(next);
 	}
+
+	function commitSequenceText(field: InstrumentMacroField, text: string): void {
+		const next = applyInstrumentMacroSequenceText(macros, fields, field, text, asHex);
+		if (next && next !== macros) onChange(next);
+	}
 </script>
 
 <section
@@ -431,11 +439,9 @@
 					values={fieldMacro(field).values}
 					{stepWidthPx}
 					rowHeight={macroFieldRowHeight(field, isExpanded)}
-					{asHex}
 					{isExpanded}
 					onPaintStart={(index, event, fromY) =>
 						beginPaint(field, index, event, fromY)}
-					onCommitValue={(index, value) => setValue(field, index, value)}
 					{onStepClick}
 					{isStepEnabled} />
 			{/each}
@@ -466,6 +472,18 @@
 				onkeydown={handleLengthKeydown} />
 		</div>
 	</div>
+	{#if textFields.length > 0}
+		<div class="flex flex-col gap-1 px-2 pt-1 pb-2">
+			{#each textFields as field (field.id)}
+				<InstrumentMacroSequenceText
+					{field}
+					values={fieldMacro(field).values}
+					loop={fieldMacro(field).loop}
+					{asHex}
+					onCommit={(text) => commitSequenceText(field, text)} />
+			{/each}
+		</div>
+	{/if}
 	<InstrumentMacroHoverTooltip
 		visible={hoverTooltip !== null}
 		x={hoverTooltip?.x ?? 0}

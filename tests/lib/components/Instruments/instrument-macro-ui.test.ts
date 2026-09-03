@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { InstrumentMacroField } from '@/lib/chips/base/instrument-macros';
 import {
+	applyInstrumentMacroSequenceText,
 	applyMacroLengthKey,
 	applyMacroLoopKey,
 	cycleInstrumentMacroEnum,
+	formatMacroSequenceText,
 	instrumentMacroEnumIsActive,
 	instrumentMacroEnumLabel,
 	instrumentMacroUsesBarChart,
 	integerMacroBarStyle,
-	macroFieldRowHeight
+	macroFieldRowHeight,
+	parseMacroSequenceText
 } from '@/lib/components/Instruments/instrument-macro-ui';
 
 const booleanField: InstrumentMacroField = {
@@ -130,5 +133,93 @@ describe('macro handle keys', () => {
 		expect(
 			applyMacroLengthKey({ key: 'ArrowLeft', preventDefault() {} } as KeyboardEvent, 4)
 		).toBe(3);
+	});
+});
+
+describe('macro sequence text', () => {
+	it('formats values with a loop marker', () => {
+		expect(formatMacroSequenceText([15, 12, 8, 4], 2, integerField, false)).toBe('15 12 | 8 4');
+		expect(formatMacroSequenceText([15, 12, 8], 0, integerField, false)).toBe('| 15 12 8');
+		expect(formatMacroSequenceText([15, 12], 1, integerField, true)).toBe('F | C');
+	});
+
+	it('parses space-separated values and a loop marker', () => {
+		expect(parseMacroSequenceText('15 12 | 8 4', integerField, false)).toEqual({
+			values: [15, 12, 8, 4],
+			loop: 2
+		});
+		expect(parseMacroSequenceText('15 12 8', integerField, false)).toEqual({
+			values: [15, 12, 8],
+			loop: 0
+		});
+		expect(parseMacroSequenceText('15 12|8', integerField, false)).toEqual({
+			values: [15, 12, 8],
+			loop: 2
+		});
+		expect(parseMacroSequenceText('F C | 8', integerField, true)).toEqual({
+			values: [15, 12, 8],
+			loop: 2
+		});
+	});
+
+	it('rejects invalid tokens and extra loop markers', () => {
+		expect(parseMacroSequenceText('15 x 8', integerField, false)).toBeNull();
+		expect(parseMacroSequenceText('15 | 8 | 4', integerField, false)).toBeNull();
+		expect(parseMacroSequenceText('|', integerField, false)).toBeNull();
+		expect(parseMacroSequenceText('   ', integerField, false)).toBeNull();
+	});
+
+	it('clamps values to the field range', () => {
+		expect(parseMacroSequenceText('15 20 | -3', integerField, false)).toEqual({
+			values: [15, 15, 0],
+			loop: 2
+		});
+	});
+
+	it('parses enum labels and numeric values', () => {
+		const pulseField: InstrumentMacroField = {
+			...enumField,
+			id: 'pulseWidth',
+			min: 0,
+			max: 3,
+			enumValues: [
+				{ value: 0, label: '12.5%', bar: true },
+				{ value: 1, label: '25%', bar: true },
+				{ value: 2, label: '50%', bar: true }
+			]
+		};
+		expect(parseMacroSequenceText('12.5% | 50%', pulseField, false)).toEqual({
+			values: [0, 2],
+			loop: 1
+		});
+		expect(parseMacroSequenceText('0 1 | 2', pulseField, false)).toEqual({
+			values: [0, 1, 2],
+			loop: 2
+		});
+	});
+
+	it('applies text to shared sequence length and loop', () => {
+		const next = applyInstrumentMacroSequenceText(
+			{
+				volume: { values: [15, 8], loop: 0 },
+				retrigger: { values: [false, true], loop: 0 }
+			},
+			[integerField, booleanField],
+			integerField,
+			'15 12 | 8 4',
+			false
+		);
+		expect(next?.volume).toEqual({ values: [15, 12, 8, 4], loop: 2 });
+		expect(next?.retrigger?.values).toHaveLength(4);
+		expect(next?.retrigger?.loop).toBe(2);
+	});
+
+	it('leaves macros unchanged when the text matches the current sequence', () => {
+		const macros = {
+			volume: { values: [15, 8], loop: 1 }
+		};
+		expect(
+			applyInstrumentMacroSequenceText(macros, [integerField], integerField, '15 | 8', false)
+		).toBe(macros);
 	});
 });
