@@ -179,23 +179,13 @@
 			(forSongIndex === songIndex
 				? schema
 				: services.audioService.chipProcessors[forSongIndex]?.chip?.schema);
-		const pattern = PatternService.createEmptyPattern(
+		return PatternService.createEmptyPattern(
 			patternId,
 			songSchema,
 			song?.getEffectiveChannelLabels(),
-			song?.defaultPatternLength ?? projectStore.getDefaultPatternLength()
+			song?.defaultPatternLength ?? projectStore.getDefaultPatternLength(),
+			projectStore.patterns[forSongIndex]
 		);
-		return copyEffectColumnLayoutOnto(pattern, forSongIndex);
-	}
-
-	function copyEffectColumnLayoutOnto(pattern: Pattern, forSongIndex: number = songIndex): Pattern {
-		const source = projectStore.patterns[forSongIndex]?.find(
-			(existing) => existing.channels.length === pattern.channels.length
-		);
-		if (source) {
-			PatternService.copyChannelEffectColumnLayout(source, pattern);
-		}
-		return pattern;
 	}
 
 	$effect(() => {

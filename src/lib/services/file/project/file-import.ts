@@ -23,7 +23,8 @@ import type { ChipSchema } from '../../../chips/base/schema';
 import { computeEffectiveChannelLabels } from '../../../models/virtual-channels';
 import {
 	padEffectsArray,
-	resolveChannelEffectColumnCount
+	resolveChannelEffectColumnCount,
+	syncSharedEffectColumnLayout
 } from '../../../chips/base/channel-effect-columns';
 import {
 	migrateLegacyInstrument,
@@ -92,6 +93,7 @@ function reconstructSong(data: any, getChip: (chipType: string) => Chip | null):
 	song.patterns = data.patterns?.map((patternData: any) =>
 		reconstructPattern(patternData, schema, effectiveLabels)
 	) || [new Pattern(0, DEFAULT_PATTERN_LENGTH, schema)];
+	syncSharedEffectColumnLayout(song.patterns);
 	song.tuningTable = data.tuningTable || song.tuningTable;
 	song.chipType = data.chipType;
 	const songRecord = song as unknown as Record<string, unknown>;

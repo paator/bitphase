@@ -355,4 +355,47 @@ describe('FileImportService', () => {
 		expect(channel?.rows[0]?.effects[1]?.effect).toBe(86);
 		expect(channel?.rows[0]?.effects[1]?.parameter).toBe(0x44);
 	});
+
+	it('aligns effect columns across imported patterns', async () => {
+		const json = JSON.stringify({
+			name: 'mixed',
+			songs: [
+				{
+					patterns: [
+						{
+							id: 0,
+							length: 1,
+							channels: [
+								{
+									label: 'A',
+									effectColumnCount: 2,
+									rows: [{ note: { name: 0, octave: 0 }, effects: [null, null] }]
+								}
+							],
+							patternRows: [{}]
+						},
+						{
+							id: 1,
+							length: 1,
+							channels: [
+								{
+									label: 'A',
+									effectColumnCount: 1,
+									rows: [{ note: { name: 0, octave: 0 }, effects: [null] }]
+								}
+							],
+							patternRows: [{}]
+						}
+					]
+				}
+			],
+			instruments: [],
+			tables: []
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+		expect(project.songs[0]?.patterns[0]?.channels[0]?.effectColumnCount).toBe(2);
+		expect(project.songs[0]?.patterns[1]?.channels[0]?.effectColumnCount).toBe(2);
+		expect(project.songs[0]?.patterns[1]?.channels[0]?.rows[0]?.effects).toHaveLength(2);
+	});
 });

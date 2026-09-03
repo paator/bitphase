@@ -1,5 +1,9 @@
 import type { ChipSchema, ChipField } from '../chips/base/schema';
 import { getDefaultForFieldType } from '../chips/base/schema';
+import {
+	applySharedEffectColumnCounts,
+	getSharedEffectColumnCounts
+} from '../chips/base/channel-effect-columns';
 import { computeEffectiveChannelLabels } from './virtual-channels';
 
 enum NoteName {
@@ -201,17 +205,8 @@ class Song {
 		const newId = this.patterns.length;
 		const effectiveLabels = this.getEffectiveChannelLabels();
 		const pattern = new Pattern(newId, this.defaultPatternLength, this.schema, effectiveLabels);
-		const source = this.patterns[0];
-		if (source) {
-			const channelCount = Math.min(source.channels.length, pattern.channels.length);
-			for (let index = 0; index < channelCount; index++) {
-				const count = source.channels[index].effectColumnCount ?? 1;
-				pattern.channels[index].effectColumnCount = count;
-				for (const row of pattern.channels[index].rows) {
-					while (row.effects.length < count) row.effects.push(null);
-					if (row.effects.length > count) row.effects.length = count;
-				}
-			}
+		if (this.patterns.length > 0) {
+			applySharedEffectColumnCounts(pattern, getSharedEffectColumnCounts(this.patterns));
 		}
 		this.patterns.push(pattern);
 		return pattern;

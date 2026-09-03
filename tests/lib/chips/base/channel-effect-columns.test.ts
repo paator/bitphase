@@ -14,7 +14,9 @@ import {
 	padEffectsArray,
 	readEffectsFromGenericRow,
 	resolveChannelEffectColumnCount,
-	schemaHasChannelEffects
+	schemaHasChannelEffects,
+	getSharedEffectColumnCounts,
+	syncSharedEffectColumnLayout
 } from '@/lib/chips/base/channel-effect-columns';
 import { Effect, EffectType } from '@/lib/models/song';
 import { AYFormatter } from '@/lib/chips/ay/formatter';
@@ -64,6 +66,49 @@ describe('channel-effect-columns', () => {
 		const layout = getChannelLayout(noEffectSchema, 4);
 		expect(layout.template).toBe('{note} {instrument}');
 		expect(layout.fields.effect1).toBeUndefined();
+	});
+
+	it('takes the max effect column count per channel across patterns', () => {
+		const counts = getSharedEffectColumnCounts([
+			{
+				channels: [
+					{ effectColumnCount: 1 },
+					{ effectColumnCount: 1 },
+					{ effectColumnCount: 2 }
+				]
+			},
+			{
+				channels: [
+					{ effectColumnCount: 1 },
+					{ effectColumnCount: 1 },
+					{ effectColumnCount: 1 }
+				]
+			}
+		]);
+		expect(counts).toEqual([1, 1, 2]);
+	});
+
+	it('syncs every pattern to the shared per-channel column counts', () => {
+		const first = {
+			channels: [
+				{
+					effectColumnCount: 2,
+					rows: [{ effects: [null, null] }]
+				}
+			]
+		};
+		const second = {
+			channels: [
+				{
+					effectColumnCount: 1,
+					rows: [{ effects: [null] }]
+				}
+			]
+		};
+		syncSharedEffectColumnLayout([first, second]);
+		expect(first.channels[0].effectColumnCount).toBe(2);
+		expect(second.channels[0].effectColumnCount).toBe(2);
+		expect(second.channels[0].rows?.[0]?.effects).toHaveLength(2);
 	});
 
 	it('infers column count from explicit value or longest effects array', () => {

@@ -60,6 +60,52 @@ export function getPatternEffectColumnCounts(pattern: {
 	return pattern.channels.map((channel) => resolveChannelEffectColumnCount(channel));
 }
 
+type EffectColumnChannel = {
+	effectColumnCount?: number;
+	rows?: { effects?: unknown[] }[];
+};
+
+type EffectColumnPattern = {
+	channels: EffectColumnChannel[];
+};
+
+export function getSharedEffectColumnCounts(patterns: EffectColumnPattern[]): number[] {
+	const channelCount = Math.max(0, ...patterns.map((pattern) => pattern.channels.length));
+	const counts = Array.from({ length: channelCount }, () => MIN_CHANNEL_EFFECT_COLUMNS);
+	for (const pattern of patterns) {
+		for (let index = 0; index < pattern.channels.length; index++) {
+			counts[index] = Math.max(
+				counts[index] ?? MIN_CHANNEL_EFFECT_COLUMNS,
+				resolveChannelEffectColumnCount(pattern.channels[index]!)
+			);
+		}
+	}
+	return counts;
+}
+
+export function applySharedEffectColumnCounts(
+	pattern: EffectColumnPattern,
+	counts: number[]
+): void {
+	const channelCount = Math.min(pattern.channels.length, counts.length);
+	for (let index = 0; index < channelCount; index++) {
+		const count = clampChannelEffectColumnCount(counts[index] ?? MIN_CHANNEL_EFFECT_COLUMNS);
+		const channel = pattern.channels[index]!;
+		channel.effectColumnCount = count;
+		if (!channel.rows) continue;
+		for (const row of channel.rows) {
+			row.effects = padEffectsArray(row.effects, count);
+		}
+	}
+}
+
+export function syncSharedEffectColumnLayout(patterns: EffectColumnPattern[]): void {
+	const counts = getSharedEffectColumnCounts(patterns);
+	for (const pattern of patterns) {
+		applySharedEffectColumnCounts(pattern, counts);
+	}
+}
+
 export function resolveChannelEffectColumnCount(channel: {
 	effectColumnCount?: number;
 	rows?: { effects?: unknown[] }[];

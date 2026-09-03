@@ -3,7 +3,9 @@ import { isEffectLike, toNumber } from '../../utils/type-guards';
 import type { ChipSchema } from '../../chips/base/schema';
 import { PatternEffectHandling } from './editing/pattern-effect-handling';
 import {
+	applySharedEffectColumnCounts,
 	clampChannelEffectColumnCount,
+	getSharedEffectColumnCounts,
 	padEffectsArray,
 	resolveChannelEffectColumnCount
 } from '../../chips/base/channel-effect-columns';
@@ -34,15 +36,23 @@ export class PatternService {
 		id: number,
 		schema?: ChipSchema,
 		effectiveChannelLabels?: string[],
-		length: number = DEFAULT_PATTERN_LENGTH
+		length: number = DEFAULT_PATTERN_LENGTH,
+		sourcePatterns?: Pattern[]
 	): Pattern {
-		return new Pattern(id, length, schema, effectiveChannelLabels);
+		const pattern = new Pattern(id, length, schema, effectiveChannelLabels);
+		this.applySongEffectLayout(pattern, sourcePatterns);
+		return pattern;
 	}
 
 	/**
 	 * Create a deep copy of a pattern with a new ID
 	 */
-	static clonePattern(sourcePattern: Pattern, newId: number, schema?: ChipSchema): Pattern {
+	static clonePattern(
+		sourcePattern: Pattern,
+		newId: number,
+		schema?: ChipSchema,
+		sourcePatterns?: Pattern[]
+	): Pattern {
 		const channelLabels = sourcePattern.channels.map((c) => c.label);
 		const clonedPattern = new Pattern(newId, sourcePattern.length, schema, channelLabels);
 
@@ -69,7 +79,16 @@ export class PatternService {
 			this.copyPatternRowFields(patternRow, newPatternRow);
 		});
 
+		this.applySongEffectLayout(
+			clonedPattern,
+			sourcePatterns?.length ? sourcePatterns : [sourcePattern]
+		);
 		return clonedPattern;
+	}
+
+	private static applySongEffectLayout(pattern: Pattern, sourcePatterns?: Pattern[]): void {
+		if (!sourcePatterns?.length) return;
+		applySharedEffectColumnCounts(pattern, getSharedEffectColumnCounts(sourcePatterns));
 	}
 
 	static copyChannelEffectColumnLayout(source: Pattern, target: Pattern): void {
@@ -152,7 +171,13 @@ export class PatternService {
 		insertIndex: number;
 	} {
 		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
-		const newPattern = this.createEmptyPattern(newPatternId, schema, undefined, length);
+		const newPattern = this.createEmptyPattern(
+			newPatternId,
+			schema,
+			undefined,
+			length,
+			Object.values(patterns)
+		);
 
 		const newPatterns = { ...patterns, [newPatternId]: newPattern };
 		const newPatternOrder = [...patternOrder];
@@ -194,7 +219,8 @@ export class PatternService {
 				newPatternId,
 				getSchema(songIndex),
 				getEffectiveLabels?.(songIndex),
-				length
+				length,
+				songPatterns
 			);
 			const existing = songPatterns.find((p) => p.id === newPatternId);
 			if (existing) {
@@ -261,7 +287,12 @@ export class PatternService {
 		if (!targetPattern) return null;
 
 		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
-		const clonedPattern = this.clonePattern(targetPattern, newPatternId, schema);
+		const clonedPattern = this.clonePattern(
+			targetPattern,
+			newPatternId,
+			schema,
+			Object.values(patterns)
+		);
 
 		const newPatterns = { ...patterns, [newPatternId]: clonedPattern };
 		const newPatternOrder = [...patternOrder];
@@ -304,12 +335,19 @@ export class PatternService {
 				const clonedPattern = this.clonePattern(
 					sourcePattern,
 					newPatternId,
-					getSchema(songIndex)
+					getSchema(songIndex),
+					songPatterns
 				);
 				return [...songPatterns, clonedPattern];
 			}
 
-			const emptyPattern = this.createEmptyPattern(newPatternId, getSchema(songIndex));
+			const emptyPattern = this.createEmptyPattern(
+				newPatternId,
+				getSchema(songIndex),
+				undefined,
+				DEFAULT_PATTERN_LENGTH,
+				songPatterns
+			);
 			const existing = songPatterns.find((p) => p.id === newPatternId);
 			if (existing) {
 				return songPatterns.map((p) => (p.id === newPatternId ? emptyPattern : p));
@@ -376,7 +414,7 @@ export class PatternService {
 			const pattern = songPatterns.find((p) => p.id === currentId);
 			if (pattern) {
 				const schema = getSchema(songIndex);
-				const cloned = this.clonePattern(pattern, newId, schema);
+				const cloned = this.clonePattern(pattern, newId, schema, songPatterns);
 				return [...songPatterns, cloned];
 			}
 			return songPatterns;
@@ -403,7 +441,12 @@ export class PatternService {
 
 		const allPatterns = [Object.values(patterns)];
 		const newPatternId = this.findNextSequentialPatternId(allPatterns, patternOrder);
-		const uniquePattern = this.clonePattern(targetPattern, newPatternId, schema);
+		const uniquePattern = this.clonePattern(
+			targetPattern,
+			newPatternId,
+			schema,
+			Object.values(patterns)
+		);
 
 		const newPatterns = { ...patterns, [newPatternId]: uniquePattern };
 		const newPatternOrder = [...patternOrder];
@@ -453,8 +496,8 @@ export class PatternService {
 
 		if (!patterns[newId]) {
 			const newPattern = currentPattern
-				? this.clonePattern(currentPattern, newId, schema)
-				: this.createEmptyPattern(newId, schema, undefined, length);
+				? this.clonePattern(currentPattern, newId, schema, Object.values(patterns))
+				: this.createEmptyPattern(newId, schema, undefined, length, Object.values(patterns));
 			patterns = { ...patterns, [newId]: newPattern };
 		}
 
@@ -491,12 +534,13 @@ export class PatternService {
 
 			const currentPattern = songPatterns.find((p) => p.id === patternOrder[index]);
 			const newPattern = currentPattern
-				? this.clonePattern(currentPattern, newId, getSchema(songIndex))
+				? this.clonePattern(currentPattern, newId, getSchema(songIndex), songPatterns)
 				: this.createEmptyPattern(
 						newId,
 						getSchema(songIndex),
 						getEffectiveLabels?.(songIndex),
-						length
+						length,
+						songPatterns
 					);
 			return [...songPatterns, newPattern];
 		});
@@ -519,7 +563,13 @@ export class PatternService {
 	): { pattern: Pattern; newPatterns: Pattern[] } {
 		let pattern = patterns.find((p) => p.id === patternId);
 		if (!pattern) {
-			pattern = this.createEmptyPattern(patternId, schema, effectiveChannelLabels, length);
+			pattern = this.createEmptyPattern(
+				patternId,
+				schema,
+				effectiveChannelLabels,
+				length,
+				patterns
+			);
 			return { pattern, newPatterns: [...patterns, pattern] };
 		}
 		return { pattern, newPatterns: patterns };
@@ -575,6 +625,7 @@ export class PatternService {
 
 		const channelLabels = pattern.channels.map((c) => c.label);
 		const resizedPattern = new Pattern(pattern.id, newLength, schema, channelLabels);
+		this.copyChannelEffectColumnLayout(pattern, resizedPattern);
 		const copyLength = Math.min(pattern.length, newLength);
 
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
@@ -624,6 +675,7 @@ export class PatternService {
 
 		const channelLabels = pattern.channels.map((c) => c.label);
 		const result = new Pattern(pattern.id, pattern.length, schema, channelLabels);
+		this.copyChannelEffectColumnLayout(pattern, result);
 
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const sourceChannel = pattern.channels[channelIndex];
@@ -656,6 +708,7 @@ export class PatternService {
 
 		const channelLabels = pattern.channels.map((c) => c.label);
 		const result = new Pattern(pattern.id, pattern.length, schema, channelLabels);
+		this.copyChannelEffectColumnLayout(pattern, result);
 
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const sourceChannel = pattern.channels[channelIndex];

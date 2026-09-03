@@ -98,12 +98,14 @@ export class VirtualChannelService {
 		const rebuilt = new Pattern(pattern.id, pattern.length, schema, channelLabels);
 		for (let i = 0; i < newChannels.length; i++) {
 			rebuilt.channels[i].rows = newChannels[i].rows;
+			rebuilt.channels[i].effectColumnCount = newChannels[i].effectColumnCount ?? 1;
 		}
 		rebuilt.patternRows = pattern.patternRows;
 		return rebuilt;
 	}
 
 	private static copyChannelData(source: Channel, target: Channel): void {
+		target.effectColumnCount = source.effectColumnCount ?? 1;
 		const copyLen = Math.min(source.rows.length, target.rows.length);
 		for (let r = 0; r < copyLen; r++) {
 			const srcRow = source.rows[r];

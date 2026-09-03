@@ -21,6 +21,7 @@ import {
 import { MAX_INSTRUMENT_SAMPLE_BYTES } from '../../../utils/audio-sample-decode';
 import { ATARI_ST_CHIP_FREQUENCY } from '../../../chips/ay/schema';
 import { fitFrameCount, type PsgFrame } from './psg-frames';
+import { syncSharedEffectColumnLayout } from '../../../chips/base/channel-effect-columns';
 
 export type AyTimerValueLane = {
 	values: number[];
@@ -172,6 +173,7 @@ class AyRegisterSongBuilder {
 		song.patterns = boundaries.map((boundary, index) =>
 			this.buildPattern(index, boundary.startFrame, boundary.length, timerEffects, carries)
 		);
+		syncSharedEffectColumnLayout(song.patterns);
 		song.defaultPatternLength = Math.min(MAX_PATTERN_ROWS, this.input.frameCount);
 
 		const loopPatternIndex = boundaries.findIndex(

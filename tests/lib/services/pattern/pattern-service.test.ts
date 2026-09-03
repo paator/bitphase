@@ -482,6 +482,48 @@ describe('PatternService', () => {
 	});
 
 	describe('effect column layout', () => {
+		it('creates empty patterns with the song-wide extra effect columns', () => {
+			const source = new Pattern(0, 2);
+			source.channels[2].effectColumnCount = 2;
+			source.channels[2].rows.forEach((row) => {
+				row.effects = [null, null];
+			});
+
+			const created = PatternService.createEmptyPattern(1, undefined, undefined, 2, [source]);
+
+			expect(created.channels[2].effectColumnCount).toBe(2);
+			expect(created.channels[2].rows[0].effects).toHaveLength(2);
+			expect(created.channels[0].effectColumnCount).toBe(1);
+		});
+
+		it('clones using the widest effect columns in the song', () => {
+			const narrow = new Pattern(1, 2);
+			const wide = new Pattern(0, 2);
+			wide.channels[2].effectColumnCount = 2;
+			wide.channels[2].rows.forEach((row) => {
+				row.effects = [null, null];
+			});
+
+			const cloned = PatternService.clonePattern(narrow, 2, undefined, [wide, narrow]);
+
+			expect(cloned.channels[2].effectColumnCount).toBe(2);
+			expect(cloned.channels[2].rows[0].effects).toHaveLength(2);
+		});
+
+		it('keeps effect columns when resizing a pattern', () => {
+			const source = new Pattern(0, 2);
+			source.channels[0].effectColumnCount = 3;
+			source.channels[0].rows.forEach((row) => {
+				row.effects = [null, null, null];
+			});
+
+			const resized = PatternService.resizePattern(source, 4);
+
+			expect(resized.channels[0].effectColumnCount).toBe(3);
+			expect(resized.channels[0].rows[0].effects).toHaveLength(3);
+			expect(resized.channels[0].rows[3].effects).toHaveLength(3);
+		});
+
 		it('copies extra effect columns onto a new pattern', () => {
 			const source = new Pattern(0, 2);
 			source.channels[0].effectColumnCount = 3;

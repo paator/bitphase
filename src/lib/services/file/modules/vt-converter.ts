@@ -16,6 +16,7 @@ import {
 	instrumentFromLegacy
 } from '../../instrument/instrument-legacy-migration';
 import { convertPT3ToVT2, isTurboSoundPT3, splitTurboSoundPT3 } from './pt3-to-vt2';
+import { syncSharedEffectColumnLayout } from '../../../chips/base/channel-effect-columns';
 
 interface VT2Module {
 	title: string;
@@ -425,6 +426,7 @@ class VT2Converter {
 		}
 
 		song.patterns = patterns.sort((a, b) => a.id - b.id);
+		syncSharedEffectColumnLayout(song.patterns);
 		return song;
 	}
 
@@ -531,6 +533,7 @@ class VT2Converter {
 			this.convertPattern(vt2Pattern, pattern, 0);
 			return pattern;
 		});
+		syncSharedEffectColumnLayout(song.patterns);
 
 		return { song, instruments: instrumentsArray };
 	}
@@ -574,6 +577,7 @@ class VT2Converter {
 			this.convertPattern(vt2Pattern, pattern, 0);
 			return pattern;
 		});
+		syncSharedEffectColumnLayout(song.patterns);
 
 		const chipVariant = this.detectChipType(module);
 		song.chipType = chipVariant === 'AY' || chipVariant === 'YM' ? 'ay' : undefined;
