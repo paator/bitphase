@@ -73,9 +73,9 @@
 		} />
 
 	<PillTabs
+		class="mt-3 ml-2"
 		bind:activeTabId={activeTab}
 		tabs={instrumentTabs}
-		class="mt-3 ml-2"
 		onSelect={(tabId) => {
 			activeTab = tabId as InstrumentTab;
 		}} />

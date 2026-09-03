@@ -424,4 +424,49 @@ describe('AyTimerEffectsController', () => {
 		const instrument = createInstrument([{ sid: true, timerWaveform: [15, 0] }]);
 		expect(sampleTimerRowFromInstrument(instrument, 0).sid).toBe(true);
 	});
+
+	it('adds, loops, and removes timer rows while writing later steps', () => {
+		let current = createInstrument([{ sid: false }]);
+		const controller = new AyTimerEffectsController(
+			() => current,
+			(instrument) => {
+				current = instrument;
+			},
+			() => false
+		);
+
+		expect(controller.timerRowCount()).toBe(1);
+		controller.addTimerRow();
+		expect(controller.timerRowCount()).toBe(2);
+		controller.updateRowToneDetune(1, '3');
+		controller.updateRowDetune(1, '12');
+		expect(controller.rowToneDetune(1)).toBe(3);
+		expect(controller.rowDetune(1)).toBe(12);
+		controller.setTimerLoop(1);
+		expect(controller.timerLoop()).toBe(1);
+		controller.removeTimerRow(0);
+		expect(controller.timerRowCount()).toBe(1);
+		expect(controller.rowToneDetune(0)).toBe(3);
+		expect(controller.rowDetune(0)).toBe(12);
+	});
+
+	it('keeps sid and syncbuzzer exclusive when toggling rows', () => {
+		let current = createInstrument([{ sid: true, timerWaveform: [15, 0] }]);
+		const controller = new AyTimerEffectsController(
+			() => current,
+			(instrument) => {
+				current = instrument;
+			},
+			() => false
+		);
+
+		expect(controller.rowSidEnabled(0)).toBe(true);
+		expect(controller.rowSyncbuzzerEnabled(0)).toBe(false);
+		controller.updateSyncbuzzerRow(0, true);
+		expect(controller.rowSidEnabled(0)).toBe(false);
+		expect(controller.rowSyncbuzzerEnabled(0)).toBe(true);
+		controller.updateSidRow(0, true);
+		expect(controller.rowSidEnabled(0)).toBe(true);
+		expect(controller.rowSyncbuzzerEnabled(0)).toBe(false);
+	});
 });

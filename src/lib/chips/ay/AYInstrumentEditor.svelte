@@ -22,6 +22,9 @@
 	import { AY_MIXER_MACRO_FIELDS } from './mixer-macros';
 	import { AY_TIMER_MACRO_FIELDS } from './ay-timer-macros';
 	import InstrumentMacrosEditor from '../../components/Instruments/InstrumentMacrosEditor.svelte';
+	import InstrumentClassicModeToggle from '../../components/Instruments/InstrumentClassicModeToggle.svelte';
+	import AYInstrumentClassicMixer from './AYInstrumentClassicMixer.svelte';
+	import AYInstrumentClassicTimer from './AYInstrumentClassicTimer.svelte';
 	import {
 		instrumentMacroUpdates,
 		resolveTimerInstrumentMacros,
@@ -44,6 +47,7 @@
 	} = $props();
 
 	let activeTab = $state<InstrumentTab>('mixer');
+	let classicEditor = $state(false);
 
 	const extendedInstrument = $derived(instrument as Instrument & Partial<AyInstrumentFields>);
 	const hasSample = $derived(instrumentHasSample(extendedInstrument));
@@ -154,15 +158,17 @@
 			}
 		} />
 
-	<PillTabs
-		bind:activeTabId={activeTab}
-		tabs={instrumentTabs}
-		class="mt-3 ml-2"
-		onSelect={(tabId) => {
-			if (tabId === 'sample') {
-				timerEffects.closeWaveformEditor();
-			}
-		}} />
+	<div class="mt-3 ml-2 mr-2 flex items-center justify-between gap-2">
+		<PillTabs
+			bind:activeTabId={activeTab}
+			tabs={instrumentTabs}
+			onSelect={(tabId) => {
+				if (tabId === 'sample') {
+					timerEffects.closeWaveformEditor();
+				}
+			}} />
+		<InstrumentClassicModeToggle bind:classic={classicEditor} />
+	</div>
 
 	{#if activeTab === 'timer' && timerEffects.waveformEditorRowIndex !== null}
 		<AYTimerWaveformDrawer rowIndex={timerEffects.waveformEditorRowIndex} {isExpanded} />
@@ -173,13 +179,19 @@
 			<AYInstrumentSamplePanel {instrument} {isExpanded} {onInstrumentChange} />
 		</div>
 	{:else if activeTab === 'mixer'}
-		<InstrumentMacrosEditor
-			{instrument}
-			fields={AY_MIXER_MACRO_FIELDS}
-			{asHex}
-			{isExpanded}
-			icons={mixerIcons}
-			{onInstrumentChange} />
+		{#if classicEditor}
+			<AYInstrumentClassicMixer {instrument} {asHex} {isExpanded} {onInstrumentChange} />
+		{:else}
+			<InstrumentMacrosEditor
+				{instrument}
+				fields={AY_MIXER_MACRO_FIELDS}
+				{asHex}
+				{isExpanded}
+				icons={mixerIcons}
+				{onInstrumentChange} />
+		{/if}
+	{:else if classicEditor}
+		<AYInstrumentClassicTimer {isExpanded} />
 	{:else}
 		<InstrumentMacrosEditor
 			instrument={timerInstrument}

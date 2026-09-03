@@ -1,11 +1,13 @@
 import { Instrument } from '../../models/song';
 import {
-	alignSharedSequenceMacros,
 	cloneInstrumentMacros,
 	createDefaultInstrumentMacro,
+	setSharedSequenceLength,
+	setSharedSequenceLoop,
 	type InstrumentMacroValue,
 	type InstrumentMacros
 } from '../base/instrument-macros';
+import { ROW_EDITOR_MAX_ROWS } from '../../components/RowEditorTable';
 import { AY_FM_OFFSET_PERIOD, AY_TIMER_MACRO_FIELDS, decodeTimerWaveform, encodeTimerWaveform } from './ay-timer-macros';
 import {
 	clampFmWaveformValue,
@@ -28,6 +30,13 @@ import {
 	resolveAyEnvFmOffsetMode,
 	resolveAyFmOffsetMode,
 	sampleTimerRowFromMacros,
+	effectiveRowDetune,
+	effectiveRowToneDetune,
+	effectiveRowMixTimerWaveform,
+	isDefaultSidTimerWaveform,
+	resolveExclusiveTimerEffects,
+	DEFAULT_AY_TIMER_WAVEFORM,
+	DEFAULT_AY_SYNCBUZZER_WAVEFORM,
 	clampTimerPwmDuty,
 	clampTimerPwmSweep,
 	clampTimerPwmSweepMin,
@@ -44,11 +53,14 @@ import {
 type ExtendedInstrument = Instrument & Partial<AyInstrumentFields> & { timerMacros?: InstrumentMacros };
 
 export type TimerEditPanel = 'mix' | 'fm' | 'envFm';
+export type TimerEffectDragField = 'sid' | 'syncbuzzer' | 'fm' | 'envFm';
 
 export class AyTimerEffectsController {
 	fields = $state(normalizeAyInstrumentFields(new Instrument('')));
 	timerEditPanel = $state<TimerEditPanel>('mix');
 	waveformEditorRowIndex = $state<number | null>(null);
+	isDragging = $state(false);
+	dragPaintValue = $state<boolean | null>(null);
 	private waveformSnapshot: { rowIndex: number; waveform: number[] } | null = null;
 	private lastInstrumentRef: Instrument | null = null;
 
@@ -69,6 +81,25 @@ export class AyTimerEffectsController {
 			return value.toString(16).toUpperCase().padStart(1, '0');
 		}
 		return String(value);
+	}
+
+	formatSignedNum(value: number): string {
+		if (this.getAsHex()) {
+			const sign = value < 0 ? '-' : '';
+			return sign + Math.abs(value).toString(16).toUpperCase();
+		}
+		return String(value);
+	}
+
+	timerRowCount(): number {
+		return Math.max(
+			1,
+			...AY_TIMER_MACRO_FIELDS.map((field) => this.fields.timerMacros[field.id]?.values.length ?? 0)
+		);
+	}
+
+	timerLoop(): number {
+		return this.fields.timerMacros['sid']?.loop ?? 0;
 	}
 
 	handleInstrumentChange(instrument: Instrument): void {
@@ -150,9 +181,27 @@ export class AyTimerEffectsController {
 	}
 
 	private waveformStepLimit(): number {
-		const fieldId =
-			this.timerEditPanel === 'fm' ? 'fm' : this.timerEditPanel === 'envFm' ? 'envFm' : 'sid';
-		return this.fields.timerMacros[fieldId]?.values.length ?? 1;
+		return this.timerRowCount();
+	}
+
+	private syncAllTimerMacros(macros: InstrumentMacros): InstrumentMacros {
+		const length = Math.max(
+			1,
+			...AY_TIMER_MACRO_FIELDS.map((field) => macros[field.id]?.values.length ?? 0)
+		);
+		const loop = macros['sid']?.loop ?? 0;
+		return setSharedSequenceLoop(
+			setSharedSequenceLength(macros, AY_TIMER_MACRO_FIELDS, length),
+			AY_TIMER_MACRO_FIELDS,
+			loop
+		);
+	}
+
+	private commitTimerMacros(macros: InstrumentMacros): void {
+		this.commitFields({
+			...this.fields,
+			timerMacros: this.syncAllTimerMacros(macros)
+		});
 	}
 
 	private setMacroStepValue(fieldId: string, stepIndex: number, value: InstrumentMacroValue): void {
@@ -163,7 +212,7 @@ export class AyTimerEffectsController {
 		updates: Record<string, InstrumentMacroValue>,
 		stepIndex: number
 	): void {
-		let nextMacros = { ...this.fields.timerMacros };
+		let nextMacros = this.syncAllTimerMacros(this.fields.timerMacros);
 		for (const [fieldId, value] of Object.entries(updates)) {
 			const macro =
 				nextMacros[fieldId] ??
@@ -175,10 +224,7 @@ export class AyTimerEffectsController {
 			values[stepIndex] = value;
 			nextMacros = { ...nextMacros, [fieldId]: { ...macro, values } };
 		}
-		this.commitFields({
-			...this.fields,
-			timerMacros: alignSharedSequenceMacros(nextMacros, AY_TIMER_MACRO_FIELDS)
-		});
+		this.commitTimerMacros(nextMacros);
 	}
 
 	private updateInstrument(updates: Partial<ExtendedInstrument>): void {
@@ -476,6 +522,195 @@ export class AyTimerEffectsController {
 
 	rowTimerWaveformUsesFmPeriodOffsets(stepIndex: number): boolean {
 		return this.usesOffsetWaveformEditing() && this.rowFmOffsetMode(stepIndex) === 'period';
+	}
+
+	rowToneDetune(index: number): number {
+		return effectiveRowToneDetune(sampleTimerRowFromMacros(this.fields.timerMacros, index));
+	}
+
+	rowDetune(index: number): number {
+		return effectiveRowDetune(sampleTimerRowFromMacros(this.fields.timerMacros, index));
+	}
+
+	updateRowToneDetune(index: number, text: string): void {
+		let parsed = this.parseSignedNum(text);
+		if (parsed === null) return;
+		parsed = Math.max(-127, Math.min(128, parsed));
+		this.setMacroStepValue('semitone', index, parsed);
+	}
+
+	updateRowDetune(index: number, text: string): void {
+		let parsed = this.parseSignedNum(text);
+		if (parsed === null) return;
+		parsed = Math.max(-4095, Math.min(4095, parsed));
+		this.setMacroStepValue('detune', index, parsed);
+	}
+
+	setTimerLoop(loop: number): void {
+		this.commitTimerMacros(
+			setSharedSequenceLoop(this.fields.timerMacros, AY_TIMER_MACRO_FIELDS, loop)
+		);
+	}
+
+	addTimerRow(): void {
+		this.setTimerRowCount(this.timerRowCount() + 1);
+	}
+
+	setTimerRowCount(targetCount: number): void {
+		const count = Math.max(1, Math.min(ROW_EDITOR_MAX_ROWS, targetCount));
+		if (count === this.timerRowCount()) return;
+		this.commitTimerMacros(
+			setSharedSequenceLength(this.fields.timerMacros, AY_TIMER_MACRO_FIELDS, count)
+		);
+	}
+
+	removeTimerRow(index: number): void {
+		const length = this.timerRowCount();
+		if (length <= 1 || index < 0 || index >= length) return;
+		const next: InstrumentMacros = {};
+		for (const field of AY_TIMER_MACRO_FIELDS) {
+			const macro =
+				this.fields.timerMacros[field.id] ?? createDefaultInstrumentMacro(field);
+			const values = [...macro.values];
+			values.splice(index, 1);
+			next[field.id] = {
+				values: values.length > 0 ? values : [field.defaultValue],
+				loop: macro.loop
+			};
+		}
+		this.commitTimerMacros(next);
+	}
+
+	removeTimerRowsFromBottom(index: number): void {
+		this.setTimerRowCount(index + 1);
+	}
+
+	stopDrag(): void {
+		this.isDragging = false;
+		this.dragPaintValue = null;
+	}
+
+	beginDragTimerEffect(index: number, field: TimerEffectDragField): void {
+		this.isDragging = true;
+		this.dragPaintValue = !this.timerEffectFieldValue(index, field);
+		this.applyTimerEffectField(index, field, this.dragPaintValue);
+	}
+
+	dragOverTimerEffect(index: number, field: TimerEffectDragField): void {
+		if (this.isDragging && this.dragPaintValue !== null) {
+			this.applyTimerEffectField(index, field, this.dragPaintValue);
+		}
+	}
+
+	private timerEffectFieldValue(index: number, field: TimerEffectDragField): boolean {
+		if (field === 'sid') return this.rowSidEnabled(index);
+		if (field === 'syncbuzzer') return this.rowSyncbuzzerEnabled(index);
+		if (field === 'fm') return this.rowFmEnabled(index);
+		return this.rowEnvFmEnabled(index);
+	}
+
+	private applyTimerEffectField(
+		index: number,
+		field: TimerEffectDragField,
+		value: boolean
+	): void {
+		if (field === 'sid') this.updateSidRow(index, value);
+		else if (field === 'syncbuzzer') this.updateSyncbuzzerRow(index, value);
+		else if (field === 'fm') this.updateFmRow(index, value);
+		else this.updateEnvFmRow(index, value);
+	}
+
+	private writeTimerRow(index: number, row: AyTimerRow): void {
+		const updates: Record<string, InstrumentMacroValue> = {};
+		for (const field of AY_TIMER_MACRO_FIELDS) {
+			updates[field.id] = field.fromRow
+				? field.fromRow(row as Record<string, unknown>)
+				: (row as Record<string, unknown>)[field.id] as InstrumentMacroValue;
+		}
+		this.setMacroStepValues(updates, index);
+	}
+
+	updateSidRow(index: number, sid: boolean): void {
+		const row = sampleTimerRowFromMacros(this.fields.timerMacros, index);
+		const wasSyncbuzzer = Boolean(row.syncbuzzer);
+		const resolved = resolveExclusiveTimerEffects({
+			...row,
+			sid,
+			syncbuzzer: sid ? false : row.syncbuzzer
+		});
+		this.writeTimerRow(
+			index,
+			sid && wasSyncbuzzer
+				? { ...resolved, timerWaveform: [...DEFAULT_AY_TIMER_WAVEFORM] }
+				: resolved
+		);
+	}
+
+	updateSyncbuzzerRow(index: number, syncbuzzer: boolean): void {
+		const row = sampleTimerRowFromMacros(this.fields.timerMacros, index);
+		const wasSid = Boolean(row.sid);
+		const resolved = resolveExclusiveTimerEffects({
+			...row,
+			syncbuzzer,
+			sid: syncbuzzer ? false : row.sid
+		});
+		if (
+			syncbuzzer &&
+			(wasSid || isDefaultSidTimerWaveform(effectiveRowMixTimerWaveform(resolved)))
+		) {
+			this.writeTimerRow(index, {
+				...resolved,
+				timerWaveform: [...DEFAULT_AY_SYNCBUZZER_WAVEFORM]
+			});
+			return;
+		}
+		this.writeTimerRow(index, resolved);
+	}
+
+	updateFmRow(index: number, fm: boolean): void {
+		const row = sampleTimerRowFromMacros(this.fields.timerMacros, index);
+		const resolved = resolveExclusiveTimerEffects({ ...row, fm });
+		if (!fm) {
+			this.writeTimerRow(index, resolved);
+			return;
+		}
+		const hasFmWaveform = Boolean(row.fmWaveform && row.fmWaveform.length > 0);
+		this.writeTimerRow(
+			index,
+			hasFmWaveform
+				? resolved
+				: { ...resolved, fmWaveform: defaultAyFmWaveform(resolveAyFmOffsetMode(resolved)) }
+		);
+	}
+
+	updateEnvFmRow(index: number, envFm: boolean): void {
+		const row = sampleTimerRowFromMacros(this.fields.timerMacros, index);
+		const resolved = resolveExclusiveTimerEffects({ ...row, envFm });
+		if (!envFm) {
+			this.writeTimerRow(index, resolved);
+			return;
+		}
+		const hasEnvFmWaveform = Boolean(row.envFmWaveform && row.envFmWaveform.length > 0);
+		this.writeTimerRow(
+			index,
+			hasEnvFmWaveform
+				? resolved
+				: { ...resolved, envFmWaveform: defaultAyFmWaveform(resolveAyEnvFmOffsetMode(resolved)) }
+		);
+	}
+
+	private parseSignedNum(text: string): number | null {
+		const trimmed = text.trim();
+		if (!trimmed) return null;
+		let sign = 1;
+		let body = trimmed;
+		if (body.startsWith('-')) {
+			sign = -1;
+			body = body.slice(1);
+		}
+		if (!body) return null;
+		const parsed = this.getAsHex() ? parseInt(body, 16) : Number(body);
+		return Number.isFinite(parsed) ? sign * parsed : null;
 	}
 
 	private parseNum(text: string): number | null {
