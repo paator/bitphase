@@ -10,6 +10,7 @@ const NES_SQUARE_SWEEP_DISABLED = 0x08;
 const NES_SQUARE_LENGTH_NIBBLE = 0xf;
 const NES_TRIANGLE_LINEAR_RELOAD = 0x7f;
 const NES_APU_REG_COUNT = 0x16;
+const NES_APU_STATUS_INTERNAL_CHANNELS = 0x0f;
 
 export type NesCaptureResult = {
 	frames: number[][];
@@ -89,8 +90,15 @@ function writeSquareRegs(regs: number[], channelIndex: 0 | 1, channel: any): voi
 function writeTriangleRegs(regs: number[], channel: any): void {
 	if (!isTriangleChannelActive(channel)) {
 		regs[0x08] = buildTriangleSilentLinearReg();
-		regs[0x0a] = 0;
-		regs[0x0b] = 0;
+		const period = channel?.period ?? 0;
+		if (period > 0) {
+			const lengthNibble =
+				channel.lengthNibble !== NES_REGISTER_UNCHANGED
+					? channel.lengthNibble
+					: NES_SQUARE_LENGTH_NIBBLE;
+			regs[0x0a] = period & 0xff;
+			regs[0x0b] = ((lengthNibble << 3) | ((period >> 8) & 7)) & 0xff;
+		}
 		return;
 	}
 	const linearReg =
@@ -134,12 +142,7 @@ export function convertNesRegisterStateToApuRegs(registerState: any): number[] {
 	writeTriangleRegs(regs, channels[2]);
 	writeNoiseRegs(regs, channels[3]);
 
-	let status = 0;
-	if (isSquareChannelActive(channels[0])) status |= 1;
-	if (isSquareChannelActive(channels[1])) status |= 2;
-	if (isTriangleChannelActive(channels[2])) status |= 4;
-	if (isNoiseChannelActive(channels[3])) status |= 8;
-	regs[0x15] = status;
+	regs[0x15] = NES_APU_STATUS_INTERNAL_CHANNELS;
 	return regs;
 }
 

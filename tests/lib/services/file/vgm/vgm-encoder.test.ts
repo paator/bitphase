@@ -135,7 +135,7 @@ describe('nes register conversion', () => {
 		expect(regs[0x00] & 0x0f).toBe(10);
 		expect(regs[0x02]).toBe(0xff);
 		expect(regs[0x03] & 0x07).toBe(0);
-		expect(regs[0x15] & 0x01).toBe(1);
+		expect(regs[0x15]).toBe(0x0f);
 	});
 
 	it('maps active noise channel to $400C/$400E/$400F and $4015', () => {
@@ -158,7 +158,23 @@ describe('nes register conversion', () => {
 		expect(regs[0x0c]).toBe(0x1c);
 		expect(regs[0x0e]).toBe(0x85);
 		expect(regs[0x0f]).toBe(0x78);
-		expect(regs[0x15] & 0x08).toBe(0x08);
+		expect(regs[0x15]).toBe(0x0f);
+	});
+
+	it('leaves $4015 internal channels enabled when all channels are silent', () => {
+		const regs = convertNesRegisterStateToApuRegs({
+			channels: [
+				{ enabled: false, period: 0, volume: 0, duty: 2 },
+				{ enabled: false, period: 0, volume: 0, duty: 2 },
+				{ enabled: false, period: 0 },
+				{ enabled: false },
+				{ enabled: false }
+			]
+		});
+		expect(regs[0x00] & 0x0f).toBe(0);
+		expect(regs[0x08]).toBe(0);
+		expect(regs[0x0c] & 0x0f).toBe(0);
+		expect(regs[0x15]).toBe(0x0f);
 	});
 });
 

@@ -90,6 +90,19 @@ describe('NesAudioDriver envelope and length macro', () => {
 		expect(registerState.channels[2].lengthNibble).toBe(NES_REGISTER_UNCHANGED);
 	});
 
+	it('keeps triangle period and writes halt linear when silencing', () => {
+		const driver = new NesAudioDriver();
+		const registerState = new NesChipRegisterState();
+		registerState.channels[2].period = 428;
+		registerState.channels[2].enabled = true;
+
+		driver._silenceChannel(registerState, 2);
+
+		expect(registerState.channels[2].enabled).toBe(false);
+		expect(registerState.channels[2].period).toBe(428);
+		expect(registerState.channels[2].linearReg).toBe(0);
+	});
+
 	it('writes constant volume register when envelope is off', () => {
 		const driver = new NesAudioDriver();
 		const registerState = new NesChipRegisterState();

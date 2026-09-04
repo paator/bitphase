@@ -9,5 +9,8 @@ export const NES_PAL_CPU_FREQUENCY = 1_662_607;
 export const NES_SQUARE_LENGTH_NIBBLE = 0xf;
 export const NES_TRIANGLE_LINEAR_RELOAD = 0x7f;
 
+export const NES_APU_STATUS_PULSE = 0x03;
+export const NES_APU_STATUS_TRIANGLE_NOISE = 0x0c;
+
 export const NES_APU_OUTPUT_GAIN = 3.2;
 export const NES_APU_OUTPUT_SCALE = NES_APU_OUTPUT_GAIN / 8192;

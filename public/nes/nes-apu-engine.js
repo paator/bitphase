@@ -5,7 +5,9 @@ import {
 	NES_NTSC_CPU_FREQUENCY,
 	NES_SQUARE_LENGTH_NIBBLE,
 	NES_TRIANGLE_LINEAR_RELOAD,
-	NES_APU_OUTPUT_SCALE
+	NES_APU_OUTPUT_SCALE,
+	NES_APU_STATUS_PULSE,
+	NES_APU_STATUS_TRIANGLE_NOISE
 } from './nes-constants.js';
 import {
 	buildNoiseSilentVolumeReg,
@@ -35,20 +37,6 @@ function isNoiseChannelActive(channel) {
 	return channel.enabled;
 }
 
-function buildApu4015Mask(registerState) {
-	let mask = 0;
-	if (isSquareChannelActive(registerState.channels[0])) mask |= 1;
-	if (isSquareChannelActive(registerState.channels[1])) mask |= 2;
-	return mask;
-}
-
-function buildDmc4015Mask(registerState) {
-	let mask = 0;
-	if (isTriangleChannelActive(registerState.channels[2])) mask |= 4;
-	if (isNoiseChannelActive(registerState.channels[3])) mask |= 8;
-	return mask;
-}
-
 function buildApuOutputMask(registerState) {
 	let mask = 0;
 	if (!isSquareChannelActive(registerState.channels[0])) mask |= 1;
@@ -56,11 +44,8 @@ function buildApuOutputMask(registerState) {
 	return mask;
 }
 
-function buildDmcOutputMask(registerState) {
-	let mask = 4;
-	if (!isTriangleChannelActive(registerState.channels[2])) mask |= 1;
-	if (!isNoiseChannelActive(registerState.channels[3])) mask |= 2;
-	return mask;
+function buildDmcOutputMask(_registerState) {
+	return 4;
 }
 
 class NesApuEngine {
@@ -79,6 +64,7 @@ class NesApuEngine {
 		this._lastApuOutputMask = -1;
 		this._lastDmcOutputMask = -1;
 		this._lastOutput = { left: 0, right: 0 };
+		this._scopeRawOut = [0, 0, 0, 0, 0];
 	}
 
 	setCpuFrequency(frequency) {
@@ -109,6 +95,20 @@ class NesApuEngine {
 		this._lastApuOutputMask = -1;
 		this._lastDmcOutputMask = -1;
 		this._lastOutput = { left: 0, right: 0 };
+		this._scopeRawOut = [0, 0, 0, 0, 0];
+		this._parkTriangleDacAtZero();
+	}
+
+	_parkTriangleDacAtZero() {
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, 0x81);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 2, 1);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 3, 0x08);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4017, 0x80);
+		this.wasmModule.nes_dmc_Tick(this.dmcPtr, 32);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, 0);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 2, 0);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4017, 0x40);
 	}
 
 	_applyOutputMasks(registerState, forceApply) {
@@ -139,17 +139,15 @@ class NesApuEngine {
 		last.retrigger = false;
 	}
 
-	_writeTriangleSilent(channel) {
+	_writeTriangleSilent() {
 		const last = this.lastState.channels[2];
 		const linearReg = buildTriangleSilentLinearReg();
 		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, linearReg);
 		last.linearReg = linearReg;
-		last.period = 0;
-		last.lengthNibble = NES_REGISTER_UNCHANGED;
 		last.retrigger = false;
 	}
 
-	_writeNoiseSilent(channel) {
+	_writeNoiseSilent() {
 		const last = this.lastState.channels[3];
 		const volumeReg = buildNoiseSilentVolumeReg();
 		this.wasmModule.nes_dmc_Write(this.dmcPtr, NOISE_BASE, volumeReg);
@@ -244,7 +242,7 @@ class NesApuEngine {
 		const last = this.lastState.channels[2];
 		if (!isTriangleChannelActive(channel)) {
 			if (forceApply || last.enabled) {
-				this._writeTriangleSilent(channel);
+				this._writeTriangleSilent();
 			}
 			last.enabled = false;
 			return;
@@ -293,7 +291,7 @@ class NesApuEngine {
 		const last = this.lastState.channels[3];
 		if (!isNoiseChannelActive(channel)) {
 			if (forceApply || last.enabled) {
-				this._writeNoiseSilent(channel);
+				this._writeNoiseSilent();
 			}
 			last.enabled = false;
 			return;
@@ -341,15 +339,13 @@ class NesApuEngine {
 		const forceApply = this.forceFullApply;
 		this.forceFullApply = false;
 
-		const apu4015 = buildApu4015Mask(registerState);
-		const dmc4015 = buildDmc4015Mask(registerState);
-		if (forceApply || apu4015 !== this._lastApu4015) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, 0x4015, apu4015);
-			this._lastApu4015 = apu4015;
+		if (forceApply || this._lastApu4015 !== NES_APU_STATUS_PULSE) {
+			this.wasmModule.nes_apu_Write(this.apuPtr, 0x4015, NES_APU_STATUS_PULSE);
+			this._lastApu4015 = NES_APU_STATUS_PULSE;
 		}
-		if (forceApply || dmc4015 !== this._lastDmc4015) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, dmc4015);
-			this._lastDmc4015 = dmc4015;
+		if (forceApply || this._lastDmc4015 !== NES_APU_STATUS_TRIANGLE_NOISE) {
+			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
+			this._lastDmc4015 = NES_APU_STATUS_TRIANGLE_NOISE;
 		}
 
 		for (let i = 0; i < 2; i++) {
@@ -391,6 +387,14 @@ class NesApuEngine {
 		this.wasmModule.nes_apu_Tick(this.apuPtr, clocks);
 		this.wasmModule.nes_dmc_Tick(this.dmcPtr, clocks);
 
+		if (this.canReadChannelOutputs()) {
+			this._scopeRawOut[0] = this.wasmModule.nes_apu_GetOut(this.apuPtr, 0);
+			this._scopeRawOut[1] = this.wasmModule.nes_apu_GetOut(this.apuPtr, 1);
+			this._scopeRawOut[2] = this.wasmModule.nes_dmc_GetOut(this.dmcPtr, 0);
+			this._scopeRawOut[3] = this.wasmModule.nes_dmc_GetOut(this.dmcPtr, 1);
+			this._scopeRawOut[4] = this.wasmModule.nes_dmc_GetOut(this.dmcPtr, 2);
+		}
+
 		const memory = this.wasmModule.memory.buffer;
 		this.wasmModule.nes_apu_Render(this.apuPtr, this.outputPtr);
 		this.wasmModule.nes_dmc_Render(this.dmcPtr, this.outputPtr + 8);
@@ -409,12 +413,8 @@ class NesApuEngine {
 	}
 
 	getChannelRawOut(channelIndex) {
-		if (!this.canReadChannelOutputs()) return 0;
-		if (channelIndex <= 1) {
-			return this.wasmModule.nes_apu_GetOut(this.apuPtr, channelIndex);
-		}
-		if (channelIndex >= 2 && channelIndex <= 4) {
-			return this.wasmModule.nes_dmc_GetOut(this.dmcPtr, channelIndex - 2);
+		if (channelIndex >= 0 && channelIndex < this._scopeRawOut.length) {
+			return this._scopeRawOut[channelIndex];
 		}
 		return 0;
 	}
@@ -436,7 +436,7 @@ export function createNesApuEngine(wasmModule) {
 	wasmModule.nes_dmc_Init(dmcPtr);
 	wasmModule.nes_dmc_SetAPU(dmcPtr, apuPtr);
 	wasmModule.nes_apu_SetMask(apuPtr, 3);
-	wasmModule.nes_dmc_SetMask(dmcPtr, 7);
+	wasmModule.nes_dmc_SetMask(dmcPtr, 4);
 	wasmModule.nes_apu_SetStereoMix(apuPtr, 0, 128, 128);
 	wasmModule.nes_apu_SetStereoMix(apuPtr, 1, 128, 128);
 	wasmModule.nes_dmc_SetStereoMix(dmcPtr, 0, 128, 128);

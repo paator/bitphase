@@ -86,14 +86,16 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this.enforceMuteState();
 	}
 
-	_simulateRow(pattern, rowIndex) {
+	_simulateRow(pattern, rowIndex, applyToEngine = true) {
 		this.patternProcessor.parsePatternRow(pattern, rowIndex, this.registerState);
 		this.patternProcessor.processSpeedTable();
 		const ticksPerRow = this.state.timeline.currentSpeed;
 		for (let tick = 0; tick < ticksPerRow; tick++) {
 			this._processTrackerTick();
 		}
-		this._applyRegisterStateToEngine();
+		if (applyToEngine) {
+			this._applyRegisterStateToEngine();
+		}
 	}
 
 	_processTrackerTick() {
@@ -222,7 +224,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this._resetEnginesForPreview();
 
 		for (let row = 0; row < rowIndex; row++) {
-			this._simulateRow(pattern, row);
+			this._simulateRow(pattern, row, false);
 		}
 		this.patternProcessor.parsePatternRow(pattern, rowIndex, this.registerState);
 		this.patternProcessor.processTables();
@@ -239,6 +241,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 				this._silencePreviewChannel(ch);
 				this.state.channelSoundEnabled[ch] = false;
 			}
+			this._applyRegisterStateToEngine();
 		} else {
 			for (let ch = 0; ch < this.registerState.channelCount; ch++) {
 				this.previewActiveChannels.add(ch);

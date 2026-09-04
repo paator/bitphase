@@ -83,11 +83,11 @@ class NesAudioDriver {
 		if (!channel) return;
 		const hwType = this._getHardwareChannelType(channelIndex);
 		channel.enabled = false;
-		channel.period = 0;
 		channel.volume = 0;
 		channel.retrigger = false;
 		channel.lengthNibble = NES_REGISTER_UNCHANGED;
 		if (hwType <= 1) {
+			channel.period = 0;
 			channel.volumeReg = buildSquareSilentVolumeReg(channel.duty);
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 			channel.sweepReg = NES_SQUARE_SWEEP_DISABLED;
@@ -95,9 +95,11 @@ class NesAudioDriver {
 			channel.volumeReg = NES_REGISTER_UNCHANGED;
 			channel.linearReg = buildTriangleSilentLinearReg();
 		} else if (hwType === 3) {
+			channel.period = 0;
 			channel.volumeReg = buildNoiseSilentVolumeReg();
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		} else {
+			channel.period = 0;
 			channel.volumeReg = NES_REGISTER_UNCHANGED;
 			channel.linearReg = NES_REGISTER_UNCHANGED;
 		}

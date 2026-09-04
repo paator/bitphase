@@ -3,10 +3,9 @@ import NesAudioDriver from './nes-audio-driver.js';
 import NesApuEngine, { createNesApuEngine } from './nes-apu-engine.js';
 import NesChipRegisterState from './nes-chip-register-state.js';
 import NesVirtualChannelMixer from './nes-virtual-channel-mixer.js';
-import { NesWaveformCapture } from './nes-waveform-capture.js';
+import { NesWaveformCapture, noiseChannelLevelFromEmulator, noiseScopeSampleFromChannel } from './nes-waveform-capture.js';
 import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
 import { TrackerWorkletSlot } from '../tracker/tracker-worklet-slot.js';
-import { resetChipPlaybackOutput } from '../tracker/tracker-engine-transport.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
 
 export class NesWorkletSlot extends TrackerWorkletSlot {
@@ -29,6 +28,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		this.waveformPostCounter = 0;
 		this.waveformPostInterval = 6;
 		this.waveformCapture = new NesWaveformCapture(NES_CHANNEL_COUNT);
+		this._noiseLevelPeak = 0;
 	}
 
 	_slotState() {
@@ -48,22 +48,20 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		return this._playbackWorkersReady() && this.apuEngine;
 	}
 
+	_silencePlaybackOutput() {
+		this.registerState.reset();
+		this.audioDriver?.resetChannelMixerState?.();
+		this._applyRegisterStateToEngine();
+	}
+
 	_prepareOutputForPlay() {
-		resetChipPlaybackOutput({
-			registerState: this.registerState,
-			audioDriver: this.audioDriver,
-			chipEngine: this.apuEngine,
-			applyRegisterState: () => this._applyRegisterStateToEngine()
-		});
+		this.resetChannelWaveformCapture();
+		this._silencePlaybackOutput();
 	}
 
 	_onTransportStop() {
-		resetChipPlaybackOutput({
-			registerState: this.registerState,
-			audioDriver: this.audioDriver,
-			chipEngine: this.apuEngine,
-			applyRegisterState: () => this._applyRegisterStateToEngine()
-		});
+		this.resetChannelWaveformCapture();
+		this._silencePlaybackOutput();
 	}
 
 	_applyRegisterStateToEngine() {
@@ -104,12 +102,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 			this.audioDriver.resizeChannels(totalChannels);
 		}
 		if (this.apuEngine) {
-			resetChipPlaybackOutput({
-				registerState: this.registerState,
-				audioDriver: this.audioDriver,
-				chipEngine: this.apuEngine,
-				applyRegisterState: () => this._applyRegisterStateToEngine()
-			});
+			this._silencePlaybackOutput();
 		}
 	}
 
@@ -185,8 +178,8 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 				this.audioDriver.advanceSweepTable(this.state);
 				this.audioDriver.syncSweepTableRegisterState(this.state, this.registerState);
 			}
+			this._applyRegisterStateToEngine();
 		}
-		this._applyRegisterStateToEngine();
 	}
 
 	resetChannelWaveformCapture() {
@@ -260,6 +253,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 			this._applyVirtualChannelResize();
 			this.registerState.reset();
 			this.initialized = true;
+			this._applyRegisterStateToEngine();
 		} catch (error) {
 			console.error('Failed to initialize NES APU:', error);
 		}
@@ -280,10 +274,27 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		this.state.setIntFrequency(intFrequency, sampleRate);
 	}
 
+	_clearHardwareWaveformChannel(hardwareChannelIndex) {
+		if (
+			hardwareChannelIndex < 0 ||
+			hardwareChannelIndex >= this.channelWaveformBuf.length
+		) {
+			return;
+		}
+		this.channelWaveformBuf[hardwareChannelIndex].fill(0);
+		if (hardwareChannelIndex === 3) {
+			this._noiseLevelPeak = 0;
+		}
+	}
+
 	handleSetChannelMute({ channelIndex, muted }) {
 		const totalChannels = this.virtualChannelMixer.getTotalVirtualChannelCount();
 		if (channelIndex >= 0 && channelIndex < totalChannels) {
 			this.state.channelMuted[channelIndex] = muted;
+			const hwType = this.virtualChannelMixer.hasVirtualChannels()
+				? this.virtualChannelMixer.getHardwareChannelIndex(channelIndex)
+				: channelIndex;
+			this._clearHardwareWaveformChannel(hwType);
 			if (muted) {
 				this.audioDriver?._silenceChannel(this.registerState, channelIndex);
 				this._applyRegisterStateToEngine();
@@ -299,16 +310,37 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		this.resetChannelWaveformCapture();
 	}
 
-	_resetEnginesForPreview() {
-		resetChipPlaybackOutput({ chipEngine: this.apuEngine });
-	}
-
 	_silencePreviewChannel(channelIndex) {
 		this.audioDriver?._silenceChannel(this.registerState, channelIndex);
 	}
 
 	canRender() {
 		return Boolean(this.initialized && this.state.wasmModule && this.state.apuPtr);
+	}
+
+	shouldAccumulateStereoOutput() {
+		return this.canRender();
+	}
+
+	_isHardwareChannelMuted(hardwareChannelIndex) {
+		if (this.virtualChannelMixer.hasVirtualChannels()) {
+			const total = this.virtualChannelMixer.getTotalVirtualChannelCount();
+			let mapped = false;
+			for (let logical = 0; logical < total; logical++) {
+				if (
+					this.virtualChannelMixer.getHardwareChannelIndex(logical) !==
+					hardwareChannelIndex
+				) {
+					continue;
+				}
+				mapped = true;
+				if (!this.state.channelMuted[logical]) {
+					return false;
+				}
+			}
+			return mapped;
+		}
+		return Boolean(this.state.channelMuted[hardwareChannelIndex]);
 	}
 
 	_isLogicalChannelAudible(channelIndex) {
@@ -343,17 +375,26 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		const audibleIndices = this.virtualChannelMixer.hasVirtualChannels()
 			? new Set(this.virtualChannelMixer.getAudibleVirtualChannelIndices(this.registerState))
 			: null;
+		const noisePeak = this._noiseLevelPeak;
+		this._noiseLevelPeak = 0;
 
 		for (let i = 0; i < channelCount; i++) {
-			if (!this._isLogicalChannelAudible(i)) continue;
-			if (audibleIndices && !audibleIndices.has(i)) continue;
+			if (this.state.channelMuted[i]) continue;
 
 			const channel = this.registerState.channels[i];
-			if (!channel?.enabled && (channel?.volume ?? 0) <= 0) continue;
-
 			const hwType = this.virtualChannelMixer.hasVirtualChannels()
 				? this.virtualChannelMixer.getHardwareChannelIndex(i)
 				: i;
+
+			if (hwType === 3) {
+				levels[i] = noiseChannelLevelFromEmulator(noisePeak, channel);
+				continue;
+			}
+
+			if (!this._isLogicalChannelAudible(i)) continue;
+			if (audibleIndices && !audibleIndices.has(i)) continue;
+			if (!channel?.enabled && (channel?.volume ?? 0) <= 0) continue;
+
 			if (hwType === 2) {
 				levels[i] = channel.enabled ? 1 : 0;
 			} else if (hwType === 4) {
@@ -386,27 +427,52 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		return { toneHz };
 	}
 
+	_captureHardwareWaveformSample(channelIndex, channel, emulatorOutputs, cpuFrequency) {
+		if (this._isHardwareChannelMuted(channelIndex)) return 0;
+		if (channelIndex === 4) return 0;
+
+		if (channelIndex === 3) {
+			const rawOut = this.apuEngine?.getChannelRawOut?.(3) ?? 0;
+			return noiseScopeSampleFromChannel(rawOut, channel);
+		}
+
+		if (!this._isHardwareChannelAudible(channelIndex)) return 0;
+		if (!channel?.enabled) return 0;
+		if (emulatorOutputs == null) {
+			return this.waveformCapture.sample(channelIndex, channel, cpuFrequency, sampleRate);
+		}
+		return emulatorOutputs[channelIndex];
+	}
+
 	accumulateStereoOutput(sampleIndex, mix) {
 		if (!this.apuEngine) return;
 		const { left, right } = this.apuEngine.process(sampleRate);
 		mix.l += left;
 		mix.r += right;
 
-		const cpuFrequency = this.state.cpuFrequency;
+		if (this.paused && !this.isPreviewActive()) {
+			return;
+		}
+
+		if (this.apuEngine.canReadChannelOutputs?.() && !this._isHardwareChannelMuted(3)) {
+			const noiseRaw = this.apuEngine.getChannelRawOut(3);
+			if (noiseRaw > this._noiseLevelPeak) {
+				this._noiseLevelPeak = noiseRaw;
+			}
+		}
+
 		const wi = this.channelWaveformWriteIndex;
 		const emulatorOutputs = this.waveformCapture.readChannelOutputs(this.apuEngine);
+		const cpuFrequency = this.state.cpuFrequency;
 		const hwState = this._getEngineRegisterState();
 		for (let ch = 0; ch < this.channelWaveformBuf.length; ch++) {
-			const channel = hwState.channels[ch];
-			const sample =
-				emulatorOutputs != null
-					? this._isHardwareChannelAudible(ch) && channel?.enabled
-						? emulatorOutputs[ch]
-						: 0
-					: this._isHardwareChannelAudible(ch)
-						? this.waveformCapture.sample(ch, channel, cpuFrequency, sampleRate)
-						: 0;
-			this.channelWaveformBuf[ch][(wi + sampleIndex) % 512] = sample;
+			this.channelWaveformBuf[ch][(wi + sampleIndex) % 512] =
+				this._captureHardwareWaveformSample(
+					ch,
+					hwState.channels[ch],
+					emulatorOutputs,
+					cpuFrequency
+				);
 		}
 	}
 

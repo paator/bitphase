@@ -12,6 +12,35 @@ export function normalizeNesChannelWaveformSample(channelIndex, rawOut) {
 	return (rawOut / max - 0.5) * NES_WAVEFORM_SCALE;
 }
 
+export function noiseScopeSampleFromEmulatorLevel(rawOut, random = Math.random) {
+	if (!(rawOut > 0)) return 0;
+	const amplitude = Math.min(1, rawOut / NES_SQUARE_NOISE_MAX) * 0.5 * NES_WAVEFORM_SCALE;
+	return (random() < 0.5 ? 1 : -1) * amplitude;
+}
+
+export function noiseChannelLevelFromEmulator(rawOut, channel) {
+	const registerVolume = Math.max(
+		channel?.volume ?? 0,
+		channel?.volumeReg >= 0 ? channel.volumeReg & 15 : 0
+	);
+	if (rawOut > 0) {
+		return Math.min(1, Math.max(registerVolume / NES_SQUARE_NOISE_MAX, (rawOut * 2) / NES_SQUARE_NOISE_MAX));
+	}
+	if (registerVolume > 0) {
+		return Math.min(1, registerVolume / NES_SQUARE_NOISE_MAX);
+	}
+	if (channel?.enabled) {
+		return 1;
+	}
+	return 0;
+}
+
+export function noiseScopeSampleFromChannel(rawOut, channel, random = Math.random) {
+	const level = noiseChannelLevelFromEmulator(rawOut, channel);
+	if (!(level > 0)) return 0;
+	return (random() < 0.5 ? 1 : -1) * level * 0.5 * NES_WAVEFORM_SCALE;
+}
+
 export class NesWaveformCapture {
 	constructor(channelCount) {
 		this.channelCount = channelCount;
@@ -24,10 +53,11 @@ export class NesWaveformCapture {
 			return null;
 		}
 		for (let ch = 0; ch < this.channelCount; ch++) {
-			outputs[ch] = normalizeNesChannelWaveformSample(
-				ch,
-				apuEngine.getChannelRawOut(ch)
-			);
+			const rawOut = apuEngine.getChannelRawOut(ch);
+			outputs[ch] =
+				ch === 3
+					? noiseScopeSampleFromEmulatorLevel(rawOut)
+					: normalizeNesChannelWaveformSample(ch, rawOut);
 		}
 		return outputs;
 	}
@@ -59,8 +89,7 @@ export class NesWaveformCapture {
 		}
 
 		if (channelIndex === 3) {
-			if (channel.volume <= 0) return 0;
-			return ((Math.random() < 0.5 ? 1 : -1) * channel.volume) / 15 * 0.5;
+			return noiseScopeSampleFromChannel(0, channel);
 		}
 
 		return 0;
