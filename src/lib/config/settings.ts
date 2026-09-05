@@ -142,6 +142,14 @@ export const settingsItems: SettingsItem[] = [
 		category: 'appearance'
 	},
 	{
+		label: 'Compact Instrument List',
+		description: 'Show instruments as a compact top-to-bottom list instead of a wrapping grid',
+		type: 'toggle',
+		defaultValue: false,
+		setting: 'compactInstrumentList',
+		category: 'appearance'
+	},
+	{
 		label: 'Show Oscilloscopes',
 		description: 'Display per-channel waveform oscilloscopes',
 		type: 'toggle',

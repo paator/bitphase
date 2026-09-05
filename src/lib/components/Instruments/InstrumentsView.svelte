@@ -45,6 +45,8 @@
 	} from '../../services/instrument/instrument-preset';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
+	import { settingsStore } from '../../stores/settings.svelte';
+	import InstrumentListModeToggle from './InstrumentListModeToggle.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
 	import { createPersistedResizableListHeight } from '../../utils/persisted-resizable-list-height.svelte';
 	import {
@@ -96,13 +98,16 @@
 		defaultHeight: DEFAULT_ITEM_LIST_HEIGHT
 	});
 
+	const compactInstrumentList = $derived(settingsStore.compactInstrumentList);
 	const instrumentGridRows = $derived.by(() =>
-		computeGridRows(
-			chipInstruments?.length ?? 0,
-			instrumentListResize.listHeight,
-			ITEM_ROW_HEIGHT,
-			ITEM_BUTTON_BAR_HEIGHT
-		)
+		compactInstrumentList
+			? []
+			: computeGridRows(
+					chipInstruments?.length ?? 0,
+					instrumentListResize.listHeight,
+					ITEM_ROW_HEIGHT,
+					ITEM_BUTTON_BAR_HEIGHT
+				)
 	);
 
 	let asHex = $state(false);
@@ -575,63 +580,72 @@
 				class="flex shrink-0 flex-col border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
 				style="height: {instrumentListResize.listHeight}px">
 				<div
-					class="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden"
+					class="flex min-h-0 flex-1 flex-col {compactInstrumentList
+						? 'overflow-x-hidden overflow-y-auto'
+						: 'overflow-x-auto overflow-y-hidden'}"
 					bind:this={instrumentListScrollRef}>
-					{#each instrumentGridRows as rowIndices}
-						<div
-							class="flex min-w-max shrink-0 items-stretch border-b border-[var(--color-app-border)]"
-							style="height: {ITEM_ROW_HEIGHT}px">
-							{#each rowIndices as index}
-								{@const instrument = chipInstruments[index]}
-								{#if instrument}
-									{@const isSelected = selectedInstrumentIndex === index}
-									<ItemGridCell
-										dataIndexKind="instrument"
-										dataValue={index}
-										{isSelected}
-										isUsed={isInstrumentUsed(instrument)}
-										isEditing={editingInstrumentId === index}
-										idLabel={instrument.id}
-										nameLabel={instrument.name}
-										copyTitle="Copy instrument"
-										removeTitle="Remove instrument"
-										showCopy={hasSongs}
-										showRemove={hasSongs && chipInstruments.length > 1}
-										onSelect={() => (selectedInstrumentIndex = index)}
-										onDoubleClick={() => {
-											if (hasSongs) startEditingInstrumentId(index);
-										}}
-										onCopy={(e) => {
-											e.stopPropagation();
-											copyInstrument(index);
-										}}
-										onRemove={(e) => {
-											e.stopPropagation();
-											removeInstrument(index);
-										}}>
-										{#snippet edit()}
-											<EditableIdField
-												bind:value={editingInstrumentIdValue}
-												error={editingInstrumentIdValue
-													? getInstrumentIdError(
-															index,
-															editingInstrumentIdValue
-														)
-													: null}
-												onCommit={finishEditingInstrumentId}
-												onCancel={cancelEditingInstrumentId}
-												maxLength={2}
-												inputFilter={(v) =>
-													v
-														.toUpperCase()
-														.slice(0, 2)
-														.replace(/[^0-9A-Z]/g, '')} />
-										{/snippet}
-									</ItemGridCell>
-								{/if}
-							{/each}
-						</div>
-					{/each}
+					{#snippet instrumentCell(index: number, layout: 'grid' | 'list')}
+						{@const instrument = chipInstruments[index]}
+						{#if instrument}
+							{@const isSelected = selectedInstrumentIndex === index}
+							<ItemGridCell
+								dataIndexKind="instrument"
+								dataValue={index}
+								{isSelected}
+								isUsed={isInstrumentUsed(instrument)}
+								isEditing={editingInstrumentId === index}
+								idLabel={instrument.id}
+								nameLabel={instrument.name}
+								copyTitle="Copy instrument"
+								removeTitle="Remove instrument"
+								showCopy={hasSongs}
+								showRemove={hasSongs && chipInstruments.length > 1}
+								{layout}
+								onSelect={() => (selectedInstrumentIndex = index)}
+								onDoubleClick={() => {
+									if (hasSongs) startEditingInstrumentId(index);
+								}}
+								onCopy={(e) => {
+									e.stopPropagation();
+									copyInstrument(index);
+								}}
+								onRemove={(e) => {
+									e.stopPropagation();
+									removeInstrument(index);
+								}}>
+								{#snippet edit()}
+									<EditableIdField
+										bind:value={editingInstrumentIdValue}
+										error={editingInstrumentIdValue
+											? getInstrumentIdError(index, editingInstrumentIdValue)
+											: null}
+										onCommit={finishEditingInstrumentId}
+										onCancel={cancelEditingInstrumentId}
+										maxLength={2}
+										inputFilter={(v) =>
+											v
+												.toUpperCase()
+												.slice(0, 2)
+												.replace(/[^0-9A-Z]/g, '')} />
+								{/snippet}
+							</ItemGridCell>
+						{/if}
+					{/snippet}
+					{#if compactInstrumentList}
+						{#each chipInstruments as instrument, index (instrument.id)}
+							{@render instrumentCell(index, 'list')}
+						{/each}
+					{:else}
+						{#each instrumentGridRows as rowIndices, rowIndex (rowIndex)}
+							<div
+								class="flex min-w-max shrink-0 items-stretch border-b border-[var(--color-app-border)]"
+								style="height: {ITEM_ROW_HEIGHT}px">
+								{#each rowIndices as index (index)}
+									{@render instrumentCell(index, 'grid')}
+								{/each}
+							</div>
+						{/each}
+					{/if}
 				</div>
 				<div
 					class="flex shrink-0 items-center gap-2 border-t border-[var(--color-app-border)] px-2 py-1.5">
@@ -663,6 +677,9 @@
 						onclick={openPresets}
 						disabled={!hasSongs || chipInstruments.length === 0}
 						title="Load instrument from built-in presets" />
+					<div class="ml-auto">
+						<InstrumentListModeToggle />
+					</div>
 				</div>
 			</div>
 
