@@ -51,7 +51,7 @@
 			: 0
 	);
 
-	const schema = chip.schema;
+	const schema = $derived(chip.schema);
 
 	function getTableById(tables: Table[], id: number): Table | undefined {
 		return tables.find((t) => t.id === id);
