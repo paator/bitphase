@@ -166,7 +166,13 @@
 	const CHANNEL_LEVEL_DECAY = 0.82;
 	const CHANNEL_LEVEL_EPSILON = 0.01;
 
-	let channelLevels: number[] = $state([]);
+	let channelLevels: number[] = [];
+	let levelStripHeader: {
+		rowString: string;
+		channelLabels: string[];
+		channelMuted: boolean[];
+		vcGroups: ReturnType<typeof getVirtualChannelGroups> | undefined;
+	} | null = null;
 
 	const services: { audioService: AudioService } = getContext('container');
 
@@ -1431,6 +1437,7 @@
 
 		const header = getHeaderRowContext(patternToDraw);
 		if (!header) return;
+		levelStripHeader = header;
 
 		applyChannelEffectColumnCounts(patternToDraw);
 		renderer.drawChannelLabels({
@@ -1451,11 +1458,7 @@
 		if (document.hidden) return;
 		if (!settingsStore.showChannelVolumeBars || channelLevels.length === 0) return;
 
-		const patternId = patternOrder[currentPatternOrderIndex];
-		const patternToDraw = findOrCreatePattern(patternId);
-		if (!patternToDraw) return;
-
-		const header = getHeaderRowContext(patternToDraw);
+		const header = levelStripHeader;
 		if (!header) return;
 
 		renderer.drawChannelLevelStripOnly({
