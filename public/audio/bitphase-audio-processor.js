@@ -1,10 +1,8 @@
 import SongTimeline from '../tracker/song-timeline.js';
 import { createAudioSlot } from './audio-slot-registry.js';
 import {
-	capIdleTickAccumulator,
 	leaderPatternLengthFromSlots,
 	runSharedTimelineQuantum,
-	sharedPlaybackShouldHoldClock,
 	sortPlaySlotsForQuantum
 } from '../tracker/shared-playback-orchestrator.js';
 import './builtin-audio-slots.js';
@@ -72,25 +70,7 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 
 		const active = slots.filter((s) => s && s.canRender());
 		const anyPreview = active.some((s) => s.isPreviewActive());
-		const catchingUpSlots = anyPreview ? [] : active.filter((s) => s.hasPendingCatchUp?.());
-		if (catchingUpSlots.length > 0) {
-			for (const s of catchingUpSlots) {
-				s.advanceCatchUp(Number.MAX_SAFE_INTEGER);
-			}
-			for (let i = 0; i < numSamples; i++) {
-				leftChannel[i] = 0;
-				rightChannel[i] = 0;
-			}
-			for (let j = 0; j < slots.length; j++) {
-				const s = slots[j];
-				if (s) s.finishAudioBlock(numSamples);
-			}
-			return true;
-		}
-
-		const transportSlots = anyPreview ? [] : active.filter((s) => s.isPlayingTransport());
-		const playSlots = transportSlots.filter((s) => s.shouldRunPlaybackAccumulation());
-		const holdClock = sharedPlaybackShouldHoldClock(transportSlots.length, playSlots.length);
+		const playSlots = anyPreview ? [] : active.filter((s) => s.shouldRunPlaybackAccumulation());
 		const outputSlots = anyPreview
 			? []
 			: active.filter((s) => s.shouldAccumulateStereoOutput());
@@ -108,11 +88,9 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 						s.accumulateStereoOutput(i, mix);
 					}
 				}
-			} else if (!holdClock && playSlots.length > 0 && tl.tickAccumulator >= 1.0) {
+			} else if (playSlots.length > 0 && tl.tickAccumulator >= 1.0) {
 				runSharedTimelineQuantum(quantumSlots, slots.filter(Boolean), tl, leaderLen);
 				tl.tickAccumulator -= 1.0;
-			} else if (holdClock || playSlots.length === 0) {
-				tl.tickAccumulator = capIdleTickAccumulator(tl.tickAccumulator, false);
 			}
 
 			if (!anyPreview) {

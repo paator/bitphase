@@ -25,8 +25,6 @@
 	} from '../../services/pattern/pattern-visible-rows';
 	import { PatternEditingService } from '../../services/pattern/pattern-editing';
 	import { PreviewService } from '../../services/audio/preview-service';
-	import { PlaybackOrderIndexGate } from '../../services/audio/playback-order-index-gate';
-	import { PlaybackSeekScheduler } from '../../services/audio/playback-seek-scheduler';
 	import { PatternEditorRenderer } from '../../ui-rendering/pattern-editor-renderer';
 	import { PatternEditorTextParser } from '../../ui-rendering/pattern-editor-text-parser';
 	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
@@ -163,13 +161,7 @@
 	const CHANNEL_LEVEL_DECAY = 0.82;
 	const CHANNEL_LEVEL_EPSILON = 0.01;
 
-	let channelLevels: number[] = [];
-	let levelStripHeader: {
-		rowString: string;
-		channelLabels: string[];
-		channelMuted: boolean[];
-		vcGroups: ReturnType<typeof getVirtualChannelGroups> | undefined;
-	} | null = null;
+	let channelLevels: number[] = $state([]);
 
 	const services: { audioService: AudioService } = getContext('container');
 
@@ -177,14 +169,6 @@
 	const converter = $derived.by(() => getConverter(chip));
 	const schema = $derived(chip.schema);
 	const previewService = new PreviewService();
-	const orderIndexGate = new PlaybackOrderIndexGate();
-	const playbackSeekScheduler = new PlaybackSeekScheduler(() => {
-		if (!playbackStore.isPlaying) return;
-		if (services.audioService.playing) {
-			services.audioService.stop();
-		}
-		togglePlayback();
-	});
 	const pressedKeyChannels = new Map<string, number>();
 	let previewInitialized = false;
 
@@ -517,22 +501,15 @@
 		currentPatternOrderIndex = 0;
 	}
 
-	function discardPendingPlaybackPosition(pinnedOrderIndex?: number): void {
-		pendingPlaybackPosition = null;
-		playbackStartTime = performance.now();
-		if (playbackRafId !== null) {
-			cancelAnimationFrame(playbackRafId);
-			playbackRafId = null;
-		}
-		if (pinnedOrderIndex !== undefined) {
-			orderIndexGate.pin(pinnedOrderIndex);
-		}
-	}
-
 	export function setPatternOrderIndex(index: number) {
 		if (index >= 0 && index < patternOrder.length) {
 			currentPatternOrderIndex = index;
-			discardPendingPlaybackPosition(index);
+			pendingPlaybackPosition = null;
+			playbackStartTime = performance.now();
+			if (playbackRafId !== null) {
+				cancelAnimationFrame(playbackRafId);
+				playbackRafId = null;
+			}
 		}
 	}
 
@@ -799,7 +776,12 @@
 			}
 
 			initAllChips?.();
-			discardPendingPlaybackPosition();
+			pendingPlaybackPosition = null;
+			playbackStartTime = performance.now();
+			if (playbackRafId !== null) {
+				cancelAnimationFrame(playbackRafId);
+				playbackRafId = null;
+			}
 
 			const chipProcessors = services.audioService.chipProcessors;
 			const usePerChip = chipProcessors.length > 1;
@@ -890,8 +872,12 @@
 			}
 
 			initAllChipsForPlayPattern?.();
-			discardPendingPlaybackPosition();
-			orderIndexGate.clear();
+			pendingPlaybackPosition = null;
+			playbackStartTime = performance.now();
+			if (playbackRafId !== null) {
+				cancelAnimationFrame(playbackRafId);
+				playbackRafId = null;
+			}
 
 			const chipProcessors = services.audioService.chipProcessors;
 			const usePerChip = chipProcessors.length > 1;
@@ -907,10 +893,59 @@
 								createEmptyPatternForSong(patternId, chipIndex)
 							);
 						},
-						getCatchUpSegmentsForChip: (_chipIndex: number) => []
+						getCatchUpSegmentsForChip: (chipIndex: number) => {
+							const songPatterns = projectStore.patterns[chipIndex] ?? [];
+							const schema = chipProcessors[chipIndex]?.chip?.schema;
+							const getPattern = (id: number) =>
+								songPatterns.find((p) => p.id === id);
+							const orderIndexForBacktrack =
+								services.audioService.getPlayPatternId() !== null
+									? Math.max(0, patternOrder.indexOf(currentPattern.id))
+									: 0;
+							const horizon =
+								schema && songPatterns.length > 0
+									? computeStateHorizon(
+											patternOrder,
+											getPattern,
+											orderIndexForBacktrack,
+											0,
+											schema
+										)
+									: null;
+							return horizon
+								? buildCatchUpSegmentsToHorizon(
+										patternOrder,
+										getPattern,
+										horizon.orderIndex,
+										horizon.row
+									)
+								: [];
+						}
 					};
 				}
-				return { catchUpSegments: [], startPattern: currentPattern };
+				const getPattern = (id: number) => findOrCreatePattern(id);
+				const orderIndexForBacktrack =
+					services.audioService.getPlayPatternId() !== null
+						? Math.max(0, patternOrder.indexOf(currentPattern.id))
+						: 0;
+				const horizon = chip.schema
+					? computeStateHorizon(
+							patternOrder,
+							getPattern,
+							orderIndexForBacktrack,
+							0,
+							chip.schema
+						)
+					: null;
+				const catchUpSegments = horizon
+					? buildCatchUpSegmentsToHorizon(
+							patternOrder,
+							getPattern,
+							horizon.orderIndex,
+							horizon.row
+						)
+					: [];
+				return { catchUpSegments, startPattern: currentPattern };
 			};
 
 			services.audioService.playFromRow(0, 0, getSpeedForPlayPattern ?? getSpeedForChip, {
@@ -936,7 +971,12 @@
 				}
 
 				initAllChips?.();
-				discardPendingPlaybackPosition();
+				pendingPlaybackPosition = null;
+				playbackStartTime = performance.now();
+				if (playbackRafId !== null) {
+					cancelAnimationFrame(playbackRafId);
+					playbackRafId = null;
+				}
 
 				const defaultGetSpeed = (index: number) =>
 					projectStore.songs[index]?.initialSpeed ?? 3;
@@ -955,11 +995,52 @@
 									createEmptyPatternForSong(patternId, chipIndex)
 								);
 							},
-							getCatchUpSegmentsForChip: (_chipIndex: number) => []
+							getCatchUpSegmentsForChip: (chipIndex: number) => {
+								const songPatterns = projectStore.patterns[chipIndex] ?? [];
+								const schema = chipProcessors[chipIndex]?.chip?.schema;
+								const getPattern = (id: number) =>
+									songPatterns.find((p) => p.id === id);
+								const horizon =
+									schema && songPatterns.length > 0
+										? computeStateHorizon(
+												patternOrder,
+												getPattern,
+												currentPatternOrderIndex,
+												startRow,
+												schema
+											)
+										: null;
+								return horizon
+									? buildCatchUpSegmentsToHorizon(
+											patternOrder,
+											getPattern,
+											horizon.orderIndex,
+											horizon.row
+										)
+									: [];
+							}
 						};
 					}
+					const getPattern = (id: number) => findOrCreatePattern(id);
+					const horizon = chip.schema
+						? computeStateHorizon(
+								patternOrder,
+								getPattern,
+								currentPatternOrderIndex,
+								startRow,
+								chip.schema
+							)
+						: null;
+					const catchUpSegments = horizon
+						? buildCatchUpSegmentsToHorizon(
+								patternOrder,
+								getPattern,
+								horizon.orderIndex,
+								horizon.row
+							)
+						: [];
 					return {
-						catchUpSegments: [],
+						catchUpSegments,
 						startPattern: currentPattern
 					};
 				};
@@ -995,9 +1076,7 @@
 	}
 
 	function pausePlayback() {
-		playbackSeekScheduler.cancel();
 		services.audioService.stop();
-		orderIndexGate.clear();
 	}
 
 	function getCellPositions(
@@ -1344,7 +1423,6 @@
 
 		const header = getHeaderRowContext(patternToDraw);
 		if (!header) return;
-		levelStripHeader = header;
 
 		applyChannelEffectColumnCounts(patternToDraw);
 		renderer.drawChannelLabels({
@@ -1365,7 +1443,11 @@
 		if (document.hidden) return;
 		if (!settingsStore.showChannelVolumeBars || channelLevels.length === 0) return;
 
-		const header = levelStripHeader;
+		const patternId = patternOrder[currentPatternOrderIndex];
+		const patternToDraw = findOrCreatePattern(patternId);
+		if (!patternToDraw) return;
+
+		const header = getHeaderRowContext(patternToDraw);
 		if (!header) return;
 
 		renderer.drawChannelLevelStripOnly({
@@ -1475,7 +1557,12 @@
 		selectedRow = navigationState.selectedRow;
 		if (currentPatternOrderIndex !== navigationState.currentPatternOrderIndex) {
 			currentPatternOrderIndex = navigationState.currentPatternOrderIndex;
-			discardPendingPlaybackPosition(navigationState.currentPatternOrderIndex);
+			pendingPlaybackPosition = null;
+			playbackStartTime = performance.now();
+			if (playbackRafId !== null) {
+				cancelAnimationFrame(playbackRafId);
+				playbackRafId = null;
+			}
 		}
 
 		const updatedPattern = currentPattern || ensurePatternExists();
@@ -1580,7 +1667,12 @@
 			onSetCurrentPatternOrderIndex: (index: number) => {
 				currentPatternOrderIndex = index;
 				selectedRow = 0;
-				discardPendingPlaybackPosition(index);
+				pendingPlaybackPosition = null;
+				playbackStartTime = performance.now();
+				if (playbackRafId !== null) {
+					cancelAnimationFrame(playbackRafId);
+					playbackRafId = null;
+				}
 			},
 			onClearSelection: () => {
 				selectionStartRow = null;
@@ -3150,19 +3242,16 @@
 
 		const handleVisibilityChange = () => {
 			if (!document.hidden) {
-				syncPlaybackFollowFromWorklet();
 				updateSize();
 				if (setupCanvas()) draw();
 			}
 		};
 
 		window.addEventListener('resize', handleResize);
-		window.addEventListener('focus', handleVisibilityChange);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		return () => {
 			window.removeEventListener('resize', handleResize);
-			window.removeEventListener('focus', handleVisibilityChange);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	});
@@ -3200,74 +3289,34 @@
 	let playbackStartTime = 0;
 	let lastPatternOrderIndexFromPlayback = currentPatternOrderIndex;
 
-	function applyPendingPlaybackPosition(): boolean {
+	$effect(() => {
+		if (
+			currentPatternOrderIndex !== lastPatternOrderIndexFromPlayback &&
+			services.audioService.playing
+		) {
+			const indexToApply = currentPatternOrderIndex;
+			pendingPlaybackPosition = null;
+			playbackStartTime = performance.now();
+			if (playbackRafId !== null) {
+				cancelAnimationFrame(playbackRafId);
+				playbackRafId = null;
+			}
+			selectedRow = 0;
+			lastPatternOrderIndexFromPlayback = indexToApply;
+			if (isPlaybackMaster) {
+				services.audioService.stop();
+				togglePlayback();
+			}
+		}
+	});
+
+	export function markPatternChangeFromUser(selectedIndex?: number): void {
+		pendingPlaybackPosition = null;
+		playbackStartTime = performance.now();
 		if (playbackRafId !== null) {
 			cancelAnimationFrame(playbackRafId);
 			playbackRafId = null;
 		}
-		const pending = pendingPlaybackPosition;
-		pendingPlaybackPosition = null;
-		if (!pending || !services.audioService.playing) return false;
-		if (pending.timestamp < playbackStartTime) return false;
-		if (!orderIndexGate.consume(pending.orderIndex)) return false;
-
-		selectedRow = pending.row;
-		if (
-			pending.orderIndex !== undefined &&
-			services.audioService.getPlayPatternId() === null
-		) {
-			currentPatternOrderIndex = pending.orderIndex;
-			lastPatternOrderIndexFromPlayback = pending.orderIndex;
-		}
-		return true;
-	}
-
-	function syncPlaybackFollowFromWorklet(): void {
-		if (!playbackStore.isPlaying) return;
-		applyPendingPlaybackPosition();
-	}
-
-	$effect(() => {
-		return () => playbackSeekScheduler.cancel();
-	});
-
-	$effect(() => {
-		if (!playbackStore.isPlaying) {
-			lastPatternOrderIndexFromPlayback = currentPatternOrderIndex;
-			playbackSeekScheduler.cancel();
-			return;
-		}
-		if (currentPatternOrderIndex === lastPatternOrderIndexFromPlayback) {
-			return;
-		}
-		const indexToApply = currentPatternOrderIndex;
-		discardPendingPlaybackPosition(indexToApply);
-		selectedRow = 0;
-		lastPatternOrderIndexFromPlayback = indexToApply;
-		if (isPlaybackMaster) {
-			if (services.audioService.playing) {
-				services.audioService.stop();
-			}
-			playbackSeekScheduler.schedule();
-		}
-	});
-
-	export function markPatternChangeFromUser(
-		selectedIndex?: number,
-		immediate = true
-	): void {
-		const index = selectedIndex ?? currentPatternOrderIndex;
-		discardPendingPlaybackPosition(index);
-		lastPatternOrderIndexFromPlayback = index;
-		if (!isPlaybackMaster || !playbackStore.isPlaying) return;
-		if (immediate) {
-			playbackSeekScheduler.flush();
-			return;
-		}
-		if (services.audioService.playing) {
-			services.audioService.stop();
-		}
-		playbackSeekScheduler.schedule();
 	}
 
 	$effect(() => {
@@ -3282,7 +3331,6 @@
 		) => {
 			if (!services.audioService.playing) return;
 			if (!isPlaybackMaster) return;
-			if (!orderIndexGate.allows(currentPatternOrderIndexUpdate)) return;
 
 			pendingPlaybackPosition = {
 				row: currentRow,
@@ -3294,7 +3342,11 @@
 				playbackRafId = requestAnimationFrame(() => {
 					playbackRafId = null;
 					const pending = pendingPlaybackPosition;
-					if (!pending) return;
+					pendingPlaybackPosition = null;
+					if (!pending || !services.audioService.playing) return;
+					if (pending.timestamp < playbackStartTime) {
+						return;
+					}
 
 					if (settingsStore.debugMode) {
 						const orderIdx =
@@ -3311,7 +3363,14 @@
 						}
 					}
 
-					applyPendingPlaybackPosition();
+					selectedRow = pending.row;
+					if (
+						pending.orderIndex !== undefined &&
+						services.audioService.getPlayPatternId() === null
+					) {
+						currentPatternOrderIndex = pending.orderIndex;
+						lastPatternOrderIndexFromPlayback = pending.orderIndex;
+					}
 				});
 			}
 		};

@@ -6,9 +6,6 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this.previewActiveChannels = new Set();
 		this.previewTickSampleCounter = 0;
 		this._rowParsePrimed = -1;
-		this._catchUpJob = null;
-		this._catchUpSegIdx = 0;
-		this._catchUpRowIdx = 0;
 	}
 
 	_playbackWorkersReady() {
@@ -39,7 +36,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			this.state.setPattern(segment.pattern, segment.patternOrderIndex);
 			const numRows = segment.numRows ?? 0;
 			for (let row = 0; row < numRows; row++) {
-				this._simulateRow(this.state.currentPattern, row, false);
+				this._simulateRow(this.state.currentPattern, row);
 			}
 		}
 	}
@@ -54,7 +51,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			return;
 		}
 		for (let row = 0; row < upToRow; row++) {
-			this._simulateRow(this.state.currentPattern, row, false);
+			this._simulateRow(this.state.currentPattern, row);
 		}
 	}
 
@@ -77,86 +74,11 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this.patternProcessor.processSpeedTable();
 		this._rowParsePrimed = rowIndex;
 		this.enforceMuteState();
-		this._processTrackerTick();
-		if (this.chipIndex === 0) {
-			this.state.timeline.tickAccumulator = 0;
-		}
 		this._applyRegisterStateToEngine();
 	}
 
 	_afterTransportStop() {
-		this._catchUpJob = null;
-		this._catchUpSegIdx = 0;
-		this._catchUpRowIdx = 0;
 		this.handleStopPreview();
-	}
-
-	_queueCatchUpPlayback(job) {
-		this._catchUpJob = job;
-		this._catchUpSegIdx = 0;
-		this._catchUpRowIdx = 0;
-		if (!job.catchUpSegments?.length) {
-			this._commitCatchUpPlayback();
-		}
-		return true;
-	}
-
-	hasPendingCatchUp() {
-		const job = this._catchUpJob;
-		return job != null && this._catchUpSegIdx < job.catchUpSegments.length;
-	}
-
-	advanceCatchUp(maxRows) {
-		if (!this.hasPendingCatchUp() || !this._chipEngineReady()) {
-			if (this._catchUpJob && !this.hasPendingCatchUp()) {
-				this._commitCatchUpPlayback();
-			}
-			return;
-		}
-		const segments = this._catchUpJob.catchUpSegments;
-		let done = 0;
-		while (done < maxRows && this._catchUpSegIdx < segments.length) {
-			const segment = segments[this._catchUpSegIdx];
-			const numRows = segment.numRows ?? 0;
-			if (this._catchUpRowIdx === 0) {
-				if (segment.pattern?.channels?.length) {
-					this._resizeForPatternChannels(segment.pattern.channels.length);
-				}
-				this.state.setPattern(segment.pattern, segment.patternOrderIndex);
-			}
-			if (this._catchUpRowIdx >= numRows) {
-				this._catchUpSegIdx++;
-				this._catchUpRowIdx = 0;
-				continue;
-			}
-			this._simulateRow(this.state.currentPattern, this._catchUpRowIdx, false);
-			this._catchUpRowIdx++;
-			done++;
-			if (this._catchUpRowIdx >= numRows) {
-				this._catchUpSegIdx++;
-				this._catchUpRowIdx = 0;
-			}
-		}
-		if (!this.hasPendingCatchUp()) {
-			this._commitCatchUpPlayback();
-		}
-	}
-
-	_commitCatchUpPlayback() {
-		const job = this._catchUpJob;
-		this._catchUpJob = null;
-		this._catchUpSegIdx = 0;
-		this._catchUpRowIdx = 0;
-		if (!job) return;
-		const state = this.state;
-		if (job.startPattern?.channels?.length) {
-			this._resizeForPatternChannels(job.startPattern.channels.length);
-		}
-		state.setPattern(job.startPattern, job.startPatternOrderIndex);
-		state.timeline.currentPatternOrderIndex = job.startPatternOrderIndex;
-		state.timeline.currentRow = job.startRow;
-		this.timelinePattern.postPositionUpdate();
-		this._afterPlaybackPositionSet(job.startRow);
 	}
 
 	_preparePatternWorkersForPlay() {

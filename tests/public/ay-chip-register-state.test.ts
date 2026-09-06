@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import AYChipRegisterState, {
-	channelMeterLevelFromRegister
-} from '../../public/ay/ay-chip-register-state.js';
+import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 
 describe('AYChipRegisterState', () => {
 	describe('constructor', () => {
@@ -88,38 +86,6 @@ describe('AYChipRegisterState', () => {
 			const copy = state.copy();
 			copy.channels[0].tone = 999;
 			expect(state.channels[0].tone).toBe(100);
-		});
-	});
-
-	describe('channelMeterLevelFromRegister', () => {
-		it('is silent when mixer output is off', () => {
-			expect(
-				channelMeterLevelFromRegister({
-					volume: 15,
-					mixer: { tone: false, noise: false, envelope: false }
-				})
-			).toBe(0);
-		});
-
-		it('uses the volume nibble and ignores the envelope enable bit', () => {
-			expect(
-				channelMeterLevelFromRegister({
-					volume: 0x10,
-					mixer: { tone: false, noise: false, envelope: true }
-				})
-			).toBe(0);
-			expect(
-				channelMeterLevelFromRegister({
-					volume: 0x1f,
-					mixer: { tone: false, noise: false, envelope: true }
-				})
-			).toBe(1);
-			expect(
-				channelMeterLevelFromRegister({
-					volume: 8,
-					mixer: { tone: true, noise: false, envelope: false }
-				})
-			).toBeCloseTo(8 / 15);
 		});
 	});
 });

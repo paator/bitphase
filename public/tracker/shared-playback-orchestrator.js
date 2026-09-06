@@ -6,18 +6,6 @@
  * @property {(needsChange: boolean) => void} [onPatternOrderAdvanced]
  */
 
-export const CATCH_UP_ROWS_PER_BLOCK = 24;
-
-export function capIdleTickAccumulator(tickAccumulator, hasPlaySlots) {
-	if (hasPlaySlots) return tickAccumulator;
-	return tickAccumulator > 1.0 ? 1.0 : tickAccumulator;
-}
-
-export function sharedPlaybackShouldHoldClock(transportCount, readyCount) {
-	if (transportCount <= 0) return false;
-	return readyCount < transportCount;
-}
-
 /**
  * @param {SharedPlaybackSlot[]} playSlots
  */

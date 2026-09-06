@@ -7,14 +7,6 @@ import {
 const AY_REGISTER_COUNT = 14;
 const AY_TONE_CHANNELS = 3;
 
-export function channelMeterLevelFromRegister(channel) {
-	if (!channel) return 0;
-	const mixer = channel.mixer;
-	const hasOutput = mixer && (mixer.tone || mixer.noise || mixer.envelope);
-	if (!hasOutput) return 0;
-	return (channel.volume & 0x0f) / 15;
-}
-
 class AYChipRegisterState {
 	constructor(channelCount = 3) {
 		this.channelCount = channelCount;

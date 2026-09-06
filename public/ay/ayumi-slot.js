@@ -19,7 +19,6 @@ import AYAudioDriver from './ay-audio-driver.js';
 import AyumiEngine from './ayumi-engine.js';
 import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
 import { Ay8910WorkletSlot } from './ay8910-worklet-slot.js';
-import { channelMeterLevelFromRegister } from './ay-chip-register-state.js';
 
 export class AyumiSlot extends Ay8910WorkletSlot {
 	constructor(port, chipIndex, sharedTimeline) {
@@ -176,7 +175,7 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 	}
 
 	_prepareOutputForPlay() {
-		this.fadeInSamples = 0;
+		this.fadeInSamples = Math.floor(sampleRate * this.fadeInDuration);
 		resetChipPlaybackOutput({
 			registerState: this.registerState,
 			audioDriver: this.audioDriver,
@@ -400,16 +399,17 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 			if (!this._isLogicalChannelAudible(i)) continue;
 			if (audibleIndices && !audibleIndices.has(i)) continue;
 
-			levels[i] = channelMeterLevelFromRegister(this.registerState.channels[i]);
+			const volume = this.registerState.channels[i]?.volume ?? 0;
+			if ((volume & 0x10) !== 0) {
+				levels[i] = 1;
+			} else {
+				levels[i] = (volume & 0x0f) / 15;
+			}
 		}
 		return levels;
 	}
 
 	finishAudioBlock(numSamples) {
-		if (this.hasPendingCatchUp() || this.hasAudioStartHold()) {
-			this.finishAudioBlockFlushTransport(numSamples, this.paused);
-			return;
-		}
 		if (this.paused && !this.isPreviewActive()) {
 			this.finishAudioBlockFlushTransport(numSamples, this.paused);
 			return;

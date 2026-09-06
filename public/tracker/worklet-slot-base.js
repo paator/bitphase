@@ -185,17 +185,6 @@ export class WorkletSlotBase {
 			this._publishLeaderPlaybackSpeed(speed);
 		}
 
-		if (
-			this._queueCatchUpPlayback({
-				catchUpSegments,
-				startPattern,
-				startPatternOrderIndex,
-				startRow
-			})
-		) {
-			return;
-		}
-
 		this._replayCatchUpSegments(catchUpSegments);
 
 		const state = this._slotState();
@@ -243,39 +232,13 @@ export class WorkletSlotBase {
 
 	_afterPlaybackPositionSet(_rowIndex) {}
 
-	_queueCatchUpPlayback(_job) {
-		return false;
-	}
-
-	hasPendingCatchUp() {
-		return false;
-	}
-
-	advanceCatchUp(_maxRows) {}
-
-	isPlayingTransport() {
-		return !this.paused;
-	}
-
-	hasAudioStartHold() {
-		return false;
-	}
-
-	consumeAudioStartHold() {}
-
 	shouldAccumulateStereoOutput() {
-		return !this.paused && !this.hasPendingCatchUp() && !this.hasAudioStartHold();
+		return !this.paused;
 	}
 
 	shouldRunPlaybackAccumulation() {
 		const state = this._slotState();
-		return (
-			this.isPlayingTransport() &&
-			!this.hasPendingCatchUp() &&
-			!this.hasAudioStartHold() &&
-			state.currentPattern &&
-			state.currentPattern.length > 0
-		);
+		return !this.paused && state.currentPattern && state.currentPattern.length > 0;
 	}
 
 	finishAudioBlockFlushTransport(numSamples, paused) {

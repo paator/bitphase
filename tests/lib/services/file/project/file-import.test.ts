@@ -4,7 +4,7 @@ import { normalizeAyInstrumentFields, sampleTimerRowFromInstrument } from '@/lib
 import { decodeTimerWaveform } from '@/lib/chips/ay/ay-timer-macros';
 import { Instrument } from '@/lib/models/song';
 
-describe('FileImportService', { timeout: 20_000 }, () => {
+describe('FileImportService', () => {
 	it('preserves projects with zero songs', async () => {
 		const json = JSON.stringify({
 			name: 'empty',
@@ -21,7 +21,7 @@ describe('FileImportService', { timeout: 20_000 }, () => {
 		expect(project.name).toBe('empty');
 		expect(project.instruments).toHaveLength(1);
 		expect(project.tables).toHaveLength(1);
-	}, 20_000);
+	});
 
 	it('preserves fm and env-fm timer waveforms when reconstructing instruments', async () => {
 		const json = JSON.stringify({
@@ -83,7 +83,7 @@ describe('FileImportService', { timeout: 20_000 }, () => {
 		expect(row.envFm).toBe(true);
 		expect(row.fmWaveformLoop).toBe(1);
 		expect(row.envFmWaveformLoop).toBe(2);
-	}, 20_000);
+	});
 
 	it('preserves fm period offset mode when reconstructing instruments', async () => {
 		const json = JSON.stringify({

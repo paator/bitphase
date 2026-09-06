@@ -67,18 +67,18 @@ async function assertTAYMMatchesReference(btpFilename: string, taymFilename: str
 	).toBe(true);
 }
 
-describe('PSG playback regression', { timeout: 30_000 }, () => {
+describe('PSG playback regression', () => {
 	it('kizuna: dynamically generated PSG matches reference dump', async () => {
 		await assertPSGMatchesReference('kizuna.btp', 'kizuna.psg');
-	}, 30_000);
+	});
 
 	it('frozen_over: dynamically generated PSG matches reference dump', async () => {
 		await assertPSGMatchesReference('frozen_over.btp', 'frozen_over.psg');
-	}, 30_000);
+	});
 
 	it('man: dynamically generated PSG matches reference dump', async () => {
 		await assertPSGMatchesReference('man.btp', 'man.psg');
-	}, 30_000);
+	});
 });
 
 describe('TAYM playback regression', () => {
