@@ -18,6 +18,21 @@ import {
 } from './empty-note-alignment';
 
 export const CHANNEL_LEVEL_STRIP_HEIGHT = 6;
+
+export function getChannelLevelStripDeviceRect(
+	lineHeight: number,
+	cssWidth: number,
+	scale: number
+): { x: number; y: number; width: number; height: number } {
+	const safeScale = scale > 0 ? scale : 1;
+	return {
+		x: 0,
+		y: Math.round(lineHeight * safeScale),
+		width: Math.max(0, Math.round(cssWidth * safeScale)),
+		height: Math.max(0, Math.round(CHANNEL_LEVEL_STRIP_HEIGHT * safeScale))
+	};
+}
+
 const EFFECT_COLUMN_CONTROL_MIN_WIDTH = 10;
 const EFFECT_COLUMN_CONTROL_MAX_WIDTH = 14;
 
@@ -161,6 +176,19 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.restore();
 	}
 
+	private getChannelLevelStripDeviceRect(): {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	} {
+		return getChannelLevelStripDeviceRect(
+			this.lineHeight,
+			this.canvasWidth,
+			this.ctx.getTransform().a
+		);
+	}
+
 	drawChannelLevelStripOnly(data: ChannelLabelData): void {
 		if (data.channelLevels === undefined) return;
 
@@ -168,7 +196,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		const separatorMargin = 4;
 
 		if (this.stripBackground) {
-			this.ctx.putImageData(this.stripBackground, 0, this.lineHeight);
+			const rect = this.getChannelLevelStripDeviceRect();
+			this.ctx.putImageData(this.stripBackground, rect.x, rect.y);
 		}
 		this.drawChannelLevelStrip(data, channelPositions, separatorMargin);
 	}
@@ -178,12 +207,12 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			this.stripBackground = null;
 			return;
 		}
-		this.stripBackground = this.ctx.getImageData(
-			0,
-			this.lineHeight,
-			this.canvasWidth,
-			CHANNEL_LEVEL_STRIP_HEIGHT
-		);
+		const rect = this.getChannelLevelStripDeviceRect();
+		if (rect.width <= 0 || rect.height <= 0) {
+			this.stripBackground = null;
+			return;
+		}
+		this.stripBackground = this.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
 	}
 
 	private drawVirtualChannelGroupLabels(
