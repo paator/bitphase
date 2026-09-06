@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	isPlausiblePlaybackOrderAdvance,
-	PlaybackOrderIndexGate
-} from '../../../../src/lib/services/audio/playback-order-index-gate';
+import { PlaybackOrderIndexGate } from '../../../../src/lib/services/audio/playback-order-index-gate';
 
 describe('PlaybackOrderIndexGate', () => {
 	it('allows every update until an order index is pinned', () => {
@@ -63,23 +60,5 @@ describe('PlaybackOrderIndexGate', () => {
 
 		expect(gate.isPinned()).toBe(false);
 		expect(gate.allows(0)).toBe(true);
-	});
-});
-
-describe('isPlausiblePlaybackOrderAdvance', () => {
-	it('accepts the current slot and the next slot', () => {
-		expect(isPlausiblePlaybackOrderAdvance(4, 4, 8, 0)).toBe(true);
-		expect(isPlausiblePlaybackOrderAdvance(4, 5, 8, 0)).toBe(true);
-	});
-
-	it('rejects a jump back to a leftover playhead', () => {
-		expect(isPlausiblePlaybackOrderAdvance(4, 2, 8, 0)).toBe(false);
-		expect(isPlausiblePlaybackOrderAdvance(7, 3, 8, 0)).toBe(false);
-	});
-
-	it('accepts wrap to the loop point from the last slot', () => {
-		expect(isPlausiblePlaybackOrderAdvance(7, 2, 8, 2)).toBe(true);
-		expect(isPlausiblePlaybackOrderAdvance(7, 0, 8, 0)).toBe(true);
-		expect(isPlausiblePlaybackOrderAdvance(6, 2, 8, 2)).toBe(false);
 	});
 });
