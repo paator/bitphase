@@ -176,7 +176,7 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 	}
 
 	_prepareOutputForPlay() {
-		this.fadeInSamples = Math.floor(sampleRate * this.fadeInDuration);
+		this.fadeInSamples = 0;
 		resetChipPlaybackOutput({
 			registerState: this.registerState,
 			audioDriver: this.audioDriver,
@@ -406,6 +406,10 @@ export class AyumiSlot extends Ay8910WorkletSlot {
 	}
 
 	finishAudioBlock(numSamples) {
+		if (this.hasPendingCatchUp() || this.hasAudioStartHold()) {
+			this.finishAudioBlockFlushTransport(numSamples, this.paused);
+			return;
+		}
 		if (this.paused && !this.isPreviewActive()) {
 			this.finishAudioBlockFlushTransport(numSamples, this.paused);
 			return;

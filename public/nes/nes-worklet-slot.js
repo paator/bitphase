@@ -477,6 +477,10 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	}
 
 	finishAudioBlock(numSamples) {
+		if (this.hasPendingCatchUp() || this.hasAudioStartHold()) {
+			this.finishAudioBlockFlushTransport(numSamples, this.paused);
+			return;
+		}
 		if (this.paused && !this.isPreviewActive()) {
 			this.finishAudioBlockFlushTransport(numSamples, this.paused);
 			return;

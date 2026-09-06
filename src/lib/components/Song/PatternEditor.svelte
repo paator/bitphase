@@ -907,59 +907,10 @@
 								createEmptyPatternForSong(patternId, chipIndex)
 							);
 						},
-						getCatchUpSegmentsForChip: (chipIndex: number) => {
-							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							const schema = chipProcessors[chipIndex]?.chip?.schema;
-							const getPattern = (id: number) =>
-								songPatterns.find((p) => p.id === id);
-							const orderIndexForBacktrack =
-								services.audioService.getPlayPatternId() !== null
-									? Math.max(0, patternOrder.indexOf(currentPattern.id))
-									: 0;
-							const horizon =
-								schema && songPatterns.length > 0
-									? computeStateHorizon(
-											patternOrder,
-											getPattern,
-											orderIndexForBacktrack,
-											0,
-											schema
-										)
-									: null;
-							return horizon
-								? buildCatchUpSegmentsToHorizon(
-										patternOrder,
-										getPattern,
-										horizon.orderIndex,
-										horizon.row
-									)
-								: [];
-						}
+						getCatchUpSegmentsForChip: (_chipIndex: number) => []
 					};
 				}
-				const getPattern = (id: number) => findOrCreatePattern(id);
-				const orderIndexForBacktrack =
-					services.audioService.getPlayPatternId() !== null
-						? Math.max(0, patternOrder.indexOf(currentPattern.id))
-						: 0;
-				const horizon = chip.schema
-					? computeStateHorizon(
-							patternOrder,
-							getPattern,
-							orderIndexForBacktrack,
-							0,
-							chip.schema
-						)
-					: null;
-				const catchUpSegments = horizon
-					? buildCatchUpSegmentsToHorizon(
-							patternOrder,
-							getPattern,
-							horizon.orderIndex,
-							horizon.row
-						)
-					: [];
-				return { catchUpSegments, startPattern: currentPattern };
+				return { catchUpSegments: [], startPattern: currentPattern };
 			};
 
 			services.audioService.playFromRow(0, 0, getSpeedForPlayPattern ?? getSpeedForChip, {
@@ -1004,52 +955,11 @@
 									createEmptyPatternForSong(patternId, chipIndex)
 								);
 							},
-							getCatchUpSegmentsForChip: (chipIndex: number) => {
-								const songPatterns = projectStore.patterns[chipIndex] ?? [];
-								const schema = chipProcessors[chipIndex]?.chip?.schema;
-								const getPattern = (id: number) =>
-									songPatterns.find((p) => p.id === id);
-								const horizon =
-									schema && songPatterns.length > 0
-										? computeStateHorizon(
-												patternOrder,
-												getPattern,
-												currentPatternOrderIndex,
-												startRow,
-												schema
-											)
-										: null;
-								return horizon
-									? buildCatchUpSegmentsToHorizon(
-											patternOrder,
-											getPattern,
-											horizon.orderIndex,
-											horizon.row
-										)
-									: [];
-							}
+							getCatchUpSegmentsForChip: (_chipIndex: number) => []
 						};
 					}
-					const getPattern = (id: number) => findOrCreatePattern(id);
-					const horizon = chip.schema
-						? computeStateHorizon(
-								patternOrder,
-								getPattern,
-								currentPatternOrderIndex,
-								startRow,
-								chip.schema
-							)
-						: null;
-					const catchUpSegments = horizon
-						? buildCatchUpSegmentsToHorizon(
-								patternOrder,
-								getPattern,
-								horizon.orderIndex,
-								horizon.row
-							)
-						: [];
 					return {
-						catchUpSegments,
+						catchUpSegments: [],
 						startPattern: currentPattern
 					};
 				};
