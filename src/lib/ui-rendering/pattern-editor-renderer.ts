@@ -84,7 +84,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	private emptyNoteBaselineOffset: number | null = null;
 	private channelPositionsCacheKey = '';
 	private channelPositionsCache: number[] = [];
-	private stripBackground: ImageData | null = null;
 	private effectColumnCounts: number[] = [];
 	private effectColumnControlsEnabled = true;
 
@@ -176,43 +175,18 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.restore();
 	}
 
-	private getChannelLevelStripDeviceRect(): {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	} {
-		return getChannelLevelStripDeviceRect(
-			this.lineHeight,
-			this.canvasWidth,
-			this.ctx.getTransform().a
-		);
-	}
-
-	drawChannelLevelStripOnly(data: ChannelLabelData): void {
-		if (data.channelLevels === undefined) return;
-
-		const channelPositions = this.calculateChannelPositions(data.rowString);
-		const separatorMargin = 4;
-
-		if (this.stripBackground) {
-			const rect = this.getChannelLevelStripDeviceRect();
-			this.ctx.putImageData(this.stripBackground, rect.x, rect.y);
+	drawChannelLevelStripOnOverlay(
+		overlayCtx: CanvasRenderingContext2D,
+		data: ChannelLabelData
+	): void {
+		const saved = this.ctx;
+		this.ctx = overlayCtx;
+		overlayCtx.clearRect(0, 0, this.canvasWidth, CHANNEL_LEVEL_STRIP_HEIGHT);
+		if (data.channelLevels !== undefined) {
+			const channelPositions = this.calculateChannelPositions(data.rowString);
+			this.drawChannelLevelStrip(data, channelPositions, 4, 0);
 		}
-		this.drawChannelLevelStrip(data, channelPositions, separatorMargin);
-	}
-
-	captureStripBackground(): void {
-		if (this.canvasWidth <= 0 || this.lineHeight <= 0) {
-			this.stripBackground = null;
-			return;
-		}
-		const rect = this.getChannelLevelStripDeviceRect();
-		if (rect.width <= 0 || rect.height <= 0) {
-			this.stripBackground = null;
-			return;
-		}
-		this.stripBackground = this.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
+		this.ctx = saved;
 	}
 
 	private drawVirtualChannelGroupLabels(
@@ -532,13 +506,14 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	private drawChannelLevelStrip(
 		data: ChannelLabelData,
 		channelPositions: number[],
-		separatorMargin: number
+		separatorMargin: number,
+		stripTopY: number = this.lineHeight
 	): void {
 		const levels = data.channelLevels;
 		if (!levels) return;
 
 		const barHeight = Math.max(2, Math.round(CHANNEL_LEVEL_STRIP_HEIGHT * 0.5));
-		const barY = this.lineHeight + Math.floor((CHANNEL_LEVEL_STRIP_HEIGHT - barHeight) / 2);
+		const barY = stripTopY + Math.floor((CHANNEL_LEVEL_STRIP_HEIGHT - barHeight) / 2);
 
 		for (let i = 0; i < channelPositions.length; i++) {
 			const channelStart = channelPositions[i];

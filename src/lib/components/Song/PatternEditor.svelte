@@ -27,7 +27,10 @@
 	import { PreviewService } from '../../services/audio/preview-service';
 	import { PlaybackOrderIndexGate } from '../../services/audio/playback-order-index-gate';
 	import { PlaybackSeekScheduler } from '../../services/audio/playback-seek-scheduler';
-	import { PatternEditorRenderer } from '../../ui-rendering/pattern-editor-renderer';
+	import {
+		CHANNEL_LEVEL_STRIP_HEIGHT,
+		PatternEditorRenderer
+	} from '../../ui-rendering/pattern-editor-renderer';
 	import { PatternEditorTextParser } from '../../ui-rendering/pattern-editor-text-parser';
 	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
 	import { Cache } from '../../utils/memoize';
@@ -285,7 +288,10 @@
 
 	let canvas: HTMLCanvasElement;
 	let ctx: CanvasRenderingContext2D;
+	let levelStripCanvas: HTMLCanvasElement | undefined;
+	let levelStripCtx: CanvasRenderingContext2D | null = null;
 	let containerDiv: HTMLDivElement;
+	let pendingDrawRaf: number | null = null;
 
 	let COLORS = $state(getColors());
 	let FONTS = $derived.by(() => {
@@ -973,7 +979,8 @@
 	function setupCanvas(): boolean {
 		if (!canvas) return false;
 
-		ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+		ctx = canvas.getContext('2d')!;
+		setupLevelStripCanvas();
 
 		try {
 			const effectiveFontFamily =
@@ -1265,7 +1272,6 @@
 			renderer.drawChannelSeparators(header.rowString, canvasHeight, header.vcGroups);
 		}
 
-		renderer.captureStripBackground();
 	}
 
 	function drawHeaderOverlay(): void {
@@ -1286,23 +1292,21 @@
 			channelLabels: header.channelLabels,
 			channelMuted: header.channelMuted,
 			virtualChannelGroups: header.vcGroups,
-			channelLevels:
-				settingsStore.showChannelVolumeBars && channelLevels.length > 0
-					? channelLevels
-					: undefined,
 			effectColumnControlsEnabled: !playbackStore.isPlaying
 		});
+		drawChannelLevelStripOverlay();
 	}
 
 	function drawChannelLevelStripOverlay(): void {
-		if (!ctx || !renderer || !textParser) return;
+		if (!levelStripCtx || !renderer) return;
 		if (document.hidden) return;
-		if (!settingsStore.showChannelVolumeBars || channelLevels.length === 0) return;
-
 		const header = levelStripHeader;
-		if (!header) return;
+		if (!header || !settingsStore.showChannelVolumeBars || channelLevels.length === 0) {
+			levelStripCtx.clearRect(0, 0, canvasWidth, CHANNEL_LEVEL_STRIP_HEIGHT);
+			return;
+		}
 
-		renderer.drawChannelLevelStripOnly({
+		renderer.drawChannelLevelStripOnOverlay(levelStripCtx, {
 			rowString: header.rowString,
 			channelLabels: header.channelLabels,
 			channelMuted: header.channelMuted,
@@ -1311,9 +1315,31 @@
 		});
 	}
 
+	function setupLevelStripCanvas(): void {
+		if (!levelStripCanvas) return;
+		levelStripCtx = levelStripCanvas.getContext('2d');
+		if (!levelStripCtx) return;
+		setupCanvasUtil({
+			canvas: levelStripCanvas,
+			ctx: levelStripCtx,
+			width: canvasWidth,
+			height: CHANNEL_LEVEL_STRIP_HEIGHT,
+			fontSize,
+			fonts: FONTS
+		});
+	}
+
 	function draw() {
 		drawPatternGrid();
 		drawHeaderOverlay();
+	}
+
+	function scheduleDraw(): void {
+		if (pendingDrawRaf !== null) return;
+		pendingDrawRaf = requestAnimationFrame(() => {
+			pendingDrawRaf = null;
+			if (!document.hidden) draw();
+		});
 	}
 
 	$effect(() => {
@@ -1336,7 +1362,7 @@
 		if (!showBars) {
 			if (channelLevels.length > 0) {
 				channelLevels = [];
-				draw();
+				drawChannelLevelStripOverlay();
 			}
 			return;
 		}
@@ -1353,7 +1379,7 @@
 			if (!playing && !active) {
 				if (channelLevels.length > 0) {
 					channelLevels = [];
-					draw();
+					drawChannelLevelStripOverlay();
 				}
 				return;
 			}
@@ -2943,6 +2969,7 @@
 	}
 
 	let lastDrawnRow = -1;
+	let lastDrawnPatternId = -1;
 	let lastDrawnOrderIndex = -1;
 	let lastPatternOrderLength = -1;
 	let lastPatternsLength = -1;
@@ -2988,11 +3015,12 @@
 		}
 
 		if (needsSetup || !ctx || chipTypeChanged) {
-			ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+			ctx = canvas.getContext('2d')!;
 			const ready = setupCanvas();
 			needsSetup = false;
 			if (ready && !document.hidden) draw();
 			lastDrawnRow = selectedRow;
+			lastDrawnPatternId = currentPattern?.id ?? -1;
 			lastDrawnOrderIndex = currentPatternOrderIndex;
 			lastPatternOrderLength = patternOrder.length;
 			lastPatternsLength = patterns.length;
@@ -3036,7 +3064,7 @@
 			return;
 		}
 
-		const patternChanged = currentPattern !== null;
+		const patternChanged = (currentPattern?.id ?? -1) !== lastDrawnPatternId;
 		const patternLengthChanged = currentPatternLength !== lastDrawnPatternLength;
 		const channelCountChanged = currentChannelCount !== lastChannelCount;
 		const sizeChanged = canvasWidth !== lastCanvasWidth || canvasHeight !== lastCanvasHeight;
@@ -3066,8 +3094,15 @@
 			sizeChanged ||
 			channelCountChanged
 		) {
-			if (fontReady && !document.hidden) draw();
+			if (fontReady && !document.hidden) {
+				if (rowChanged && !orderChanged && !patternChanged && !sizeChanged) {
+					scheduleDraw();
+				} else {
+					draw();
+				}
+			}
 			lastDrawnRow = selectedRow;
+			lastDrawnPatternId = currentPattern?.id ?? -1;
 			lastDrawnOrderIndex = currentPatternOrderIndex;
 			lastPatternOrderLength = patternOrder.length;
 			lastPatternsLength = patterns.length;
@@ -3155,7 +3190,13 @@
 	}
 
 	$effect(() => {
-		return () => playbackSeekScheduler.cancel();
+		return () => {
+			playbackSeekScheduler.cancel();
+			if (pendingDrawRaf !== null) {
+				cancelAnimationFrame(pendingDrawRaf);
+				pendingDrawRaf = null;
+			}
+		};
 	});
 
 	$effect(() => {
@@ -3282,6 +3323,11 @@
 			onmouseup={handleCanvasMouseUp}
 			oncontextmenu={handleContextMenu}
 			class="focus:border-opacity-50 border-pattern-empty focus:border-pattern-text block border transition-colors duration-150 focus:outline-none">
+		</canvas>
+		<canvas
+			bind:this={levelStripCanvas}
+			class="pointer-events-none absolute left-px z-[1]"
+			style="top: calc({lineHeight}px + 1px); width: {canvasWidth}px; height: {CHANNEL_LEVEL_STRIP_HEIGHT}px;">
 		</canvas>
 
 		<ContextMenu
