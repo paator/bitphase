@@ -25,10 +25,7 @@
 	} from '../../services/pattern/pattern-visible-rows';
 	import { PatternEditingService } from '../../services/pattern/pattern-editing';
 	import { PreviewService } from '../../services/audio/preview-service';
-	import {
-		isPlausiblePlaybackOrderAdvance,
-		PlaybackOrderIndexGate
-	} from '../../services/audio/playback-order-index-gate';
+	import { PlaybackOrderIndexGate } from '../../services/audio/playback-order-index-gate';
 	import { PlaybackSeekScheduler } from '../../services/audio/playback-seek-scheduler';
 	import { PatternEditorRenderer } from '../../ui-rendering/pattern-editor-renderer';
 	import { PatternEditorTextParser } from '../../ui-rendering/pattern-editor-text-parser';
@@ -3243,16 +3240,19 @@
 
 		const handleVisibilityChange = () => {
 			if (!document.hidden) {
+				syncPlaybackFollowFromWorklet();
 				updateSize();
 				if (setupCanvas()) draw();
 			}
 		};
 
 		window.addEventListener('resize', handleResize);
+		window.addEventListener('focus', handleVisibilityChange);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		return () => {
 			window.removeEventListener('resize', handleResize);
+			window.removeEventListener('focus', handleVisibilityChange);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	});
@@ -3289,6 +3289,33 @@
 	let playbackRafId: number | null = null;
 	let playbackStartTime = 0;
 	let lastPatternOrderIndexFromPlayback = currentPatternOrderIndex;
+
+	function applyPendingPlaybackPosition(): boolean {
+		if (playbackRafId !== null) {
+			cancelAnimationFrame(playbackRafId);
+			playbackRafId = null;
+		}
+		const pending = pendingPlaybackPosition;
+		pendingPlaybackPosition = null;
+		if (!pending || !services.audioService.playing) return false;
+		if (pending.timestamp < playbackStartTime) return false;
+		if (!orderIndexGate.consume(pending.orderIndex)) return false;
+
+		selectedRow = pending.row;
+		if (
+			pending.orderIndex !== undefined &&
+			services.audioService.getPlayPatternId() === null
+		) {
+			currentPatternOrderIndex = pending.orderIndex;
+			lastPatternOrderIndexFromPlayback = pending.orderIndex;
+		}
+		return true;
+	}
+
+	function syncPlaybackFollowFromWorklet(): void {
+		if (!playbackStore.isPlaying) return;
+		applyPendingPlaybackPosition();
+	}
 
 	$effect(() => {
 		return () => playbackSeekScheduler.cancel();
@@ -3346,19 +3373,6 @@
 			if (!services.audioService.playing) return;
 			if (!isPlaybackMaster) return;
 			if (!orderIndexGate.allows(currentPatternOrderIndexUpdate)) return;
-			if (
-				services.audioService.getPlayPatternId() === null &&
-				currentPatternOrderIndexUpdate !== undefined &&
-				currentPatternOrderIndexUpdate !== currentPatternOrderIndex &&
-				!isPlausiblePlaybackOrderAdvance(
-					currentPatternOrderIndex,
-					currentPatternOrderIndexUpdate,
-					currentPatternOrder.length,
-					projectStore.loopPointId
-				)
-			) {
-				return;
-			}
 
 			pendingPlaybackPosition = {
 				row: currentRow,
@@ -3370,14 +3384,7 @@
 				playbackRafId = requestAnimationFrame(() => {
 					playbackRafId = null;
 					const pending = pendingPlaybackPosition;
-					pendingPlaybackPosition = null;
-					if (!pending || !services.audioService.playing) return;
-					if (pending.timestamp < playbackStartTime) {
-						return;
-					}
-					if (!orderIndexGate.consume(pending.orderIndex)) {
-						return;
-					}
+					if (!pending) return;
 
 					if (settingsStore.debugMode) {
 						const orderIdx =
@@ -3394,14 +3401,7 @@
 						}
 					}
 
-					selectedRow = pending.row;
-					if (
-						pending.orderIndex !== undefined &&
-						services.audioService.getPlayPatternId() === null
-					) {
-						currentPatternOrderIndex = pending.orderIndex;
-						lastPatternOrderIndexFromPlayback = pending.orderIndex;
-					}
+					applyPendingPlaybackPosition();
 				});
 			}
 		};
