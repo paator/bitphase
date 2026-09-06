@@ -577,8 +577,8 @@
 							await tick();
 							patternEditors.forEach((e) => e?.requestRedraw?.());
 						}}
-						onPatternSelect={(index) =>
-							patternEditors[0]?.markPatternChangeFromUser?.(index)} />
+						onPatternSelect={(index, immediate) =>
+							patternEditors[0]?.markPatternChangeFromUser?.(index, immediate)} />
 				</Card>
 			</div>
 			<div

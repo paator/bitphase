@@ -36,9 +36,50 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			this.state.setPattern(segment.pattern, segment.patternOrderIndex);
 			const numRows = segment.numRows ?? 0;
 			for (let row = 0; row < numRows; row++) {
-				this._simulateRow(this.state.currentPattern, row);
+				this._simulateRow(this.state.currentPattern, row, false);
 			}
 		}
+	}
+
+	_applyPlaybackCarry(carry) {
+		if (!carry) return;
+		if (carry.speed > 0) {
+			this._publishLeaderPlaybackSpeed(carry.speed);
+		}
+		const channelFields = carry.channelFields;
+		const globalFields = carry.globalFields;
+		const hasChannelFields = channelFields?.some(
+			(fields) => fields && Object.keys(fields).length > 0
+		);
+		const hasGlobalFields = Boolean(
+			globalFields && Object.keys(globalFields).length > 0
+		);
+		if (!hasChannelFields && !hasGlobalFields) return;
+		if (!this._chipEngineReady()) return;
+
+		const channelCount = Math.max(channelFields?.length ?? 0, 1);
+		this._resizeForPatternChannels(channelCount);
+		const channels = [];
+		for (let ch = 0; ch < channelCount; ch++) {
+			channels.push({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						effects: [null],
+						...(channelFields?.[ch] ?? {})
+					}
+				]
+			});
+		}
+		this.patternProcessor.parsePatternRow(
+			{
+				length: 1,
+				channels,
+				patternRows: [globalFields ?? {}]
+			},
+			0,
+			this.registerState
+		);
 	}
 
 	_runCatchUpRows(upToRow) {
@@ -51,12 +92,16 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			return;
 		}
 		for (let row = 0; row < upToRow; row++) {
-			this._simulateRow(this.state.currentPattern, row);
+			this._simulateRow(this.state.currentPattern, row, false);
 		}
 	}
 
 	_afterPlaybackPositionSet(rowIndex) {
 		this._primePatternRowForPlayback(rowIndex);
+	}
+
+	_onPatternIdentityChanged() {
+		this._rowParsePrimed = -1;
 	}
 
 	_primePatternRowForPlayback(rowIndex) {

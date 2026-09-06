@@ -90,8 +90,13 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	}
 
 	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount }) {
-		this.virtualChannelMap = virtualChannelMap || {};
-		this.hwChannelCount = hwChannelCount || NES_CHANNEL_COUNT;
+		const nextMap = virtualChannelMap || {};
+		const nextHw = hwChannelCount || NES_CHANNEL_COUNT;
+		const configUnchanged =
+			this.hwChannelCount === nextHw &&
+			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap);
+		this.virtualChannelMap = nextMap;
+		this.hwChannelCount = nextHw;
 		this.virtualChannelMixer.configure(this.virtualChannelMap, this.hwChannelCount);
 
 		const totalChannels = this.virtualChannelMixer.getTotalVirtualChannelCount();
@@ -101,7 +106,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		if (this.audioDriver) {
 			this.audioDriver.resizeChannels(totalChannels);
 		}
-		if (this.apuEngine) {
+		if (this.apuEngine && !configUnchanged) {
 			this._silencePlaybackOutput();
 		}
 	}

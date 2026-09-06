@@ -24,7 +24,7 @@
 		currentPatternOrderIndex: number;
 		selectedRow: number;
 		lineHeight?: number;
-		onPatternSelect?: (index: number) => void;
+		onPatternSelect?: (index: number, immediate?: boolean) => void;
 		onMakeUnique?: (index: number) => void;
 		onPatternOrderEdited?: () => void;
 	}
@@ -532,7 +532,7 @@
 		const newIndex = currentPatternOrderIndex + Math.sign(event.deltaY);
 
 		if (newIndex >= 0 && newIndex < patternOrder.length) {
-			switchPattern(newIndex);
+			switchPattern(newIndex, false);
 		}
 	}
 
@@ -550,7 +550,7 @@
 			finishPatternEdit();
 		}
 
-		switchPattern(newIndex);
+		switchPattern(newIndex, false);
 		startPatternEdit(newIndex);
 	}
 
@@ -699,10 +699,10 @@
 		}
 	}
 
-	function switchPattern(index: number): void {
+	function switchPattern(index: number, immediate = true): void {
 		currentPatternOrderIndex = index;
 		selectedRow = 0;
-		onPatternSelect?.(index);
+		onPatternSelect?.(index, immediate);
 
 		if (lastMouseY !== null && lastMouseX !== null) {
 			updateCursor(lastMouseY, lastMouseX);

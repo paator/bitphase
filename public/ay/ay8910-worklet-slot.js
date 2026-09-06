@@ -71,8 +71,13 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 	}
 
 	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount }) {
-		this.virtualChannelMap = virtualChannelMap || {};
-		this.hwChannelCount = hwChannelCount || 3;
+		const nextMap = virtualChannelMap || {};
+		const nextHw = hwChannelCount || 3;
+		const configUnchanged =
+			this.hwChannelCount === nextHw &&
+			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap);
+		this.virtualChannelMap = nextMap;
+		this.hwChannelCount = nextHw;
 		this.virtualChannelMixer.configure(this.virtualChannelMap, this.hwChannelCount);
 
 		const totalChannels = this.virtualChannelMixer.getTotalVirtualChannelCount();
@@ -81,7 +86,7 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 		if (this.audioDriver) {
 			this.audioDriver.resizeChannels(totalChannels);
 		}
-		if (this.ayumiEngine) {
+		if (this.ayumiEngine && !configUnchanged) {
 			resetChipPlaybackOutput({
 				registerState: this.registerState,
 				audioDriver: this.audioDriver,

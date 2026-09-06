@@ -10,7 +10,7 @@ import type {
 	VirtualChannelSupport
 } from '../base/processor';
 import type { ChipSettings } from '../../services/audio/chip-settings';
-import type { CatchUpSegment } from '../../services/audio/play-from-position';
+import type { PlaybackCarryState } from '../../services/audio/play-from-position';
 import { MixerWorkletBridge } from '../../services/audio/mixer-worklet-bridge';
 
 export function sanitizeInstrumentForWorklet(instrument: Instrument) {
@@ -138,25 +138,13 @@ export class NESProcessor
 		this.bridge.sendCommand({ type: 'play', initialSpeed });
 	}
 
-	playFromRow(row: number, patternOrderIndex?: number, speed?: number | null): void {
-		this.bridge.sendCommand({ type: 'play_from_row', row, patternOrderIndex, speed });
-	}
-
-	playFromPosition(
+	playFromRow(
 		row: number,
-		patternOrderIndex: number,
-		speed: number | null,
-		catchUpSegments: CatchUpSegment[],
-		startPattern: Pattern
+		patternOrderIndex?: number,
+		speed?: number | null,
+		carry?: PlaybackCarryState | null
 	): void {
-		this.bridge.sendCommand({
-			type: 'play_from_position',
-			catchUpSegments,
-			startPattern,
-			startPatternOrderIndex: patternOrderIndex,
-			startRow: row,
-			speed
-		});
+		this.bridge.sendCommand({ type: 'play_from_row', row, patternOrderIndex, speed, carry });
 	}
 
 	stop(): void {

@@ -34,6 +34,8 @@ export class WorkletSlotBase {
 
 	_runCatchUpRows(_upToRow) {}
 
+	_applyPlaybackCarry(_carry) {}
+
 	_applyPlaybackSpeed(_speed) {}
 
 	_publishLeaderPlaybackSpeed(speed) {
@@ -59,8 +61,6 @@ export class WorkletSlotBase {
 			onAppliedCurrentOrder: (hadPendingRow, paused) => {
 				if (hadPendingRow && !paused) {
 					this._runCatchUpRows(this._slotState().timeline.currentRow);
-				}
-				if (!paused) {
 					this._afterPlaybackPositionSet(this._slotState().timeline.currentRow);
 					this.timelinePattern.postPositionUpdate();
 				}
@@ -138,13 +138,17 @@ export class WorkletSlotBase {
 		this._afterPlaybackPositionSet(state.timeline.currentRow);
 	}
 
-	handlePlayFromRow({ row, patternOrderIndex, speed }) {
+	handlePlayFromRow({ row, patternOrderIndex, speed, carry }) {
 		if (!this._isReadyForPlayback()) {
 			console.warn('Play aborted: worklet slot not ready');
 			return;
 		}
 
 		this.startPlaybackCommon();
+		if (speed !== undefined && speed !== null && speed > 0) {
+			this._publishLeaderPlaybackSpeed(speed);
+		}
+		this._applyPlaybackCarry(carry);
 
 		const state = this._slotState();
 		if (patternOrderIndex !== undefined) {
@@ -158,9 +162,6 @@ export class WorkletSlotBase {
 			});
 		}
 		state.timeline.currentRow = row;
-		if (speed !== undefined && speed !== null && speed > 0) {
-			this._publishLeaderPlaybackSpeed(speed);
-		}
 
 		this.timelinePattern.postPositionUpdate();
 		this._runCatchUpRows(state.timeline.currentRow);
@@ -223,7 +224,12 @@ export class WorkletSlotBase {
 
 	onPatternOrderAdvanced(needsPatternChange) {
 		this.timelinePattern.onPatternOrderAdvanced(needsPatternChange);
+		if (needsPatternChange) {
+			this._onPatternIdentityChanged();
+		}
 	}
+
+	_onPatternIdentityChanged() {}
 
 	getLeaderPatternRowCount() {
 		const p = this._slotState().currentPattern;

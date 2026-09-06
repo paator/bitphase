@@ -25,6 +25,11 @@
 	} from '../../services/pattern/pattern-visible-rows';
 	import { PatternEditingService } from '../../services/pattern/pattern-editing';
 	import { PreviewService } from '../../services/audio/preview-service';
+	import {
+		isPlausiblePlaybackOrderAdvance,
+		PlaybackOrderIndexGate
+	} from '../../services/audio/playback-order-index-gate';
+	import { PlaybackSeekScheduler } from '../../services/audio/playback-seek-scheduler';
 	import { PatternEditorRenderer } from '../../ui-rendering/pattern-editor-renderer';
 	import { PatternEditorTextParser } from '../../ui-rendering/pattern-editor-text-parser';
 	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
@@ -89,10 +94,7 @@
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { projectStore } from '../../stores/project.svelte';
 	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
-	import {
-		computeStateHorizon,
-		buildCatchUpSegmentsToHorizon
-	} from '../../services/audio/play-from-position';
+	import { collectPlaybackCarry } from '../../services/audio/play-from-position';
 	import {
 		getVirtualChannelGroups,
 		getHardwareChannelIndex,
@@ -169,6 +171,22 @@
 	const converter = $derived.by(() => getConverter(chip));
 	const schema = $derived(chip.schema);
 	const previewService = new PreviewService();
+	let pendingPlaybackPosition: {
+		row: number;
+		orderIndex?: number;
+		timestamp: number;
+	} | null = null;
+	let playbackRafId: number | null = null;
+	let playbackStartTime = 0;
+	const orderIndexGate = new PlaybackOrderIndexGate();
+	const playbackSeekScheduler = new PlaybackSeekScheduler(() => {
+		if (!playbackStore.isPlaying) return;
+		discardPendingPlaybackPosition(currentPatternOrderIndex);
+		if (services.audioService.playing) {
+			services.audioService.stop();
+		}
+		togglePlayback();
+	});
 	const pressedKeyChannels = new Map<string, number>();
 	let previewInitialized = false;
 
@@ -501,15 +519,22 @@
 		currentPatternOrderIndex = 0;
 	}
 
+	function discardPendingPlaybackPosition(pinnedOrderIndex?: number): void {
+		pendingPlaybackPosition = null;
+		playbackStartTime = performance.now();
+		if (playbackRafId !== null) {
+			cancelAnimationFrame(playbackRafId);
+			playbackRafId = null;
+		}
+		if (pinnedOrderIndex !== undefined) {
+			orderIndexGate.pin(pinnedOrderIndex);
+		}
+	}
+
 	export function setPatternOrderIndex(index: number) {
 		if (index >= 0 && index < patternOrder.length) {
 			currentPatternOrderIndex = index;
-			pendingPlaybackPosition = null;
-			playbackStartTime = performance.now();
-			if (playbackRafId !== null) {
-				cancelAnimationFrame(playbackRafId);
-				playbackRafId = null;
-			}
+			discardPendingPlaybackPosition(index);
 		}
 	}
 
@@ -763,6 +788,37 @@
 		isEnterKeyHeld = false;
 	}
 
+	function buildCarryPlayOptions(orderIndex: number, startRow: number) {
+		const chipProcessors = services.audioService.chipProcessors;
+		if (chipProcessors.length > 1) {
+			return {
+				getCarryForChip: (chipIndex: number) => {
+					const songPatterns = projectStore.patterns[chipIndex] ?? [];
+					const schema = chipProcessors[chipIndex]?.chip?.schema;
+					if (!schema) return null;
+					return collectPlaybackCarry(
+						patternOrder,
+						(id) => songPatterns.find((p) => p.id === id),
+						orderIndex,
+						startRow,
+						schema
+					);
+				}
+			};
+		}
+		return {
+			carry: chip.schema
+				? collectPlaybackCarry(
+						patternOrder,
+						findOrCreatePattern,
+						orderIndex,
+						startRow,
+						chip.schema
+					)
+				: null
+		};
+	}
+
 	export function playFromCursor() {
 		if (!chipProcessor || !chipProcessor.isAudioNodeAvailable()) {
 			console.warn('Audio processor not available or not initialized');
@@ -776,82 +832,13 @@
 			}
 
 			initAllChips?.();
-			pendingPlaybackPosition = null;
-			playbackStartTime = performance.now();
-			if (playbackRafId !== null) {
-				cancelAnimationFrame(playbackRafId);
-				playbackRafId = null;
-			}
-
-			const chipProcessors = services.audioService.chipProcessors;
-			const usePerChip = chipProcessors.length > 1;
-
-			const buildOptions = () => {
-				if (usePerChip) {
-					return {
-						getStartPatternForChip: (chipIndex: number) => {
-							const patternId = patternOrder[currentPatternOrderIndex];
-							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							return (
-								songPatterns.find((p) => p.id === patternId) ??
-								createEmptyPatternForSong(patternId, chipIndex)
-							);
-						},
-						getCatchUpSegmentsForChip: (chipIndex: number) => {
-							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							const schema = chipProcessors[chipIndex]?.chip?.schema;
-							const getPattern = (id: number) =>
-								songPatterns.find((p) => p.id === id);
-							const horizon =
-								schema && songPatterns.length > 0
-									? computeStateHorizon(
-											patternOrder,
-											getPattern,
-											currentPatternOrderIndex,
-											selectedRow,
-											schema
-										)
-									: null;
-							return horizon
-								? buildCatchUpSegmentsToHorizon(
-										patternOrder,
-										getPattern,
-										horizon.orderIndex,
-										horizon.row
-									)
-								: [];
-						}
-					};
-				}
-				const getPattern = (id: number) => findOrCreatePattern(id);
-				const horizon = chip.schema
-					? computeStateHorizon(
-							patternOrder,
-							getPattern,
-							currentPatternOrderIndex,
-							selectedRow,
-							chip.schema
-						)
-					: null;
-				const catchUpSegments = horizon
-					? buildCatchUpSegmentsToHorizon(
-							patternOrder,
-							getPattern,
-							horizon.orderIndex,
-							horizon.row
-						)
-					: [];
-				return {
-					catchUpSegments,
-					startPattern: currentPattern
-				};
-			};
+			discardPendingPlaybackPosition();
 
 			services.audioService.playFromRow(
 				selectedRow,
 				currentPatternOrderIndex,
 				getSpeedForChip,
-				buildOptions()
+				buildCarryPlayOptions(currentPatternOrderIndex, selectedRow)
 			);
 		} catch (error) {
 			console.error('Error during playback from cursor:', error);
@@ -872,84 +859,16 @@
 			}
 
 			initAllChipsForPlayPattern?.();
-			pendingPlaybackPosition = null;
-			playbackStartTime = performance.now();
-			if (playbackRafId !== null) {
-				cancelAnimationFrame(playbackRafId);
-				playbackRafId = null;
-			}
+			discardPendingPlaybackPosition();
+			orderIndexGate.clear();
 
-			const chipProcessors = services.audioService.chipProcessors;
-			const usePerChip = chipProcessors.length > 1;
-
-			const buildOptions = () => {
-				if (usePerChip) {
-					return {
-						getStartPatternForChip: (chipIndex: number) => {
-							const patternId = currentPattern.id;
-							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							return (
-								songPatterns.find((p) => p.id === patternId) ??
-								createEmptyPatternForSong(patternId, chipIndex)
-							);
-						},
-						getCatchUpSegmentsForChip: (chipIndex: number) => {
-							const songPatterns = projectStore.patterns[chipIndex] ?? [];
-							const schema = chipProcessors[chipIndex]?.chip?.schema;
-							const getPattern = (id: number) =>
-								songPatterns.find((p) => p.id === id);
-							const orderIndexForBacktrack =
-								services.audioService.getPlayPatternId() !== null
-									? Math.max(0, patternOrder.indexOf(currentPattern.id))
-									: 0;
-							const horizon =
-								schema && songPatterns.length > 0
-									? computeStateHorizon(
-											patternOrder,
-											getPattern,
-											orderIndexForBacktrack,
-											0,
-											schema
-										)
-									: null;
-							return horizon
-								? buildCatchUpSegmentsToHorizon(
-										patternOrder,
-										getPattern,
-										horizon.orderIndex,
-										horizon.row
-									)
-								: [];
-						}
-					};
-				}
-				const getPattern = (id: number) => findOrCreatePattern(id);
-				const orderIndexForBacktrack =
-					services.audioService.getPlayPatternId() !== null
-						? Math.max(0, patternOrder.indexOf(currentPattern.id))
-						: 0;
-				const horizon = chip.schema
-					? computeStateHorizon(
-							patternOrder,
-							getPattern,
-							orderIndexForBacktrack,
-							0,
-							chip.schema
-						)
-					: null;
-				const catchUpSegments = horizon
-					? buildCatchUpSegmentsToHorizon(
-							patternOrder,
-							getPattern,
-							horizon.orderIndex,
-							horizon.row
-						)
-					: [];
-				return { catchUpSegments, startPattern: currentPattern };
-			};
+			const orderIndexForBacktrack =
+				services.audioService.getPlayPatternId() !== null
+					? Math.max(0, patternOrder.indexOf(currentPattern.id))
+					: 0;
 
 			services.audioService.playFromRow(0, 0, getSpeedForPlayPattern ?? getSpeedForChip, {
-				...buildOptions()
+				...buildCarryPlayOptions(orderIndexForBacktrack, 0)
 			});
 		} catch (error) {
 			console.error('Error during play pattern:', error);
@@ -971,85 +890,16 @@
 				}
 
 				initAllChips?.();
-				pendingPlaybackPosition = null;
-				playbackStartTime = performance.now();
-				if (playbackRafId !== null) {
-					cancelAnimationFrame(playbackRafId);
-					playbackRafId = null;
-				}
+				discardPendingPlaybackPosition();
 
 				const defaultGetSpeed = (index: number) =>
 					projectStore.songs[index]?.initialSpeed ?? 3;
-				const chipProcessors = services.audioService.chipProcessors;
-				const usePerChip = chipProcessors.length > 1;
-				const startRow = 0;
-
-				const buildOptions = () => {
-					if (usePerChip) {
-						return {
-							getStartPatternForChip: (chipIndex: number) => {
-								const patternId = patternOrder[currentPatternOrderIndex];
-								const songPatterns = projectStore.patterns[chipIndex] ?? [];
-								return (
-									songPatterns.find((p) => p.id === patternId) ??
-									createEmptyPatternForSong(patternId, chipIndex)
-								);
-							},
-							getCatchUpSegmentsForChip: (chipIndex: number) => {
-								const songPatterns = projectStore.patterns[chipIndex] ?? [];
-								const schema = chipProcessors[chipIndex]?.chip?.schema;
-								const getPattern = (id: number) =>
-									songPatterns.find((p) => p.id === id);
-								const horizon =
-									schema && songPatterns.length > 0
-										? computeStateHorizon(
-												patternOrder,
-												getPattern,
-												currentPatternOrderIndex,
-												startRow,
-												schema
-											)
-										: null;
-								return horizon
-									? buildCatchUpSegmentsToHorizon(
-											patternOrder,
-											getPattern,
-											horizon.orderIndex,
-											horizon.row
-										)
-									: [];
-							}
-						};
-					}
-					const getPattern = (id: number) => findOrCreatePattern(id);
-					const horizon = chip.schema
-						? computeStateHorizon(
-								patternOrder,
-								getPattern,
-								currentPatternOrderIndex,
-								startRow,
-								chip.schema
-							)
-						: null;
-					const catchUpSegments = horizon
-						? buildCatchUpSegmentsToHorizon(
-								patternOrder,
-								getPattern,
-								horizon.orderIndex,
-								horizon.row
-							)
-						: [];
-					return {
-						catchUpSegments,
-						startPattern: currentPattern
-					};
-				};
 
 				services.audioService.playFromRow(
-					startRow,
+					0,
 					currentPatternOrderIndex,
 					getSpeedForChip ?? defaultGetSpeed,
-					buildOptions()
+					buildCarryPlayOptions(currentPatternOrderIndex, 0)
 				);
 			}
 		} catch (error) {
@@ -1076,7 +926,9 @@
 	}
 
 	function pausePlayback() {
+		playbackSeekScheduler.cancel();
 		services.audioService.stop();
+		orderIndexGate.clear();
 	}
 
 	function getCellPositions(
@@ -1557,12 +1409,7 @@
 		selectedRow = navigationState.selectedRow;
 		if (currentPatternOrderIndex !== navigationState.currentPatternOrderIndex) {
 			currentPatternOrderIndex = navigationState.currentPatternOrderIndex;
-			pendingPlaybackPosition = null;
-			playbackStartTime = performance.now();
-			if (playbackRafId !== null) {
-				cancelAnimationFrame(playbackRafId);
-				playbackRafId = null;
-			}
+			discardPendingPlaybackPosition(navigationState.currentPatternOrderIndex);
 		}
 
 		const updatedPattern = currentPattern || ensurePatternExists();
@@ -1667,12 +1514,7 @@
 			onSetCurrentPatternOrderIndex: (index: number) => {
 				currentPatternOrderIndex = index;
 				selectedRow = 0;
-				pendingPlaybackPosition = null;
-				playbackStartTime = performance.now();
-				if (playbackRafId !== null) {
-					cancelAnimationFrame(playbackRafId);
-					playbackRafId = null;
-				}
+				discardPendingPlaybackPosition(index);
 			},
 			onClearSelection: () => {
 				selectionStartRow = null;
@@ -3280,43 +3122,43 @@
 		};
 	});
 
-	let pendingPlaybackPosition: {
-		row: number;
-		orderIndex?: number;
-		timestamp: number;
-	} | null = null;
-	let playbackRafId: number | null = null;
-	let playbackStartTime = 0;
 	let lastPatternOrderIndexFromPlayback = currentPatternOrderIndex;
 
 	$effect(() => {
-		if (
-			currentPatternOrderIndex !== lastPatternOrderIndexFromPlayback &&
-			services.audioService.playing
-		) {
-			const indexToApply = currentPatternOrderIndex;
-			pendingPlaybackPosition = null;
-			playbackStartTime = performance.now();
-			if (playbackRafId !== null) {
-				cancelAnimationFrame(playbackRafId);
-				playbackRafId = null;
-			}
-			selectedRow = 0;
-			lastPatternOrderIndexFromPlayback = indexToApply;
-			if (isPlaybackMaster) {
-				services.audioService.stop();
-				togglePlayback();
-			}
+		return () => playbackSeekScheduler.cancel();
+	});
+
+	$effect(() => {
+		if (!playbackStore.isPlaying) {
+			lastPatternOrderIndexFromPlayback = currentPatternOrderIndex;
+			playbackSeekScheduler.cancel();
+			return;
+		}
+		if (currentPatternOrderIndex === lastPatternOrderIndexFromPlayback) {
+			return;
+		}
+		const indexToApply = currentPatternOrderIndex;
+		discardPendingPlaybackPosition(indexToApply);
+		selectedRow = 0;
+		lastPatternOrderIndexFromPlayback = indexToApply;
+		if (isPlaybackMaster) {
+			playbackSeekScheduler.schedule();
 		}
 	});
 
-	export function markPatternChangeFromUser(selectedIndex?: number): void {
-		pendingPlaybackPosition = null;
-		playbackStartTime = performance.now();
-		if (playbackRafId !== null) {
-			cancelAnimationFrame(playbackRafId);
-			playbackRafId = null;
+	export function markPatternChangeFromUser(
+		selectedIndex?: number,
+		immediate = true
+	): void {
+		const index = selectedIndex ?? currentPatternOrderIndex;
+		discardPendingPlaybackPosition(index);
+		lastPatternOrderIndexFromPlayback = index;
+		if (!isPlaybackMaster || !playbackStore.isPlaying) return;
+		if (immediate) {
+			playbackSeekScheduler.flush();
+			return;
 		}
+		playbackSeekScheduler.schedule();
 	}
 
 	$effect(() => {
@@ -3331,6 +3173,20 @@
 		) => {
 			if (!services.audioService.playing) return;
 			if (!isPlaybackMaster) return;
+			if (!orderIndexGate.allows(currentPatternOrderIndexUpdate)) return;
+			if (
+				services.audioService.getPlayPatternId() === null &&
+				currentPatternOrderIndexUpdate !== undefined &&
+				currentPatternOrderIndexUpdate !== currentPatternOrderIndex &&
+				!isPlausiblePlaybackOrderAdvance(
+					currentPatternOrderIndex,
+					currentPatternOrderIndexUpdate,
+					currentPatternOrder.length,
+					projectStore.loopPointId
+				)
+			) {
+				return;
+			}
 
 			pendingPlaybackPosition = {
 				row: currentRow,
@@ -3345,6 +3201,9 @@
 					pendingPlaybackPosition = null;
 					if (!pending || !services.audioService.playing) return;
 					if (pending.timestamp < playbackStartTime) {
+						return;
+					}
+					if (!orderIndexGate.consume(pending.orderIndex)) {
 						return;
 					}
 

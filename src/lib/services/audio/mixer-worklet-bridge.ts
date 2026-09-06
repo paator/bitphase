@@ -1,7 +1,7 @@
 import type { Pattern, Instrument } from '../../models/song';
 import type { Table } from '../../models/project';
 import type { Chip } from '../../chips/types';
-import type { CatchUpSegment } from './play-from-position';
+import type { PlaybackCarryState } from './play-from-position';
 
 export type MixerWorkletIncomingMessage =
 	| {
@@ -42,20 +42,16 @@ export type MixerWorkletIncomingMessage =
 			channelInstrumentIndex: number[];
 	  };
 
-export type PlayFromPositionMixerCommand = {
-	type: 'play_from_position';
-	catchUpSegments: CatchUpSegment[];
-	startPattern: Pattern;
-	startPatternOrderIndex: number;
-	startRow: number;
-	speed: number | null;
-};
-
 export type MixerSlotCommand =
 	| { type: 'init'; wasmBuffer: ArrayBuffer }
 	| { type: 'play'; initialSpeed?: number }
-	| { type: 'play_from_row'; row: number; patternOrderIndex?: number; speed?: number | null }
-	| PlayFromPositionMixerCommand
+	| {
+			type: 'play_from_row';
+			row: number;
+			patternOrderIndex?: number;
+			speed?: number | null;
+			carry?: PlaybackCarryState | null;
+	  }
 	| { type: 'stop' }
 	| { type: 'update_order'; order: number[]; loopPointId: number }
 	| { type: 'init_pattern'; pattern: Pattern; patternOrderIndex: number }

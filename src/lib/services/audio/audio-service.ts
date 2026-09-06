@@ -6,22 +6,18 @@ import {
 import type { Chip } from '../../chips/types';
 import type { Table } from '../../models/project';
 import { ChipSettingsRegistry } from './chip-settings';
-import type { CatchUpSegment } from './play-from-position';
+import type { PlaybackCarryState } from './play-from-position';
 import { channelMuteStore } from '../../stores/channel-mute.svelte';
 import { waveformStore } from '../../stores/waveform.svelte';
 import { playbackToneDebugStore } from '../../stores/playback-tone-debug.svelte';
 import { filterInstrumentsForChip } from '../instrument/instrument-filter';
 
-import type { Pattern } from '../../models/song';
-
 const BITPHASE_AUDIO_PROCESSOR = 'bitphase-audio-processor';
 const BITPHASE_AUDIO_MODULE = 'audio/bitphase-audio-processor.js';
 
 export interface PlayFromRowOptions {
-	catchUpSegments?: CatchUpSegment[];
-	startPattern?: Pattern;
-	getCatchUpSegmentsForChip?: (chipIndex: number) => CatchUpSegment[];
-	getStartPatternForChip?: (chipIndex: number) => Pattern;
+	carry?: PlaybackCarryState | null;
+	getCarryForChip?: (chipIndex: number) => PlaybackCarryState | null;
 }
 
 export class AudioService {
@@ -260,27 +256,12 @@ export class AudioService {
 
 		this.applyMuteStateToAllChips();
 
-		const catchUpSegments = options?.catchUpSegments;
-		const startPattern = options?.startPattern;
-		const getCatchUpSegmentsForChip = options?.getCatchUpSegmentsForChip;
-		const getStartPatternForChip = options?.getStartPatternForChip;
-		const orderIndex = patternOrderIndex ?? 0;
+		const getCarryForChip = options?.getCarryForChip;
 
 		this.chipProcessors.forEach((chipProcessor, index) => {
 			const speed = getSpeedForChip ? (getSpeedForChip(index) ?? null) : null;
-			const chipCatchUp = getCatchUpSegmentsForChip?.(index) ?? catchUpSegments;
-			const chipStartPattern = getStartPatternForChip?.(index) ?? startPattern;
-			if (chipCatchUp && chipStartPattern && chipProcessor.playFromPosition) {
-				chipProcessor.playFromPosition(
-					row,
-					orderIndex,
-					speed,
-					chipCatchUp,
-					chipStartPattern
-				);
-			} else {
-				chipProcessor.playFromRow(row, patternOrderIndex, speed ?? undefined);
-			}
+			const chipCarry = getCarryForChip?.(index) ?? options?.carry ?? null;
+			chipProcessor.playFromRow(row, patternOrderIndex, speed ?? undefined, chipCarry);
 		});
 	}
 

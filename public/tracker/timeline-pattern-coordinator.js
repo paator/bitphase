@@ -26,16 +26,21 @@ export class TimelinePatternCoordinator {
 
 	handleInitPattern(data) {
 		const state = this.getState();
+		if (data.pattern?.channels?.length) {
+			this.resizeForPatternChannelCount(data.pattern.channels.length);
+		}
 		if (
 			data.patternOrderIndex !== undefined &&
 			state.timeline.currentPatternOrderIndex !== data.patternOrderIndex
 		) {
-			state.currentPattern = null;
-		}
-		if (data.pattern?.channels?.length) {
-			this.resizeForPatternChannelCount(data.pattern.channels.length);
+			this.pendingNextPattern = {
+				pattern: data.pattern,
+				orderIndex: data.patternOrderIndex
+			};
+			return false;
 		}
 		state.setPattern(data.pattern, data.patternOrderIndex);
+		return true;
 	}
 
 	handleUpdateOrder(data) {
