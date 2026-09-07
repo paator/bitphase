@@ -7,3 +7,9 @@ export type MenuItem = {
 	shortcut?: string;
 	disabled?: boolean | (() => boolean);
 };
+
+export type MenuPanelContext = {
+	getActiveSubmenu: () => string;
+	enterItem: (label: string, expandable: boolean) => void;
+	setActiveSubmenu: (label: string) => void;
+};

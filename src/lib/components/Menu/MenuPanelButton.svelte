@@ -1,6 +1,6 @@
 <script lang="ts">
 	import MenuPanel from './MenuPanel.svelte';
-	import type { MenuItem } from './types';
+	import type { MenuItem, MenuPanelContext } from './types';
 	import { getContext } from 'svelte';
 
 	let {
@@ -29,10 +29,7 @@
 
 	const isDisabled = $derived(typeof disabled === 'function' ? disabled() : disabled || false);
 
-	const menuPanelContext = getContext<{
-		setActiveSubmenu: (label: string) => void;
-		getActiveSubmenu: () => string;
-	}>('menuPanel');
+	const menuPanelContext = getContext<MenuPanelContext | undefined>('menuPanel');
 
 	let localShowSubmenu = $state(false);
 
@@ -43,6 +40,9 @@
 	);
 
 	const isActive = $derived(showSubmenuPanel && type === 'expandable');
+	const isSubmenuOpen = $derived(
+		menuPanelContext ? menuPanelContext.getActiveSubmenu() !== '' : localShowSubmenu
+	);
 
 	function handleClick(event: MouseEvent) {
 		event.stopPropagation();
@@ -55,37 +55,33 @@
 		onMenuClose?.({ all: true });
 	}
 
-	let menuHoverTimeout: ReturnType<typeof setTimeout>;
-
 	function handleMouseEnter(event: MouseEvent) {
 		event.stopPropagation();
+
+		if (isDisabled) {
+			return;
+		}
+
+		if (menuPanelContext) {
+			menuPanelContext.enterItem(label, type === 'expandable');
+			return;
+		}
 
 		if (type !== 'expandable') {
 			return;
 		}
 
-		menuHoverTimeout = setTimeout(() => {
-			if (menuPanelContext) {
-				menuPanelContext.setActiveSubmenu(label);
-			} else {
-				localShowSubmenu = !localShowSubmenu;
-			}
-		}, 300);
+		localShowSubmenu = true;
 	}
 
 	function handleMouseLeave(event: MouseEvent) {
 		event.stopPropagation();
 
-		if (type !== 'expandable') {
+		if (menuPanelContext || type !== 'expandable') {
 			return;
 		}
 
-		clearTimeout(menuHoverTimeout);
-		if (menuPanelContext) {
-			menuPanelContext.setActiveSubmenu(''); // This prevents the menu re-openning if is closed and mouse moves out.
-		} else {
-			localShowSubmenu = false;
-		}
+		localShowSubmenu = false;
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -97,7 +93,8 @@
 				onMenuClose?.({ all: true });
 			} else if (type === 'expandable') {
 				if (menuPanelContext) {
-					menuPanelContext.setActiveSubmenu(label);
+					const isOpen = menuPanelContext.getActiveSubmenu() === label;
+					menuPanelContext.setActiveSubmenu(isOpen ? '' : label);
 				} else {
 					localShowSubmenu = !localShowSubmenu;
 				}
@@ -124,7 +121,6 @@
 		onMenuClose?.(data);
 	}
 
-	//TODO: this is not a correct .root() usage, cleanup this later
 	$effect.root(() => {
 		return () => {
 			if (!menuPanelContext) {
@@ -144,17 +140,21 @@
 	</div>
 {:else}
 	<div
-		class="menu-panel-button relative flex cursor-pointer items-center justify-between gap-3 px-1.5 py-[0.2rem] text-xs whitespace-nowrap hover:bg-[var(--color-app-surface-hover)]"
-		class:cursor-not-allowed={isDisabled}
-		class:opacity-50={isDisabled}
-		class:hover:bg-transparent={isDisabled}
+		class={[
+			'menu-panel-button relative flex cursor-pointer items-center justify-between gap-3 px-1.5 py-[0.2rem] text-xs whitespace-nowrap',
+			{
+				'cursor-not-allowed opacity-50': isDisabled,
+				'hover:bg-[var(--color-app-surface-hover)]':
+					!isDisabled && (!isSubmenuOpen || isActive),
+				'bg-[var(--color-app-surface-hover)]': isActive
+			}
+		]}
 		onclick={handleClick}
 		onkeydown={handleKeyDown}
 		onmouseenter={handleMouseEnter}
 		onmouseleave={handleMouseLeave}
 		tabindex="0"
-		role="menuitem"
-		class:bg-[var(--color-app-surface-hover)]={isActive}>
+		role="menuitem">
 		<div class="flex items-center gap-1.5">
 			{#if icon}
 				<span>{icon}</span>
@@ -172,7 +172,7 @@
 		</div>
 
 		{#if showSubmenuPanel && type === 'expandable' && items && items.length > 0}
-			<div class="absolute top-0 left-full ml-0.5">
+			<div class="absolute top-0 left-full z-10 -ml-1 pl-1" data-submenu-host>
 				<MenuPanel
 					isFirst={false}
 					{items}
