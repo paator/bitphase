@@ -17,7 +17,7 @@ export type InstrumentMacros = Record<string, InstrumentMacro>;
 export type InstrumentMacroEnumOption = {
 	value: number;
 	label: string;
-	icon?: 'semitone' | 'period';
+	icon?: 'semitone' | 'period' | 'close' | 'up' | 'down';
 	bar?: boolean;
 };
 

@@ -256,7 +256,10 @@
 			if (action === ACTION_INCREMENT_VALUE || action === ACTION_TRANSPOSE_OCTAVE_UP) {
 				event.preventDefault();
 				incrementSelectedRows(delta);
-			} else if (action === ACTION_DECREMENT_VALUE || action === ACTION_TRANSPOSE_OCTAVE_DOWN) {
+			} else if (
+				action === ACTION_DECREMENT_VALUE ||
+				action === ACTION_TRANSPOSE_OCTAVE_DOWN
+			) {
 				event.preventDefault();
 				incrementSelectedRows(-delta);
 			}
@@ -277,21 +280,29 @@
 			class="row-editor-table table-fixed border-collapse bg-[var(--color-app-surface)] font-mono text-xs select-none">
 			<thead>
 				<tr>
-					<th class={isExpanded ? 'w-14 min-w-14 px-2 py-1.5' : 'w-8 min-w-8 px-1 py-1'}>row</th>
+					<th class={isExpanded ? 'w-14 min-w-14 px-2 py-1.5' : 'w-8 min-w-8 px-1 py-1'}
+						>row</th>
 					<th class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-10 min-w-10 px-0.5'}></th>
 					<th class={isExpanded ? 'w-6 min-w-6 px-1.5' : 'w-4 min-w-4 px-0.5'}
 						>{isExpanded ? 'loop' : 'lp'}</th>
-					<th class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}" title="Tone Generator">
+					<th
+						class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}"
+						title="Tone Generator">
 						<div class="flex items-center justify-center">
-							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<IconCarbonChartWinLoss
+								class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 						</div>
 					</th>
-					<th class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}" title="Noise Generator">
+					<th
+						class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}"
+						title="Noise Generator">
 						<div class="flex items-center justify-center">
 							<IconCarbonWaveform class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 						</div>
 					</th>
-					<th class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}" title="Hardware Envelope">
+					<th
+						class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}"
+						title="Hardware Envelope">
 						<div class="flex items-center justify-center">
 							<IconCarbonActivity class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 						</div>
@@ -303,25 +314,35 @@
 							<IconCarbonRepeat class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 						</div>
 					</th>
-					<th class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'} title="Tone Offset">
+					<th
+						class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'}
+						title="Tone Offset">
 						<div class="flex items-center justify-center gap-0.5">
-							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<IconCarbonChartWinLoss
+								class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>+</span>
 						</div>
 					</th>
-					<th class={isExpanded ? 'w-8 min-w-8 px-1' : 'w-10 px-0.5 text-[0.65rem]'} title="Tone Accumulation">
+					<th
+						class={isExpanded ? 'w-8 min-w-8 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Tone Accumulation">
 						<div class="flex items-center justify-center gap-0.5">
-							<IconCarbonChartWinLoss class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<IconCarbonChartWinLoss
+								class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>↑</span>
 						</div>
 					</th>
-					<th class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'} title="Noise Offset">
+					<th
+						class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5 text-[0.65rem]'}
+						title="Noise Offset">
 						<div class="flex items-center justify-center gap-0.5">
 							<IconCarbonWaveform class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>+</span>
 						</div>
 					</th>
-					<th class={isExpanded ? 'w-8 min-w-8 px-1' : 'w-10 px-0.5 text-[0.65rem]'} title="Noise Accumulation">
+					<th
+						class={isExpanded ? 'w-8 min-w-8 px-1' : 'w-10 px-0.5 text-[0.65rem]'}
+						title="Noise Accumulation">
 						<div class="flex items-center justify-center gap-0.5">
 							<IconCarbonWaveform class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>↑</span>
@@ -343,7 +364,9 @@
 							<span>↑</span>
 						</div>
 					</th>
-					<th class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-12 px-0.5 text-[0.65rem]'} title="Volume Level">
+					<th
+						class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-12 px-0.5 text-[0.65rem]'}
+						title="Volume Level">
 						<div class="flex items-center justify-center">
 							<IconCarbonVolumeUp class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 						</div>
@@ -352,7 +375,8 @@
 						class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}"
 						title="Amplitude Slide: ↑ up / ↓ down / blank off">
 						<div class="flex items-center justify-center">
-							<IconCarbonArrowsVertical class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<IconCarbonArrowsVertical
+								class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 						</div>
 					</th>
 				</tr>
@@ -367,7 +391,10 @@
 			<tbody>
 				{#each mixerSync.rows as row, index (index)}
 					{@const selected = selection.isRowSelected(index)}
-					<tr class="{isExpanded ? 'h-8' : 'h-7'} {selected ? ROW_SELECTION_STYLES.row : ''}">
+					<tr
+						class="{isExpanded ? 'h-8' : 'h-7'} {selected
+							? ROW_SELECTION_STYLES.row
+							: ''}">
 						<SelectableRowNumberCell
 							{index}
 							{selected}
@@ -397,7 +424,9 @@
 									(value) => updateBooleanRow(index, 'tone', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateBooleanRow(index, 'tone', value))} />
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'tone', value)
+								)} />
 						<BooleanPaintableCell
 							active={row.noise}
 							{selected}
@@ -409,7 +438,9 @@
 									(value) => updateBooleanRow(index, 'noise', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateBooleanRow(index, 'noise', value))} />
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'noise', value)
+								)} />
 						<BooleanPaintableCell
 							active={row.envelope}
 							{selected}
@@ -421,7 +452,9 @@
 									(value) => updateBooleanRow(index, 'envelope', value)
 								)}
 							onPaintOver={() =>
-								booleanDrag.dragOver((value) => updateBooleanRow(index, 'envelope', value))} />
+								booleanDrag.dragOver((value) =>
+									updateBooleanRow(index, 'envelope', value)
+								)} />
 						<BooleanPaintableCell
 							active={row.retriggerEnvelope}
 							{selected}
@@ -435,7 +468,8 @@
 								)}
 							onPaintOver={() =>
 								booleanDrag.dragOver((value) =>
-									updateBooleanRow(index, 'retriggerEnvelope', value))} />
+									updateBooleanRow(index, 'retriggerEnvelope', value)
+								)} />
 						<td class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5'}>
 							<CommitNumericInput
 								value={row.toneAdd}
@@ -460,7 +494,8 @@
 								)}
 							onPaintOver={() =>
 								booleanDrag.dragOver((value) =>
-									updateBooleanRow(index, 'toneAccumulation', value))} />
+									updateBooleanRow(index, 'toneAccumulation', value)
+								)} />
 						<td class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5'}>
 							<CommitNumericInput
 								value={row.noiseAdd}
@@ -485,7 +520,8 @@
 								)}
 							onPaintOver={() =>
 								booleanDrag.dragOver((value) =>
-									updateBooleanRow(index, 'noiseAccumulation', value))} />
+									updateBooleanRow(index, 'noiseAccumulation', value)
+								)} />
 						<td class={isExpanded ? 'w-16 min-w-16 px-1.5' : 'w-12 px-0.5'}>
 							<CommitNumericInput
 								value={row.envelopeAdd}
@@ -506,11 +542,13 @@
 							onPaintBegin={() =>
 								booleanDrag.begin(
 									() => row.envelopeAccumulation,
-									(value) => updateBooleanRow(index, 'envelopeAccumulation', value)
+									(value) =>
+										updateBooleanRow(index, 'envelopeAccumulation', value)
 								)}
 							onPaintOver={() =>
 								booleanDrag.dragOver((value) =>
-									updateBooleanRow(index, 'envelopeAccumulation', value))} />
+									updateBooleanRow(index, 'envelopeAccumulation', value)
+								)} />
 						<td class={isExpanded ? 'w-12 min-w-12 px-1.5' : 'w-12 px-0.5'}>
 							<CommitNumericInput
 								value={row.volume}
@@ -548,11 +586,16 @@
 				<tr>
 					<td colspan={MIXER_COLUMNS} class="px-2 py-1">
 						<RowEditorAddRowButton
-							onAdd={() => mixerSync.addRow(() => coerceMixerRow(createDefaultAyMixerRow()))} />
+							onAdd={() =>
+								mixerSync.addRow(() =>
+									coerceMixerRow(createDefaultAyMixerRow())
+								)} />
 					</td>
 				</tr>
 				<tr>
-					<td colspan={MIXER_COLUMNS} class="border-t border-[var(--color-app-border)] p-0">
+					<td
+						colspan={MIXER_COLUMNS}
+						class="border-t border-[var(--color-app-border)] p-0">
 						<RowResizeHandle
 							rowCount={mixerSync.rows.length}
 							onRowCountChange={(count) =>
@@ -606,10 +649,12 @@
 								formatValue={(value) => formatRowEditorNumber(value, asHex)}
 								onPaintBegin={(_, value) =>
 									volumeDrag.begin(value, (paintValue) =>
-										updateRow(index, 'volume', paintValue))}
+										updateRow(index, 'volume', paintValue)
+									)}
 								onPaintOver={(_, value) =>
 									volumeDrag.dragOverWithValue(value, (paintValue) =>
-										updateRow(index, 'volume', paintValue))} />
+										updateRow(index, 'volume', paintValue)
+									)} />
 						{/each}
 					</tr>
 				{/each}

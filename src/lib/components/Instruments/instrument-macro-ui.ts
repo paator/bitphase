@@ -34,11 +34,15 @@ export function instrumentMacroUsesBarChart(field: InstrumentMacroField): boolea
 	return field.kind === 'integer' || Boolean(field.enumValues?.some((option) => option.bar));
 }
 
+export function instrumentMacroUsesSquareSteps(field: InstrumentMacroField): boolean {
+	if (field.kind === 'boolean') return true;
+	return field.kind === 'enum' && !instrumentMacroUsesBarChart(field);
+}
+
 export function macroFieldRowHeight(field: InstrumentMacroField, isExpanded: boolean): number {
 	if (instrumentMacroUsesBarChart(field)) return isExpanded ? 124 : 100;
-	if (field.kind === 'boolean') return isExpanded ? 36 : 30;
+	if (instrumentMacroUsesSquareSteps(field)) return isExpanded ? 36 : 30;
 	if (field.kind === 'waveform') return isExpanded ? 48 : 38;
-	if (field.enumValues?.some((option) => option.icon)) return isExpanded ? 36 : 30;
 	return isExpanded ? 28 : 22;
 }
 
@@ -168,7 +172,8 @@ function parseMacroSequenceToken(
 ): number | null {
 	if (field.kind === 'enum' && field.enumValues?.length) {
 		const labelMatch = field.enumValues.find(
-			(option) => option.label.length > 0 && option.label.toLowerCase() === token.toLowerCase()
+			(option) =>
+				option.label.length > 0 && option.label.toLowerCase() === token.toLowerCase()
 		);
 		if (labelMatch) return labelMatch.value;
 	}
@@ -232,10 +237,7 @@ export function applyInstrumentMacroSequenceText(
 	const parsed = parseMacroSequenceText(text, field, asHex);
 	if (!parsed) return null;
 	const current = macros[field.id];
-	if (
-		current &&
-		instrumentMacroSequenceEquals(current.values, current.loop, parsed)
-	) {
+	if (current && instrumentMacroSequenceEquals(current.values, current.loop, parsed)) {
 		return macros;
 	}
 	const resized = setSharedSequenceLength(macros, fields, parsed.values.length);

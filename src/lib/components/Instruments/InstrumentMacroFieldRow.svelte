@@ -4,6 +4,8 @@
 	import IconCarbonEdit from '~icons/carbon/edit';
 	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
 	import IconCarbonSettingsAdjust from '~icons/carbon/settings-adjust';
+	import IconCarbonArrowUp from '~icons/carbon/arrow-up';
+	import IconCarbonArrowDown from '~icons/carbon/arrow-down';
 	import {
 		instrumentMacroAccentColor,
 		type InstrumentMacroField,
@@ -42,7 +44,6 @@
 	const gateIconClass = $derived(macroIconClass(isExpanded));
 	const sequenceWidth = $derived(stepWidthPx * values.length);
 	const usesBarChart = $derived(instrumentMacroUsesBarChart(field));
-
 </script>
 
 <div
@@ -55,13 +56,11 @@
 				type="button"
 				class="relative cursor-crosshair border-0 border-r border-[var(--color-app-border)]/60 bg-[var(--color-app-surface-secondary)] p-0 last:border-r-0"
 				style="width: {stepWidthPx}px; height: {rowHeight}px"
-				aria-label="{field.kind === 'enum'
+				aria-label={field.kind === 'enum'
 					? `${field.label} ${instrumentMacroEnumLabel(field, value)} step ${index}`
-					: `${field.label} step ${index}`}"
+					: `${field.label} step ${index}`}
 				onpointerdown={(event) => onPaintStart(index, event, true)}>
-				<div
-					class="absolute rounded-sm"
-					style={integerMacroBarStyle(field, value, accent)}>
+				<div class="absolute rounded-sm" style={integerMacroBarStyle(field, value, accent)}>
 				</div>
 			</button>
 		{:else if field.kind === 'enum'}
@@ -76,13 +75,19 @@
 					: 'var(--color-app-surface-secondary)'}; color: {active
 					? 'var(--color-app-surface)'
 					: 'var(--color-app-text-muted)'}"
-				aria-label="{field.label} {optionLabel} step {index}"
-				title={optionLabel}
+				aria-label="{field.label} {optionLabel || 'Off'} step {index}"
+				title={optionLabel || 'Off'}
 				onpointerdown={(event) => onPaintStart(index, event, false)}>
 				{#if option?.icon === 'period'}
 					<IconCarbonSettingsAdjust class={gateIconClass} />
 				{:else if option?.icon === 'semitone'}
 					<IconCarbonChartWinLoss class={gateIconClass} />
+				{:else if option?.icon === 'close' || (!option?.icon && !optionLabel)}
+					<IconCarbonClose class={gateIconClass} />
+				{:else if option?.icon === 'up'}
+					<IconCarbonArrowUp class={gateIconClass} />
+				{:else if option?.icon === 'down'}
+					<IconCarbonArrowDown class={gateIconClass} />
 				{:else}
 					{optionLabel}
 				{/if}
@@ -91,7 +96,9 @@
 			{@const waveformEnabled = isStepEnabled?.(field.id, index) ?? true}
 			<button
 				type="button"
-				class="flex items-center justify-center border-r border-[var(--color-app-border)]/60 bg-[var(--color-app-surface-secondary)] last:border-r-0 {waveformEnabled ? 'cursor-pointer text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]' : 'cursor-default text-[var(--color-app-border)]'}"
+				class="flex items-center justify-center border-r border-[var(--color-app-border)]/60 bg-[var(--color-app-surface-secondary)] last:border-r-0 {waveformEnabled
+					? 'cursor-pointer text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]'
+					: 'cursor-default text-[var(--color-app-border)]'}"
 				style="width: {stepWidthPx}px; height: {rowHeight}px;"
 				aria-label="{field.label} step {index}"
 				aria-disabled={!waveformEnabled}

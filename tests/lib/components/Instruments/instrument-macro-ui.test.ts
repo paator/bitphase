@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InstrumentMacroField } from '@/lib/chips/base/instrument-macros';
+import { AY_MIXER_MACRO_FIELDS } from '@/lib/chips/ay/mixer-macros';
 import {
 	applyInstrumentMacroSequenceText,
 	applyMacroLengthKey,
@@ -9,6 +10,7 @@ import {
 	instrumentMacroEnumIsActive,
 	instrumentMacroEnumLabel,
 	instrumentMacroUsesBarChart,
+	instrumentMacroUsesSquareSteps,
 	integerMacroBarStyle,
 	macroFieldRowHeight,
 	parseMacroSequenceText
@@ -82,6 +84,15 @@ describe('macroFieldRowHeight', () => {
 		};
 		expect(macroFieldRowHeight(iconEnumField, false)).toBe(30);
 		expect(macroFieldRowHeight(iconEnumField, true)).toBe(36);
+	});
+
+	it('makes amplitude slide rows square like booleans', () => {
+		const slideField = AY_MIXER_MACRO_FIELDS.find((field) => field.id === 'amplitudeSlide')!;
+		expect(instrumentMacroUsesSquareSteps(slideField)).toBe(true);
+		expect(macroFieldRowHeight(slideField, false)).toBe(
+			macroFieldRowHeight(booleanField, false)
+		);
+		expect(macroFieldRowHeight(slideField, true)).toBe(macroFieldRowHeight(booleanField, true));
 	});
 
 	it('keeps integer rows taller than gate rows', () => {

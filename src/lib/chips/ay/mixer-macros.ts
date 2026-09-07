@@ -32,9 +32,9 @@ export const AY_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		max: AY_AMPLITUDE_SLIDE_UP,
 		defaultValue: AY_AMPLITUDE_SLIDE_OFF,
 		enumValues: [
-			{ value: AY_AMPLITUDE_SLIDE_OFF, label: '' },
-			{ value: AY_AMPLITUDE_SLIDE_UP, label: '↑' },
-			{ value: AY_AMPLITUDE_SLIDE_DOWN, label: '↓' }
+			{ value: AY_AMPLITUDE_SLIDE_OFF, label: '', icon: 'close' },
+			{ value: AY_AMPLITUDE_SLIDE_UP, label: '↑', icon: 'up' },
+			{ value: AY_AMPLITUDE_SLIDE_DOWN, label: '↓', icon: 'down' }
 		],
 		fromRow: (row) => {
 			if (!row.amplitudeSliding) return AY_AMPLITUDE_SLIDE_OFF;
