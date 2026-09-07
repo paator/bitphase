@@ -1164,20 +1164,9 @@
 	} | null {
 		if (patternToDraw.length <= 0) return null;
 
-		const visibleRows = getVisibleRows(patternToDraw);
-		const firstVisibleRow = visibleRows.find((r) => !r.isEmpty);
-		const rowToUse =
-			firstVisibleRow &&
-			firstVisibleRow.rowIndex >= 0 &&
-			firstVisibleRow.rowIndex < patternToDraw.length
-				? firstVisibleRow.rowIndex
-				: 0;
-
-		if (rowToUse < 0 || rowToUse >= patternToDraw.length) return null;
-
 		const song = projectStore.songs[songIndex];
 		return {
-			rowString: getPatternRowData(patternToDraw, rowToUse),
+			rowString: getPatternRowData(patternToDraw, 0),
 			channelLabels: patternToDraw.channels.map((ch) => ch.label),
 			channelMuted: getChannelMutedState(patternToDraw),
 			vcGroups: song
@@ -1975,17 +1964,10 @@
 		const patternToRender = findOrCreatePattern(currentPattern.id);
 
 		if (y <= lineHeight) {
-			const visibleRows = getVisibleRows(currentPattern);
-			const firstVisibleRow = visibleRows.find((r) => !r.isEmpty);
-			if (
-				!firstVisibleRow ||
-				firstVisibleRow.rowIndex < 0 ||
-				firstVisibleRow.rowIndex >= patternToRender.length
-			)
-				return;
+			const header = getHeaderRowContext(patternToRender);
+			if (!header) return;
 
-			const rowString = getPatternRowData(patternToRender, firstVisibleRow.rowIndex);
-			const effectControl = renderer.hitTestEffectColumnControl(x, y, rowString);
+			const effectControl = renderer.hitTestEffectColumnControl(x, y, header.rowString);
 			if (effectControl) {
 				changeChannelEffectColumnCount(
 					effectControl.channelIndex,
@@ -1993,7 +1975,7 @@
 				);
 				return;
 			}
-			const channelPositions = renderer.calculateChannelPositions(rowString);
+			const channelPositions = renderer.calculateChannelPositions(header.rowString);
 
 			for (let i = 0; i < channelPositions.length; i++) {
 				const channelStart = channelPositions[i];
@@ -2170,15 +2152,9 @@
 
 		if (y <= lineHeight && currentPattern) {
 			const patternToRender = findOrCreatePattern(currentPattern.id);
-			const visibleRows = getVisibleRows(currentPattern);
-			const firstVisibleRow = visibleRows.find((r) => !r.isEmpty);
-			if (
-				firstVisibleRow &&
-				firstVisibleRow.rowIndex >= 0 &&
-				firstVisibleRow.rowIndex < patternToRender.length
-			) {
-				const rowString = getPatternRowData(patternToRender, firstVisibleRow.rowIndex);
-				const channelPositions = renderer.calculateChannelPositions(rowString);
+			const header = getHeaderRowContext(patternToRender);
+			if (header) {
+				const channelPositions = renderer.calculateChannelPositions(header.rowString);
 				const song = projectStore.songs[songIndex];
 				const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
 
