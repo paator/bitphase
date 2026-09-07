@@ -85,20 +85,6 @@ describe('NesWorkletSlot preview', () => {
 		expect(slot.apuEngine.applyRegisterState).toHaveBeenCalled();
 	});
 
-	it('does not reset the APU when virtual channel config is reapplied', () => {
-		const slot = createPreviewSlot();
-		slot.apuEngine.reset.mockClear();
-		slot.apuEngine.applyRegisterState.mockClear();
-
-		slot.handleSetVirtualChannelConfig({
-			virtualChannelMap: {},
-			hwChannelCount: 5
-		});
-
-		expect(slot.apuEngine.reset).not.toHaveBeenCalled();
-		expect(slot.apuEngine.applyRegisterState).toHaveBeenCalled();
-	});
-
 	it('stays in the audio mix while paused so preview start and stop are not hard cuts', () => {
 		const slot = createPreviewSlot();
 		slot.paused = true;

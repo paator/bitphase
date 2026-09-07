@@ -30,6 +30,7 @@ import {
 	migrateLegacyInstrument,
 	type LegacyInstrument
 } from '../../../services/instrument/instrument-legacy-migration';
+import { parseHexColor } from '../../../utils/hex-color';
 
 function reconstructProject(data: any, getChip: (chipType: string) => Chip | null): Project {
 	const songs = data.songs?.map((songData: any) => reconstructSong(songData, getChip)) || [];
@@ -225,6 +226,10 @@ function reconstructInstrument(data: any): Instrument {
 		data.name ?? '',
 		typeof data.chipType === 'string' ? data.chipType : 'ay'
 	);
+	if (typeof data.color === 'string') {
+		const color = parseHexColor(data.color);
+		if (color) instrument.color = color;
+	}
 	const legacy: LegacyInstrument = { ...instrument };
 	if (data.rows) {
 		legacy.rows = data.rows.map((rowData: any) =>

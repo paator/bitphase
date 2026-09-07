@@ -23,6 +23,34 @@ describe('FileImportService', () => {
 		expect(project.tables).toHaveLength(1);
 	});
 
+	it('preserves instrument color when reconstructing', async () => {
+		const json = JSON.stringify({
+			name: 'colored',
+			songs: [],
+			patternOrder: [0],
+			tables: [],
+			instruments: [{ id: '01', name: 'Lead', color: '#FF00AA', loop: 0, rows: [] }]
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+
+		expect(project.instruments[0].color).toBe('#ff00aa');
+	});
+
+	it('ignores invalid instrument color when reconstructing', async () => {
+		const json = JSON.stringify({
+			name: 'colored',
+			songs: [],
+			patternOrder: [0],
+			tables: [],
+			instruments: [{ id: '01', name: 'Lead', color: 'red', loop: 0, rows: [] }]
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+
+		expect(project.instruments[0].color).toBeUndefined();
+	});
+
 	it('preserves fm and env-fm timer waveforms when reconstructing instruments', async () => {
 		const json = JSON.stringify({
 			name: 'test',

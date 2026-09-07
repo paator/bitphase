@@ -22,6 +22,7 @@ describe('PatternVisibleRowsService', () => {
 
 		const firstNonEmpty = rows.find((row) => !row.isEmpty);
 		expect(firstNonEmpty?.isGhost).toBe(true);
+		expect(firstNonEmpty?.orderIndex).toBe(0);
 		expect(firstNonEmpty?.rowIndex ?? -1).toBeGreaterThanOrEqual(current.length);
 	});
 });

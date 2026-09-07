@@ -11,7 +11,7 @@
 	import IconCarbonRenew from '~icons/carbon/renew';
 	import IconCarbonSettingsAdjust from '~icons/carbon/settings-adjust';
 	import PillTabs, { type PillTab } from '../../components/PillTabs/PillTabs.svelte';
-	import { RowEditorNameField } from '../../components/RowEditorTable';
+	import InstrumentEditorIdentity from '../../components/Instruments/InstrumentEditorIdentity.svelte';
 	import AYTimerWaveformDrawer from './AYTimerWaveformDrawer.svelte';
 	import AYTimerPwmControls from './AYTimerPwmControls.svelte';
 	import AYInstrumentSamplePanel from './AYInstrumentSamplePanel.svelte';
@@ -150,14 +150,7 @@
 </script>
 
 <div class="w-full max-w-full min-w-0 overflow-x-auto outline-none focus:outline-none" tabindex="-1">
-	<RowEditorNameField
-		bind:name={
-			() => instrument.name,
-			(value) => {
-				if (value === instrument.name) return;
-				onInstrumentChange({ ...instrument, name: value });
-			}
-		} />
+	<InstrumentEditorIdentity {instrument} {onInstrumentChange} />
 
 	<div class="mt-3 ml-2 mr-2 flex items-center justify-between gap-2">
 		<PillTabs

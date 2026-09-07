@@ -15,6 +15,7 @@
 		isSelected,
 		isUsed,
 		isEditing,
+		accentColor,
 		idLabel,
 		nameLabel,
 		copyTitle,
@@ -32,6 +33,7 @@
 		isSelected: boolean;
 		isUsed: boolean;
 		isEditing: boolean;
+		accentColor?: string;
 		idLabel: string;
 		nameLabel: string;
 		copyTitle: string;
@@ -57,12 +59,18 @@
 	<div
 		{...dataIndexAttr}
 		class="group relative flex min-w-[6rem] shrink-0 flex-col items-center justify-center border-r border-[var(--color-app-border)] p-3 {bgClass}">
+		{#if accentColor}
+			<div class="absolute inset-x-0 top-0 h-0.5" style:background={accentColor}></div>
+		{/if}
 		{@render edit()}
 	</div>
 {:else}
 	<div
 		{...dataIndexAttr}
 		class="group relative flex min-w-[6rem] shrink-0 flex-col items-center border-r border-[var(--color-app-border)]">
+		{#if accentColor}
+			<div class="absolute inset-x-0 top-0 h-0.5" style:background={accentColor}></div>
+		{/if}
 		<button
 			type="button"
 			class="flex h-full w-full shrink-0 cursor-pointer flex-col items-center justify-center p-3 {bgClass}"

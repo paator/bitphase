@@ -51,6 +51,7 @@ class Instrument {
 	id: string;
 	chipType: string;
 	name: string = '';
+	color?: string;
 	macros?: Record<string, { values: (boolean | number | string)[]; loop: number }>;
 
 	constructor(id: string, name: string = '', chipType: string = 'ay') {

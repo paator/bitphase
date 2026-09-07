@@ -28,6 +28,15 @@ describe('HistoryClone.instrument', () => {
 		expect(source.sampleData[0]).toBe(9);
 	});
 
+	it('copies instrument color', () => {
+		const source = Object.assign(new Instrument('01', 'Lead', 'ay'), { color: '#ff00aa' });
+		const cloned = HistoryClone.instrument(source);
+
+		expect(cloned.color).toBe('#ff00aa');
+		cloned.color = '#000000';
+		expect(source.color).toBe('#ff00aa');
+	});
+
 	it('copies sample data for NES instruments', () => {
 		const source = Object.assign(new Instrument('02', 'Kick', 'nes'), {
 			sampleData: [1, 2],

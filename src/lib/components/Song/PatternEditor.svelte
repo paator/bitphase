@@ -32,6 +32,11 @@
 		PatternEditorRenderer
 	} from '../../ui-rendering/pattern-editor-renderer';
 	import { PatternEditorTextParser } from '../../ui-rendering/pattern-editor-text-parser';
+	import {
+		applyInstrumentColorsToSegments,
+		createInstrumentCarryLookup,
+		instrumentColorsById
+	} from '../../ui-rendering/instrument-pattern-colors';
 	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
 	import { Cache } from '../../utils/memoize';
 	import { channelMuteStore } from '../../stores/channel-mute.svelte';
@@ -148,6 +153,11 @@
 	const tuningTable = $derived(projectStore.songs[songIndex]?.tuningTable ?? []);
 	const speed = $derived(projectStore.songs[songIndex]?.initialSpeed ?? 3);
 	const instruments = $derived(filterInstrumentsForChip(projectStore.instruments, chip.type));
+	const instrumentColorFingerprint = $derived(
+		[...instrumentColorsById(instruments)]
+			.map(([id, color]) => `${id}:${color}`)
+			.join('|')
+	);
 	const tables = $derived(projectStore.tables);
 
 	function updatePatterns(newPatterns: Pattern[]): void {
@@ -395,6 +405,11 @@
 			}
 			draw();
 		});
+	});
+
+	$effect(() => {
+		instrumentColorFingerprint;
+		untrack(() => scheduleDraw());
 	});
 
 	let lastActiveState = isActive;
@@ -1191,6 +1206,13 @@
 		const visibleRows = getVisibleRows(patternToDraw);
 		const bounds = getSelectionBounds();
 		const channelMutedByPatternId = new Map<number, boolean[]>();
+		const instrumentColors = instrumentColorsById(instruments);
+		const instrumentCarry =
+			instrumentColors.size > 0
+				? createInstrumentCarryLookup(patternOrder, (patternId) =>
+						patterns.find((pattern) => pattern.id === patternId)
+					)
+				: null;
 
 		function getCachedChannelMuted(pattern: Pattern): boolean[] {
 			let muted = channelMutedByPatternId.get(pattern.id);
@@ -1220,7 +1242,16 @@
 				const rowString = getPatternRowData(patternToRender, row.rowIndex);
 
 				if (!textParser || !renderer) continue;
-				const segments = textParser.parseRowString(rowString, row.rowIndex);
+				const parsedSegments = textParser.parseRowString(rowString, row.rowIndex);
+				const segments =
+					instrumentCarry
+						? applyInstrumentColorsToSegments(
+								parsedSegments,
+								rowString,
+								instrumentColors,
+								instrumentCarry.idsAt(row.orderIndex, row.rowIndex)
+							)
+						: parsedSegments;
 				const cellPositions = getCellPositions(rowString, row.rowIndex);
 				const channelMuted = getCachedChannelMuted(patternToRender);
 
@@ -1536,7 +1567,7 @@
 				selectionStartColumn = null;
 				selectionEndRow = null;
 				selectionEndColumn = null;
-				draw();
+				scheduleDraw();
 			},
 			onSetSelectionAnchor: (row: number, column: number) => {
 				selectionStartRow = row;
@@ -2945,6 +2976,7 @@
 	}
 
 	let lastDrawnRow = -1;
+	let lastDrawnColumn = -1;
 	let lastDrawnPatternId = -1;
 	let lastDrawnOrderIndex = -1;
 	let lastPatternOrderLength = -1;
@@ -2996,6 +3028,7 @@
 			needsSetup = false;
 			if (ready && !document.hidden) draw();
 			lastDrawnRow = selectedRow;
+			lastDrawnColumn = selectedColumn;
 			lastDrawnPatternId = currentPattern?.id ?? -1;
 			lastDrawnOrderIndex = currentPatternOrderIndex;
 			lastPatternOrderLength = patternOrder.length;
@@ -3045,6 +3078,7 @@
 		const channelCountChanged = currentChannelCount !== lastChannelCount;
 		const sizeChanged = canvasWidth !== lastCanvasWidth || canvasHeight !== lastCanvasHeight;
 		const rowChanged = selectedRow !== lastDrawnRow;
+		const columnChanged = selectedColumn !== lastDrawnColumn;
 		const orderChanged =
 			currentPatternOrderIndex !== lastDrawnOrderIndex ||
 			patternOrder.length !== lastPatternOrderLength ||
@@ -3064,6 +3098,7 @@
 
 		if (
 			rowChanged ||
+			columnChanged ||
 			orderChanged ||
 			patternChanged ||
 			patternLengthChanged ||
@@ -3071,13 +3106,19 @@
 			channelCountChanged
 		) {
 			if (fontReady && !document.hidden) {
-				if (rowChanged && !orderChanged && !patternChanged && !sizeChanged) {
+				if (
+					(rowChanged || columnChanged) &&
+					!orderChanged &&
+					!patternChanged &&
+					!sizeChanged
+				) {
 					scheduleDraw();
 				} else {
 					draw();
 				}
 			}
 			lastDrawnRow = selectedRow;
+			lastDrawnColumn = selectedColumn;
 			lastDrawnPatternId = currentPattern?.id ?? -1;
 			lastDrawnOrderIndex = currentPatternOrderIndex;
 			lastPatternOrderLength = patternOrder.length;

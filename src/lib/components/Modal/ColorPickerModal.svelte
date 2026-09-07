@@ -5,10 +5,12 @@
 
 	let {
 		initialColor = '#808080',
+		title = 'Pattern order color',
 		resolve,
 		dismiss
 	}: {
 		initialColor?: string;
+		title?: string;
 		resolve?: (value: string) => void;
 		dismiss?: () => void;
 	} = $props();
@@ -42,7 +44,7 @@
 	}
 </script>
 
-<ModalPanel title="Pattern order color" width="w-80" compact>
+<ModalPanel {title} width="w-80" compact>
 	{#snippet children()}
 		<div class="flex items-center gap-3">
 			<input

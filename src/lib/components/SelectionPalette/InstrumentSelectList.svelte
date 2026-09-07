@@ -29,6 +29,10 @@
 			style:min-height="{ITEM_COMPACT_ROW_HEIGHT}px"
 			onclick={() => selectInstrument(instrument.id)}>
 			<span
+				class="h-2 w-2 shrink-0 rounded-full"
+				style:background={instrument.color ?? 'transparent'}
+				aria-hidden="true"></span>
+			<span
 				class="w-5 shrink-0 font-mono text-[0.65rem] font-semibold {itemGridIdTextClass(
 					isSelected,
 					true

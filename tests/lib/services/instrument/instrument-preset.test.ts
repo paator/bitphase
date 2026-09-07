@@ -175,4 +175,22 @@ describe('serializeInstrumentPreset', () => {
 		expect(restored.sampleRate).toBe(8000);
 		expect(restored.sampleLoopStart).toBe(1);
 	});
+
+	it('round-trips instrument color', () => {
+		const source = instrumentFromPreset(
+			{
+				name: 'Lead',
+				color: '#AABBCC',
+				macros: { volume: { values: [15], loop: 0 } }
+			},
+			'01',
+			'ay'
+		);
+		const payload = parseInstrumentPreset(serializeInstrumentPreset(source))!;
+		const restored = instrumentFromPreset(payload, '01', 'ay');
+
+		expect(source.color).toBe('#aabbcc');
+		expect(payload.color).toBe('#aabbcc');
+		expect(restored.color).toBe('#aabbcc');
+	});
 });

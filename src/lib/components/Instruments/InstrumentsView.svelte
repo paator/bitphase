@@ -351,6 +351,9 @@
 		const newId = getNextAvailableInstrumentId(existingIds);
 		if (!newId) return;
 		const copy = new InstrumentModel(newId, instrument.name + ' (Copy)', chip.type);
+		if (instrument.color) {
+			copy.color = instrument.color;
+		}
 		if (instrument.macros) {
 			copy.macros = Object.fromEntries(
 				Object.entries(instrument.macros).map(([id, macro]) => [
@@ -591,6 +594,7 @@
 										{isSelected}
 										isUsed={isInstrumentUsed(instrument)}
 										isEditing={editingInstrumentId === index}
+										accentColor={instrument.color}
 										idLabel={instrument.id}
 										nameLabel={instrument.name}
 										copyTitle="Copy instrument"

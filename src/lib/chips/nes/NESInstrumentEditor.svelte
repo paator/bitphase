@@ -10,7 +10,7 @@
 	import IconCarbonRenew from '~icons/carbon/renew';
 	import IconCarbonSettingsAdjust from '~icons/carbon/settings-adjust';
 	import IconCarbonTime from '~icons/carbon/time';
-	import { RowEditorNameField } from '../../components/RowEditorTable';
+	import InstrumentEditorIdentity from '../../components/Instruments/InstrumentEditorIdentity.svelte';
 	import type { NESInstrumentFields } from './instrument';
 	import PillTabs, { type PillTab } from '../../components/PillTabs/PillTabs.svelte';
 	import NESInstrumentSamplePanel from './NESInstrumentSamplePanel.svelte';
@@ -63,14 +63,7 @@
 </script>
 
 <div class="w-full max-w-full min-w-0 overflow-x-auto outline-none focus:outline-none" tabindex="-1">
-	<RowEditorNameField
-		bind:name={
-			() => instrument.name,
-			(value) => {
-				if (value === instrument.name) return;
-				onInstrumentChange({ ...instrument, name: value });
-			}
-		} />
+	<InstrumentEditorIdentity {instrument} {onInstrumentChange} />
 
 	<PillTabs
 		class="mt-3 ml-2"

@@ -142,6 +142,7 @@ describe('Instrument', () => {
 			expect(instrument.name).toBe('Lead');
 			expect(instrument.chipType).toBe('ay');
 			expect(instrument.macros).toBeUndefined();
+			expect(instrument.color).toBeUndefined();
 		});
 
 		it('should create instrument with default name and chip', () => {

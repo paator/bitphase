@@ -1,5 +1,6 @@
 import { Instrument } from '../../models/song';
 import { migrateLegacyInstrument, type LegacyInstrument } from '../instrument/instrument-legacy-migration';
+import { parseHexColor } from '../../utils/hex-color';
 
 type InstrumentMacroBag = Record<string, { values: (boolean | number | string)[]; loop: number }>;
 
@@ -8,6 +9,7 @@ export type InstrumentPresetPayload = {
 	rows?: Record<string, unknown>[];
 	loop?: number;
 	name: string;
+	color?: string;
 	macros?: InstrumentMacroBag;
 	timerMacros?: InstrumentMacroBag;
 	timerPwmDuty?: number;
@@ -54,6 +56,7 @@ export function serializeInstrumentPreset(instrument: Instrument): InstrumentPre
 	return {
 		chipType: instrument.chipType,
 		name: instrument.name,
+		...(instrument.color ? { color: instrument.color } : {}),
 		...(instrument.macros ? { macros: cloneMacros(instrument.macros) } : {}),
 		...(extra.timerMacros ? { timerMacros: cloneMacros(extra.timerMacros) } : {}),
 		...(extra.timerPwmDuty !== undefined ? { timerPwmDuty: extra.timerPwmDuty } : {}),
@@ -86,6 +89,7 @@ export function parseInstrumentPreset(parsed: unknown): InstrumentPresetPayload 
 	const sampleData = parseSampleData(record.sampleData);
 	const pwm = parsePwmFields(record);
 	const sample = parseSampleFields(record, sampleData);
+	const color = typeof record.color === 'string' ? parseHexColor(record.color) : null;
 	if (!rows && !macros && !timerMacros && !sampleData && Object.keys(pwm).length === 0) return null;
 
 	return {
@@ -93,6 +97,7 @@ export function parseInstrumentPreset(parsed: unknown): InstrumentPresetPayload 
 		...(rows ? { rows } : {}),
 		loop: typeof record.loop === 'number' ? record.loop : 0,
 		name: record.name != null ? String(record.name) : '',
+		...(color ? { color } : {}),
 		...(macros ? { macros } : {}),
 		...(timerMacros ? { timerMacros } : {}),
 		...pwm,
@@ -182,6 +187,10 @@ export function instrumentFromPreset(
 	chipType: string
 ): Instrument {
 	const instrument = new Instrument(id, payload.name, chipType);
+	if (payload.color) {
+		const color = parseHexColor(payload.color);
+		if (color) instrument.color = color;
+	}
 	if (payload.macros) {
 		instrument.macros = Object.fromEntries(
 			Object.entries(payload.macros).map(([macroId, macro]) => [

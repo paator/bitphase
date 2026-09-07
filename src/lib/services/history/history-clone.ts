@@ -121,6 +121,9 @@ export class HistoryClone {
 			instrument.name,
 			instrument.chipType ?? 'ay'
 		);
+		if (instrument.color) {
+			cloned.color = instrument.color;
+		}
 		if ((instrument.chipType ?? 'ay') === 'nes') {
 			copyNesInstrumentFields(instrument, cloned);
 		} else {
