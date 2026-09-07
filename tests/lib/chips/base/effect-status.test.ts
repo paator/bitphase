@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { Pattern, Effect } from '@/lib/models/song';
 import { AY_CHIP_SCHEMA } from '@/lib/chips/ay/schema';
-import { describeAyEffect } from '@/lib/chips/ay/effects';
-import { describeNesEffect } from '@/lib/chips/nes/effects';
+import { describeAyEffect, listAyEffectStatusHints } from '@/lib/chips/ay/effects';
+import { describeNesEffect, listNesEffectStatusHints } from '@/lib/chips/nes/effects';
 import {
 	describeGeneralEffect,
 	describePatternEffect,
-	getEffectFromPattern
+	formatEffectStatusHint,
+	getEffectFromPattern,
+	listPatternEffectStatusLines,
+	listPatternEffectStatusSections
 } from '@/lib/chips/base/effect-status';
 
 describe('effect status descriptions', () => {
@@ -17,12 +20,12 @@ describe('effect status descriptions', () => {
 		expect(
 			describeGeneralEffect({ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 })
 		).toBe('VXYZ: Vibrato (X: delay; Y: speed; Z: depth)');
-		expect(
-			describeGeneralEffect({ effect: 4, delay: 0, parameter: 5 })
-		).toBe('4.XY: Instrument Position (XY: row)');
-		expect(
-			describeGeneralEffect({ effect: 5, delay: 0, parameter: 3 })
-		).toBe('5.XY: Table Position (XY: row)');
+		expect(describeGeneralEffect({ effect: 4, delay: 0, parameter: 5 })).toBe(
+			'4.XY: Instrument Position (XY: row)'
+		);
+		expect(describeGeneralEffect({ effect: 5, delay: 0, parameter: 3 })).toBe(
+			'5.XY: Table Position (XY: row)'
+		);
 		expect(
 			describeGeneralEffect({
 				effect: 'V'.charCodeAt(0),
@@ -49,6 +52,77 @@ describe('effect status descriptions', () => {
 				{ describeEffect: describeAyEffect }
 			)
 		).toBe('VXYZ: Vibrato (X: delay; Y: speed; Z: depth)');
+	});
+
+	it('lists the same one-line status-bar descriptions', () => {
+		const arpeggio = describeGeneralEffect({
+			effect: 'A'.charCodeAt(0),
+			delay: 1,
+			parameter: 0x37
+		});
+		const vibratoTable = describeGeneralEffect({
+			effect: 'V'.charCodeAt(0),
+			delay: 1,
+			parameter: 0,
+			tableIndex: 0
+		});
+		const lines = listPatternEffectStatusLines();
+		expect(arpeggio).toBeTruthy();
+		expect(vibratoTable).toBeTruthy();
+		expect(lines).toContain(arpeggio);
+		expect(lines).toContain(vibratoTable);
+		expect(lines).toContain('1XYZ: Slide Down (X: delay; YZ: step)');
+		expect(lines).toContain('S.TY: Speed (Y: table)');
+		expect(lines).not.toContain('E1XY: PWM Min (XY: duty)');
+
+		const ayLines = listPatternEffectStatusLines({
+			listEffectStatusHints: listAyEffectStatusHints
+		});
+		const ayPwm = describeAyEffect({ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x80 });
+		expect(ayLines).toContain(ayPwm);
+		expect(ayLines).toContain(arpeggio);
+		expect(ayLines).not.toContain('E1XY: Pulse Width (XY: duty, 00=inst)');
+
+		const nesLines = listPatternEffectStatusLines({
+			listEffectStatusHints: listNesEffectStatusHints
+		});
+		const nesPulse = describeNesEffect({
+			effect: 'E'.charCodeAt(0),
+			delay: 1,
+			parameter: 0x80
+		});
+		expect(nesLines).toContain(nesPulse);
+		expect(nesLines).not.toContain('E1XY: PWM Min (XY: duty)');
+	});
+
+	it('sections chip-specific effects only for chips in the project', () => {
+		const ayOnly = listPatternEffectStatusSections([
+			{
+				name: 'AY-3-8910 / YM2149F',
+				type: 'ay',
+				listEffectStatusHints: listAyEffectStatusHints
+			}
+		]);
+		expect(ayOnly.map((section) => section.id)).toEqual(['general', 'ay']);
+		const ayLines = ayOnly.flatMap((section) => section.hints.map(formatEffectStatusHint));
+		expect(ayLines).toContain('E1XY: PWM Min (XY: duty)');
+		expect(ayLines).not.toContain('E1XY: Pulse Width (XY: duty, 00=inst)');
+
+		const mixed = listPatternEffectStatusSections([
+			{
+				name: 'AY-3-8910 / YM2149F',
+				type: 'ay',
+				listEffectStatusHints: listAyEffectStatusHints
+			},
+			{
+				name: '2A03 / 2A07',
+				type: 'nes',
+				listEffectStatusHints: listNesEffectStatusHints
+			}
+		]);
+		expect(mixed.map((section) => section.id)).toEqual(['general', 'ay', 'nes']);
+		expect(mixed[1]?.title).toBe('AY-3-8910 / YM2149F');
+		expect(mixed[2]?.title).toBe('2A03 / 2A07');
 	});
 
 	it('reads the selected channel or envelope effect from the pattern', () => {

@@ -34,6 +34,13 @@ describe('selectionPaletteStore', () => {
 		expect(stored).toEqual({ isOpen: true, activeTabId: 'instruments' });
 	});
 
+	it('switches to the effects tab', () => {
+		selectionPaletteStore.selectTab('instruments');
+		selectionPaletteStore.selectTab('effects');
+		expect(selectionPaletteStore.isOpen).toBe(true);
+		expect(selectionPaletteStore.activeTabId).toBe('effects');
+	});
+
 	it('restores persisted state on init', () => {
 		localStorage.setItem(
 			'selectionPalette',
@@ -42,5 +49,15 @@ describe('selectionPaletteStore', () => {
 		selectionPaletteStore.init();
 		expect(selectionPaletteStore.isOpen).toBe(true);
 		expect(selectionPaletteStore.activeTabId).toBe('instruments');
+	});
+
+	it('restores the effects tab from storage', () => {
+		localStorage.setItem(
+			'selectionPalette',
+			JSON.stringify({ isOpen: true, activeTabId: 'effects' })
+		);
+		selectionPaletteStore.init();
+		expect(selectionPaletteStore.isOpen).toBe(true);
+		expect(selectionPaletteStore.activeTabId).toBe('effects');
 	});
 });

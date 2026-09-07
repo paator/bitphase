@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'selectionPalette';
 
-export const SELECTION_PALETTE_TAB_IDS = ['instruments'] as const;
+export const SELECTION_PALETTE_TAB_IDS = ['instruments', 'effects'] as const;
 
 export type SelectionPaletteTabId = (typeof SELECTION_PALETTE_TAB_IDS)[number];
 
@@ -25,7 +25,10 @@ class SelectionPaletteStore {
 			if (typeof parsed.isOpen === 'boolean') {
 				this.isOpen = parsed.isOpen;
 			}
-			if (typeof parsed.activeTabId === 'string' && isSelectionPaletteTabId(parsed.activeTabId)) {
+			if (
+				typeof parsed.activeTabId === 'string' &&
+				isSelectionPaletteTabId(parsed.activeTabId)
+			) {
 				this.activeTabId = parsed.activeTabId;
 			}
 		} catch {

@@ -2,12 +2,9 @@ import type { Chip } from '../types';
 import type { Pattern } from '../../models/song';
 import { isEffectLike, type EffectLike } from '../../utils/type-guards';
 import { PatternEffectHandling } from '../../services/pattern/editing/pattern-effect-handling';
-import {
-	getChannelEffectSlotIndex,
-	isEffectFieldKey
-} from './channel-effect-columns';
+import { getChannelEffectSlotIndex, isEffectFieldKey } from './channel-effect-columns';
 
-type EffectStatusHint = {
+export type EffectStatusHint = {
 	format: string;
 	name: string;
 	params: string;
@@ -61,6 +58,19 @@ const GENERAL_TABLE_HINTS: Record<number, EffectStatusHint> = {
 	['S'.charCodeAt(0)]: { format: 'S.TY', name: 'Speed', params: 'Y: table' }
 };
 
+const GENERAL_EFFECT_CODE_ORDER = [
+	'A'.charCodeAt(0),
+	'V'.charCodeAt(0),
+	1,
+	2,
+	'P'.charCodeAt(0),
+	4,
+	5,
+	6,
+	'D'.charCodeAt(0),
+	'S'.charCodeAt(0)
+];
+
 export function formatEffectStatusHint(hint: EffectStatusHint): string {
 	return `${hint.format}: ${hint.name} (${hint.params})`;
 }
@@ -83,6 +93,50 @@ export function describePatternEffect(
 ): string | null {
 	if (!effect || PatternEffectHandling.isEmptyEffect(effect)) return null;
 	return chip.describeEffect?.(effect) ?? describeGeneralEffect(effect);
+}
+
+export function listGeneralEffectStatusHints(): EffectStatusHint[] {
+	const hints: EffectStatusHint[] = [];
+	for (const code of GENERAL_EFFECT_CODE_ORDER) {
+		const inline = GENERAL_EFFECT_HINTS[code];
+		if (inline) hints.push(inline);
+		const table = GENERAL_TABLE_HINTS[code];
+		if (table) hints.push(table);
+	}
+	return hints;
+}
+
+export function listPatternEffectStatusHints(
+	chip?: Pick<Chip, 'listEffectStatusHints'>
+): EffectStatusHint[] {
+	return [...listGeneralEffectStatusHints(), ...(chip?.listEffectStatusHints?.() ?? [])];
+}
+
+export type EffectStatusSection = {
+	id: string;
+	title: string;
+	hints: EffectStatusHint[];
+};
+
+export function listPatternEffectStatusSections(
+	chips: Array<Pick<Chip, 'name' | 'type' | 'listEffectStatusHints'>> = []
+): EffectStatusSection[] {
+	const sections: EffectStatusSection[] = [
+		{ id: 'general', title: 'General', hints: listGeneralEffectStatusHints() }
+	];
+	const seen = new Set<string>();
+	for (const chip of chips) {
+		if (seen.has(chip.type)) continue;
+		seen.add(chip.type);
+		const hints = chip.listEffectStatusHints?.() ?? [];
+		if (hints.length === 0) continue;
+		sections.push({ id: chip.type, title: chip.name, hints });
+	}
+	return sections;
+}
+
+export function listPatternEffectStatusLines(chip?: Pick<Chip, 'listEffectStatusHints'>): string[] {
+	return listPatternEffectStatusHints(chip).map(formatEffectStatusHint);
 }
 
 export function getEffectFromPattern(

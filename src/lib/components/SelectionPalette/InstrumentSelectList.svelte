@@ -3,11 +3,7 @@
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { ITEM_COMPACT_ROW_HEIGHT } from '../../config/item-grid';
-	import {
-		itemGridCellBackground,
-		itemGridIdTextClass,
-		itemGridNameTextClass
-	} from '../../utils/item-grid-cell';
+	import { itemGridIdTextClass, itemGridNameTextClass } from '../../utils/item-grid-cell';
 
 	let { chipType = 'ay' }: { chipType?: string } = $props();
 
@@ -24,10 +20,12 @@
 		{@const isSelected = selectedId === instrument.id}
 		<button
 			type="button"
-			class="flex w-full min-w-0 cursor-pointer items-center gap-1.5 px-2 py-0.5 text-left {itemGridCellBackground(
-				isSelected,
-				true
-			)}"
+			class={[
+				'flex w-full min-w-0 cursor-pointer items-center gap-1.5 px-2 py-0.5 text-left',
+				isSelected
+					? 'bg-[var(--color-app-primary)]'
+					: 'bg-transparent hover:bg-[var(--color-app-surface-hover)]'
+			]}
 			style:min-height="{ITEM_COMPACT_ROW_HEIGHT}px"
 			onclick={() => selectInstrument(instrument.id)}>
 			<span

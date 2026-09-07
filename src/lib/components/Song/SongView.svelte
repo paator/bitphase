@@ -39,7 +39,10 @@
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { isEditableElement } from '../../utils/shortcut-input-exclusion';
 	import { ACTION_REDO, ACTION_TOGGLE_PLAYBACK, ACTION_UNDO } from '../../config/keybindings';
-	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
+	import {
+		filterInstrumentsForChip,
+		getOrderedProjectChipTypes
+	} from '../../services/instrument/instrument-filter';
 	import { EmptyState } from '../EmptyState';
 	import { newSongOptions } from '../../config/app-menu';
 	import IconCarbonChevronRight from '~icons/carbon/chevron-right';
@@ -163,15 +166,20 @@
 	);
 
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
+	const paletteChips = $derived.by(() => {
+		const byType = new Map(
+			chipProcessors.map((processor) => [processor.chip.type, processor.chip])
+		);
+		return getOrderedProjectChipTypes(chipProcessors)
+			.map((type) => byType.get(type))
+			.filter((chip) => chip != null);
+	});
 
 	function getHardwareChannelLabels(chipIndex: number): string[] {
 		return chipProcessors[chipIndex]?.chip.schema.channelLabels ?? ['A', 'B', 'C'];
 	}
 
-	function getVirtualIndicesForOscilloscopeChannel(
-		chipIndex: number,
-		hwIndex: number
-	): number[] {
+	function getVirtualIndicesForOscilloscopeChannel(chipIndex: number, hwIndex: number): number[] {
 		return getVirtualIndicesForHardwareChannel(
 			hwIndex,
 			getHardwareChannelLabels(chipIndex),
@@ -586,12 +594,14 @@
 				class="flex min-h-0 min-w-max flex-1 flex-col overflow-hidden transition-all duration-300 {blurredContentClass}">
 				<div class="flex min-h-0 min-w-0 flex-1 flex-nowrap justify-center px-8">
 					{#if projectStore.songs.length === 0}
-						<div class="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+						<div
+							class="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
 							<EmptySongPatternBackdrop />
 							<div
 								class="pointer-events-none absolute inset-0 bg-[var(--color-app-surface-secondary)]/50">
 							</div>
-							<div class="relative z-10 flex items-center justify-center p-8 pointer-events-auto">
+							<div
+								class="pointer-events-auto relative z-10 flex items-center justify-center p-8">
 								<EmptyState
 									icon={IconCarbonChip}
 									title="No songs yet"
@@ -602,7 +612,8 @@
 											<button
 												type="button"
 												class="group flex w-full cursor-pointer items-center gap-3 rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-3 py-2.5 text-left text-[var(--color-app-text-secondary)] transition-colors hover:border-[var(--color-app-border-hover)] hover:bg-[var(--color-app-surface-hover)]"
-												onclick={() => onaction?.({ action: option.action })}>
+												onclick={() =>
+													onaction?.({ action: option.action })}>
 												<span
 													class="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-[var(--color-app-surface-secondary)]">
 													<IconCarbonChip
@@ -781,7 +792,7 @@
 					aria-label="Collapse panel"></button>
 			{/if}
 		</div>
-		<SelectionPalette chipType={activeChipProcessor?.chip.type} />
+		<SelectionPalette chip={activeChipProcessor?.chip} chips={paletteChips} />
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div

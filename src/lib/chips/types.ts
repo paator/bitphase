@@ -29,4 +29,9 @@ export interface Chip {
 		parameter?: number;
 		tableIndex?: number;
 	}) => string | null;
+	listEffectStatusHints?: () => Array<{
+		format: string;
+		name: string;
+		params: string;
+	}>;
 }
