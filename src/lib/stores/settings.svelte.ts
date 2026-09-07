@@ -6,7 +6,7 @@ const STORAGE_KEY = 'settings';
 class SettingsStore {
 	volume = $state(60);
 	envelopeAsNote = $state(false);
-	autoEnterInstrument = $state(false);
+	autoEnterInstrument = $state(true);
 	midiInputDeviceId = $state('');
 	patternEditorFontSize = $state(14);
 	patternEditorFontFamily = $state('monospace');
@@ -21,7 +21,6 @@ class SettingsStore {
 	selectionStyle = $state<'inverted' | 'filled'>('inverted');
 	emptyNoteAlignment = $state<'center' | 'baseline'>('center');
 	classicInstrumentEditor = $state(false);
-	compactInstrumentList = $state(false);
 
 	init(): void {
 		const stored = localStorage.getItem(STORAGE_KEY);

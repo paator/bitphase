@@ -1,6 +1,7 @@
 import { settingsStore } from './stores/settings.svelte';
 import { keybindingsStore } from './stores/keybindings.svelte';
 import { editorStateStore } from './stores/editor-state.svelte';
+import { selectionPaletteStore } from './stores/selection-palette.svelte';
 import { themeStore } from './stores/theme.svelte';
 import { themeService } from './services/theme/theme-service';
 import { userScriptsStore } from './stores/user-scripts.svelte';
@@ -12,6 +13,7 @@ export function runAppBootstrap(): void {
 	midiService.setSelectedInputId(settingsStore.midiInputDeviceId || null);
 	keybindingsStore.init();
 	editorStateStore.init();
+	selectionPaletteStore.init();
 	themeStore.init(themeService);
 	userScriptsStore.init();
 	alphaNoticeStore.init();

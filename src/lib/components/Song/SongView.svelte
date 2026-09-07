@@ -14,6 +14,7 @@
 	import { TablesView } from '../Tables';
 	import { DetailsView } from '../Details';
 	import { InstrumentsView } from '../Instruments';
+	import { SelectionPalette } from '../SelectionPalette';
 	import IconCarbonChip from '~icons/carbon/chip';
 	import IconCarbonListBoxes from '~icons/carbon/list-boxes';
 	import IconCarbonDataTable from '~icons/carbon/data-table';
@@ -583,7 +584,7 @@
 			</div>
 			<div
 				class="flex min-h-0 min-w-max flex-1 flex-col overflow-hidden transition-all duration-300 {blurredContentClass}">
-				<div class="flex min-h-0 min-w-0 flex-1 flex-nowrap justify-center">
+				<div class="flex min-h-0 min-w-0 flex-1 flex-nowrap justify-center px-8">
 					{#if projectStore.songs.length === 0}
 						<div class="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
 							<EmptySongPatternBackdrop />
@@ -780,6 +781,7 @@
 					aria-label="Collapse panel"></button>
 			{/if}
 		</div>
+		<SelectionPalette chipType={activeChipProcessor?.chip.type} />
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div

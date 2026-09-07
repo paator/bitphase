@@ -43,8 +43,7 @@
 		debugMode: settingsStore.debugMode,
 		selectionStyle: settingsStore.selectionStyle,
 		emptyNoteAlignment: settingsStore.emptyNoteAlignment,
-		classicInstrumentEditor: settingsStore.classicInstrumentEditor,
-		compactInstrumentList: settingsStore.compactInstrumentList
+		classicInstrumentEditor: settingsStore.classicInstrumentEditor
 	};
 	let tempSettings = $state<Settings>({ ...currentSettings });
 	let activeTabId = $state(initialTabId || 'general');

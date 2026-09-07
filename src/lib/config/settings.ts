@@ -46,7 +46,7 @@ export const settingsItems: SettingsItem[] = [
 		label: 'Auto-enter Instrument',
 		description: 'Automatically insert the current instrument index when entering notes',
 		type: 'toggle',
-		defaultValue: false,
+		defaultValue: true,
 		setting: 'autoEnterInstrument',
 		category: 'general'
 	},
@@ -139,14 +139,6 @@ export const settingsItems: SettingsItem[] = [
 		type: 'toggle',
 		defaultValue: false,
 		setting: 'decimalRowNumbers',
-		category: 'appearance'
-	},
-	{
-		label: 'Compact Instrument List',
-		description: 'Show instruments as a compact top-to-bottom list instead of a wrapping grid',
-		type: 'toggle',
-		defaultValue: false,
-		setting: 'compactInstrumentList',
 		category: 'appearance'
 	},
 	{
