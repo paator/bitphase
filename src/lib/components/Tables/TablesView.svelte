@@ -28,6 +28,7 @@
 	} from '../../utils/table-id';
 	import { projectStore } from '../../stores/project.svelte';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
+	import { settingsStore } from '../../stores/settings.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
 	import { createPersistedResizableListHeight } from '../../utils/persisted-resizable-list-height.svelte';
 	import {
@@ -66,7 +67,6 @@
 		)
 	);
 
-	let asHex = $state(false);
 	let selectedTableIndex = $state(0);
 	let selectedTableRowIndices = $state<number[]>([]);
 	let tableListScrollRef: HTMLDivElement | null = $state(null);
@@ -381,6 +381,7 @@
 		}
 	}
 
+	const asHex = $derived(settingsStore.hexNumerals);
 	const hexIcon = $derived(asHex ? IconCarbonHexagonSolid : IconCarbonHexagonOutline);
 	const expandIcon = $derived(isExpanded ? IconCarbonMinimize : IconCarbonMaximize);
 
@@ -388,7 +389,7 @@
 		{
 			label: 'Hex',
 			icon: hexIcon,
-			onClick: () => (asHex = !asHex),
+			onClick: () => settingsStore.set('hexNumerals', !asHex),
 			class: asHex ? 'text-[var(--color-app-primary)]' : ''
 		},
 		{

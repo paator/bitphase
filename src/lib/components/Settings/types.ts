@@ -8,6 +8,7 @@ export interface Settings {
 	uiFontFamily: string;
 	channelSeparatorWidth: number;
 	decimalRowNumbers: boolean;
+	hexNumerals: boolean;
 	showOscilloscopes: boolean;
 	showChannelVolumeBars: boolean;
 	showInstrumentPreview: boolean;

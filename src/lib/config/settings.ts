@@ -142,6 +142,14 @@ export const settingsItems: SettingsItem[] = [
 		category: 'appearance'
 	},
 	{
+		label: 'Hexadecimal Numbers',
+		description: 'Display instrument and table editor values as hexadecimal',
+		type: 'toggle',
+		defaultValue: false,
+		setting: 'hexNumerals',
+		category: 'appearance'
+	},
+	{
 		label: 'Show Oscilloscopes',
 		description: 'Display per-channel waveform oscilloscopes',
 		type: 'toggle',

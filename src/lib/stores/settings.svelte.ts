@@ -13,6 +13,7 @@ class SettingsStore {
 	uiFontFamily = $state('Fira Code');
 	channelSeparatorWidth = $state(1);
 	decimalRowNumbers = $state(false);
+	hexNumerals = $state(false);
 	showOscilloscopes = $state(true);
 	showChannelVolumeBars = $state(true);
 	showInstrumentPreview = $state(true);

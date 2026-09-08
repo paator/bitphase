@@ -35,4 +35,10 @@ describe('row-editor-numeric', () => {
 		expect(commitRowEditorNumericInput(input, 0, true, { min: 0, max: 15 })).toBe(10);
 		expect(input.value).toBe(formatRowEditorNumber(10, true));
 	});
+
+	it('formats table row numbers as hex', () => {
+		expect(formatRowEditorNumber(10, false)).toBe('10');
+		expect(formatRowEditorNumber(10, true)).toBe('A');
+		expect(formatRowEditorNumber(15, true)).toBe('F');
+	});
 });

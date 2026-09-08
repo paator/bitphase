@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { ROW_SELECTION_STYLES } from '../../utils/row-selection';
+	import { formatRowEditorNumber } from '../../utils/row-editor-numeric';
 
 	let {
 		index,
 		selected,
+		asHex = false,
 		sizeClass = 'px-2 py-1.5',
 		onmousedown
 	}: {
 		index: number;
 		selected: boolean;
+		asHex?: boolean;
 		sizeClass?: string;
 		onmousedown: (e: MouseEvent) => void;
 	} = $props();
@@ -21,4 +24,4 @@
 	role="button"
 	tabindex="-1"
 	onmousedown={onmousedown}
-	title="Click to select, Shift+click for range, Ctrl/Cmd+click to toggle">{index}</td>
+	title="Click to select, Shift+click for range, Ctrl/Cmd+click to toggle">{formatRowEditorNumber(index, asHex)}</td>

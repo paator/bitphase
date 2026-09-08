@@ -36,6 +36,7 @@
 		uiFontFamily: settingsStore.uiFontFamily,
 		channelSeparatorWidth: settingsStore.channelSeparatorWidth,
 		decimalRowNumbers: settingsStore.decimalRowNumbers,
+		hexNumerals: settingsStore.hexNumerals,
 		showOscilloscopes: settingsStore.showOscilloscopes,
 		showChannelVolumeBars: settingsStore.showChannelVolumeBars,
 		showInstrumentPreview: settingsStore.showInstrumentPreview,

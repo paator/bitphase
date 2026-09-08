@@ -398,6 +398,7 @@
 						<SelectableRowNumberCell
 							{index}
 							{selected}
+							{asHex}
 							sizeClass={isExpanded
 								? 'w-14 min-w-14 px-2 py-1.5'
 								: 'w-8 min-w-8 px-1 py-1 text-[0.65rem]'}

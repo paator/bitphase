@@ -45,6 +45,7 @@
 	} from '../../services/instrument/instrument-preset';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
+	import { settingsStore } from '../../stores/settings.svelte';
 	import { computeGridRows } from '../../utils/compute-grid-rows';
 	import { createPersistedResizableListHeight } from '../../utils/persisted-resizable-list-height.svelte';
 	import {
@@ -105,7 +106,6 @@
 		)
 	);
 
-	let asHex = $state(false);
 	let selectedInstrumentIndex = $state(0);
 	let instrumentListScrollRef: HTMLDivElement | null = $state(null);
 
@@ -183,6 +183,7 @@
 	});
 
 	const InstrumentEditor = $derived(chip?.instrumentEditor);
+	const asHex = $derived(settingsStore.hexNumerals);
 
 	const hexIcon = $derived(asHex ? IconCarbonHexagonSolid : IconCarbonHexagonOutline);
 	const expandIcon = $derived(isExpanded ? IconCarbonMinimize : IconCarbonMaximize);
@@ -191,7 +192,7 @@
 		{
 			label: 'Hex',
 			icon: hexIcon,
-			onClick: () => (asHex = !asHex),
+			onClick: () => settingsStore.set('hexNumerals', !asHex),
 			class: asHex ? 'text-[var(--color-app-primary)]' : ''
 		},
 		{

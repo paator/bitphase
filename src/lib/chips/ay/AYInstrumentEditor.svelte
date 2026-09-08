@@ -185,7 +185,7 @@
 				{onInstrumentChange} />
 		{/if}
 	{:else if classicEditor}
-		<AYInstrumentClassicTimer {isExpanded} />
+		<AYInstrumentClassicTimer {isExpanded} {asHex} />
 	{:else}
 		<InstrumentMacrosEditor
 			instrument={timerInstrument}

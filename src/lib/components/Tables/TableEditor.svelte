@@ -322,6 +322,7 @@
 							<SelectableRowNumberCell
 								{index}
 								{selected}
+								{asHex}
 								sizeClass="px-2 py-1.5"
 								onmousedown={(e) => selection.handleRowSelect(index, e)} />
 							<RowEditorActionsCell
@@ -417,6 +418,7 @@
 							<SelectableRowNumberCell
 								{index}
 								{selected}
+								{asHex}
 								sizeClass="px-2 py-1.5"
 								onmousedown={(e) => selection.handleRowSelect(index, e)} />
 							{#each SHIFT_VALUES as s}

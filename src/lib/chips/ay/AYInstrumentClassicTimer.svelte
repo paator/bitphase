@@ -18,7 +18,7 @@
 	import { getAyTimerEffectsContext } from './ay-timer-effects-context';
 	import type { TimerEditPanel, TimerEffectDragField } from './ay-timer-effects-controller.svelte';
 
-	let { isExpanded = false }: { isExpanded?: boolean } = $props();
+	let { isExpanded = false, asHex = false }: { isExpanded?: boolean; asHex?: boolean } = $props();
 
 	const controller = getAyTimerEffectsContext();
 	const timerEditTabs = $derived.by((): PillTab[] => [
@@ -118,6 +118,7 @@
 						<SelectableRowNumberCell
 							{index}
 							{selected}
+							{asHex}
 							sizeClass={isExpanded
 								? 'w-14 min-w-14 px-2 py-1.5'
 								: 'w-8 min-w-8 px-1 py-1 text-[0.65rem]'}
