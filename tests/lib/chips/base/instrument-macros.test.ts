@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	alignSharedSequenceMacros,
 	groupInstrumentMacroFields,
 	instrumentRowsToMacros,
 	macrosToInstrumentRows,
@@ -12,6 +13,7 @@ import {
 	setInstrumentMacroValue
 } from '@/lib/chips/base/instrument-macros';
 import { AY_MIXER_MACRO_FIELDS } from '@/lib/chips/ay/mixer-macros';
+import { AY_TIMER_MACRO_FIELDS } from '@/lib/chips/ay/ay-timer-macros';
 import { NES_APU_MACRO_FIELDS } from '@/lib/chips/nes/apu-macros';
 
 describe('sampleInstrumentMacroIndex', () => {
@@ -282,6 +284,42 @@ describe('groupInstrumentMacroFields', () => {
 		expect(groups.find((group) => group.label === 'Envelope retrigger')?.shareSequence).toBe(
 			true
 		);
+	});
+
+	it('keeps AY timer effect groups on independent shared sequences', () => {
+		expect(
+			groupInstrumentMacroFields(AY_TIMER_MACRO_FIELDS).map((group) => [
+				group.label,
+				group.fields.map((field) => field.id),
+				group.shareSequence
+			])
+		).toEqual([
+			['SID / Syncbuzzer', ['sid', 'syncbuzzer', 'timerWaveform'], true],
+			['FM', ['fm', 'fmOffsetMode', 'fmWaveform'], true],
+			['Env FM', ['envFm', 'envFmOffsetMode', 'envFmWaveform'], true],
+			['Semitone Δ', ['semitone'], false],
+			['Period Δ', ['detune'], false]
+		]);
+	});
+
+	it('does not pad unrelated AY timer groups to the longest sequence', () => {
+		const macros = alignSharedSequenceMacros(
+			{
+				sid: { values: [true, false, true], loop: 0 },
+				syncbuzzer: { values: [false], loop: 0 },
+				timerWaveform: { values: ['[15,0]'], loop: 0 },
+				fm: { values: [false, true, true, true, true], loop: 1 },
+				semitone: { values: [0], loop: 0 },
+				detune: { values: [1], loop: 0 }
+			},
+			AY_TIMER_MACRO_FIELDS
+		);
+		expect(macros.sid?.values).toHaveLength(3);
+		expect(macros.syncbuzzer?.values).toHaveLength(3);
+		expect(macros.timerWaveform?.values).toHaveLength(3);
+		expect(macros.fm?.values).toHaveLength(5);
+		expect(macros.semitone?.values).toHaveLength(1);
+		expect(macros.detune?.values).toHaveLength(1);
 	});
 
 	it('keeps NES APU macros on independent sequences', () => {

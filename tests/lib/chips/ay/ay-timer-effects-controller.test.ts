@@ -5,7 +5,8 @@ import {
 	AY_TIMER_WAVEFORM_MAX_LENGTH,
 	sampleTimerRowFromInstrument
 } from '@/lib/chips/ay/instrument';
-import { decodeTimerWaveform } from '@/lib/chips/ay/ay-timer-macros';
+import { decodeTimerWaveform, encodeTimerWaveform } from '@/lib/chips/ay/ay-timer-macros';
+import type { InstrumentMacros } from '@/lib/chips/base/instrument-macros';
 import { Instrument } from '@/lib/models/song';
 import { HistoryClone } from '@/lib/services/history/history-clone';
 import { legacyInstrument } from '../../../helpers/instrument-fixtures';
@@ -46,6 +47,29 @@ function createInstrument(
 		(instrument as Instrument & { timerPwmPreserveOnNewNote?: boolean }).timerPwmPreserveOnNewNote =
 			pwm.timerPwmPreserveOnNewNote;
 	}
+	return instrument;
+}
+
+function timerMacrosOf(instrument: Instrument): InstrumentMacros {
+	return (instrument as Instrument & { timerMacros?: InstrumentMacros }).timerMacros ?? {};
+}
+
+function withIndependentTimerGroups(instrument: Instrument): Instrument {
+	const macros = timerMacrosOf(instrument);
+	(instrument as Instrument & { timerMacros?: InstrumentMacros }).timerMacros = {
+		...macros,
+		fm: { values: [false, true, true, true, true], loop: 0 },
+		fmOffsetMode: { values: [0, 0, 0, 0, 0], loop: 0 },
+		fmWaveform: {
+			values: Array.from({ length: 5 }, () => encodeTimerWaveform([0, 7])),
+			loop: 0
+		},
+		envFm: { values: [false], loop: 0 },
+		envFmOffsetMode: { values: [0], loop: 0 },
+		envFmWaveform: { values: [encodeTimerWaveform([0, 7])], loop: 0 },
+		semitone: { values: [0], loop: 0 },
+		detune: { values: [1], loop: 0 }
+	};
 	return instrument;
 }
 
@@ -448,6 +472,63 @@ describe('AyTimerEffectsController', () => {
 		expect(controller.timerRowCount()).toBe(1);
 		expect(controller.rowToneDetune(0)).toBe(3);
 		expect(controller.rowDetune(0)).toBe(12);
+	});
+
+	it('does not expand unrelated timer macro groups when editing a SID waveform step', () => {
+		let current = withIndependentTimerGroups(
+			createInstrument([
+				{ sid: true, timerWaveform: [15, 0] },
+				{ sid: true, timerWaveform: [14, 1] },
+				{ sid: true, timerWaveform: [13, 2] }
+			])
+		);
+		const controller = new AyTimerEffectsController(
+			() => current,
+			(instrument) => {
+				current = instrument;
+			},
+			() => false
+		);
+
+		controller.setTimerEditPanel('mix');
+		controller.setRowTimerWaveform(2, [15, 8, 0]);
+
+		const macros = timerMacrosOf(current);
+		expect(macros.sid?.values).toHaveLength(3);
+		expect(macros.syncbuzzer?.values).toHaveLength(3);
+		expect(macros.timerWaveform?.values).toHaveLength(3);
+		expect(macros.fm?.values).toHaveLength(5);
+		expect(macros.fmWaveform?.values).toHaveLength(5);
+		expect(macros.envFm?.values).toHaveLength(1);
+		expect(macros.semitone?.values).toHaveLength(1);
+		expect(macros.detune?.values).toHaveLength(1);
+		expect(decodeTimerWaveform(String(macros.timerWaveform?.values[2] ?? ''))).toEqual([15, 8, 0]);
+	});
+
+	it('does not expand unrelated timer macro groups when toggling SID', () => {
+		let current = withIndependentTimerGroups(
+			createInstrument([
+				{ sid: false, timerWaveform: [15, 0] },
+				{ sid: false, timerWaveform: [15, 0] },
+				{ sid: false, timerWaveform: [15, 0] }
+			])
+		);
+		const controller = new AyTimerEffectsController(
+			() => current,
+			(instrument) => {
+				current = instrument;
+			},
+			() => false
+		);
+
+		controller.updateSidRow(0, true);
+
+		const macros = timerMacrosOf(current);
+		expect(macros.sid?.values).toHaveLength(3);
+		expect(macros.fm?.values).toHaveLength(5);
+		expect(macros.envFm?.values).toHaveLength(1);
+		expect(macros.semitone?.values).toHaveLength(1);
+		expect(macros.sid?.values[0]).toBe(true);
 	});
 
 	it('keeps sid and syncbuzzer exclusive when toggling rows', () => {

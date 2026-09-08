@@ -2,8 +2,11 @@ import { Instrument } from '../../models/song';
 import {
 	cloneInstrumentMacros,
 	createDefaultInstrumentMacro,
+	groupInstrumentMacroFields,
+	instrumentMacroUpdates,
 	setSharedSequenceLength,
 	setSharedSequenceLoop,
+	type InstrumentMacroField,
 	type InstrumentMacroValue,
 	type InstrumentMacros
 } from '../base/instrument-macros';
@@ -181,27 +184,54 @@ export class AyTimerEffectsController {
 	}
 
 	private waveformStepLimit(): number {
-		return this.timerRowCount();
+		return this.activeSequenceLength();
 	}
 
-	private syncAllTimerMacros(macros: InstrumentMacros): InstrumentMacros {
-		const length = Math.max(
-			1,
-			...AY_TIMER_MACRO_FIELDS.map((field) => macros[field.id]?.values.length ?? 0)
+	private activeSequenceFields(): readonly InstrumentMacroField[] {
+		const fieldId =
+			this.timerEditPanel === 'envFm' ? 'envFm' : this.timerEditPanel === 'fm' ? 'fm' : 'sid';
+		return (
+			groupInstrumentMacroFields(AY_TIMER_MACRO_FIELDS).find((group) =>
+				group.fields.some((field) => field.id === fieldId)
+			)?.fields ?? []
 		);
-		const loop = macros['sid']?.loop ?? 0;
-		return setSharedSequenceLoop(
-			setSharedSequenceLength(macros, AY_TIMER_MACRO_FIELDS, length),
-			AY_TIMER_MACRO_FIELDS,
-			loop
+	}
+
+	private activeSequenceLength(): number {
+		return Math.max(
+			1,
+			...this.activeSequenceFields().map(
+				(field) => this.fields.timerMacros[field.id]?.values.length ?? 0
+			)
 		);
 	}
 
 	private commitTimerMacros(macros: InstrumentMacros): void {
 		this.commitFields({
 			...this.fields,
-			timerMacros: this.syncAllTimerMacros(macros)
+			timerMacros: instrumentMacroUpdates(macros, AY_TIMER_MACRO_FIELDS).macros
 		});
+	}
+
+	private ensureSequenceCoversStep(
+		macros: InstrumentMacros,
+		fieldIds: readonly string[],
+		stepIndex: number
+	): InstrumentMacros {
+		let next = macros;
+		for (const group of groupInstrumentMacroFields(AY_TIMER_MACRO_FIELDS)) {
+			const touching = group.fields.filter((field) => fieldIds.includes(field.id));
+			if (touching.length === 0) continue;
+			const groupFields = group.shareSequence ? group.fields : touching;
+			const length = Math.max(
+				1,
+				...groupFields.map((field) => next[field.id]?.values.length ?? 0)
+			);
+			if (stepIndex >= length) {
+				next = setSharedSequenceLength(next, groupFields, stepIndex + 1);
+			}
+		}
+		return next;
 	}
 
 	private setMacroStepValue(fieldId: string, stepIndex: number, value: InstrumentMacroValue): void {
@@ -212,14 +242,18 @@ export class AyTimerEffectsController {
 		updates: Record<string, InstrumentMacroValue>,
 		stepIndex: number
 	): void {
-		let nextMacros = this.syncAllTimerMacros(this.fields.timerMacros);
+		if (stepIndex < 0) return;
+		const fieldIds = Object.keys(updates);
+		let nextMacros = this.ensureSequenceCoversStep(
+			this.fields.timerMacros,
+			fieldIds,
+			stepIndex
+		);
 		for (const [fieldId, value] of Object.entries(updates)) {
-			const macro =
-				nextMacros[fieldId] ??
-				createDefaultInstrumentMacro(
-					AY_TIMER_MACRO_FIELDS.find((field) => field.id === fieldId)!
-				);
-			if (stepIndex < 0 || stepIndex >= macro.values.length) continue;
+			const field = AY_TIMER_MACRO_FIELDS.find((item) => item.id === fieldId);
+			if (!field) continue;
+			const macro = nextMacros[fieldId] ?? createDefaultInstrumentMacro(field);
+			if (stepIndex >= macro.values.length) continue;
 			const values = [...macro.values];
 			values[stepIndex] = value;
 			nextMacros = { ...nextMacros, [fieldId]: { ...macro, values } };
@@ -620,12 +654,17 @@ export class AyTimerEffectsController {
 		else this.updateEnvFmRow(index, value);
 	}
 
-	private writeTimerRow(index: number, row: AyTimerRow): void {
+	private writeTimerGroupRow(index: number, row: AyTimerRow, fieldId: string): void {
+		const group = groupInstrumentMacroFields(AY_TIMER_MACRO_FIELDS).find((item) =>
+			item.fields.some((field) => field.id === fieldId)
+		);
+		const fields =
+			group?.fields ?? AY_TIMER_MACRO_FIELDS.filter((field) => field.id === fieldId);
 		const updates: Record<string, InstrumentMacroValue> = {};
-		for (const field of AY_TIMER_MACRO_FIELDS) {
+		for (const field of fields) {
 			updates[field.id] = field.fromRow
 				? field.fromRow(row as Record<string, unknown>)
-				: (row as Record<string, unknown>)[field.id] as InstrumentMacroValue;
+				: ((row as Record<string, unknown>)[field.id] as InstrumentMacroValue);
 		}
 		this.setMacroStepValues(updates, index);
 	}
@@ -638,11 +677,12 @@ export class AyTimerEffectsController {
 			sid,
 			syncbuzzer: sid ? false : row.syncbuzzer
 		});
-		this.writeTimerRow(
+		this.writeTimerGroupRow(
 			index,
 			sid && wasSyncbuzzer
 				? { ...resolved, timerWaveform: [...DEFAULT_AY_TIMER_WAVEFORM] }
-				: resolved
+				: resolved,
+			'sid'
 		);
 	}
 
@@ -658,28 +698,33 @@ export class AyTimerEffectsController {
 			syncbuzzer &&
 			(wasSid || isDefaultSidTimerWaveform(effectiveRowMixTimerWaveform(resolved)))
 		) {
-			this.writeTimerRow(index, {
-				...resolved,
-				timerWaveform: [...DEFAULT_AY_SYNCBUZZER_WAVEFORM]
-			});
+			this.writeTimerGroupRow(
+				index,
+				{
+					...resolved,
+					timerWaveform: [...DEFAULT_AY_SYNCBUZZER_WAVEFORM]
+				},
+				'syncbuzzer'
+			);
 			return;
 		}
-		this.writeTimerRow(index, resolved);
+		this.writeTimerGroupRow(index, resolved, 'syncbuzzer');
 	}
 
 	updateFmRow(index: number, fm: boolean): void {
 		const row = sampleTimerRowFromMacros(this.fields.timerMacros, index);
 		const resolved = resolveExclusiveTimerEffects({ ...row, fm });
 		if (!fm) {
-			this.writeTimerRow(index, resolved);
+			this.writeTimerGroupRow(index, resolved, 'fm');
 			return;
 		}
 		const hasFmWaveform = Boolean(row.fmWaveform && row.fmWaveform.length > 0);
-		this.writeTimerRow(
+		this.writeTimerGroupRow(
 			index,
 			hasFmWaveform
 				? resolved
-				: { ...resolved, fmWaveform: defaultAyFmWaveform(resolveAyFmOffsetMode(resolved)) }
+				: { ...resolved, fmWaveform: defaultAyFmWaveform(resolveAyFmOffsetMode(resolved)) },
+			'fm'
 		);
 	}
 
@@ -687,15 +732,16 @@ export class AyTimerEffectsController {
 		const row = sampleTimerRowFromMacros(this.fields.timerMacros, index);
 		const resolved = resolveExclusiveTimerEffects({ ...row, envFm });
 		if (!envFm) {
-			this.writeTimerRow(index, resolved);
+			this.writeTimerGroupRow(index, resolved, 'envFm');
 			return;
 		}
 		const hasEnvFmWaveform = Boolean(row.envFmWaveform && row.envFmWaveform.length > 0);
-		this.writeTimerRow(
+		this.writeTimerGroupRow(
 			index,
 			hasEnvFmWaveform
 				? resolved
-				: { ...resolved, envFmWaveform: defaultAyFmWaveform(resolveAyEnvFmOffsetMode(resolved)) }
+				: { ...resolved, envFmWaveform: defaultAyFmWaveform(resolveAyEnvFmOffsetMode(resolved)) },
+			'envFm'
 		);
 	}
 
