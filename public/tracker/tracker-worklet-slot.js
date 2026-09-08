@@ -43,6 +43,13 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 
 	_applyPlaybackCarry(carry) {
 		if (!carry) return;
+		if (typeof carry.speedTable === 'number') {
+			this.state.speedTable = carry.speedTable;
+			this.state.speedTablePosition =
+				typeof carry.speedTablePosition === 'number' && carry.speedTablePosition >= 0
+					? carry.speedTablePosition
+					: 0;
+		}
 		if (carry.speed > 0) {
 			this._publishLeaderPlaybackSpeed(carry.speed);
 		}

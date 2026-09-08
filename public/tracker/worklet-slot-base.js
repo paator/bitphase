@@ -39,7 +39,7 @@ export class WorkletSlotBase {
 	_applyPlaybackSpeed(_speed) {}
 
 	_publishLeaderPlaybackSpeed(speed) {
-		if (this.chipIndex !== 0 || !(speed > 0)) return;
+		if (!(speed > 0)) return;
 		this._applyPlaybackSpeed(speed);
 	}
 

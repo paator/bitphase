@@ -163,7 +163,7 @@ describe('PSG import', () => {
 				);
 			}
 		}
-	}, 60_000);
+	});
 
 	it('replays the source registers exactly after import', async () => {
 		const { project } = importPsgBuffer(buildPsg(), 'demo');
@@ -183,5 +183,5 @@ describe('PSG import', () => {
 				);
 			}
 		}
-	}, 60_000);
+	});
 });

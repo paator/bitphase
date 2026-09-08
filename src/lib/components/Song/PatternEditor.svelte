@@ -99,7 +99,11 @@
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import { projectStore } from '../../stores/project.svelte';
 	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
-	import { collectPlaybackCarry } from '../../services/audio/play-from-position';
+	import {
+		collectPlaybackCarry,
+		type PlaybackCarryState
+	} from '../../services/audio/play-from-position';
+	import { findLastSpeedCommand } from '../../services/audio/playback-speed';
 	import {
 		getVirtualChannelGroups,
 		getHardwareChannelIndex,
@@ -812,34 +816,73 @@
 		isEnterKeyHeld = false;
 	}
 
+	function mergeSpeedCarry(
+		carry: PlaybackCarryState | null,
+		orderIndex: number,
+		startRow: number,
+		chipIndex: number
+	): PlaybackCarryState | null {
+		const speedState = findLastSpeedCommand(
+			projectStore.patterns,
+			patternOrder,
+			orderIndex,
+			startRow - 1,
+			projectStore.tables
+		);
+		if (!speedState) return carry;
+		const next: PlaybackCarryState = carry ? { ...carry } : {};
+		if (speedState.speed !== undefined) next.speed = speedState.speed;
+		if (chipIndex === speedState.ownerChipIndex) {
+			next.speedTable = speedState.speedTable;
+			next.speedTablePosition = speedState.speedTablePosition;
+		} else {
+			delete next.speedTable;
+			delete next.speedTablePosition;
+		}
+		return next;
+	}
+
 	function buildCarryPlayOptions(orderIndex: number, startRow: number) {
+		const tables = projectStore.tables;
 		const chipProcessors = services.audioService.chipProcessors;
 		if (chipProcessors.length > 1) {
 			return {
 				getCarryForChip: (chipIndex: number) => {
 					const songPatterns = projectStore.patterns[chipIndex] ?? [];
 					const schema = chipProcessors[chipIndex]?.chip?.schema;
-					if (!schema) return null;
-					return collectPlaybackCarry(
-						patternOrder,
-						(id) => songPatterns.find((p) => p.id === id),
+					if (!schema) return mergeSpeedCarry(null, orderIndex, startRow, chipIndex);
+					return mergeSpeedCarry(
+						collectPlaybackCarry(
+							patternOrder,
+							(id) => songPatterns.find((p) => p.id === id),
+							orderIndex,
+							startRow,
+							schema,
+							tables
+						),
 						orderIndex,
 						startRow,
-						schema
+						chipIndex
 					);
 				}
 			};
 		}
 		return {
 			carry: chip.schema
-				? collectPlaybackCarry(
-						patternOrder,
-						findOrCreatePattern,
+				? mergeSpeedCarry(
+						collectPlaybackCarry(
+							patternOrder,
+							findOrCreatePattern,
+							orderIndex,
+							startRow,
+							chip.schema,
+							tables
+						),
 						orderIndex,
 						startRow,
-						chip.schema
+						songIndex
 					)
-				: null
+				: mergeSpeedCarry(null, orderIndex, startRow, songIndex)
 		};
 	}
 

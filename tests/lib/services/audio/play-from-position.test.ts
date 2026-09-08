@@ -174,4 +174,29 @@ describe('collectPlaybackCarry', () => {
 				?.speed
 		).toBe(8);
 	});
+
+	it('carries S.TY table speed from a previous pattern', () => {
+		const first = makePattern(0, [2]);
+		first.channels[0]!.rows[0]!.effects = [
+			null,
+			{ effect: 'S'.charCodeAt(0), delay: 0, parameter: 0, tableIndex: 4 }
+		];
+		const second = makePattern(1, [2]);
+		const tables = [{ id: 4, rows: [0, 7, 2], loop: 0, name: 'T', additive: false }];
+
+		expect(
+			collectPlaybackCarry(
+				[0, 1],
+				(id) => (id === 0 ? first : second),
+				1,
+				0,
+				schema,
+				tables
+			)
+		).toMatchObject({
+			speed: 7,
+			speedTable: 4,
+			speedTablePosition: 1
+		});
+	});
 });

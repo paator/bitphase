@@ -48,6 +48,7 @@
 	import IconCarbonChevronRight from '~icons/carbon/chevron-right';
 	import EmptySongPatternBackdrop from './EmptySongPatternBackdrop.svelte';
 	import { getVirtualIndicesForHardwareChannel } from '../../models/virtual-channels';
+	import { findLastSpeedCommand } from '../../services/audio/playback-speed';
 
 	let {
 		chipProcessors,
@@ -319,8 +320,6 @@
 		);
 	});
 
-	const SPEED_EFFECT_TYPE = 'S'.charCodeAt(0);
-
 	function handleMakeUnique(index: number): void {
 		const beforePatterns = projectStore.patterns.map((songPatterns) => [...songPatterns]);
 		const beforePatternOrder = [...projectStore.patternOrder];
@@ -355,52 +354,20 @@
 		patternEditors.forEach((editor) => editor?.requestRedraw?.());
 	}
 
-	function findLastSpeedCommand(
-		songPatterns: Pattern[],
-		order: number[],
-		startPatternOrderIndex: number,
-		startRow: number
-	): number | null {
-		for (
-			let patternOrderIdx = startPatternOrderIndex;
-			patternOrderIdx >= 0;
-			patternOrderIdx--
-		) {
-			const patternId = order[patternOrderIdx];
-			const pattern = songPatterns.find((p) => p.id === patternId);
-			if (!pattern) continue;
-
-			const startRowIdx =
-				patternOrderIdx === startPatternOrderIndex ? startRow : pattern.length - 1;
-
-			for (let rowIdx = startRowIdx; rowIdx >= 0; rowIdx--) {
-				for (const channel of pattern.channels) {
-					const row = channel.rows[rowIdx];
-					if (row.effects[0] && row.effects[0].effect === SPEED_EFFECT_TYPE) {
-						const speed = row.effects[0].parameter;
-						if (speed > 0) {
-							return speed;
-						}
-					}
-				}
-			}
-		}
-
-		return null;
+	function resolveSpeedAt(orderIndex: number, row: number): number | null {
+		if (projectStore.songs.length === 0) return null;
+		const lastSpeed = findLastSpeedCommand(
+			projectStore.patterns,
+			projectStore.patternOrder,
+			orderIndex,
+			row,
+			projectStore.tables
+		);
+		return lastSpeed?.speed ?? projectStore.songs[0]?.initialSpeed ?? 3;
 	}
 
-	function getSpeedForChip(chipIndex: number): number | null {
-		const song = projectStore.songs[chipIndex];
-		const songPatterns = projectStore.patterns[chipIndex];
-		if (!song || !songPatterns) return null;
-
-		const lastSpeed = findLastSpeedCommand(
-			songPatterns,
-			projectStore.patternOrder,
-			sharedPatternOrderIndex,
-			sharedSelectedRow
-		);
-		return lastSpeed !== null ? lastSpeed : song.initialSpeed;
+	function getSpeedForChip(_chipIndex: number): number | null {
+		return resolveSpeedAt(sharedPatternOrderIndex, sharedSelectedRow);
 	}
 
 	function initAllChips(playPattern: boolean) {
@@ -466,18 +433,8 @@
 		initAllChips(true);
 	}
 
-	function getSpeedForPlayPattern(chipIndex: number): number | null {
-		const song = projectStore.songs[chipIndex];
-		const songPatterns = projectStore.patterns[chipIndex];
-		if (!song || !songPatterns) return null;
-
-		const lastSpeed = findLastSpeedCommand(
-			songPatterns,
-			projectStore.patternOrder,
-			sharedPatternOrderIndex,
-			0
-		);
-		return lastSpeed !== null ? lastSpeed : song.initialSpeed;
+	function getSpeedForPlayPattern(_chipIndex: number): number | null {
+		return resolveSpeedAt(sharedPatternOrderIndex, 0);
 	}
 
 	const rightPanelTabs = [

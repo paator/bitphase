@@ -1,13 +1,15 @@
 import type { Pattern } from '../../models/song';
+import type { Table } from '../../models/project';
 import type { ChipSchema, ChipField } from '../../chips/base/schema';
+import { readLastSpeedCommandOnRow, resolveSpeedCommand } from './playback-speed';
 
 export interface PlaybackCarryState {
 	channelFields?: Array<Record<string, unknown>>;
 	globalFields?: Record<string, unknown>;
 	speed?: number;
+	speedTable?: number;
+	speedTablePosition?: number;
 }
-
-const SPEED_EFFECT_TYPE = 'S'.charCodeAt(0);
 
 function toNum(v: unknown): number {
 	if (v === undefined || v === null) return NaN;
@@ -15,11 +17,7 @@ function toNum(v: unknown): number {
 	return Number.isNaN(n) ? NaN : n;
 }
 
-function isGlobalFieldValueSet(
-	key: string,
-	value: unknown,
-	field: ChipField
-): boolean {
+function isGlobalFieldValueSet(key: string, value: unknown, field: ChipField): boolean {
 	if (value === undefined || value === null) return false;
 	const n = toNum(value);
 	if (Number.isNaN(n)) return false;
@@ -28,11 +26,7 @@ function isGlobalFieldValueSet(
 	return true;
 }
 
-function isChannelFieldValueSet(
-	key: string,
-	value: unknown,
-	field: ChipField
-): boolean {
+function isChannelFieldValueSet(key: string, value: unknown, field: ChipField): boolean {
 	if (value === undefined || value === null) return false;
 	if (field.type === 'note' || key === 'note') {
 		const note = value as { name?: number } | undefined;
@@ -53,25 +47,13 @@ function isPersistChannelField(key: string, field: ChipField): boolean {
 	return true;
 }
 
-function readRowSpeed(row: Record<string, unknown> | undefined): number | null {
-	const effects = row?.effects;
-	if (!Array.isArray(effects)) return null;
-	for (const effect of effects) {
-		if (!effect || typeof effect !== 'object') continue;
-		const slot = effect as { effect?: unknown; parameter?: unknown };
-		if (slot.effect !== SPEED_EFFECT_TYPE) continue;
-		const speed = toNum(slot.parameter);
-		if (!Number.isNaN(speed) && speed > 0) return speed;
-	}
-	return null;
-}
-
 export function collectPlaybackCarry(
 	patternOrder: number[],
 	getPattern: (patternId: number) => Pattern | undefined,
 	targetOrderIndex: number,
 	targetRow: number,
-	schema: ChipSchema
+	schema: ChipSchema,
+	tables?: Table[]
 ): PlaybackCarryState | null {
 	if (targetOrderIndex < 0) return null;
 	const targetPatternId = patternOrder[targetOrderIndex];
@@ -100,6 +82,8 @@ export function collectPlaybackCarry(
 	);
 	const globalFields: Record<string, unknown> = {};
 	let speed: number | undefined;
+	let speedTable: number | undefined;
+	let speedTablePosition: number | undefined;
 	let remaining =
 		channelCount * channelFieldEntries.length + globalFieldEntries.length + 1;
 	if (remaining === 0) return null;
@@ -121,18 +105,23 @@ export function collectPlaybackCarry(
 				globalFields[key] = value;
 				remaining--;
 			}
+			if (speed === undefined && speedTable === undefined) {
+				const command = readLastSpeedCommandOnRow(pattern.channels, rowIndex);
+				if (command) {
+					const resolved = resolveSpeedCommand(command, tables);
+					if (resolved) {
+						speed = resolved.speed;
+						speedTable = resolved.speedTable;
+						speedTablePosition = resolved.speedTablePosition;
+						remaining--;
+					}
+				}
+			}
 			for (let ch = 0; ch < channelCount && ch < pattern.channels.length; ch++) {
 				const row = pattern.channels[ch].rows?.[rowIndex] as
 					| Record<string, unknown>
 					| undefined;
 				if (!row) continue;
-				if (speed === undefined) {
-					const rowSpeed = readRowSpeed(row);
-					if (rowSpeed !== null) {
-						speed = rowSpeed;
-						remaining--;
-					}
-				}
 				const carryForChannel = channelFields[ch];
 				for (const [key, field] of channelFieldEntries) {
 					if (key in carryForChannel) continue;
@@ -149,7 +138,12 @@ export function collectPlaybackCarry(
 		(fields) => Object.keys(fields).length > 0
 	);
 	const hasGlobalFields = Object.keys(globalFields).length > 0;
-	if (!hasChannelFields && !hasGlobalFields && speed === undefined) {
+	if (
+		!hasChannelFields &&
+		!hasGlobalFields &&
+		speed === undefined &&
+		speedTable === undefined
+	) {
 		return null;
 	}
 
@@ -157,5 +151,9 @@ export function collectPlaybackCarry(
 	if (hasChannelFields) carry.channelFields = channelFields;
 	if (hasGlobalFields) carry.globalFields = globalFields;
 	if (speed !== undefined) carry.speed = speed;
+	if (speedTable !== undefined) {
+		carry.speedTable = speedTable;
+		carry.speedTablePosition = speedTablePosition ?? 0;
+	}
 	return carry;
 }

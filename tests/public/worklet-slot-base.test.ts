@@ -26,8 +26,11 @@ class TestSlot extends WorkletSlotBase {
 		reset: () => {}
 	};
 
-	constructor() {
-		super({ postMessage: vi.fn() }, 0);
+	appliedCarry: unknown = null;
+	appliedSpeeds: number[] = [];
+
+	constructor(chipIndex = 0) {
+		super({ postMessage: vi.fn() }, chipIndex);
 	}
 
 	_post(data: { type: string; patternOrderIndex?: number }) {
@@ -48,10 +51,12 @@ class TestSlot extends WorkletSlotBase {
 
 	_runCatchUpRows(_upToRow: number) {}
 
-	appliedCarry: unknown = null;
-
 	_applyPlaybackCarry(carry: unknown) {
 		this.appliedCarry = carry;
+	}
+
+	_applyPlaybackSpeed(speed: number) {
+		this.appliedSpeeds.push(speed);
 	}
 }
 
@@ -59,7 +64,7 @@ describe('WorkletSlotBase play from row', () => {
 	it('requests the pattern for the start order index', () => {
 		const slot = new TestSlot();
 
-		slot.handlePlayFromRow({ row: 0, patternOrderIndex: 0, speed: 3 });
+		slot.handlePlayFromRow({ row: 0, patternOrderIndex: 0, speed: 3, carry: null });
 
 		expect(slot.posted).toContainEqual({
 			type: 'request_pattern',
@@ -72,7 +77,7 @@ describe('WorkletSlotBase play from row', () => {
 		const slot = new TestSlot();
 		slot.state.currentPattern = null;
 
-		slot.handlePlayFromRow({ row: 0, patternOrderIndex: 2, speed: 3 });
+		slot.handlePlayFromRow({ row: 0, patternOrderIndex: 2, speed: 3, carry: null });
 
 		expect(slot.posted).toContainEqual({
 			type: 'request_pattern',
@@ -93,6 +98,14 @@ describe('WorkletSlotBase play from row', () => {
 
 		expect(slot.appliedCarry).toEqual(carry);
 		expect(slot.primes).toEqual([0]);
+	});
+
+	it('publishes play-from-row speed from a non-leader chip', () => {
+		const slot = new TestSlot(1);
+
+		slot.handlePlayFromRow({ row: 0, patternOrderIndex: 0, speed: 8, carry: null });
+
+		expect(slot.appliedSpeeds).toEqual([8]);
 	});
 });
 
