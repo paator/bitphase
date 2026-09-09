@@ -2,3 +2,8 @@
 	path = external/ayumi
 	url = https://github.com/paator/ayumi.git
 	branch = master
+
+[submodule "external/ymfm"]
+	path = external/ymfm
+	url = https://github.com/AnnoyedArt1256/ymfm.git
+	branch = main

@@ -36,3 +36,9 @@ emcc ${EMCC_ARGS} \
 	external/nsfplug/nes_mmc5.c \
     -o public/nes/nes_mmc5.wasm \
     -s EXPORTED_FUNCTIONS='["_nes_mmc5_Init", "_nes_mmc5_Reset", "_nes_mmc5_Tick", "_nes_mmc5_Render", "_nes_mmc5_Write", "_nes_mmc5_SetMask", "_nes_mmc5_SetStereoMix", "_nes_mmc5_TickFrameSequence"]'
+
+emcc ${EMCC_ARGS} -lembind \
+	external/ymfm.cpp \
+	external/ymfm/src/ymfm_opn.cpp \
+	external/ymfm/src/ymfm_ssg.cpp \
+    -o public/ymfm/ymfm.wasm
