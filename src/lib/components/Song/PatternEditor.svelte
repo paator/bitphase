@@ -315,6 +315,12 @@
 
 	let fontSize = $derived(settingsStore.patternEditorFontSize);
 	let fontFamily = $derived(settingsStore.patternEditorFontFamily);
+	let patternEditorFontString = $derived.by(() => {
+		const effectiveFontFamily =
+			fontFamily === 'monospace' ? 'monospace' : `"${fontFamily}"`;
+		const fontFallback = fontFamily === 'monospace' ? 'monospace' : FONTS.mono;
+		return `${fontSize}px ${effectiveFontFamily}, ${fontFallback}`;
+	});
 	let channelSeparatorWidth = $derived(settingsStore.channelSeparatorWidth);
 	let selectionStyle = $derived(settingsStore.selectionStyle);
 	let emptyNoteAlignment = $derived(settingsStore.emptyNoteAlignment);
@@ -1041,10 +1047,7 @@
 		setupLevelStripCanvas();
 
 		try {
-			const effectiveFontFamily =
-				fontFamily === 'monospace' ? 'monospace' : `"${fontFamily}"`;
-			const fontFallback = fontFamily === 'monospace' ? 'monospace' : FONTS.mono;
-			const fontString = `${fontSize}px ${effectiveFontFamily}, ${fontFallback}`;
+			const fontString = patternEditorFontString;
 
 			canvas.style.fontFeatureSettings = "'liga' 0, 'calt' 0";
 			canvas.style.fontVariantLigatures = 'none';
@@ -1095,6 +1098,9 @@
 						.then(() => {
 							if (ctx && canvas) {
 								ctx.font = fontString;
+								if (levelStripCtx) {
+									levelStripCtx.font = fontString;
+								}
 								clearAllCaches();
 								updateSize();
 								draw();
@@ -1388,8 +1394,9 @@
 			width: canvasWidth,
 			height: CHANNEL_LEVEL_STRIP_HEIGHT,
 			fontSize,
-			fonts: FONTS
+			fonts: { ...FONTS, mono: patternEditorFontString }
 		});
+		levelStripCtx.font = patternEditorFontString;
 	}
 
 	function draw() {

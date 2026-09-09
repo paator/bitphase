@@ -179,11 +179,14 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		overlayCtx: CanvasRenderingContext2D,
 		data: ChannelLabelData
 	): void {
+		const channelPositions =
+			data.channelLevels !== undefined
+				? this.calculateChannelPositions(data.rowString)
+				: [];
 		const saved = this.ctx;
 		this.ctx = overlayCtx;
 		overlayCtx.clearRect(0, 0, this.canvasWidth, CHANNEL_LEVEL_STRIP_HEIGHT);
 		if (data.channelLevels !== undefined) {
-			const channelPositions = this.calculateChannelPositions(data.rowString);
 			this.drawChannelLevelStrip(data, channelPositions, 4, 0);
 		}
 		this.ctx = saved;
