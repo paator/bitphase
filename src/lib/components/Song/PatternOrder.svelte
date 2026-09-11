@@ -781,6 +781,8 @@
 	}
 
 	function addPatternAtIndex(index: number): void {
+		if (!canAllocatePatternId) return;
+
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder],
@@ -795,6 +797,7 @@
 			(songIndex) => projectStore.songs[songIndex]?.getEffectiveChannelLabels(),
 			projectStore.getDefaultPatternLength()
 		);
+		if (!result) return;
 
 		result.newPatternsPerSong.forEach((newPatterns, songIndex) => {
 			projectStore.updatePatterns(songIndex, newPatterns);
@@ -835,6 +838,8 @@
 	}
 
 	function clonePatternAtIndex(index: number): void {
+		if (!canAllocatePatternId) return;
+
 		const before = {
 			patterns: projectStore.patterns.map((songPatterns) => [...songPatterns]),
 			patternOrder: [...projectStore.patternOrder],
@@ -847,6 +852,7 @@
 			index,
 			(songIndex) => projectStore.songs[songIndex]?.getSchema()
 		);
+		if (!result) return;
 
 		result.newPatternsPerSong.forEach((newPatterns, songIndex) => {
 			projectStore.updatePatterns(songIndex, newPatterns);
@@ -863,6 +869,8 @@
 	}
 
 	function makePatternUniqueAtIndex(index: number): void {
+		if (!canAllocatePatternId) return;
+
 		if (projectStore.patterns.length > 1 && onMakeUnique) {
 			onMakeUnique(index);
 			return;
@@ -880,6 +888,7 @@
 			index,
 			(songIndex) => projectStore.songs[songIndex]?.getSchema()
 		);
+		if (!result) return;
 
 		result.updatedPatterns.forEach((newPatterns, songIndex) => {
 			projectStore.updatePatterns(songIndex, newPatterns);
@@ -903,6 +912,11 @@
 	const totalHeight = BUTTON_SIZE * 4 + BUTTON_SPACING * 3;
 	const startY = $derived(buttonCenterY - totalHeight / 2);
 	const canRemove = $derived(patternOrder.length > 1);
+	const canAllocatePatternId = $derived(
+		PatternService.findNextAvailablePatternIdFromPatterns(projectStore.patterns, patternOrder) !==
+			null
+	);
+	const noFreePatternTitle = 'No free pattern numbers (00-99 are used)';
 
 	function handleContextMenu(event: MouseEvent): void {
 		event.preventDefault();
@@ -1005,10 +1019,15 @@
 					: { label: 'Set loop marker', type: 'normal', action: 'loop-set' };
 		const base: MenuItem[] = [
 			...(loopMenuItem ? [loopMenuItem] : []),
-			{ label: 'Make Unique', type: 'normal', action: 'make-unique' },
+			{
+				label: 'Make Unique',
+				type: 'normal',
+				action: 'make-unique',
+				disabled: () => !canAllocatePatternId
+			},
 			{ label: 'Delete', type: 'normal', action: 'delete', disabled: () => !canRemove },
-			{ label: 'Add', type: 'normal', action: 'add' },
-			{ label: 'Clone', type: 'normal', action: 'clone' },
+			{ label: 'Add', type: 'normal', action: 'add', disabled: () => !canAllocatePatternId },
+			{ label: 'Clone', type: 'normal', action: 'clone', disabled: () => !canAllocatePatternId },
 			{ label: 'Color...', type: 'normal', action: 'color-picker' }
 		];
 		const hasCustomColor =
@@ -1064,10 +1083,13 @@
 		<PatternOrderButton
 			buttonType="up"
 			isHovered={hoveredButton === 'up'}
-			onClick={() => makePatternUniqueAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = 'up')}
+			onClick={() => {
+				if (canAllocatePatternId) makePatternUniqueAtIndex(currentPatternOrderIndex);
+			}}
+			onMouseEnter={() => (hoveredButton = canAllocatePatternId ? 'up' : null)}
 			onMouseLeave={() => (hoveredButton = null)}
-			title="Make Unique"
+			disabled={!canAllocatePatternId}
+			title={canAllocatePatternId ? 'Make Unique' : noFreePatternTitle}
 			size={BUTTON_SIZE}>
 			<IconCarbonUnlink
 				class="text-pattern-text"
@@ -1091,10 +1113,13 @@
 		<PatternOrderButton
 			buttonType="add"
 			isHovered={hoveredButton === 'add'}
-			onClick={() => addPatternAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = 'add')}
+			onClick={() => {
+				if (canAllocatePatternId) addPatternAtIndex(currentPatternOrderIndex);
+			}}
+			onMouseEnter={() => (hoveredButton = canAllocatePatternId ? 'add' : null)}
 			onMouseLeave={() => (hoveredButton = null)}
-			title="Add"
+			disabled={!canAllocatePatternId}
+			title={canAllocatePatternId ? 'Add' : noFreePatternTitle}
 			size={BUTTON_SIZE}>
 			<IconCarbonAdd
 				class="text-pattern-text"
@@ -1103,10 +1128,13 @@
 		<PatternOrderButton
 			buttonType="clone"
 			isHovered={hoveredButton === 'clone'}
-			onClick={() => clonePatternAtIndex(currentPatternOrderIndex)}
-			onMouseEnter={() => (hoveredButton = 'clone')}
+			onClick={() => {
+				if (canAllocatePatternId) clonePatternAtIndex(currentPatternOrderIndex);
+			}}
+			onMouseEnter={() => (hoveredButton = canAllocatePatternId ? 'clone' : null)}
 			onMouseLeave={() => (hoveredButton = null)}
-			title="Clone"
+			disabled={!canAllocatePatternId}
+			title={canAllocatePatternId ? 'Clone' : noFreePatternTitle}
 			size={BUTTON_SIZE}
 			hasMargin={false}>
 			<IconCarbonCopy

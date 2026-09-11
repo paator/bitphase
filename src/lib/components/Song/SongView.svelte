@@ -329,6 +329,7 @@
 			index,
 			(i) => chipProcessors[i]?.chip?.schema
 		);
+		if (!result) return;
 		result.updatedPatterns.forEach((newPatterns, i) => {
 			projectStore.updatePatterns(i, newPatterns);
 		});

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PatternService } from '../../../../src/lib/services/pattern/pattern-service';
+import { PatternService, MAX_PATTERN_ID } from '../../../../src/lib/services/pattern/pattern-service';
 import {
 	Pattern,
 	Note,
@@ -32,6 +32,42 @@ describe('PatternService', () => {
 			const result = PatternService.findNextAvailablePatternId(patterns, patternOrder);
 			expect(result).toBe(1);
 		});
+
+		it('should reuse unused empty patterns', () => {
+			const patterns = {
+				0: new Pattern(0),
+				1: new Pattern(1),
+				2: new Pattern(2)
+			};
+			expect(PatternService.findNextAvailablePatternId(patterns, [0])).toBe(1);
+		});
+
+		it('should keep unused non-empty patterns reserved', () => {
+			const reserved = new Pattern(1, 4);
+			reserved.channels[0].rows[0].note = new Note(NoteName.C, 4);
+			const patterns = { 0: new Pattern(0, 4), 1: reserved };
+			expect(PatternService.findNextAvailablePatternId(patterns, [0])).toBe(2);
+		});
+
+		it('should return 99 when 0-98 are used', () => {
+			const patternOrder = Array.from({ length: MAX_PATTERN_ID }, (_, id) => id);
+			const patterns = Object.fromEntries(patternOrder.map((id) => [id, new Pattern(id)]));
+			expect(PatternService.findNextAvailablePatternId(patterns, patternOrder)).toBe(MAX_PATTERN_ID);
+		});
+
+		it('should return null when all ids 00-99 are used', () => {
+			const patternOrder = Array.from({ length: MAX_PATTERN_ID + 1 }, (_, id) => id);
+			const patterns = Object.fromEntries(patternOrder.map((id) => [id, new Pattern(id)]));
+			expect(PatternService.findNextAvailablePatternId(patterns, patternOrder)).toBeNull();
+		});
+
+		it('should recycle empty unused ids when they are not in the order', () => {
+			const patternOrder = [0];
+			const patterns = Object.fromEntries(
+				Array.from({ length: MAX_PATTERN_ID + 1 }, (_, id) => [id, new Pattern(id)])
+			);
+			expect(PatternService.findNextAvailablePatternId(patterns, patternOrder)).toBe(1);
+		});
 	});
 
 	describe('createEmptyPattern', () => {
@@ -46,6 +82,18 @@ describe('PatternService', () => {
 			const pattern = PatternService.createEmptyPattern(10, undefined, undefined, 32);
 			expect(pattern.id).toBe(10);
 			expect(pattern.length).toBe(32);
+		});
+	});
+
+	describe('isPatternEmpty', () => {
+		it('should treat a new pattern as empty', () => {
+			expect(PatternService.isPatternEmpty(new Pattern(3, 4))).toBe(true);
+		});
+
+		it('should treat a pattern with a note as not empty', () => {
+			const pattern = new Pattern(3, 4);
+			pattern.channels[0].rows[0].note = new Note(NoteName.Off, 0);
+			expect(PatternService.isPatternEmpty(pattern)).toBe(false);
 		});
 	});
 
@@ -97,11 +145,12 @@ describe('PatternService', () => {
 
 			const result = PatternService.addPatternAfter(patterns, patternOrder, 0);
 
-			expect(result.newPatternOrder).toEqual([0, 2, 1]);
-			expect(result.insertIndex).toBe(1);
-			expect(result.newPatternId).toBe(2);
-			expect(result.newPatterns[2]).toBeDefined();
-			expect(result.newPatterns[2].id).toBe(2);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([0, 2, 1]);
+			expect(result!.insertIndex).toBe(1);
+			expect(result!.newPatternId).toBe(2);
+			expect(result!.newPatterns[2]).toBeDefined();
+			expect(result!.newPatterns[2].id).toBe(2);
 		});
 
 		it('should add pattern at the end when index is last', () => {
@@ -110,8 +159,9 @@ describe('PatternService', () => {
 
 			const result = PatternService.addPatternAfter(patterns, patternOrder, 0);
 
-			expect(result.newPatternOrder).toEqual([0, 1]);
-			expect(result.insertIndex).toBe(1);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([0, 1]);
+			expect(result!.insertIndex).toBe(1);
 		});
 	});
 
@@ -173,10 +223,11 @@ describe('PatternService', () => {
 		it('should insert a new pattern id in the order when there are no songs', () => {
 			const result = PatternService.clonePatternAfterMultiChip([], [0, 1], 0, () => undefined);
 
-			expect(result.newPatternOrder).toEqual([0, 2, 1]);
-			expect(result.newPatternId).toBe(2);
-			expect(result.insertIndex).toBe(1);
-			expect(result.newPatternsPerSong).toEqual([]);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([0, 2, 1]);
+			expect(result!.newPatternId).toBe(2);
+			expect(result!.insertIndex).toBe(1);
+			expect(result!.newPatternsPerSong).toEqual([]);
 		});
 
 		it('should clone source patterns when present', () => {
@@ -191,9 +242,31 @@ describe('PatternService', () => {
 				() => undefined
 			);
 
-			expect(result.newPatternOrder).toEqual([0, 1]);
-			expect(result.newPatternsPerSong[0]).toHaveLength(2);
-			expect(result.newPatternsPerSong[0][1].channels[0].rows[0].note.name).toBe(NoteName.C);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([0, 1]);
+			expect(result!.newPatternsPerSong[0]).toHaveLength(2);
+			expect(result!.newPatternsPerSong[0][1].channels[0].rows[0].note.name).toBe(NoteName.C);
+		});
+
+		it('should reuse an unused empty pattern id without duplicating it', () => {
+			const source = new Pattern(0, 4);
+			source.channels[0].rows[0].note = new Note(NoteName.C, 4);
+			const leftover = new Pattern(1, 4);
+
+			const result = PatternService.clonePatternAfterMultiChip(
+				[[source, leftover]],
+				[0],
+				0,
+				() => undefined
+			);
+
+			expect(result).not.toBeNull();
+			expect(result!.newPatternId).toBe(1);
+			expect(result!.newPatternsPerSong[0]).toHaveLength(2);
+			expect(result!.newPatternsPerSong[0].filter((pattern) => pattern.id === 1)).toHaveLength(1);
+			expect(result!.newPatternsPerSong[0].find((pattern) => pattern.id === 1)?.channels[0].rows[0].note.name).toBe(
+				NoteName.C
+			);
 		});
 	});
 
@@ -236,6 +309,22 @@ describe('PatternService', () => {
 			const patternOrder = [0, 1, 2];
 			expect(PatternService.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder)).toBe(3);
 		});
+
+		it('should return null when all ids 00-99 are used', () => {
+			const allPatterns = [Array.from({ length: MAX_PATTERN_ID + 1 }, (_, id) => new Pattern(id))];
+			const patternOrder = Array.from({ length: MAX_PATTERN_ID + 1 }, (_, id) => id);
+
+			expect(PatternService.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder)).toBeNull();
+			expect(
+				PatternService.addPatternAfterMultiChip(allPatterns, patternOrder, 99, () => undefined)
+			).toBeNull();
+			expect(
+				PatternService.clonePatternAfterMultiChip(allPatterns, patternOrder, 99, () => undefined)
+			).toBeNull();
+			expect(
+				PatternService.makePatternUniqueMultiChip(allPatterns, patternOrder, 99, () => undefined)
+			).toBeNull();
+		});
 	});
 
 	describe('makePatternUniqueMultiChip', () => {
@@ -257,11 +346,12 @@ describe('PatternService', () => {
 				() => undefined
 			);
 
-			expect(result.newPatternOrder).toEqual([2, 1]);
-			expect(result.updatedPatterns[0]).toHaveLength(3);
-			expect(result.updatedPatterns[1]).toHaveLength(3);
-			const unique0 = result.updatedPatterns[0].find((p) => p.id === 2);
-			const unique1 = result.updatedPatterns[1].find((p) => p.id === 2);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([2, 1]);
+			expect(result!.updatedPatterns[0]).toHaveLength(3);
+			expect(result!.updatedPatterns[1]).toHaveLength(3);
+			const unique0 = result!.updatedPatterns[0].find((p) => p.id === 2);
+			const unique1 = result!.updatedPatterns[1].find((p) => p.id === 2);
 			expect(unique0).toBeDefined();
 			expect(unique1).toBeDefined();
 			expect(unique0!.channels[0].rows[0].note.name).toBe(NoteName.C);
@@ -279,27 +369,34 @@ describe('PatternService', () => {
 
 			const result = PatternService.makePatternUniqueMultiChip(allPatterns, patternOrder, 0, () => undefined);
 
-			expect(result.updatedPatterns[0]).toHaveLength(2);
-			expect(result.updatedPatterns[1]).toHaveLength(0);
+			expect(result).not.toBeNull();
+			expect(result!.updatedPatterns[0]).toHaveLength(2);
+			expect(result!.updatedPatterns[1]).toHaveLength(0);
 		});
 
 		it('should still update the order when there are no songs', () => {
 			const result = PatternService.makePatternUniqueMultiChip([], [0, 0, 0], 1, () => undefined);
 
-			expect(result.newPatternOrder).toEqual([0, 1, 0]);
-			expect(result.updatedPatterns).toEqual([]);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([0, 1, 0]);
+			expect(result!.updatedPatterns).toEqual([]);
 		});
 
-		it('should allocate sequential ids when repeatedly making unique with no songs', () => {
-			let order = [0, 1];
+		it('should pick the first free id when there is a gap', () => {
+			const allPatterns: Pattern[][] = [[new Pattern(0), new Pattern(1), new Pattern(5)]];
+			const patternOrder = [0, 1, 5];
 
-			for (let expectedId = 2; expectedId <= 6; expectedId++) {
-				const result = PatternService.makePatternUniqueMultiChip([], order, 1, () => undefined);
-				expect(result.newPatternOrder[1]).toBe(expectedId);
-				order = result.newPatternOrder;
-			}
+			const result = PatternService.makePatternUniqueMultiChip(
+				allPatterns,
+				patternOrder,
+				2,
+				() => undefined
+			);
 
-			expect(order).toEqual([0, 6]);
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([0, 1, 2]);
+			expect(result!.updatedPatterns[0].find((p) => p.id === 2)).toBeDefined();
+			expect(result!.updatedPatterns[0].find((p) => p.id === 5)).toBeDefined();
 		});
 	});
 
@@ -342,22 +439,31 @@ describe('PatternService', () => {
 			expect(result!.newPatternOrder).toEqual([3]);
 		});
 
-		it('should clone current pattern if provided when creating new', () => {
+		it('should create an empty pattern when ID does not exist', () => {
 			const current = new Pattern(0, 4);
 			current.channels[0].rows[0].note = new Note(NoteName.E, 3);
 			const patterns = { 0: current };
 			const patternOrder = [0];
 
-			const result = PatternService.setPatternIdInOrder(
-				patterns,
-				patternOrder,
-				0,
-				2,
-				current
-			);
+			const result = PatternService.setPatternIdInOrder(patterns, patternOrder, 0, 2);
 
 			expect(result).not.toBeNull();
-			expect(result!.newPatterns[2].channels[0].rows[0].note.name).toBe(NoteName.E);
+			expect(result!.newPatterns[2].channels[0].rows[0].note.name).toBe(NoteName.None);
+			expect(result!.newPatterns[0].channels[0].rows[0].note.name).toBe(NoteName.E);
+		});
+
+		it('should reuse existing pattern content instead of creating a new one', () => {
+			const existing = new Pattern(6, 4);
+			existing.channels[0].rows[0].note = new Note(NoteName.C, 4);
+			const patterns = { 0: new Pattern(0, 4), 6: existing };
+			const patternOrder = [0];
+
+			const result = PatternService.setPatternIdInOrder(patterns, patternOrder, 0, 6);
+
+			expect(result).not.toBeNull();
+			expect(result!.newPatternOrder).toEqual([6]);
+			expect(result!.newPatterns[6].channels[0].rows[0].note.name).toBe(NoteName.C);
+			expect(result!.newPatterns[6]).toBe(existing);
 		});
 
 		it('should return null for invalid pattern IDs', () => {
@@ -366,6 +472,43 @@ describe('PatternService', () => {
 
 			expect(PatternService.setPatternIdInOrder(patterns, patternOrder, 0, -1)).toBeNull();
 			expect(PatternService.setPatternIdInOrder(patterns, patternOrder, 0, 100)).toBeNull();
+		});
+	});
+
+	describe('setPatternIdInOrderMultiChip', () => {
+		it('should show existing pattern 06 then create empty 66', () => {
+			const pattern06 = new Pattern(6, 4);
+			pattern06.channels[0].rows[0].note = new Note(NoteName.G, 2);
+			const allPatterns = [[new Pattern(0, 4), pattern06]];
+			const getSchema = () => undefined;
+
+			const afterFirstDigit = PatternService.setPatternIdInOrderMultiChip(
+				allPatterns,
+				[0],
+				0,
+				6,
+				getSchema
+			);
+
+			expect(afterFirstDigit).not.toBeNull();
+			expect(afterFirstDigit!.newPatternOrder).toEqual([6]);
+			const reused = afterFirstDigit!.newPatternsPerSong[0].find((p) => p.id === 6);
+			expect(reused?.channels[0].rows[0].note.name).toBe(NoteName.G);
+
+			const afterSecondDigit = PatternService.setPatternIdInOrderMultiChip(
+				afterFirstDigit!.newPatternsPerSong,
+				afterFirstDigit!.newPatternOrder,
+				0,
+				66,
+				getSchema
+			);
+
+			expect(afterSecondDigit).not.toBeNull();
+			expect(afterSecondDigit!.newPatternOrder).toEqual([66]);
+			const created = afterSecondDigit!.newPatternsPerSong[0].find((p) => p.id === 66);
+			expect(created?.channels[0].rows[0].note.name).toBe(NoteName.None);
+			const original06 = afterSecondDigit!.newPatternsPerSong[0].find((p) => p.id === 6);
+			expect(original06?.channels[0].rows[0].note.name).toBe(NoteName.G);
 		});
 	});
 

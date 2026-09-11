@@ -1,4 +1,4 @@
-import { Pattern, Note, Effect, DEFAULT_PATTERN_LENGTH } from '../../models/song';
+import { Pattern, Note, Effect, NoteName, DEFAULT_PATTERN_LENGTH, Row } from '../../models/song';
 import { isEffectLike, toNumber } from '../../utils/type-guards';
 import type { ChipSchema } from '../../chips/base/schema';
 import { PatternEffectHandling } from './editing/pattern-effect-handling';
@@ -11,6 +11,9 @@ import {
 } from '../../chips/base/channel-effect-columns';
 import { HistoryClone } from '../history/history-clone';
 
+export const MIN_PATTERN_ID = 0;
+export const MAX_PATTERN_ID = 99;
+
 export class PatternService {
 	/**
 	 * Find the next available pattern ID
@@ -18,15 +21,22 @@ export class PatternService {
 	static findNextAvailablePatternId(
 		patterns: Record<number, Pattern>,
 		patternOrder: number[]
-	): number {
-		const usedPatternIds = new Set([...patternOrder, ...Object.keys(patterns).map(Number)]);
+	): number | null {
+		return this.findFirstFreePatternId(
+			this.collectAllocatedPatternIds(Object.values(patterns), patternOrder)
+		);
+	}
 
-		let newPatternId = 0;
-		while (usedPatternIds.has(newPatternId)) {
-			newPatternId++;
+	static isPatternEmpty(pattern: Pattern): boolean {
+		for (const channel of pattern.channels) {
+			for (const row of channel.rows) {
+				if (!this.isChannelRowEmpty(row)) return false;
+			}
 		}
-
-		return newPatternId;
+		for (const patternRow of pattern.patternRows) {
+			if (!this.isDataRecordEmpty(patternRow)) return false;
+		}
+		return true;
 	}
 
 	/**
@@ -169,8 +179,10 @@ export class PatternService {
 		newPatternOrder: number[];
 		newPatternId: number;
 		insertIndex: number;
-	} {
+	} | null {
 		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
+		if (newPatternId === null) return null;
+
 		const newPattern = this.createEmptyPattern(
 			newPatternId,
 			schema,
@@ -208,8 +220,10 @@ export class PatternService {
 		newPatternOrder: number[];
 		newPatternId: number;
 		insertIndex: number;
-	} {
+	} | null {
 		const newPatternId = this.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder);
+		if (newPatternId === null) return null;
+
 		const insertIndex = index + 1;
 		const newPatternOrder = [...patternOrder];
 		newPatternOrder.splice(insertIndex, 0, newPatternId);
@@ -222,11 +236,7 @@ export class PatternService {
 				length,
 				songPatterns
 			);
-			const existing = songPatterns.find((p) => p.id === newPatternId);
-			if (existing) {
-				return songPatterns.map((p) => (p.id === newPatternId ? newPattern : p));
-			}
-			return [...songPatterns, newPattern];
+			return this.replaceOrAppendPattern(songPatterns, newPattern);
 		});
 
 		return {
@@ -287,6 +297,8 @@ export class PatternService {
 		if (!targetPattern) return null;
 
 		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
+		if (newPatternId === null) return null;
+
 		const clonedPattern = this.clonePattern(
 			targetPattern,
 			newPatternId,
@@ -321,10 +333,11 @@ export class PatternService {
 		newPatternOrder: number[];
 		newPatternId: number;
 		insertIndex: number;
-	} {
+	} | null {
 		const targetPatternId = patternOrder[index];
-		const newPatternId =
-			this.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder);
+		const newPatternId = this.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder);
+		if (newPatternId === null) return null;
+
 		const insertIndex = index + 1;
 		const newPatternOrder = [...patternOrder];
 		newPatternOrder.splice(insertIndex, 0, newPatternId);
@@ -338,7 +351,7 @@ export class PatternService {
 					getSchema(songIndex),
 					songPatterns
 				);
-				return [...songPatterns, clonedPattern];
+				return this.replaceOrAppendPattern(songPatterns, clonedPattern);
 			}
 
 			const emptyPattern = this.createEmptyPattern(
@@ -348,11 +361,7 @@ export class PatternService {
 				DEFAULT_PATTERN_LENGTH,
 				songPatterns
 			);
-			const existing = songPatterns.find((p) => p.id === newPatternId);
-			if (existing) {
-				return songPatterns.map((p) => (p.id === newPatternId ? emptyPattern : p));
-			}
-			return [...songPatterns, emptyPattern];
+			return this.replaceOrAppendPattern(songPatterns, emptyPattern);
 		});
 
 		return {
@@ -369,34 +378,67 @@ export class PatternService {
 	static findNextAvailablePatternIdFromPatterns(
 		allPatterns: Pattern[][],
 		patternOrder: number[]
-	): number {
+	): number | null {
+		return this.findFirstFreePatternId(
+			this.collectAllocatedPatternIds(allPatterns.flat(), patternOrder)
+		);
+	}
+
+	private static collectAllocatedPatternIds(
+		patterns: Pattern[],
+		patternOrder: number[]
+	): Set<number> {
 		const usedPatternIds = new Set(patternOrder);
-		for (const songPatterns of allPatterns) {
-			for (const pattern of songPatterns) {
+		for (const pattern of patterns) {
+			if (!this.isPatternEmpty(pattern)) {
 				usedPatternIds.add(pattern.id);
 			}
 		}
-		let newPatternId = 0;
-		while (usedPatternIds.has(newPatternId)) {
-			newPatternId++;
-		}
-		return newPatternId;
+		return usedPatternIds;
 	}
 
-	static findNextSequentialPatternId(
-		allPatterns: Pattern[][],
-		patternOrder: number[]
-	): number {
-		let maxId = -1;
-		for (const id of patternOrder) {
-			if (id > maxId) maxId = id;
+	private static replaceOrAppendPattern(songPatterns: Pattern[], nextPattern: Pattern): Pattern[] {
+		const existingIndex = songPatterns.findIndex((pattern) => pattern.id === nextPattern.id);
+		if (existingIndex === -1) return [...songPatterns, nextPattern];
+		return songPatterns.map((pattern, index) =>
+			index === existingIndex ? nextPattern : pattern
+		);
+	}
+
+	private static isChannelRowEmpty(row: Row): boolean {
+		if (row.note.name !== NoteName.None) return false;
+		if (row.effects.some((effect) => effect && !PatternEffectHandling.isEmptyEffect(effect))) {
+			return false;
 		}
-		for (const songPatterns of allPatterns) {
-			for (const pattern of songPatterns) {
-				if (pattern.id > maxId) maxId = pattern.id;
-			}
+		for (const [key, value] of Object.entries(row)) {
+			if (key === 'note' || key === 'effects') continue;
+			if (!this.isEmptyFieldValue(value)) return false;
 		}
-		return maxId + 1;
+		return true;
+	}
+
+	private static isDataRecordEmpty(record: Record<string, unknown>): boolean {
+		for (const value of Object.values(record)) {
+			if (!this.isEmptyFieldValue(value)) return false;
+		}
+		return true;
+	}
+
+	private static isEmptyFieldValue(value: unknown): boolean {
+		if (value === null || value === undefined || value === '' || value === 0 || value === false) {
+			return true;
+		}
+		if (isEffectLike(value)) {
+			return PatternEffectHandling.isEmptyEffect(value);
+		}
+		return false;
+	}
+
+	private static findFirstFreePatternId(usedPatternIds: Set<number>): number | null {
+		for (let id = MIN_PATTERN_ID; id <= MAX_PATTERN_ID; id++) {
+			if (!usedPatternIds.has(id)) return id;
+		}
+		return null;
 	}
 
 	static makePatternUniqueMultiChip(
@@ -404,9 +446,10 @@ export class PatternService {
 		patternOrder: number[],
 		index: number,
 		getSchema: (songIndex: number) => ChipSchema | undefined
-	): { newPatternOrder: number[]; updatedPatterns: Pattern[][] } {
+	): { newPatternOrder: number[]; updatedPatterns: Pattern[][] } | null {
 		const currentId = patternOrder[index];
-		const newId = this.findNextSequentialPatternId(allPatterns, patternOrder);
+		const newId = this.findNextAvailablePatternIdFromPatterns(allPatterns, patternOrder);
+		if (newId === null) return null;
 		const newPatternOrder = [...patternOrder];
 		newPatternOrder[index] = newId;
 
@@ -415,7 +458,7 @@ export class PatternService {
 			if (pattern) {
 				const schema = getSchema(songIndex);
 				const cloned = this.clonePattern(pattern, newId, schema, songPatterns);
-				return [...songPatterns, cloned];
+				return this.replaceOrAppendPattern(songPatterns, cloned);
 			}
 			return songPatterns;
 		});
@@ -439,8 +482,9 @@ export class PatternService {
 	} | null {
 		if (!targetPattern) return null;
 
-		const allPatterns = [Object.values(patterns)];
-		const newPatternId = this.findNextSequentialPatternId(allPatterns, patternOrder);
+		const newPatternId = this.findNextAvailablePatternId(patterns, patternOrder);
+		if (newPatternId === null) return null;
+
 		const uniquePattern = this.clonePattern(
 			targetPattern,
 			newPatternId,
@@ -485,19 +529,22 @@ export class PatternService {
 		patternOrder: number[],
 		index: number,
 		newId: number,
-		currentPattern?: Pattern,
 		schema?: ChipSchema,
 		length: number = DEFAULT_PATTERN_LENGTH
 	): {
 		newPatterns: Record<number, Pattern>;
 		newPatternOrder: number[];
 	} | null {
-		if (newId < 0 || newId > 99) return null;
+		if (newId < MIN_PATTERN_ID || newId > MAX_PATTERN_ID) return null;
 
 		if (!patterns[newId]) {
-			const newPattern = currentPattern
-				? this.clonePattern(currentPattern, newId, schema, Object.values(patterns))
-				: this.createEmptyPattern(newId, schema, undefined, length, Object.values(patterns));
+			const newPattern = this.createEmptyPattern(
+				newId,
+				schema,
+				undefined,
+				length,
+				Object.values(patterns)
+			);
 			patterns = { ...patterns, [newId]: newPattern };
 		}
 
@@ -524,7 +571,7 @@ export class PatternService {
 		newPatternsPerSong: Pattern[][];
 		newPatternOrder: number[];
 	} | null {
-		if (newId < 0 || newId > 99) return null;
+		if (newId < MIN_PATTERN_ID || newId > MAX_PATTERN_ID) return null;
 
 		const newPatternOrder = patternOrder.map((id, i) => (i === index ? newId : id));
 
@@ -532,16 +579,13 @@ export class PatternService {
 			const existing = songPatterns.find((p) => p.id === newId);
 			if (existing) return songPatterns;
 
-			const currentPattern = songPatterns.find((p) => p.id === patternOrder[index]);
-			const newPattern = currentPattern
-				? this.clonePattern(currentPattern, newId, getSchema(songIndex), songPatterns)
-				: this.createEmptyPattern(
-						newId,
-						getSchema(songIndex),
-						getEffectiveLabels?.(songIndex),
-						length,
-						songPatterns
-					);
+			const newPattern = this.createEmptyPattern(
+				newId,
+				getSchema(songIndex),
+				getEffectiveLabels?.(songIndex),
+				length,
+				songPatterns
+			);
 			return [...songPatterns, newPattern];
 		});
 
