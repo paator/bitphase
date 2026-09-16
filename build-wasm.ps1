@@ -17,6 +17,8 @@ $nesApuArgs = "external/nsfplug/nes_apu.c", "external/nsfplug/nes_dmc.c", "-o", 
 $nesMmc5Args = "external/nsfplug/nes_mmc5.c", "-o", "public/nes/nes_mmc5.wasm",
     "-s", "EXPORTED_FUNCTIONS=`"[\`"_nes_mmc5_Init\`", \`"_nes_mmc5_Reset\`", \`"_nes_mmc5_Tick\`", \`"_nes_mmc5_Render\`", \`"_nes_mmc5_Write\`", \`"_nes_mmc5_SetMask\`", \`"_nes_mmc5_SetStereoMix\`", \`"_nes_mmc5_TickFrameSequence\`"]`""
 
+$ymfmArgs = "-lembind", "external/ymfm.cpp", "external/ymfm/src/ymfm_opn.cpp", "external/ymfm/src/ymfm_ssg.cpp", "-o" "public/ymfm/ymfm.wasm"
+
 $python = $null
 foreach ($name in @('python', 'python3')) {
     $c = Get-Command $name -EA SilentlyContinue
@@ -67,4 +69,6 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $python $emccPy @emccArgs @nesApuArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $python $emccPy @emccArgs @nesMmc5Args
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& $python $emccPy @emccArgs @ymfmArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
