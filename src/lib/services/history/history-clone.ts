@@ -52,6 +52,7 @@ export class HistoryClone {
 		cloned.chipVariant = song.chipVariant;
 		cloned.chipFrequency = song.chipFrequency;
 		cloned.interruptFrequency = song.interruptFrequency;
+		cloned.tempo = song.tempo;
 		cloned.tuningTableIndex = song.tuningTableIndex;
 		cloned.a4TuningHz = song.a4TuningHz;
 		cloned.virtualChannelMap = { ...song.virtualChannelMap };

@@ -84,6 +84,14 @@ export class NESProcessor
 		);
 
 		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('tempo', (value) => {
+				if (typeof value === 'number') {
+					this.sendUpdateTempo(value);
+				}
+			})
+		);
+
+		this.settingsUnsubscribers.push(
 			chipSettings.subscribe('tuningTable', (value) => {
 				if (Array.isArray(value) && value.length > 0) {
 					this.sendInitTuningTable(value as number[]);
@@ -246,6 +254,10 @@ export class NESProcessor
 		this.bridge.sendCommand({ type: 'update_int_frequency', intFrequency });
 	}
 
+	sendUpdateTempo(tempo: number): void {
+		this.bridge.sendCommand({ type: 'update_tempo', tempo });
+	}
+
 	updateParameter(parameter: string, value: unknown): void {
 		if (parameter.startsWith('channelMute_')) {
 			const channelIndex = parseInt(parameter.replace('channelMute_', ''), 10);
@@ -261,6 +273,9 @@ export class NESProcessor
 				break;
 			case 'interruptFrequency':
 				this.sendUpdateIntFrequency(value as number);
+				break;
+			case 'tempo':
+				this.sendUpdateTempo(value as number);
 				break;
 			case 'chipVariant':
 				this.sendUpdateChipVariant(value as string);

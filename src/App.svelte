@@ -36,6 +36,7 @@
 	import { createMenuActionHandler } from './lib/services/app/menu-action-handler';
 	import type { MenuActionContext } from './lib/services/app/menu-action-context';
 	import type { ChipProcessor } from './lib/chips/base/processor';
+	import { PROJECT_FIELDS } from './lib/models/project-fields';
 	import { projectStore } from './lib/stores/project.svelte';
 	import AlphaNoticeModal from './lib/components/Modal/AlphaNoticeModal.svelte';
 	import { alphaNoticeStore } from './lib/stores/alpha-notice.svelte';
@@ -196,15 +197,18 @@
 			const chip = getChipByType(chipType);
 			if (!chip) return;
 
-			const settings = chip.schema.settings || [];
-			settings
-				.filter((s) => s.group === 'chip' && s.notifyAudioService)
-				.forEach((s) => {
-					const value = firstSong[s.key] ?? s.defaultValue;
-					if (value !== undefined) {
-						container.audioService.chipSettings.forChip(chipType).set(s.key, value);
-					}
-				});
+			const settings = [
+				...(chip.schema.settings || []).filter(
+					(s) => s.group === 'chip' && s.notifyAudioService
+				),
+				...PROJECT_FIELDS.filter((s) => s.notifyAudioService)
+			];
+			settings.forEach((s) => {
+				const value = firstSong[s.key] ?? s.defaultValue;
+				if (value !== undefined) {
+					container.audioService.chipSettings.forChip(chipType).set(s.key, value);
+				}
+			});
 		});
 	});
 

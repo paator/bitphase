@@ -23,6 +23,7 @@ describe('Song', () => {
 			expect(song.tuningTable).toEqual([]);
 			expect(song.chipVariant).toBeUndefined();
 			expect(song.interruptFrequency).toBe(50);
+			expect(song.tempo).toBe(0);
 		});
 	});
 

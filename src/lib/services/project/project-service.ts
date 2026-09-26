@@ -1,5 +1,5 @@
 import { Project } from '../../models/project';
-import { Song } from '../../models/song';
+import { Song, tempoForInterruptFrequency } from '../../models/song';
 import type { Chip } from '../../chips/types';
 import type { AudioService } from '../audio/audio-service';
 import { applySchemaDefaults, type ChipSchema } from '../../chips/base/schema';
@@ -24,8 +24,12 @@ export class ProjectService {
 		newSong.chipType = chip.type;
 		applySchemaDefaults(newSong, chip.schema);
 		this.applyChipDefaults(newSong, chip.schema);
+		if (existingSongs.length === 0) {
+			newSong.tempo = tempoForInterruptFrequency(newSong.interruptFrequency);
+		}
 		if (existingSongs.length > 0) {
 			newSong.initialSpeed = existingSongs[0].initialSpeed;
+			newSong.tempo = existingSongs[0].tempo;
 			newSong.defaultPatternLength = existingSongs[0].defaultPatternLength;
 		}
 		this.syncFromPeerSongs(newSong, existingSongs, chip.schema);
@@ -58,6 +62,7 @@ export class ProjectService {
 		}
 
 		targetSong.initialSpeed = peer.initialSpeed;
+		targetSong.tempo = peer.tempo;
 		targetSong.defaultPatternLength = peer.defaultPatternLength;
 		targetSong.tuningTable = [...peer.tuningTable];
 	}
@@ -106,6 +111,9 @@ export class ProjectService {
 
 				if (target.initialSpeed !== source.initialSpeed) {
 					target.initialSpeed = source.initialSpeed;
+				}
+				if (target.tempo !== source.tempo) {
+					target.tempo = source.tempo;
 				}
 				if (target.defaultPatternLength !== source.defaultPatternLength) {
 					target.defaultPatternLength = source.defaultPatternLength;

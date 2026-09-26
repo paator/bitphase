@@ -108,11 +108,18 @@
 		return setting.dependsOn.map((k) => String(context[k] ?? '')).join('-');
 	}
 
+	function normalizeProjectNumber(value: unknown, setting: ChipSetting): number {
+		const n = Number(value);
+		if (!Number.isFinite(n) || (n === 0 && (setting.min ?? 0) > 0)) {
+			return Number(setting.defaultValue) || 0;
+		}
+		return n;
+	}
+
 	function handleSettingChange(key: string, value: unknown, setting: ChipSetting) {
 		const beforeSettings = { ...settingsHistorySnapshot };
 		const beforeSongs = projectStore.cloneForHistory(projectStore.songs);
-		const normalized =
-			setting.type === 'number' ? Number(value) || setting.defaultValue : value;
+		const normalized = setting.type === 'number' ? normalizeProjectNumber(value, setting) : value;
 		for (const song of songs) {
 			(song as unknown as Record<string, unknown>)[key] = normalized;
 		}
@@ -130,12 +137,7 @@
 		);
 		if (setting.notifyAudioService) {
 			for (const group of chipsByType) {
-				const notifies = group.chip.schema.settings?.some(
-					(s) => s.key === key && s.notifyAudioService
-				);
-				if (notifies) {
-					services.audioService.chipSettings.forChip(group.type).set(key, normalized);
-				}
+				services.audioService.chipSettings.forChip(group.type).set(key, normalized);
 			}
 		}
 	}
@@ -358,13 +360,16 @@
 <div class="flex h-full flex-col gap-3 overflow-auto p-4">
 	<Card title="Project Info" icon={IconCarbonFolders} class="flex w-full flex-col gap-2 p-3">
 		<div class="flex flex-wrap gap-2">
-			{#each projectSettings as setting}
+			{#each projectSettings as setting (setting.key)}
+				{#if setting.startNewRow}
+					<div class="h-0 min-h-0 w-full basis-full" aria-hidden="true"></div>
+				{/if}
 				<div
 					class={setting.fullWidth
 						? 'w-full basis-full'
 						: setting.type === 'toggle'
 							? ''
-							: 'flex-1'}>
+							: 'min-w-0 flex-1 basis-0'}>
 					<CardElement label={setting.label}>
 						{#key getDependsOnKey(setting, projectContext)}
 							<DynamicField

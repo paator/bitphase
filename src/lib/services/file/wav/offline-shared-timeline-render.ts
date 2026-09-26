@@ -14,6 +14,7 @@ export type OfflineSharedTimeline = {
 	currentPatternOrderIndex: number;
 	patternOrder: number[];
 	advancePosition: (leaderPatternLength: number) => boolean;
+	isLastFrameOfRow: () => boolean;
 };
 
 export type OfflineSharedTimelineRenderOptions = {
@@ -77,7 +78,7 @@ export async function renderOfflineSharedTimeline({
 				timeline.currentPatternOrderIndex >= timeline.patternOrder.length - 1;
 			const leaderRowCount = leaderPatternLengthFromSlots(lanes);
 			const isLastRow = timeline.currentRow >= leaderRowCount - 1;
-			const isLastTick = timeline.currentTick >= timeline.currentSpeed - 1;
+			const isLastTick = timeline.isLastFrameOfRow();
 
 			if (isLastPattern && isLastRow && isLastTick) {
 				completedLoops++;

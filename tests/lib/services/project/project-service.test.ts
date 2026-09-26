@@ -93,6 +93,8 @@ describe('ProjectService', () => {
 
 			expect(song).toBeInstanceOf(Song);
 			expect(song.chipType).toBe(CHIP_TYPE_AY);
+			expect(song.interruptFrequency).toBe(50);
+			expect(song.tempo).toBe(125);
 		});
 
 		it('should add chip processor when creating new song', async () => {
@@ -102,6 +104,17 @@ describe('ProjectService', () => {
 
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledOnce();
 			expect(mockAudioService.addChipProcessor).toHaveBeenCalledWith(mockChip);
+		});
+
+		it('should inherit tempo 0 from an existing song', async () => {
+			const mockChip = createMockChip();
+			const existing = new Song(mockChip.schema);
+			existing.chipType = CHIP_TYPE_AY;
+			existing.tempo = 0;
+
+			const song = await projectService.createNewSong(mockChip, [existing]);
+
+			expect(song.tempo).toBe(0);
 		});
 
 		it('should inherit initialSpeed from an existing song', async () => {

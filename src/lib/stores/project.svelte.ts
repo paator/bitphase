@@ -1,5 +1,5 @@
 import type { Song, Instrument, Pattern } from '../models/song';
-import { DEFAULT_PATTERN_LENGTH, Instrument as InstrumentModel } from '../models/song';
+import { DEFAULT_PATTERN_LENGTH, Instrument as InstrumentModel, tempoForInterruptFrequency } from '../models/song';
 import { Project, Table } from '../models/project';
 import {
 	filterInstrumentsForActiveChipTypes,
@@ -25,6 +25,7 @@ class ProjectStore {
 		title: '',
 		author: '',
 		initialSpeed: 3,
+		tempo: 0,
 		defaultPatternLength: DEFAULT_PATTERN_LENGTH
 	});
 	initialized = $state(false);
@@ -82,11 +83,13 @@ class ProjectStore {
 	applyProject(project: Project): void {
 		undoRedoStore.clear();
 		channelMuteStore.clear();
+		const firstSong = project.songs[0];
 		this.settings = {
 			title: project.name,
 			author: project.author,
-			initialSpeed: project.songs[0]?.initialSpeed ?? 3,
-			defaultPatternLength: project.songs[0]?.defaultPatternLength ?? DEFAULT_PATTERN_LENGTH
+			initialSpeed: firstSong?.initialSpeed ?? 3,
+			tempo: firstSong?.tempo ?? 0,
+			defaultPatternLength: firstSong?.defaultPatternLength ?? DEFAULT_PATTERN_LENGTH
 		};
 		this.patterns = project.songs.map((song) => song.patterns);
 		this.songs = project.songs;
@@ -126,6 +129,18 @@ class ProjectStore {
 		const projectInitialSpeed = this.settings.initialSpeed;
 		if (typeof projectInitialSpeed === 'number' && projectInitialSpeed >= 1) {
 			song.initialSpeed = projectInitialSpeed;
+		}
+		const projectTempo = this.settings.tempo;
+		const isFirstSong = this.songs.length === 0;
+		if (isFirstSong) {
+			if (!(song.tempo > 0)) {
+				song.tempo = tempoForInterruptFrequency(song.interruptFrequency);
+			}
+			this.settings.tempo = song.tempo;
+		} else if (typeof projectTempo === 'number' && projectTempo >= 0) {
+			song.tempo = Math.floor(projectTempo);
+		} else {
+			this.settings.tempo = song.tempo;
 		}
 		const projectDefaultPatternLength = this.settings.defaultPatternLength;
 		if (

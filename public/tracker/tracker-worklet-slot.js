@@ -192,6 +192,9 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			case 'init_speed':
 				this.handleInitSpeed(data);
 				break;
+			case 'update_tempo':
+				this.handleUpdateTempo(data);
+				break;
 			case 'init_tables':
 				this.handleInitTables(data);
 				break;
@@ -227,6 +230,11 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		if (!(speed > 0)) return;
 		if (this.chipIndex !== 0) return;
 		this.state.publishPlaybackSpeed(speed);
+	}
+
+	handleUpdateTempo({ tempo }) {
+		if (this.chipIndex !== 0) return;
+		this.state.setTempo(tempo);
 	}
 
 	handleInitTables({ tables }) {

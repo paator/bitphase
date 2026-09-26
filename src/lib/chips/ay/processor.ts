@@ -138,6 +138,14 @@ export class AYProcessor
 		);
 
 		this.settingsUnsubscribers.push(
+			chipSettings.subscribe('tempo', (value) => {
+				if (typeof value === 'number') {
+					this.sendUpdateTempo(value);
+				}
+			})
+		);
+
+		this.settingsUnsubscribers.push(
 			chipSettings.subscribe('chipVariant', (value) => {
 				if (typeof value === 'string') {
 					this.sendUpdateChipVariant(value);
@@ -305,6 +313,10 @@ export class AYProcessor
 		this.bridge.sendCommand({ type: 'update_int_frequency', intFrequency });
 	}
 
+	sendUpdateTempo(tempo: number): void {
+		this.bridge.sendCommand({ type: 'update_tempo', tempo });
+	}
+
 	sendUpdateChipVariant(chipVariant: string): void {
 		this.bridge.sendCommand({ type: 'update_chip_variant', chipVariant });
 	}
@@ -332,6 +344,9 @@ export class AYProcessor
 				break;
 			case 'interruptFrequency':
 				this.sendUpdateIntFrequency(value as number);
+				break;
+			case 'tempo':
+				this.sendUpdateTempo(value as number);
 				break;
 			case 'chipVariant':
 				this.sendUpdateChipVariant(value as string);

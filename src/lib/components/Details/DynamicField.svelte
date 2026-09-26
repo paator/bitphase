@@ -99,7 +99,7 @@
 			defaultValue={typeof setting.defaultValue === 'number' ? setting.defaultValue : undefined}
 			onchange={() => onChange?.(setting.key, value, setting)} />
 	{:else if setting.type === 'number'}
-		<div class="flex items-center gap-2">
+		<div class="flex w-full min-w-0 items-center gap-2">
 			<CommitNumericInput
 				value={numberValue}
 				min={setting.min}

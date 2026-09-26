@@ -106,6 +106,10 @@ class TrackerState {
 		this.timeline.setSpeed(speed);
 	}
 
+	setTempo(tempo) {
+		this.timeline.setTempo(tempo);
+	}
+
 	publishPlaybackSpeed(speed) {
 		this.timeline.publishPlaybackSpeed(speed);
 	}

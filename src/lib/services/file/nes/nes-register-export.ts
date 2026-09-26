@@ -297,7 +297,7 @@ async function captureRegisterFrames(
 		const isLastPattern =
 			state.timeline.currentPatternOrderIndex >= state.timeline.patternOrder.length - 1;
 		const isLastRow = state.timeline.currentRow >= state.currentPattern.length - 1;
-		const isLastTick = state.timeline.currentTick >= state.timeline.currentSpeed - 1;
+		const isLastTick = state.timeline.isLastFrameOfRow();
 		if (isLastPattern && isLastRow && isLastTick) {
 			break;
 		}
@@ -358,6 +358,7 @@ export async function captureNesRegisterFrames(
 	state.setTables(project.tables);
 	state.setPatternOrder(project.patternOrder || [0]);
 	state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+	state.setTempo(song.tempo ?? 0);
 	if (song.interruptFrequency) {
 		state.timeline.intFrequency = song.interruptFrequency;
 	}

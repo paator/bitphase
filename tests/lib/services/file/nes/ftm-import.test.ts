@@ -182,6 +182,8 @@ describe('ftm import', () => {
 		expect(song.chipVariant).toBe('NTSC');
 		expect(song.initialSpeed).toBe(6);
 		expect(song.interruptFrequency).toBe(60);
+		expect(song.tempo).toBe(150);
+		expect(warnings.some((warning) => warning.includes('tempo was not imported'))).toBe(false);
 		expect(song.patterns[0]!.length).toBe(4);
 
 		const pulse = song.patterns[0]!.channels[0]!.rows;

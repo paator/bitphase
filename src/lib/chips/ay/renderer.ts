@@ -202,6 +202,7 @@ export class AYChipRenderer implements ChipRenderer {
 			state.setIntFrequency(interruptFrequency, SAMPLE_RATE);
 			state.setPatternOrder(project.patternOrder || [0], project.loopPointId || 0);
 			state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+			state.setTempo(song.tempo ?? 0);
 			state.updateSamplesPerTick(SAMPLE_RATE);
 		}
 	}
@@ -324,7 +325,7 @@ export class AYChipRenderer implements ChipRenderer {
 					state.timeline.currentPatternOrderIndex >=
 					state.timeline.patternOrder.length - 1;
 				const isLastRow = state.timeline.currentRow >= state.currentPattern.length - 1;
-				const isLastTick = state.timeline.currentTick >= state.timeline.currentSpeed - 1;
+				const isLastTick = state.timeline.isLastFrameOfRow();
 
 				if (isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
@@ -482,7 +483,7 @@ export class AYChipRenderer implements ChipRenderer {
 					leader.state.currentPattern != null
 						? tl.currentRow >= leader.state.currentPattern.length - 1
 						: false;
-				const isLastTick = tl.currentTick >= tl.currentSpeed - 1;
+				const isLastTick = tl.isLastFrameOfRow();
 
 				if (isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;

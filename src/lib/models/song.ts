@@ -175,6 +175,7 @@ class Song {
 	public chipVariant?: string;
 	public chipFrequency?: number;
 	public interruptFrequency: number;
+	public tempo: number;
 	public tuningTableIndex?: number;
 	public a4TuningHz?: number;
 	public virtualChannelMap: Record<number, number> = {};
@@ -187,6 +188,7 @@ class Song {
 		this.patterns = [new Pattern(0, this.defaultPatternLength, schema)];
 		this.tuningTable = [];
 		this.interruptFrequency = 50;
+		this.tempo = 0;
 	}
 
 	setSchema(schema: ChipSchema): void {
@@ -212,6 +214,11 @@ class Song {
 		this.patterns.push(pattern);
 		return pattern;
 	}
+}
+
+export function tempoForInterruptFrequency(interruptFrequency: number): number {
+	const hz = interruptFrequency > 0 ? interruptFrequency : 50;
+	return Math.min(255, Math.max(1, Math.round(hz * 2.5)));
 }
 
 export {

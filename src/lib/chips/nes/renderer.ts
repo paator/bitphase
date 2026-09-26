@@ -20,7 +20,7 @@ const DEFAULT_INTERRUPT_FREQUENCY = 50;
 
 type NesSlotLane = {
 	songIndex: number;
-	song: { patterns: Pattern[]; chipType?: string; chipVariant?: string; chipFrequency?: number; interruptFrequency?: number; initialSpeed?: number; tuningTable: number[] };
+	song: { patterns: Pattern[]; chipType?: string; chipVariant?: string; chipFrequency?: number; interruptFrequency?: number; initialSpeed?: number; tempo?: number; tuningTable: number[] };
 	state: {
 		currentPattern: Pattern | null;
 		timeline: {
@@ -32,6 +32,7 @@ type NesSlotLane = {
 			currentPatternOrderIndex: number;
 			patternOrder: number[];
 			loopPointId: number;
+			isLastFrameOfRow: () => boolean;
 		};
 		advancePosition: (leaderPatternLength?: number) => boolean;
 	};
@@ -149,6 +150,7 @@ export class NESChipRenderer implements ChipRenderer {
 			setIntFrequency: (frequency: number, sampleRate: number) => void;
 			setPatternOrder: (order: number[], loopPointId: number) => void;
 			setSpeed: (speed: number) => void;
+			setTempo: (tempo: number) => void;
 			updateSamplesPerTick: (sampleRate: number) => void;
 		},
 		song: NesSlotLane['song'],
@@ -169,6 +171,7 @@ export class NESChipRenderer implements ChipRenderer {
 			state.setIntFrequency(song.interruptFrequency ?? DEFAULT_INTERRUPT_FREQUENCY, SAMPLE_RATE);
 			state.setPatternOrder(project.patternOrder || [0], project.loopPointId || 0);
 			state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+			state.setTempo(song.tempo ?? 0);
 			state.updateSamplesPerTick(SAMPLE_RATE);
 		}
 	}
@@ -286,7 +289,7 @@ export class NESChipRenderer implements ChipRenderer {
 				const isLastRow =
 					lane.state.currentPattern != null &&
 					tl.currentRow >= lane.state.currentPattern.length - 1;
-				const isLastTick = tl.currentTick >= tl.currentSpeed - 1;
+				const isLastTick = tl.isLastFrameOfRow();
 
 				if (isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
@@ -382,7 +385,7 @@ export class NESChipRenderer implements ChipRenderer {
 				const isLastRow =
 					leader.state.currentPattern != null &&
 					tl.currentRow >= leader.state.currentPattern.length - 1;
-				const isLastTick = tl.currentTick >= tl.currentSpeed - 1;
+				const isLastTick = tl.isLastFrameOfRow();
 
 				if (isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
@@ -468,6 +471,7 @@ export class NESChipRenderer implements ChipRenderer {
 					setIntFrequency: (frequency: number, sampleRate: number) => void;
 					setPatternOrder: (order: number[], loopPointId: number) => void;
 					setSpeed: (speed: number) => void;
+					setTempo: (tempo: number) => void;
 					updateSamplesPerTick: (sampleRate: number) => void;
 				};
 
@@ -598,6 +602,7 @@ export class NESChipRenderer implements ChipRenderer {
 				setIntFrequency: (frequency: number, sampleRate: number) => void;
 				setPatternOrder: (order: number[], loopPointId: number) => void;
 				setSpeed: (speed: number) => void;
+				setTempo: (tempo: number) => void;
 				updateSamplesPerTick: (sampleRate: number) => void;
 			};
 

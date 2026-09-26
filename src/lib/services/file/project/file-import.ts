@@ -120,6 +120,11 @@ function reconstructSong(data: any, getChip: (chipType: string) => Chip | null):
 	if (schema?.normalizeSettings) {
 		Object.assign(songRecord, schema.normalizeSettings(songRecord));
 	}
+	const loadedTempo = data.tempo;
+	song.tempo =
+		typeof loadedTempo === 'number' && loadedTempo >= 0 && loadedTempo <= 255
+			? Math.floor(loadedTempo)
+			: 0;
 	const loadedSpeed = data.initialSpeed;
 	song.initialSpeed =
 		typeof loadedSpeed === 'number' && loadedSpeed >= 1 && loadedSpeed <= 255 ? loadedSpeed : 3;

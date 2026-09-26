@@ -346,7 +346,7 @@ class PsgExportService {
 			const isLastPattern =
 				timeline.currentPatternOrderIndex >= timeline.patternOrder.length - 1;
 			const isLastRow = timeline.currentRow >= leaderLen - 1;
-			const isLastTick = timeline.currentTick >= timeline.currentSpeed - 1;
+			const isLastTick = timeline.isLastFrameOfRow();
 			if (isLastPattern && isLastRow && isLastTick) {
 				break;
 			}
@@ -446,6 +446,7 @@ class PsgExportService {
 		if (ownsTimeline) {
 			state.setPatternOrder(project.patternOrder || [0]);
 			state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+			state.setTempo(song.tempo ?? 0);
 			if (song.interruptFrequency) {
 				timeline.intFrequency = song.interruptFrequency;
 			}

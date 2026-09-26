@@ -282,6 +282,7 @@ function createAyCaptureSlot(
 	if (ownsTimeline) {
 		state.setPatternOrder(patternOrder, project.loopPointId || 0);
 		state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+		state.setTempo(song.tempo ?? 0);
 		timeline.intFrequency = interruptFrequency;
 	}
 
@@ -406,6 +407,7 @@ function createNesCaptureSlot(
 	if (ownsTimeline) {
 		state.setPatternOrder(patternOrder, project.loopPointId || 0);
 		state.setSpeed(song.initialSpeed || DEFAULT_SPEED);
+		state.setTempo(song.tempo ?? 0);
 		timeline.intFrequency = interruptFrequency;
 	}
 	if (typeof state.resizeChannels === 'function' && totalChannelCount !== NES_HW_CHANNEL_COUNT) {
@@ -588,6 +590,7 @@ async function captureSharedProject(
 		currentPatternOrderIndex: number;
 		patternOrder: number[];
 		advancePosition: (leaderLen: number) => boolean;
+		isLastFrameOfRow: () => boolean;
 	};
 
 	const leaderSongIndex = orderedSlots[0]!.songIndex;
@@ -646,7 +649,7 @@ async function captureSharedProject(
 		const isLastPattern =
 			timeline.currentPatternOrderIndex >= timeline.patternOrder.length - 1;
 		const isLastRow = timeline.currentRow >= leaderLen - 1;
-		const isLastTick = timeline.currentTick >= timeline.currentSpeed - 1;
+		const isLastTick = timeline.isLastFrameOfRow();
 		if (isLastPattern && isLastRow && isLastTick) {
 			break;
 		}

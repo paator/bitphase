@@ -308,11 +308,6 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 	if (header.trackCount > 1) {
 		note('Bitphase keeps one order list, taken from the first song');
 	}
-	const defaultTempo = params.machine === 'PAL' ? DEFAULT_TEMPO_PAL : DEFAULT_TEMPO_NTSC;
-	if (frames.some((track) => track.tempo !== defaultTempo)) {
-		note('FamiTracker tempo was not imported; row speed was kept');
-	}
-
 	const skippedEffects = new Set<string>();
 	const arpTables = buildArpTables(instruments, sequences, note);
 	const projectInstruments = instruments.map((instrument) =>
@@ -850,6 +845,7 @@ function toSong(
 	song.chipVariant = params.machine;
 	song.chipFrequency = resolveNesCpuFrequency(params.machine);
 	song.interruptFrequency = params.engineHz;
+	song.tempo = track.tempo > 0 ? track.tempo : 0;
 	song.tuningTable = resolveNesTuningTable(song.chipFrequency, song.a4TuningHz);
 
 	const latchedInstrument = Array.from({ length: NES_CHANNEL_COUNT }, () => -1);

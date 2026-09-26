@@ -12,14 +12,18 @@ export class TimelinePatternCoordinator {
 		this.pendingPositionUpdate = null;
 	}
 
-	postPositionUpdate() {
+	buildPositionUpdate() {
 		const state = this.getState();
-		this.post({
+		return {
 			type: 'position_update',
 			currentRow: state.timeline.currentRow,
 			currentTick: state.timeline.currentTick,
 			currentPatternOrderIndex: state.timeline.currentPatternOrderIndex
-		});
+		};
+	}
+
+	postPositionUpdate() {
+		this.post(this.buildPositionUpdate());
 		this.lastPositionUpdateTime = 0;
 		this.pendingPositionUpdate = null;
 	}
@@ -89,12 +93,7 @@ export class TimelinePatternCoordinator {
 			}
 			state.setPattern(this.pendingNextPattern.pattern, this.pendingNextPattern.orderIndex);
 			this.pendingNextPattern = null;
-			this.post({
-				type: 'position_update',
-				currentRow: state.timeline.currentRow,
-				currentTick: state.timeline.currentTick,
-				currentPatternOrderIndex: state.timeline.currentPatternOrderIndex
-			});
+			this.post(this.buildPositionUpdate());
 			this.lastPositionUpdateTime = 0;
 			this.pendingPositionUpdate = null;
 		} else {
@@ -103,12 +102,7 @@ export class TimelinePatternCoordinator {
 			const needId = oi >= 0 && oi < order.length ? order[oi] : null;
 			const cur = state.currentPattern;
 			if (needId !== null && cur && cur.id === needId) {
-				this.post({
-					type: 'position_update',
-					currentRow: state.timeline.currentRow,
-					currentTick: state.timeline.currentTick,
-					currentPatternOrderIndex: state.timeline.currentPatternOrderIndex
-				});
+				this.post(this.buildPositionUpdate());
 				this.lastPositionUpdateTime = 0;
 				this.pendingPositionUpdate = null;
 			} else {
@@ -147,19 +141,16 @@ export class TimelinePatternCoordinator {
 		const state = this.getState();
 		const now = currentTime * 1000;
 		if (now - this.lastPositionUpdateTime >= this.positionUpdateThrottleMs) {
-			this.post({
-				type: 'position_update',
-				currentRow: state.timeline.currentRow,
-				currentTick: state.timeline.currentTick,
-				currentPatternOrderIndex: state.timeline.currentPatternOrderIndex
-			});
+			const update = this.buildPositionUpdate();
+			this.post(update);
 			this.lastPositionUpdateTime = now;
 			this.pendingPositionUpdate = null;
 		} else {
+			const update = this.buildPositionUpdate();
 			this.pendingPositionUpdate = {
-				currentRow: state.timeline.currentRow,
-				currentTick: state.timeline.currentTick,
-				currentPatternOrderIndex: state.timeline.currentPatternOrderIndex
+				currentRow: update.currentRow,
+				currentTick: update.currentTick,
+				currentPatternOrderIndex: update.currentPatternOrderIndex
 			};
 		}
 	}
