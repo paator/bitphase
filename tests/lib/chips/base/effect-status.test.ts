@@ -20,6 +20,9 @@ describe('effect status descriptions', () => {
 		expect(
 			describeGeneralEffect({ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 })
 		).toBe('VXYZ: Vibrato (X: delay; Y: speed; Z: depth)');
+		expect(describeGeneralEffect({ effect: 7, delay: 0, parameter: 4 })).toBe(
+			'7.XY: Note Delay (XY: ticks)'
+		);
 		expect(describeGeneralEffect({ effect: 4, delay: 0, parameter: 5 })).toBe(
 			'4.XY: Instrument Position (XY: row)'
 		);
@@ -72,6 +75,7 @@ describe('effect status descriptions', () => {
 		expect(lines).toContain(arpeggio);
 		expect(lines).toContain(vibratoTable);
 		expect(lines).toContain('1XYZ: Slide Down (X: delay; YZ: step)');
+		expect(lines).toContain('7.XY: Note Delay (XY: ticks)');
 		expect(lines).toContain('S.TY: Speed (Y: table)');
 		expect(lines).not.toContain('E1XY: PWM Min (XY: duty)');
 

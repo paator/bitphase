@@ -7,6 +7,7 @@ class EffectAlgorithms {
 	static ORNAMENT_POSITION = 5;
 	static VIBRATO = 'V'.charCodeAt(0);
 	static ON_OFF = 6;
+	static NOTE_DELAY = 7;
 	static SPEED = 'S'.charCodeAt(0);
 	static AUTO_ENVELOPE = 'E'.charCodeAt(0);
 	static DETUNE = 'D'.charCodeAt(0);

@@ -127,6 +127,15 @@ describe('PatternEffectHandling', () => {
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('S.TZ');
 		});
 
+		it('effect 7 (note delay) ignores delay digit and formats with dot delay', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('7104');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe(7);
+			expect(parsed!.delay).toBe(0);
+			expect(parsed!.parameter).toBe(0x04);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('7.04');
+		});
+
 		it('effect 6 (on/off) ignores delay digit and formats with dot delay', () => {
 			const parsed = PatternEffectHandling.parseEffectFromString('6124');
 			expect(parsed).not.toBeNull();

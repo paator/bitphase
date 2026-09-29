@@ -31,6 +31,7 @@ enum EffectType {
 	SamplePosition = 4,
 	OrnamentPosition = 5,
 	OnOff = 6,
+	NoteDelay = 7,
 	Speed = 'S'.charCodeAt(0),
 	Vibrato = 'V'.charCodeAt(0),
 	AutoEnvelope = 'E'.charCodeAt(0),

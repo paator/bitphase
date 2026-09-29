@@ -37,7 +37,9 @@ const CHANNEL_ARRAY_SPECS = [
 	['channelVibratoDelay', 0],
 	['channelVibratoCounter', 0],
 	['channelVibratoPosition', 0],
-	['channelDetune', 0]
+	['channelDetune', 0],
+	['channelNoteDelayArmed', false],
+	['channelNoteDelayCounter', 0]
 ];
 
 class TrackerState {

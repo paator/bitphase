@@ -31,6 +31,7 @@ const GENERAL_EFFECT_HINTS: Record<number, EffectStatusHint> = {
 	4: { format: '4.XY', name: 'Instrument Position', params: 'XY: row' },
 	5: { format: '5.XY', name: 'Table Position', params: 'XY: row' },
 	6: { format: '6.XY', name: 'On/Off', params: 'X: on; Y: off' },
+	7: { format: '7.XY', name: 'Note Delay', params: 'XY: ticks' },
 	['D'.charCodeAt(0)]: { format: 'D.XY', name: 'Detune', params: 'XY: signed, 80=0' },
 	['S'.charCodeAt(0)]: { format: 'S.XY', name: 'Speed', params: 'XY: ticks' }
 };
@@ -67,6 +68,7 @@ const GENERAL_EFFECT_CODE_ORDER = [
 	4,
 	5,
 	6,
+	7,
 	'D'.charCodeAt(0),
 	'S'.charCodeAt(0)
 ];

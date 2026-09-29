@@ -124,6 +124,14 @@
 			example: '6.24 - on duration 2, off duration 4'
 		},
 		{
+			code: '7',
+			name: 'Note Delay',
+			description: 'Delays the note on this channel (7.XY).',
+			format: '7.XY',
+			parameter: 'XY - ticks to wait (01-FF)',
+			example: '7.04 - wait 4 ticks'
+		},
+		{
 			code: 'D',
 			name: 'Detune',
 			description:

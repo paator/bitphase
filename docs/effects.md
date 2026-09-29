@@ -81,6 +81,12 @@ Alternates between playing and muting (`6.XY` / `6.TY`).
 
 **Example:** `6.24` - on duration 2, off duration 4.
 
+### 7 - Note delay
+
+Delays the note on this channel (`7.XY`).
+
+**Example:** `7.04` - wait 4 ticks.
+
 ### D - Detune
 
 Offsets channel pitch by a signed amount (`D.XY` / `D.TY`).

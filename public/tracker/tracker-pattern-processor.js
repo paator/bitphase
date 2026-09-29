@@ -13,6 +13,9 @@ class TrackerPatternProcessor {
 		this.state = state;
 		this.chipAudioDriver = chipAudioDriver;
 		this.port = port;
+		this._noteDelayPending = [];
+		this._delayHoldsNote = [];
+		this._registerState = null;
 	}
 
 	_applyPlaybackSpeed(speed) {
@@ -26,14 +29,26 @@ class TrackerPatternProcessor {
 		const patternRow = pattern.patternRows[rowIndex];
 		if (!patternRow) return;
 
+		this._registerState = registerState;
+
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const channel = pattern.channels[channelIndex];
 			const row = channel.rows[rowIndex];
 
-			this._processNote(channelIndex, row);
-			this._processTable(channelIndex, row);
-			this._processVolume(channelIndex, row);
-			this._processEffects(channelIndex, row, true);
+			if (
+				this.state.channelNoteDelayArmed?.[channelIndex] &&
+				this.state.channelNoteDelayCounter[channelIndex] === 0
+			) {
+				this._flushNoteDelay(channelIndex);
+			}
+			const delayTicks = this._noteDelayParameter(row);
+			if (delayTicks > 0) {
+				this._armNoteDelay(channelIndex, delayTicks, pattern, rowIndex, patternRow);
+				this._delayHoldsNote[channelIndex] = true;
+				continue;
+			}
+			this._delayHoldsNote[channelIndex] = false;
+			this._applyChannelContent(channelIndex, row);
 		}
 
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
@@ -42,16 +57,40 @@ class TrackerPatternProcessor {
 			this._processSpeedOnly(channelIndex, row);
 		}
 
-		this.chipAudioDriver.processPatternRow(
-			this.state,
-			pattern,
-			rowIndex,
-			patternRow,
-			registerState
-		);
+		this._dispatchPatternRow(pattern, rowIndex, patternRow, registerState);
+	}
+
+	_dispatchPatternRow(pattern, rowIndex, patternRow, registerState) {
+		const saved = [];
+		const channels = pattern.channels;
+		for (let channelIndex = 0; channelIndex < channels.length; channelIndex++) {
+			if (!this._delayHoldsNote[channelIndex]) continue;
+			const row = channels[channelIndex].rows[rowIndex];
+			if (!row) continue;
+			saved.push([channelIndex, row]);
+			channels[channelIndex].rows[rowIndex] = {
+				...row,
+				note: { name: 0, octave: 0 },
+				effects: null
+			};
+		}
+		try {
+			this.chipAudioDriver.processPatternRow(
+				this.state,
+				pattern,
+				rowIndex,
+				patternRow,
+				registerState
+			);
+		} finally {
+			for (const [channelIndex, row] of saved) {
+				channels[channelIndex].rows[rowIndex] = row;
+			}
+		}
 	}
 
 	processTables() {
+		this.tickNoteDelays();
 		for (let channelIndex = 0; channelIndex < this.state.channelTables.length; channelIndex++) {
 			const tableIndex = this.state.channelTables[channelIndex];
 			const baseNote = this.state.channelBaseNotes[channelIndex];
@@ -102,6 +141,59 @@ class TrackerPatternProcessor {
 		}
 	}
 
+	_noteDelayParameter(row) {
+		const effects = row?.effects;
+		if (!effects) return 0;
+		for (const effect of effects) {
+			if (!effect || effect.effect !== EffectAlgorithms.NOTE_DELAY) continue;
+			const ticks = effect.parameter ?? 0;
+			if (ticks > 0) return ticks & 0xff;
+		}
+		return 0;
+	}
+
+	_armNoteDelay(channelIndex, ticks, pattern, rowIndex, patternRow) {
+		if (!this.state.channelNoteDelayArmed) return;
+		this.state.channelNoteDelayArmed[channelIndex] = true;
+		this.state.channelNoteDelayCounter[channelIndex] = ticks;
+		this._noteDelayPending[channelIndex] = { pattern, rowIndex, patternRow };
+		const row = pattern.channels[channelIndex]?.rows?.[rowIndex];
+		if (!row) return;
+		this._processVolume(channelIndex, row);
+	}
+
+	_applyChannelContent(channelIndex, row) {
+		this._processNote(channelIndex, row);
+		this._processTable(channelIndex, row);
+		this._processVolume(channelIndex, row);
+		this._processEffects(channelIndex, row, true);
+	}
+
+	_flushNoteDelay(channelIndex) {
+		if (!this.state.channelNoteDelayArmed?.[channelIndex]) return;
+		const pending = this._noteDelayPending[channelIndex];
+		this.state.channelNoteDelayArmed[channelIndex] = false;
+		this.state.channelNoteDelayCounter[channelIndex] = 0;
+		this._noteDelayPending[channelIndex] = null;
+		if (!pending) return;
+		const row = pending.pattern.channels[channelIndex]?.rows?.[pending.rowIndex];
+		if (!row) return;
+		this._applyChannelContent(channelIndex, row);
+	}
+
+	tickNoteDelays() {
+		const armed = this.state.channelNoteDelayArmed;
+		if (!armed) return;
+		for (let channelIndex = 0; channelIndex < armed.length; channelIndex++) {
+			if (!armed[channelIndex]) continue;
+			if (this.state.channelNoteDelayCounter[channelIndex] === 0) {
+				this._flushNoteDelay(channelIndex);
+			} else {
+				this.state.channelNoteDelayCounter[channelIndex]--;
+			}
+		}
+	}
+
 	_processNote(channelIndex, row) {
 		const effects = row.effects || [];
 
@@ -112,10 +204,19 @@ class TrackerPatternProcessor {
 		if (row.note.name === 1) {
 			this._resetAllChannelEffects(channelIndex);
 			this.state.channelSoundEnabled[channelIndex] = false;
+			if (this.state.channelKeyOn) {
+				this.state.channelKeyOn[channelIndex] = false;
+			}
 			this.state.channelBaseNotes[channelIndex] = 0;
 			this.state.channelCurrentNotes[channelIndex] = 0;
 		} else if (row.note.name !== 0) {
 			this.state.channelSoundEnabled[channelIndex] = true;
+			if (this.state.instrumentPositions) {
+				this.state.instrumentPositions[channelIndex] = 0;
+			}
+			if (this.state.channelKeyOn) {
+				this.state.channelKeyOn[channelIndex] = true;
+			}
 			const noteValue = row.note.name - 2 + (row.note.octave - 1) * 12;
 
 			this.state.channelPreviousNotes[channelIndex] =
@@ -163,7 +264,9 @@ class TrackerPatternProcessor {
 
 	_resetChannelEffectsOnNewNote(channelIndex, effects) {
 		const hasEffectOfType = (type) => effects.some((e) => e && e.effect === type);
-		const rowHasExplicitEffect = effects.some((e) => e != null && e.effect !== 0);
+		const rowHasExplicitEffect = effects.some(
+			(e) => e != null && e.effect !== 0 && e.effect !== EffectAlgorithms.NOTE_DELAY
+		);
 
 		if (!hasEffectOfType(EffectAlgorithms.ARPEGGIO)) {
 			this.state.channelArpeggioCounter[channelIndex] = 0;
@@ -246,6 +349,7 @@ class TrackerPatternProcessor {
 	}
 
 	_processOneEffect(channelIndex, row, effect, skipSpeed = false) {
+		if (effect.effect === EffectAlgorithms.NOTE_DELAY) return;
 		const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
 		const usesChannelEffectTable =
 			effect.effect !== EffectAlgorithms.SPEED &&

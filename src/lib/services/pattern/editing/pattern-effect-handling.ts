@@ -18,7 +18,8 @@ export class PatternEffectHandling {
 			effect === 'S'.charCodeAt(0) ||
 			effect === 4 ||
 			effect === 5 ||
-			effect === 6
+			effect === 6 ||
+			effect === 7
 		);
 	}
 
@@ -64,7 +65,7 @@ export class PatternEffectHandling {
 		const delay = PatternEffectHandling.formatEffectDelay(effect.effect, effect.delay);
 
 		const noTableSyntax =
-			effect.effect === 4 || effect.effect === 5;
+			effect.effect === 4 || effect.effect === 5 || effect.effect === 7;
 		if (
 			!noTableSyntax &&
 			effect.tableIndex !== undefined &&
@@ -117,7 +118,7 @@ export class PatternEffectHandling {
 		const delay = parseInt(value[1] || '0', 16) || 0;
 
 		const char2 = value[2] || '.';
-		const noTableSyntax = type === 4 || type === 5;
+		const noTableSyntax = type === 4 || type === 5 || type === 7;
 		const noDelay = PatternEffectHandling.effectIgnoresDelay(type);
 		const effectiveDelay = noDelay ? 0 : delay;
 		if (!noTableSyntax && (char2 === 'T' || char2 === 't')) {
