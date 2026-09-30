@@ -180,6 +180,9 @@ uint32_t nes_apu_Render (nes_apu_t *s, int32_t b[2])
   b[1] += m[1] * s->sm[1][1];
   b[1] >>= 7;
 
+  s->mix_out[0] = m[0];
+  s->mix_out[1] = m[1];
+
   return 2;
 }
 
@@ -188,6 +191,13 @@ int32_t nes_apu_GetOut (nes_apu_t *s, int channel)
   if (channel < 0 || channel > 1)
     return 0;
   return s->out[channel];
+}
+
+int32_t nes_apu_GetMixOut (nes_apu_t *s, int channel)
+{
+  if (channel < 0 || channel > 1)
+    return 0;
+  return s->mix_out[channel];
 }
 
 void nes_apu_Init (nes_apu_t *s)
@@ -251,7 +261,10 @@ void nes_apu_Reset (nes_apu_t *s)
   }
 
   for (i = 0; i < 2; i++)
+  {
     s->out[i] = 0;
+    s->mix_out[i] = 0;
+  }
 }
 
 void nes_apu_SetOption (nes_apu_t *s, int id, int val)

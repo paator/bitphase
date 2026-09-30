@@ -54,6 +54,7 @@ type NesSlotLane = {
 	apuEngine: {
 		applyRegisterState: (registerState: unknown) => void;
 		process: (sampleRate: number) => { left: number; right: number };
+		getExportChannelSamples: () => number[];
 		setCpuFrequency: (frequency: number) => void;
 		setChipVariant: (variant: string) => void;
 		dispose: () => void;
@@ -230,10 +231,14 @@ export class NESChipRenderer implements ChipRenderer {
 		totalRows: number,
 		patterns: Pattern[],
 		loopCount: number,
-		onProgress?: (progress: number, message: string) => void
+		onProgress?: (progress: number, message: string) => void,
+		separateChannels = false
 	): Promise<Float32Array[]> {
 		const leftSamples: number[] = [];
 		const rightSamples: number[] = [];
+		const channelSamples: number[][] | null = separateChannels
+			? Array.from({ length: 5 }, () => [])
+			: null;
 		let totalSamples = 0;
 		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
 		let completedLoops = 0;
@@ -314,11 +319,21 @@ export class NESChipRenderer implements ChipRenderer {
 			}
 
 			const { left, right } = lane.apuEngine.process(SAMPLE_RATE);
-			leftSamples.push(left);
-			rightSamples.push(right);
+			if (channelSamples) {
+				const samples = lane.apuEngine.getExportChannelSamples();
+				for (let ch = 0; ch < channelSamples.length; ch++) {
+					channelSamples[ch]!.push(samples[ch] ?? 0);
+				}
+			} else {
+				leftSamples.push(left);
+				rightSamples.push(right);
+			}
 			totalSamples++;
 		}
 
+		if (channelSamples) {
+			return channelSamples.map((samples) => new Float32Array(samples));
+		}
 		return [new Float32Array(leftSamples), new Float32Array(rightSamples)];
 	}
 
@@ -327,10 +342,14 @@ export class NESChipRenderer implements ChipRenderer {
 		leaderSong: NesSlotLane['song'],
 		totalRows: number,
 		loopCount: number,
-		onProgress?: (progress: number, message: string) => void
+		onProgress?: (progress: number, message: string) => void,
+		separateChannels = false
 	): Promise<Float32Array[][]> {
 		const leftByChip: number[][] = contexts.map(() => []);
 		const rightByChip: number[][] = contexts.map(() => []);
+		const channelsByChip: number[][][] | null = separateChannels
+			? contexts.map(() => Array.from({ length: 5 }, () => []))
+			: null;
 		let totalSamples = 0;
 		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
 		let completedLoops = 0;
@@ -412,12 +431,22 @@ export class NESChipRenderer implements ChipRenderer {
 
 			for (let ci = 0; ci < contexts.length; ci++) {
 				const { left, right } = contexts[ci]!.apuEngine.process(SAMPLE_RATE);
-				leftByChip[ci].push(left);
-				rightByChip[ci].push(right);
+				if (channelsByChip) {
+					const samples = contexts[ci]!.apuEngine.getExportChannelSamples();
+					for (let ch = 0; ch < 5; ch++) {
+						channelsByChip[ci]![ch]!.push(samples[ch] ?? 0);
+					}
+				} else {
+					leftByChip[ci]!.push(left);
+					rightByChip[ci]!.push(right);
+				}
 			}
 			totalSamples++;
 		}
 
+		if (channelsByChip) {
+			return channelsByChip.map((channels) => channels.map((samples) => new Float32Array(samples)));
+		}
 		return contexts.map((_, ci) => [
 			new Float32Array(leftByChip[ci]),
 			new Float32Array(rightByChip[ci])
@@ -433,6 +462,7 @@ export class NESChipRenderer implements ChipRenderer {
 		assertSharedTimelineSlotsForChip(slots, this.binding);
 		const songIndices = slots.map((s) => s.songIndex);
 		const loopCount = Math.max(1, options?.loopCount ?? 1);
+		const separateChannels = options?.separateChannels ?? false;
 		const patternOrder = project.patternOrder || [0];
 		const requestedStartOrderIndex = options?.startPatternOrderIndex ?? 0;
 		const startOrderIndex =
@@ -537,7 +567,8 @@ export class NESChipRenderer implements ChipRenderer {
 				leaderSong,
 				totalRows,
 				loopCount,
-				onProgress
+				onProgress,
+				separateChannels
 			);
 
 			for (const ctx of contexts) {
@@ -578,6 +609,7 @@ export class NESChipRenderer implements ChipRenderer {
 		}
 
 		const loopCount = Math.max(1, options?.loopCount ?? 1);
+		const separateChannels = options?.separateChannels ?? false;
 		const patternOrder = project.patternOrder || [0];
 		const requestedStartOrderIndex = options?.startPatternOrderIndex ?? 0;
 		const startOrderIndex =
@@ -666,7 +698,8 @@ export class NESChipRenderer implements ChipRenderer {
 				totalRows,
 				patterns,
 				loopCount,
-				onProgress
+				onProgress,
+				separateChannels
 			);
 
 			engine.dispose();

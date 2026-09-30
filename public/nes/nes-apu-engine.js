@@ -22,6 +22,12 @@ import {
 const SQUARE_BASE = [0x4000, 0x4004];
 const TRIANGLE_BASE = 0x4008;
 const NOISE_BASE = 0x400c;
+const NES_EXPORT_CHANNEL_COUNT = 5;
+const NES_OUTPUT_DC_POLE = 0.995;
+
+function emptyExportChannels() {
+	return [0, 0, 0, 0, 0];
+}
 
 function buildSquareVolumeReg(volume, duty) {
 	return (3 << 4) | (volume & 15) | ((duty & 3) << 6);
@@ -70,6 +76,9 @@ class NesApuEngine {
 		this._dcPrevIn = [0, 0];
 		this._dcPrevOut = [0, 0];
 		this._scopeRawOut = [0, 0, 0, 0, 0];
+		this._exportDcIn = emptyExportChannels();
+		this._exportDcOut = emptyExportChannels();
+		this._exportChannelSamples = emptyExportChannels();
 		this.sampleMemPtr = 0;
 	}
 
@@ -104,6 +113,9 @@ class NesApuEngine {
 		this._dcPrevIn = [0, 0];
 		this._dcPrevOut = [0, 0];
 		this._scopeRawOut = [0, 0, 0, 0, 0];
+		this._exportDcIn = emptyExportChannels();
+		this._exportDcOut = emptyExportChannels();
+		this._exportChannelSamples = emptyExportChannels();
 		this._parkTriangleDacAtZero();
 	}
 
@@ -463,15 +475,38 @@ class NesApuEngine {
 		const samples = new Int32Array(memory, this.outputPtr, 4);
 		const rawLeft = (samples[0] + samples[2]) * NES_APU_OUTPUT_SCALE;
 		const rawRight = (samples[1] + samples[3]) * NES_APU_OUTPUT_SCALE;
-		const dcPole = 0.995;
-		const left = rawLeft - this._dcPrevIn[0] + dcPole * this._dcPrevOut[0];
-		const right = rawRight - this._dcPrevIn[1] + dcPole * this._dcPrevOut[1];
+		const left = rawLeft - this._dcPrevIn[0] + NES_OUTPUT_DC_POLE * this._dcPrevOut[0];
+		const right = rawRight - this._dcPrevIn[1] + NES_OUTPUT_DC_POLE * this._dcPrevOut[1];
 		this._dcPrevIn[0] = rawLeft;
 		this._dcPrevIn[1] = rawRight;
 		this._dcPrevOut[0] = left;
 		this._dcPrevOut[1] = right;
 		this._lastOutput = { left, right };
+		this._updateExportChannelSamples();
 		return this._lastOutput;
+	}
+
+	_readMixOut(channelIndex) {
+		if (channelIndex <= 1) {
+			if (typeof this.wasmModule.nes_apu_GetMixOut !== 'function') return 0;
+			return this.wasmModule.nes_apu_GetMixOut(this.apuPtr, channelIndex);
+		}
+		if (typeof this.wasmModule.nes_dmc_GetMixOut !== 'function') return 0;
+		return this.wasmModule.nes_dmc_GetMixOut(this.dmcPtr, channelIndex - 2);
+	}
+
+	_updateExportChannelSamples() {
+		for (let i = 0; i < NES_EXPORT_CHANNEL_COUNT; i++) {
+			const raw = this._readMixOut(i) * NES_APU_OUTPUT_SCALE;
+			const filtered = raw - this._exportDcIn[i] + NES_OUTPUT_DC_POLE * this._exportDcOut[i];
+			this._exportDcIn[i] = raw;
+			this._exportDcOut[i] = filtered;
+			this._exportChannelSamples[i] = filtered;
+		}
+	}
+
+	getExportChannelSamples() {
+		return this._exportChannelSamples.slice();
 	}
 
 	canReadChannelOutputs() {

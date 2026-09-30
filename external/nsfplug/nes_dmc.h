@@ -32,6 +32,7 @@ typedef struct nes_dmc
   uint32_t adr_reg;
   read_func* memory_Read;
   uint32_t out[3];
+  int32_t mix_out[3];
   uint32_t daddress;
   uint32_t dlength;
   uint32_t data;
@@ -107,6 +108,7 @@ void nes_dmc_SetOption (nes_dmc_t* s, int id, int b);
 void nes_dmc_SetStereoMix (nes_dmc_t* s, int trk, int32_t mixl, int32_t mixr);
 
 int32_t nes_dmc_GetOut (nes_dmc_t* s, int channel);
+int32_t nes_dmc_GetMixOut (nes_dmc_t* s, int channel);
 
 // void nes_dmc_SetCPU(nes_dmc_t* s, NES_CPU* cpu_);
 

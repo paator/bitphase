@@ -376,6 +376,10 @@ uint32_t nes_dmc_Render (nes_dmc_t* s, int32_t b[2])
   b[1] += m[2] * s->sm[1][2];
   b[1] >>= 7;
 
+  s->mix_out[0] = m[0];
+  s->mix_out[1] = m[1];
+  s->mix_out[2] = m[2];
+
   return 2;
 }
 
@@ -384,6 +388,13 @@ int32_t nes_dmc_GetOut (nes_dmc_t* s, int channel)
   if (channel < 0 || channel > 2)
     return 0;
   return (int32_t)s->out[channel];
+}
+
+int32_t nes_dmc_GetMixOut (nes_dmc_t* s, int channel)
+{
+  if (channel < 0 || channel > 2)
+    return 0;
+  return s->mix_out[channel];
 }
 
 void nes_dmc_SetPal (nes_dmc_t* s, bool is_pal)
@@ -481,6 +492,7 @@ void nes_dmc_Reset (nes_dmc_t* s)
   // s->cpu->UpdateIRQ(NES_CPU::IRQD_DMC, false);
 
   s->out[0] = s->out[1] = s->out[2] = 0;
+  s->mix_out[0] = s->mix_out[1] = s->mix_out[2] = 0;
   s->damp = 0;
   s->dmc_pop = false;
   s->dmc_pop_offset = 0;

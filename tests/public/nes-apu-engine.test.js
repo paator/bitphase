@@ -276,4 +276,33 @@ describe('NesApuEngine', () => {
 
 		expect(renderChannelPeak(engine, 0)).toBe(0);
 	});
+
+	it('exports each hardware channel from the mixer output', async () => {
+		const wasmModule = await loadWasm();
+		const { engine } = createNesApuEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+
+		registerState.channels[0].enabled = true;
+		registerState.channels[0].period = 428;
+		registerState.channels[0].volume = 15;
+		registerState.channels[0].duty = 2;
+		registerState.channels[0].retrigger = true;
+		engine.applyRegisterState(registerState);
+
+		let pulsePeak = 0;
+		const otherPeaks = [0, 0, 0, 0];
+		for (let i = 0; i < 800; i++) {
+			engine.process(44100);
+			const samples = engine.getExportChannelSamples();
+			pulsePeak = Math.max(pulsePeak, Math.abs(samples[0]));
+			for (let ch = 1; ch < 5; ch++) {
+				otherPeaks[ch - 1] = Math.max(otherPeaks[ch - 1], Math.abs(samples[ch]));
+			}
+		}
+
+		expect(pulsePeak).toBeGreaterThan(0.05);
+		for (const peak of otherPeaks) {
+			expect(peak).toBeLessThan(pulsePeak * 0.05);
+		}
+	});
 });

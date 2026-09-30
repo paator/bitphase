@@ -22,6 +22,7 @@ type NesExportLaneContext = {
 	wasm: Record<string, unknown>;
 	apuPtr: number;
 	dmcPtr: number;
+	separateChannels: boolean;
 };
 
 type NesWasmBundle = {
@@ -63,13 +64,14 @@ function createNesLaneHandle(
 		patterns,
 		wasm,
 		apuPtr,
-		dmcPtr
+		dmcPtr,
+		separateChannels
 	} = context;
 
 	return {
 		songIndex,
 		audioSlotKind: NES_AUDIO_SLOT_KIND,
-		separateChannels: false,
+		separateChannels,
 		getLeaderPatternRowCount() {
 			return state.currentPattern?.length > 0 ? state.currentPattern.length : 0;
 		},
@@ -98,9 +100,20 @@ function createNesLaneHandle(
 				state.currentPattern = patterns[index]!;
 			}
 		},
+		createChannelBuffers() {
+			return Array.from({ length: 5 }, () => [] as number[]);
+		},
 		captureSample() {
 			const { left, right } = apuEngine.process(SAMPLE_RATE);
-			return { left, right };
+			if (!separateChannels) {
+				return { left, right };
+			}
+			const samples = apuEngine.getExportChannelSamples();
+			return {
+				left,
+				right,
+				channels: [samples[0]!, samples[1]!, samples[2]!, samples[3]!, samples[4]!]
+			};
 		},
 		release() {
 			apuEngine.dispose();
@@ -178,7 +191,8 @@ export async function createNesSharedTimelineExportLane(
 			patterns,
 			wasm,
 			apuPtr,
-			dmcPtr
+			dmcPtr,
+			separateChannels: session.separateChannels
 		},
 		renderer
 	);

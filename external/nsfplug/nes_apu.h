@@ -24,6 +24,7 @@ typedef struct nes_apu
   uint32_t gclock;
   // uint8_t reg[0x20];
   int32_t out[2];
+  int32_t mix_out[2];
   double rate, clock;
 
   int32_t square_linear;        // linear mix approximation
@@ -68,5 +69,6 @@ void nes_apu_SetMask(nes_apu_t *s, int m);
 void nes_apu_SetStereoMix (nes_apu_t *s, int trk, int32_t mixl, int32_t mixr);
 
 int32_t nes_apu_GetOut (nes_apu_t *s, int channel);
+int32_t nes_apu_GetMixOut (nes_apu_t *s, int channel);
 
 #endif
