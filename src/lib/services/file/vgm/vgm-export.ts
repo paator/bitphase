@@ -33,7 +33,14 @@ type StreamEvent =
 			skipRegisters: Set<number>;
 	  }
 	| { sample: number; kind: 'ay-timer'; chip: 0 | 1; write: AyTimedWrite }
-	| { sample: number; kind: 'nes'; chip: 0 | 1; registers: number[]; dpcm: NesDpcmCapture | null };
+	| {
+			sample: number;
+			kind: 'nes';
+			chip: 0 | 1;
+			registers: number[];
+			dpcm: NesDpcmCapture | null;
+			lengthReloads: number[];
+	  };
 
 function getSongIndicesByChip(project: Project, chipType: string): number[] {
 	const indices: number[] = [];
@@ -152,7 +159,13 @@ function emitStreamEvents(
 					event.dpcm.bytes
 				);
 			}
-			appendNesRegisterDiffs(commands, previous, event.registers, event.chip);
+			appendNesRegisterDiffs(
+				commands,
+				previous,
+				event.registers,
+				event.chip,
+				event.lengthReloads
+			);
 		}
 	}
 
@@ -224,7 +237,8 @@ function collectFrameEvents(
 			kind: 'nes',
 			chip: chip === 0 ? 0 : 1,
 			registers: regs,
-			dpcm: nesCaptures[chip]!.dpcmFrames?.[frameIndex] ?? null
+			dpcm: nesCaptures[chip]!.dpcmFrames?.[frameIndex] ?? null,
+			lengthReloads: nesCaptures[chip]!.lengthReloads?.[frameIndex] ?? []
 		});
 	}
 

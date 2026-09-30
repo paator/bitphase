@@ -3,6 +3,7 @@ import { getTotalVirtualChannelCount } from '../../../models/virtual-channels';
 import { filterInstrumentsForChip } from '../../instrument/instrument-filter';
 import { NES_DPCM_MAX_BYTES } from '../../../chips/nes/dpcm';
 import { NES_NTSC_CPU_FREQUENCY } from '../../../chips/nes/schema';
+import { channelKeyOn } from '../../../../../public/nes/nes-channel-trigger.js';
 
 const DEFAULT_SPEED = 6;
 const NES_HW_CHANNEL_COUNT = 5;
@@ -11,6 +12,7 @@ const NES_SQUARE_SWEEP_DISABLED = 0x08;
 const NES_SQUARE_LENGTH_NIBBLE = 0xf;
 const NES_TRIANGLE_LINEAR_RELOAD = 0x7f;
 const NES_APU_REG_COUNT = 0x16;
+const NES_CHANNEL_LENGTH_REG = [0x03, 0x07, 0x0b, 0x0f] as const;
 const NES_APU_STATUS_INTERNAL_CHANNELS = 0x0f;
 const NES_APU_STATUS_DPCM = 0x10;
 
@@ -22,6 +24,7 @@ export type NesDpcmCapture = {
 export type NesCaptureResult = {
 	frames: number[][];
 	dpcmFrames: Array<NesDpcmCapture | null>;
+	lengthReloads: number[][];
 	orderIndices: number[];
 	chipFrequency: number;
 	interruptFrequency: number;
@@ -169,6 +172,29 @@ export function readNesDpcmCapture(channel: any): NesDpcmCapture | null {
 	return { retrigger: true, bytes };
 }
 
+function channelIsActive(channelIndex: number, channel: any): boolean {
+	if (channelIndex <= 1) return isSquareChannelActive(channel);
+	if (channelIndex === 2) return isTriangleChannelActive(channel);
+	return isNoiseChannelActive(channel);
+}
+
+export function createNesLengthReloadTracker(): (registerState: any) => number[] {
+	const wasEnabled = [false, false, false, false];
+	return (registerState) => {
+		const channels = registerState?.channels ?? [];
+		const reloads: number[] = [];
+		for (let channelIndex = 0; channelIndex < 4; channelIndex++) {
+			const channel = channels[channelIndex];
+			const active = channelIsActive(channelIndex, channel);
+			if (channelKeyOn(active, Boolean(channel?.retrigger), wasEnabled[channelIndex]!)) {
+				reloads.push(NES_CHANNEL_LENGTH_REG[channelIndex]!);
+			}
+			wasEnabled[channelIndex] = active;
+		}
+		return reloads;
+	};
+}
+
 export function convertNesRegisterStateToApuRegs(registerState: any): number[] {
 	const regs = new Array(NES_APU_REG_COUNT).fill(0);
 	const channels = registerState?.channels ?? [];
@@ -236,9 +262,16 @@ async function captureRegisterFrames(
 	totalRows: number,
 	patterns: any[],
 	onProgress?: (progress: number, message: string) => void
-): Promise<{ frames: number[][]; dpcmFrames: Array<NesDpcmCapture | null>; orderIndices: number[] }> {
+): Promise<{
+	frames: number[][];
+	dpcmFrames: Array<NesDpcmCapture | null>;
+	lengthReloads: number[][];
+	orderIndices: number[];
+}> {
 	const frames: number[][] = [];
 	const dpcmFrames: Array<NesDpcmCapture | null> = [];
+	const lengthReloads: number[][] = [];
+	const lengthReloadTracker = createNesLengthReloadTracker();
 	const orderIndices: number[] = [];
 	let totalTicks = 0;
 	const maxTicks = 1000000;
@@ -294,6 +327,7 @@ async function captureRegisterFrames(
 			: registerState;
 		frames.push(convertNesRegisterStateToApuRegs(stateToConvert));
 		dpcmFrames.push(readNesDpcmCapture(stateToConvert.channels?.[4]));
+		lengthReloads.push(lengthReloadTracker(stateToConvert));
 		orderIndices.push(state.timeline.currentPatternOrderIndex);
 
 		const isLastPattern =
@@ -319,7 +353,7 @@ async function captureRegisterFrames(
 		totalTicks++;
 	}
 
-	return { frames, dpcmFrames, orderIndices };
+	return { frames, dpcmFrames, lengthReloads, orderIndices };
 }
 
 export async function captureNesRegisterFrames(
@@ -409,6 +443,7 @@ export async function captureNesRegisterFrames(
 	return {
 		frames: framesResult.frames,
 		dpcmFrames: framesResult.dpcmFrames,
+		lengthReloads: framesResult.lengthReloads,
 		orderIndices: framesResult.orderIndices,
 		chipFrequency,
 		interruptFrequency

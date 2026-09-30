@@ -233,6 +233,42 @@ describe('appendNesRegisterDiffs', () => {
 		expect(commands[lengthWrites[1]! + 1]).toBe(0x0f);
 		expect(commands[lengthWrites[1]! + 2]).toBe(0x78);
 	});
+
+	it('writes a length register again when the capture marks it for reload', () => {
+		const previous = new Array(0x16).fill(0);
+		previous[0x08] = 0;
+		previous[0x0a] = 0x42;
+		previous[0x0b] = 0x78;
+		previous[0x15] = 0x0f;
+		const next = previous.slice();
+		next[0x08] = 0xff;
+
+		const commands: number[] = [];
+		appendNesRegisterDiffs(commands, previous, next, 0, [0x0b]);
+
+		const writes: Array<[number, number]> = [];
+		for (let i = 0; i < commands.length; i += 3) {
+			writes.push([commands[i + 1]!, commands[i + 2]!]);
+		}
+		const linearAt = writes.findIndex(([addr]) => addr === 0x08);
+		const lengthAt = writes.findIndex(([addr]) => addr === 0x0b);
+		expect(writes[linearAt]).toEqual([0x08, 0xff]);
+		expect(lengthAt).toBeGreaterThan(linearAt);
+		expect(writes[lengthAt]).toEqual([0x0b, 0x78]);
+	});
+
+	it('does not rewrite a length register that the capture left unmarked', () => {
+		const previous = new Array(0x16).fill(0);
+		previous[0x08] = 0xff;
+		previous[0x0a] = 0x42;
+		previous[0x0b] = 0x78;
+		previous[0x15] = 0x0f;
+
+		const commands: number[] = [];
+		appendNesRegisterDiffs(commands, previous, previous.slice(), 0, []);
+
+		expect(commands).toEqual([]);
+	});
 });
 
 describe('appendNesDpcmTrigger', () => {

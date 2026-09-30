@@ -1,3 +1,4 @@
+import { channelKeyOn } from './nes-channel-trigger.js';
 import NesChipRegisterState from './nes-chip-register-state.js';
 import {
 	NES_APU_STRUCT_SIZE,
@@ -386,7 +387,7 @@ class NesApuEngine {
 			const channel = registerState.channels[i];
 			const last = this.lastState.channels[i];
 			const isActive = isSquareChannelActive(channel);
-			const triggerChannel = isActive && (channel.retrigger || !last.enabled);
+			const triggerChannel = channelKeyOn(isActive, channel.retrigger, last.enabled);
 			this._writeSquare(i, channel, forceApply, triggerChannel);
 			last.enabled = isActive;
 		}
@@ -394,15 +395,18 @@ class NesApuEngine {
 		const triangleChannel = registerState.channels[2];
 		const triangleLast = this.lastState.channels[2];
 		const triangleActive = isTriangleChannelActive(triangleChannel);
-		const triangleTrigger =
-			triangleActive && (triangleChannel.retrigger || !triangleLast.enabled);
+		const triangleTrigger = channelKeyOn(
+			triangleActive,
+			triangleChannel.retrigger,
+			triangleLast.enabled
+		);
 		this._writeTriangle(triangleChannel, forceApply, triangleTrigger);
 		triangleLast.enabled = triangleActive;
 
 		const noiseChannel = registerState.channels[3];
 		const noiseLast = this.lastState.channels[3];
 		const noiseActive = isNoiseChannelActive(noiseChannel);
-		const noiseTrigger = noiseActive && (noiseChannel.retrigger || !noiseLast.enabled);
+		const noiseTrigger = channelKeyOn(noiseActive, noiseChannel.retrigger, noiseLast.enabled);
 		this._writeNoise(noiseChannel, forceApply, noiseTrigger);
 		noiseLast.enabled = noiseActive;
 

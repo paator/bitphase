@@ -140,7 +140,8 @@ export function appendNesRegisterDiffs(
 	commands: number[],
 	previous: number[],
 	next: number[],
-	chipIndex: 0 | 1 = 0
+	chipIndex: 0 | 1 = 0,
+	lengthReloads: readonly number[] = []
 ): void {
 	const prevStatus = previous[0x15] ?? 0;
 	const nextStatus = next[0x15] ?? 0;
@@ -151,13 +152,22 @@ export function appendNesRegisterDiffs(
 		previous[0x15] = nextStatus;
 	}
 
+	const written = new Set<number>();
 	const length = Math.min(previous.length, next.length, 0x15);
 	for (let i = 0; i < length; i++) {
 		if ((next[i] ?? 0) < 0) continue;
 		if (previous[i] !== next[i]) {
 			appendNesWrite(commands, i, next[i]!, chipIndex);
 			previous[i] = next[i]!;
+			written.add(i);
 		}
+	}
+
+	for (const register of lengthReloads) {
+		if (written.has(register)) continue;
+		const value = next[register];
+		if (value == null || value < 0) continue;
+		appendNesWrite(commands, register, value, chipIndex);
 	}
 
 	if (newlyEnabledBits === 0) {

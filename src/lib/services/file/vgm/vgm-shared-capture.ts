@@ -14,6 +14,7 @@ import {
 } from '../ay/ay-export-utils';
 import {
 	convertNesRegisterStateToApuRegs,
+	createNesLengthReloadTracker,
 	readNesDpcmCapture,
 	type NesDpcmCapture,
 	type NesCaptureResult,
@@ -385,6 +386,7 @@ function createNesCaptureSlot(
 	patternOrder: number[],
 	framesOut: number[][],
 	dpcmOut: Array<NesDpcmCapture | null>,
+	lengthReloadsOut: number[][],
 	ownsTimeline: boolean
 ): { slot: CaptureSlot; result: NesCaptureResult; timeline: unknown } {
 	const song = project.songs[songIndex]!;
@@ -426,6 +428,7 @@ function createNesCaptureSlot(
 	const patternProcessor = new modules.TrackerPatternProcessor(state, audioDriver, {
 		postMessage: () => {}
 	});
+	const lengthReloadTracker = createNesLengthReloadTracker();
 	const patterns = getPatterns(song, patternOrder);
 	if (patterns.length === 0) {
 		throw new Error(`No patterns found for song ${songIndex + 1}`);
@@ -469,6 +472,7 @@ function createNesCaptureSlot(
 				: registerState;
 			framesOut.push(convertNesRegisterStateToApuRegs(stateToConvert));
 			dpcmOut.push(readNesDpcmCapture(stateToConvert.channels?.[4]));
+			lengthReloadsOut.push(lengthReloadTracker(stateToConvert));
 		},
 		onPatternOrderAdvanced(needsChange) {
 			if (!needsChange) return;
@@ -485,6 +489,7 @@ function createNesCaptureSlot(
 		result: {
 			frames: framesOut,
 			dpcmFrames: dpcmOut,
+			lengthReloads: lengthReloadsOut,
 			orderIndices: [],
 			chipFrequency,
 			interruptFrequency
@@ -537,6 +542,7 @@ async function captureSharedProject(
 	const ayFrameBuffers = ayIndices.map(() => [] as SongCaptureFrame[]);
 	const nesFrameBuffers = nesIndices.map(() => [] as number[][]);
 	const nesDpcmBuffers = nesIndices.map(() => [] as Array<NesDpcmCapture | null>);
+	const nesLengthReloadBuffers = nesIndices.map(() => [] as number[][]);
 	const ayResults: SongCaptureResult[] = new Array(ayIndices.length);
 	const nesResults: NesCaptureResult[] = new Array(nesIndices.length);
 	const slots: CaptureSlot[] = [];
@@ -569,6 +575,7 @@ async function captureSharedProject(
 				patternOrder,
 				nesFrameBuffers[entry.arrayIndex]!,
 				nesDpcmBuffers[entry.arrayIndex]!,
+				nesLengthReloadBuffers[entry.arrayIndex]!,
 				ownsTimeline
 			);
 			if (ownsTimeline) {
