@@ -188,7 +188,7 @@ class NesAudioDriver {
 		if (basePeriod <= 0) return 0;
 		const period = basePeriod + this._sampleToneOffset(state, channelIndex, instrumentRow);
 		if (period < 0) return 0;
-		if (period > 2047) return 2047;
+		if (period > 2048) return 2048;
 		return period;
 	}
 
