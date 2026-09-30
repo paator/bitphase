@@ -54,13 +54,20 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 	let prevTables: typeof projectStore.tables | undefined;
 	let savedStereoLayout: string | undefined;
 
-	const channelCount = $derived(options.getChip().schema.channelLabels?.length ?? 3);
-	const previewProcessors = $derived(
-		audioService.chipProcessors.filter(
-			(p) => p.chip === options.getChip() && 'playPreviewRow' in p && p.isAudioNodeAvailable()
-		)
-	);
-	const maxPoly = $derived(previewProcessors.length * channelCount);
+	function channelCount() {
+		return options.getChip().schema.channelLabels?.length ?? 3;
+	}
+
+	function currentPreviewProcessors() {
+		const chip = options.getChip();
+		return audioService.chipProcessors.filter(
+			(p) => p.chip === chip && 'playPreviewRow' in p && p.isAudioNodeAvailable()
+		);
+	}
+
+	function maxPoly() {
+		return currentPreviewProcessors().length * channelCount();
+	}
 	const isDisabled = $derived(playbackStore.isPlaying);
 	const playDisabled = $derived(isDisabled || lastPlayedNotes.length === 0);
 	const effectiveNoteStrings = $derived(
@@ -82,7 +89,7 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 			: `Play preview (${playbackShortcutDisplay})`
 	);
 	const noteTitle = $derived(
-		`Click to focus, then use keyboard. Polyphony: ${maxPoly} notes (${channelCount} per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${playbackShortcutDisplay} = toggle play.`
+		`Click to focus, then use keyboard. Polyphony: ${maxPoly()} notes (${channelCount()} per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${playbackShortcutDisplay} = toggle play.`
 	);
 
 	$effect(() => {
@@ -126,9 +133,9 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 	$effect(() => {
 		const chip = options.getChip();
 		const instrumentId = options.getInstrumentId();
-		const processors = previewProcessors as unknown as PreviewNoteSupport[];
-		if (processors.length === 0) return;
 		const hasNotes = effectiveNoteStrings.length > 0;
+		const processors = currentPreviewProcessors() as unknown as PreviewNoteSupport[];
+		if (processors.length === 0) return;
 		const chipSettings = audioService.chipSettings.forChip(chip.type);
 		if (!hasNotes) {
 			if (hadActiveNotes) {
@@ -168,7 +175,7 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 			const channelNotes = notesForProcessor(
 				effectiveNoteStrings,
 				processorIndex,
-				channelCount
+				channelCount()
 			);
 			const pattern = buildPreviewPattern({
 				schema: chip.schema,
@@ -207,7 +214,7 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 			const noteFocused = noteInputEl && document.activeElement === noteInputEl;
 			if (!noteFocused) return;
 			if (velocity > 0) {
-				if (activeNotes.length >= maxPoly) return;
+				if (activeNotes.length >= maxPoly()) return;
 				if (activeNotes.some((n) => n.key === `midi-${midiNote}`)) return;
 				const noteStr = midiNoteToNoteString(midiNote);
 				if (!noteStr) return;
@@ -237,7 +244,7 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 		if (event.repeat) return;
 		const key = event.key;
 		if (activeNotes.some((n) => n.key === key)) return;
-		if (activeNotes.length >= maxPoly) return;
+		if (activeNotes.length >= maxPoly()) return;
 		const keyLower = key.toLowerCase();
 		let noteStr: string;
 		const pianoNote = PatternNoteInput.mapKeyboardCodeToNote(event.code);
