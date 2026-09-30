@@ -252,8 +252,8 @@ describe('NesApuEngine', () => {
 		const periodLowWrites = wasmModule.dmcWrites.filter((write) => write.addr === 0x400a);
 		const lengthWrites = wasmModule.dmcWrites.filter((write) => write.addr === 0x400b);
 		expect(linearWrites.at(-1)?.val).toBe(0);
-		expect(periodLowWrites.at(-1)?.val).toBe(428 & 0xff);
-		expect(lengthWrites.at(-1)?.val).toBe((0xf << 3) | ((428 >> 8) & 7));
+		expect(periodLowWrites.at(-1)?.val).toBe(427 & 0xff);
+		expect(lengthWrites.at(-1)?.val).toBe((0xf << 3) | ((427 >> 8) & 7));
 		expect(wasmModule.dmcMasks.at(-1) & 1).toBe(0);
 	});
 

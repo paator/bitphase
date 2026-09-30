@@ -73,7 +73,7 @@ export class NesWaveformCapture {
 
 		if (channelIndex <= 1) {
 			if (channel.period <= 0 || channel.volume <= 0) return 0;
-			const hz = cpuFrequency / (16 * (channel.period + 1));
+			const hz = cpuFrequency / (16 * channel.period);
 			this.phases[channelIndex] += hz / sampleRate;
 			if (this.phases[channelIndex] >= 1) this.phases[channelIndex] -= 1;
 			const duty = SQUARE_DUTY[channel.duty] ?? 0.5;
@@ -83,7 +83,7 @@ export class NesWaveformCapture {
 
 		if (channelIndex === 2) {
 			if (channel.period <= 0) return 0;
-			const hz = cpuFrequency / (16 * (channel.period + 1));
+			const hz = cpuFrequency / (32 * channel.period);
 			this.phases[channelIndex] += hz / sampleRate;
 			if (this.phases[channelIndex] >= 1) this.phases[channelIndex] -= 1;
 			const phase = this.phases[channelIndex];

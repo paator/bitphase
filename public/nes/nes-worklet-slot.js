@@ -427,8 +427,10 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 				: i;
 			if (period <= 0 || !channel?.enabled) {
 				toneHz.push(null);
-			} else if (hwType <= 2) {
-				toneHz.push(cpuFrequency / (16 * (period + 1)));
+			} else if (hwType <= 1) {
+				toneHz.push(cpuFrequency / (16 * period));
+			} else if (hwType === 2) {
+				toneHz.push(cpuFrequency / (32 * period));
 			} else {
 				toneHz.push(null);
 			}

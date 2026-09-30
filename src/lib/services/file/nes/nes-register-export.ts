@@ -104,8 +104,9 @@ function writeTriangleRegs(regs: number[], channel: any): void {
 				channel.lengthNibble !== NES_REGISTER_UNCHANGED
 					? channel.lengthNibble
 					: NES_SQUARE_LENGTH_NIBBLE;
-			regs[0x0a] = period & 0xff;
-			regs[0x0b] = ((lengthNibble << 3) | ((period >> 8) & 7)) & 0xff;
+			const timer = period - 1;
+			regs[0x0a] = timer & 0xff;
+			regs[0x0b] = ((lengthNibble << 3) | ((timer >> 8) & 7)) & 0xff;
 		}
 		return;
 	}
@@ -117,9 +118,10 @@ function writeTriangleRegs(regs: number[], channel: any): void {
 		channel.lengthNibble !== NES_REGISTER_UNCHANGED
 			? channel.lengthNibble
 			: NES_SQUARE_LENGTH_NIBBLE;
+	const period = channel.period > 0 ? channel.period - 1 : 0;
 	regs[0x08] = linearReg & 0xff;
-	regs[0x0a] = channel.period & 0xff;
-	regs[0x0b] = ((lengthNibble << 3) | ((channel.period >> 8) & 7)) & 0xff;
+	regs[0x0a] = period & 0xff;
+	regs[0x0b] = ((lengthNibble << 3) | ((period >> 8) & 7)) & 0xff;
 }
 
 function writeNoiseRegs(regs: number[], channel: any): void {

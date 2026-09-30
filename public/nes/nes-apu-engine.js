@@ -263,8 +263,9 @@ class NesApuEngine {
 			channel.lengthNibble !== NES_REGISTER_UNCHANGED
 				? channel.lengthNibble
 				: NES_SQUARE_LENGTH_NIBBLE;
-		const periodLow = channel.period & 0xff;
-		const periodHigh = (lengthNibble << 3) | ((channel.period >> 8) & 7);
+		const period = channel.period > 0 ? channel.period - 1 : 0;
+		const periodLow = period & 0xff;
+		const periodHigh = (lengthNibble << 3) | ((period >> 8) & 7);
 		const lastLengthNibble =
 			last.lengthNibble !== NES_REGISTER_UNCHANGED
 				? last.lengthNibble
@@ -290,7 +291,7 @@ class NesApuEngine {
 		) {
 			this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 3, periodHigh);
 		}
-		last.period = channel.period;
+		last.period = period;
 		last.lengthNibble = channel.lengthNibble;
 		last.retrigger = channel.retrigger;
 	}
