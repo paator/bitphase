@@ -8,6 +8,7 @@ class EffectAlgorithms {
 	static VIBRATO = 'V'.charCodeAt(0);
 	static ON_OFF = 6;
 	static NOTE_DELAY = 7;
+	static VOLUME_SLIDE = 8;
 	static SPEED = 'S'.charCodeAt(0);
 	static AUTO_ENVELOPE = 'E'.charCodeAt(0);
 	static DETUNE = 'D'.charCodeAt(0);

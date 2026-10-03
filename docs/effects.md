@@ -87,6 +87,12 @@ Delays the note on this channel (`7.XY`).
 
 **Example:** `7.04` - wait 4 ticks.
 
+### 8 - Volume slide
+
+Slides this channel's volume (`8XYZ` / `8XTY`). `X` is the delay between steps. `Y` raises the volume and `Z` lowers it. Delay `0` steps every tick. Both apply when they are set. `8000` stops the slide. It keeps going across new notes.
+
+**Example:** `8203` - delay 2, down 3.
+
 ### D - Detune
 
 Offsets channel pitch by a signed amount (`D.XY` / `D.TY`).

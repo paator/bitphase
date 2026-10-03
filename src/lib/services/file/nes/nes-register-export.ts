@@ -312,15 +312,10 @@ async function captureRegisterFrames(
 			patternProcessor.processSpeedTable();
 		}
 
-		patternProcessor.processTables();
-		patternProcessor.processArpeggio();
-		patternProcessor.processEffectTables();
-		audioDriver.processInstruments(state, registerState);
+		patternProcessor.processTrackerTick(registerState);
 		audioDriver.advancePulseWidthTable(state);
 		audioDriver.advanceSweepTable(state);
 		audioDriver.syncSweepTableRegisterState(state, registerState);
-		patternProcessor.processVibrato();
-		patternProcessor.processSlides();
 
 		const stateToConvert = mixer.hasVirtualChannels()
 			? mixer.merge(registerState, state)

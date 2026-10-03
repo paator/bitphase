@@ -451,4 +451,105 @@ describe('TrackerPatternProcessor', () => {
 			expect(state.channelNoteDelayArmed[0]).toBe(false);
 		});
 	});
+
+	describe('volume slide', () => {
+		function slidePattern(effect: unknown, volume = 0) {
+			const pattern = createMockPattern(2);
+			pattern.channels[0].rows[0] = {
+				note: { name: 0, octave: 0 },
+				volume,
+				effects: [effect]
+			};
+			pattern.channels[0].rows[1] = {
+				note: { name: 3, octave: 2 },
+				effects: [{ effect: 1, delay: 0, parameter: 1 }]
+			};
+			return pattern;
+		}
+
+		it('steps the channel volume down every tick and stops on 8.00', () => {
+			const state = createMockState();
+			const proc = new TrackerPatternProcessor(state, new AYAudioDriver(), {});
+			const registerState = new AYChipRegisterState();
+			proc.parsePatternRow(slidePattern({ effect: 8, delay: 0, parameter: 0x03 }), 0, registerState);
+			expect(state.channelVolumeSlide[0]).toBe(0x03);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(12);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(9);
+			proc.parsePatternRow(
+				slidePattern({ effect: 8, delay: 0, parameter: 0 }),
+				0,
+				registerState
+			);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(9);
+			expect(state.channelVolumeSlide[0]).toBe(0);
+		});
+
+		it('raises volume, clamps at 15, and keeps sliding after a new note', () => {
+			const state = createMockState();
+			const proc = new TrackerPatternProcessor(state, new AYAudioDriver(), {});
+			const registerState = new AYChipRegisterState();
+			state.channelPatternVolumes[0] = 13;
+			proc.parsePatternRow(
+				slidePattern({ effect: 8, delay: 0, parameter: 0x20 }),
+				0,
+				registerState
+			);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(15);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(15);
+			expect(state.channelVolumeSlide[0]).toBe(0x20);
+			proc.parsePatternRow(slidePattern({ effect: 8, delay: 0, parameter: 0x20 }), 1, registerState);
+			expect(state.channelVolumeSlide[0]).toBe(0x20);
+		});
+
+		it('applies both nibbles, down first, then up', () => {
+			const state = createMockState();
+			const proc = new TrackerPatternProcessor(state, new AYAudioDriver(), {});
+			state.channelPatternVolumes[0] = 1;
+			state.channelVolumeSlide[0] = 0x22;
+			state.channelVolumeSlideDelay[0] = 0;
+			state.channelVolumeSlideCounter[0] = 1;
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(2);
+			state.channelPatternVolumes[0] = 8;
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(8);
+		});
+
+		it('waits the delay between volume steps', () => {
+			const state = createMockState();
+			const proc = new TrackerPatternProcessor(state, new AYAudioDriver(), {});
+			const registerState = new AYChipRegisterState();
+			proc.parsePatternRow(
+				slidePattern({ effect: 8, delay: 2, parameter: 0x01 }, 8),
+				0,
+				registerState
+			);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(8);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(7);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(7);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(6);
+		});
+
+		it('uses the volume column before the first slide step', () => {
+			const state = createMockState();
+			const proc = new TrackerPatternProcessor(state, new AYAudioDriver(), {});
+			const registerState = new AYChipRegisterState();
+			proc.parsePatternRow(
+				slidePattern({ effect: 8, delay: 0, parameter: 0x01 }, 8),
+				0,
+				registerState
+			);
+			proc.processVolumeSlides();
+			expect(state.channelPatternVolumes[0]).toBe(7);
+		});
+	});
 });

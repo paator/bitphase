@@ -393,6 +393,7 @@ type FtmParams = {
 	machine: NesSystem;
 	engineHz: number;
 	speedSplit: number;
+	vibratoNew: boolean;
 };
 
 function readParams(block: FtmBlock | undefined): FtmParams {
@@ -409,7 +410,11 @@ function readParams(block: FtmBlock | undefined): FtmParams {
 	const channels = reader.i32();
 	const machine = reader.i32() === 1 ? 'PAL' : 'NTSC';
 	const engineSpeed = reader.i32();
-	if (block.version > 2) reader.i32();
+	let vibratoNew = block.version >= 7;
+	if (block.version > 2) {
+		const vibratoStyle = reader.i32();
+		if (block.version < 7) vibratoNew = vibratoStyle !== 0;
+	}
 	if (block.version > 3) {
 		reader.i32();
 		reader.i32();
@@ -422,7 +427,8 @@ function readParams(block: FtmBlock | undefined): FtmParams {
 		channels: Math.max(NES_CHANNEL_COUNT, channels),
 		machine,
 		engineHz,
-		speedSplit: speedSplit > 0 ? speedSplit : DEFAULT_SPEED_SPLIT
+		speedSplit: speedSplit > 0 ? speedSplit : DEFAULT_SPEED_SPLIT,
+		vibratoNew
 	};
 }
 
@@ -994,7 +1000,9 @@ function toSong(
 							channel,
 							latchedInstrument,
 							arpByInstrument,
-							false
+							false,
+							() => {},
+							params.vibratoNew
 						)
 					: emptyRow(NES_CHIP_SCHEMA.fields, columnCount);
 			}
@@ -1050,7 +1058,8 @@ function toAySong(
 							latchedInstrument,
 							arpByInstrument,
 							true,
-							warn
+							warn,
+							params.vibratoNew
 						)
 					: emptyRow(AY_CHIP_SCHEMA.fields, columnCount);
 			}
@@ -1086,7 +1095,8 @@ function toRow(
 	latchedInstrument: number[],
 	arpByInstrument: Map<number, number>,
 	ayChannel: boolean,
-	warn: (message: string) => void = () => {}
+	warn: (message: string) => void = () => {},
+	vibratoNew = false
 ): Row {
 	const row = emptyRow(ayChannel ? AY_CHIP_SCHEMA.fields : NES_CHIP_SCHEMA.fields, columnCount);
 	const noteOn = cell.note >= 1 && cell.note <= 12;
@@ -1118,7 +1128,8 @@ function toRow(
 			channel,
 			row,
 			skippedEffects,
-			ayChannel
+			ayChannel,
+			vibratoNew
 		);
 		if (mapped) effects.push(mapped);
 	}
@@ -1133,6 +1144,47 @@ function ftVolume(volume: number): number {
 	return volume & 0x0f;
 }
 
+const NEW_VIBRATO_DEPTH = [0, 1, 2, 3, 4, 6, 9, 11, 13, 15, 15, 15, 15, 15, 15, 15];
+const OLD_VIBRATO_DEPTH = [1, 1, 1, 2, 2, 4, 4, 8, 8, 15, 15, 15, 15, 15, 15, 15];
+
+function famitrackerVibrato(byte: number, vibratoNew: boolean): Effect {
+	const ftSpeed = (byte >> 4) & 0x0f;
+	const ftDepth = byte & 0x0f;
+	if (ftSpeed === 0) return new Effect(EffectType.Vibrato, 0, 0);
+	const depth = (vibratoNew ? NEW_VIBRATO_DEPTH : OLD_VIBRATO_DEPTH)[ftDepth] ?? 0;
+	if (depth === 0) return new Effect(EffectType.Vibrato, 0, 0);
+	let speed = 1;
+	let delay = 1;
+	let error = Number.POSITIVE_INFINITY;
+	for (let candidateDelay = 1; candidateDelay <= 15; candidateDelay++) {
+		for (let candidateSpeed = 1; candidateSpeed <= 15; candidateSpeed++) {
+			const nextError = Math.abs(candidateSpeed * candidateDelay * ftSpeed - 16);
+			if (nextError < error || (nextError === error && candidateSpeed > speed)) {
+				error = nextError;
+				speed = candidateSpeed;
+				delay = candidateDelay;
+			}
+		}
+	}
+	return new Effect(EffectType.Vibrato, delay, (speed << 4) | depth);
+}
+
+function famitrackerVolumeSlide(byte: number): Effect {
+	const net = ((byte >> 4) & 0x0f) - (byte & 0x0f);
+	if (net === 0) return new Effect(EffectType.VolumeSlide, 0, 0);
+	const amount = Math.abs(net);
+	let divisor = amount;
+	let scale = 8;
+	while (scale !== 0) {
+		const next = divisor % scale;
+		divisor = scale;
+		scale = next;
+	}
+	const step = amount / divisor;
+	const delay = 8 / divisor;
+	return new Effect(EffectType.VolumeSlide, delay, net > 0 ? step << 4 : step);
+}
+
 function mapEffect(
 	number: number,
 	param: number,
@@ -1140,7 +1192,8 @@ function mapEffect(
 	channel: number,
 	row: Row,
 	skippedEffects: Set<string>,
-	ayChannel: boolean
+	ayChannel: boolean,
+	vibratoNew = false
 ): Effect | null {
 	const byte = param & 0xff;
 	switch (number) {
@@ -1167,13 +1220,15 @@ function mapEffect(
 		case 10:
 			return new Effect(EffectType.Arpeggio, 0, byte);
 		case 11:
-			return new Effect(EffectType.Vibrato, 0, byte);
+			return famitrackerVibrato(byte, vibratoNew);
 		case 13:
 			return new Effect(EffectType.Detune, 0, byte);
 		case 16:
 			return new Effect(!ayChannel && channel === 3 ? PERIOD_UP : PERIOD_DOWN, 0, byte);
 		case 17:
 			return new Effect(!ayChannel && channel === 3 ? PERIOD_DOWN : PERIOD_UP, 0, byte);
+		case 22:
+			return famitrackerVolumeSlide(byte);
 		case 18:
 			if (ayChannel || (channel > 1 && channel !== 3)) {
 				skippedEffects.add('V');

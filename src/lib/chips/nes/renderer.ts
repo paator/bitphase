@@ -39,11 +39,7 @@ type NesSlotLane = {
 	patternProcessor: {
 		parsePatternRow: (pattern: Pattern, rowIndex: number, registerState: unknown) => void;
 		processSpeedTable: () => void;
-		processTables: () => void;
-		processArpeggio: () => void;
-		processEffectTables: () => void;
-		processVibrato: () => void;
-		processSlides: () => void;
+		processTrackerTick: (registerState: unknown) => void;
 	};
 	audioDriver: {
 		processInstruments: (state: unknown, registerState: unknown) => void;
@@ -278,15 +274,10 @@ export class NESChipRenderer implements ChipRenderer {
 					lane.patternProcessor.processSpeedTable();
 				}
 
-				lane.patternProcessor.processTables();
-				lane.patternProcessor.processArpeggio();
-				lane.patternProcessor.processEffectTables();
-				lane.audioDriver.processInstruments(lane.state, lane.registerState);
+				lane.patternProcessor.processTrackerTick(lane.registerState);
 				lane.audioDriver.advancePulseWidthTable(lane.state);
 				lane.audioDriver.advanceSweepTable(lane.state);
 				lane.audioDriver.syncSweepTableRegisterState(lane.state, lane.registerState);
-				lane.patternProcessor.processVibrato();
-				lane.patternProcessor.processSlides();
 				lane.apuEngine.applyRegisterState(lane.registerState);
 
 				const isLastPattern =
@@ -388,15 +379,10 @@ export class NESChipRenderer implements ChipRenderer {
 						);
 						ctx.patternProcessor.processSpeedTable();
 					}
-					ctx.patternProcessor.processTables();
-					ctx.patternProcessor.processArpeggio();
-					ctx.patternProcessor.processEffectTables();
-					ctx.audioDriver.processInstruments(ctx.state, ctx.registerState);
+					ctx.patternProcessor.processTrackerTick(ctx.registerState);
 					ctx.audioDriver.advancePulseWidthTable(ctx.state);
 					ctx.audioDriver.advanceSweepTable(ctx.state);
 					ctx.audioDriver.syncSweepTableRegisterState(ctx.state, ctx.registerState);
-					ctx.patternProcessor.processVibrato();
-					ctx.patternProcessor.processSlides();
 					ctx.apuEngine.applyRegisterState(ctx.registerState);
 				}
 

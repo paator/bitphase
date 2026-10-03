@@ -32,6 +32,7 @@ const GENERAL_EFFECT_HINTS: Record<number, EffectStatusHint> = {
 	5: { format: '5.XY', name: 'Table Position', params: 'XY: row' },
 	6: { format: '6.XY', name: 'On/Off', params: 'X: on; Y: off' },
 	7: { format: '7.XY', name: 'Note Delay', params: 'XY: ticks' },
+	8: { format: '8XYZ', name: 'Volume Slide', params: 'X: delay; Y: up; Z: down' },
 	['D'.charCodeAt(0)]: { format: 'D.XY', name: 'Detune', params: 'XY: signed, 80=0' },
 	['S'.charCodeAt(0)]: { format: 'S.XY', name: 'Speed', params: 'XY: ticks' }
 };
@@ -55,6 +56,7 @@ const GENERAL_TABLE_HINTS: Record<number, EffectStatusHint> = {
 		params: 'X: delay; Y: table'
 	},
 	6: { format: '6.TY', name: 'On/Off', params: 'Y: table' },
+	8: { format: '8XTY', name: 'Volume Slide', params: 'X: delay; Y: table' },
 	['D'.charCodeAt(0)]: { format: 'D.TY', name: 'Detune', params: 'Y: table' },
 	['S'.charCodeAt(0)]: { format: 'S.TY', name: 'Speed', params: 'Y: table' }
 };
@@ -69,6 +71,7 @@ const GENERAL_EFFECT_CODE_ORDER = [
 	5,
 	6,
 	7,
+	8,
 	'D'.charCodeAt(0),
 	'S'.charCodeAt(0)
 ];

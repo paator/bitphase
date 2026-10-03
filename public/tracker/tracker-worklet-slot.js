@@ -161,12 +161,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 	}
 
 	_processTrackerTick() {
-		this.patternProcessor.processTables();
-		this.patternProcessor.processArpeggio();
-		this.patternProcessor.processEffectTables();
-		this.audioDriver.processInstruments(this.state, this.registerState);
-		this.patternProcessor.processVibrato();
-		this.patternProcessor.processSlides();
+		this.patternProcessor.processTrackerTick(this.registerState);
 	}
 
 	dispatchPortMessages(type, data) {

@@ -202,13 +202,8 @@ class PsgExportService {
 			patternProcessor.processSpeedTable();
 		}
 
-		patternProcessor.processTables();
-		patternProcessor.processArpeggio();
-		patternProcessor.processEffectTables();
-		audioDriver.processInstruments(state, registerState);
-		patternProcessor.processVibrato();
 		const sampleRestartFlags = this.readSampleRestartFlags(state);
-		patternProcessor.processSlides();
+		patternProcessor.processTrackerTick(registerState);
 
 		const stateToConvert = mixer.hasVirtualChannels()
 			? mixer.merge(registerState, state)

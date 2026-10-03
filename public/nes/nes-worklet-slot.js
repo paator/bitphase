@@ -162,15 +162,10 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	}
 
 	_processTrackerTick() {
-		this.patternProcessor.processTables();
-		this.patternProcessor.processArpeggio();
-		this.patternProcessor.processEffectTables();
-		this.audioDriver.processInstruments(this.state, this.registerState);
+		super._processTrackerTick();
 		this.audioDriver.advancePulseWidthTable(this.state);
 		this.audioDriver.advanceSweepTable(this.state);
 		this.audioDriver.syncSweepTableRegisterState(this.state, this.registerState);
-		this.patternProcessor.processVibrato();
-		this.patternProcessor.processSlides();
 	}
 
 	runPreviewStep() {

@@ -410,6 +410,9 @@ class TrackerPatternProcessor {
 			case EffectAlgorithms.DETUNE:
 				this._initChannelDetune(channelIndex, effect, hasTableIndex);
 				break;
+			case EffectAlgorithms.VOLUME_SLIDE:
+				this._initChannelVolumeSlide(channelIndex, effect, hasTableIndex);
+				break;
 			case EffectAlgorithms.SAMPLE_POSITION:
 				this._initChannelSamplePosition(channelIndex, effect);
 				break;
@@ -555,6 +558,53 @@ class TrackerPatternProcessor {
 			? this._getEffectTableValue(channelIndex, effect.effect)
 			: effect.parameter;
 		this.state.channelDetune[channelIndex] = (param & 0xff) - 0x80;
+	}
+
+	_initChannelVolumeSlide(channelIndex, effect, hasTableIndex) {
+		const param =
+			(hasTableIndex
+				? this._getEffectTableValue(channelIndex, effect.effect)
+				: effect.parameter) & 0xff;
+		const delay = effect.delay || 0;
+		if (this.state.channelVolumeSlide) {
+			this.state.channelVolumeSlide[channelIndex] = param;
+		}
+		if (this.state.channelVolumeSlideDelay) {
+			this.state.channelVolumeSlideDelay[channelIndex] = delay;
+		}
+		if (this.state.channelVolumeSlideCounter) {
+			this.state.channelVolumeSlideCounter[channelIndex] =
+				param === 0 ? 0 : delay === 0 ? 1 : delay;
+		}
+	}
+
+	processVolumeSlides() {
+		const slides = this.state.channelVolumeSlide;
+		const volumes = this.state.channelPatternVolumes;
+		const counters = this.state.channelVolumeSlideCounter;
+		const delays = this.state.channelVolumeSlideDelay;
+		if (!slides || !volumes || !counters) return;
+		const count = Math.min(slides.length, volumes.length, counters.length);
+		for (let channelIndex = 0; channelIndex < count; channelIndex++) {
+			const counter = counters[channelIndex] | 0;
+			if (counter <= 0) continue;
+			const newCounter = counter - 1;
+			if (newCounter > 0) {
+				counters[channelIndex] = newCounter;
+				continue;
+			}
+			const delay = delays?.[channelIndex] | 0;
+			counters[channelIndex] = delay === 0 ? 1 : delay;
+			const param = slides[channelIndex] | 0;
+			if (!param) continue;
+			let volume = volumes[channelIndex] | 0;
+			if (volume < 0) volume = 0;
+			volume -= param & 0x0f;
+			if (volume < 0) volume = 0;
+			volume += (param >> 4) & 0x0f;
+			if (volume > 15) volume = 15;
+			volumes[channelIndex] = volume;
+		}
 	}
 
 	_initChannelSamplePosition(channelIndex, effect) {
@@ -710,7 +760,22 @@ class TrackerPatternProcessor {
 			case EffectAlgorithms.DETUNE:
 				this.state.channelDetune[channelIndex] = (param & 0xff) - 0x80;
 				break;
+			case EffectAlgorithms.VOLUME_SLIDE:
+				if (this.state.channelVolumeSlide) {
+					this.state.channelVolumeSlide[channelIndex] = param & 0xff;
+				}
+				break;
 		}
+	}
+
+	processTrackerTick(registerState) {
+		this.processTables();
+		this.processArpeggio();
+		this.processVolumeSlides();
+		this.processEffectTables();
+		this.chipAudioDriver.processInstruments(this.state, registerState);
+		this.processVibrato();
+		this.processSlides();
 	}
 
 	processSlides() {

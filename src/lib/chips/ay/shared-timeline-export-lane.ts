@@ -91,12 +91,7 @@ function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRender
 				patternProcessor.parsePatternRow(state.currentPattern, tl.currentRow, registerState);
 				patternProcessor.processSpeedTable();
 			}
-			patternProcessor.processTables();
-			patternProcessor.processArpeggio();
-			patternProcessor.processEffectTables();
-			audioDriver.processInstruments(state, registerState);
-			patternProcessor.processVibrato();
-			patternProcessor.processSlides();
+			patternProcessor.processTrackerTick(registerState);
 			if (mixer.hasVirtualChannels()) {
 				ayumiEngine.applyRegisterState(mixer.merge(registerState, state));
 				registerState.forceEnvelopeShapeWrite = false;

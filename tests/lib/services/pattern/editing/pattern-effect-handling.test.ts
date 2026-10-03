@@ -102,6 +102,24 @@ describe('PatternEffectHandling', () => {
 			expect(formatted).toBe('S.T1');
 		});
 
+		it('Volume slide 8203 keeps the delay nibble', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('8203');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe(8);
+			expect(parsed!.delay).toBe(2);
+			expect(parsed!.parameter).toBe(0x03);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('8203');
+		});
+
+		it('Volume slide with table 82T1 parses table 0', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('82T1');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe(8);
+			expect(parsed!.delay).toBe(2);
+			expect(parsed!.tableIndex).toBe(0);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('82T1');
+		});
+
 		it('Detune with table D.TG parses table 16 (G)', () => {
 			const parsed = PatternEffectHandling.parseEffectFromString('D.TG');
 			expect(parsed).not.toBeNull();

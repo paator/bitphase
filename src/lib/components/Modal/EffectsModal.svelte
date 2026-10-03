@@ -132,6 +132,18 @@
 			example: '7.04 - wait 4 ticks'
 		},
 		{
+			code: '8',
+			name: 'Volume Slide',
+			description:
+				'Slides this channel volume (8XYZ / 8XTY). Y raises it, Z lowers it. 8000 stops. Continues across notes.',
+			format: '8XYZ',
+			formatWithTable: '8XTY',
+			delay: 'X - delay between volume steps (0-F). 0 steps every tick',
+			parameter: 'Y up per step, Z down per step (0-F)',
+			tableDescription: 'slide value from table, using the same delay',
+			example: '8203 - delay 2, down 3'
+		},
+		{
 			code: 'D',
 			name: 'Detune',
 			description:

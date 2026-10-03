@@ -26,7 +26,7 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		...u32(5),
 		...u32(0),
 		...u32(0),
-		...u32(0),
+		...u32(1),
 		...u32(4),
 		...u32(16),
 		...u32(32)
@@ -120,7 +120,7 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		...u32(0),
 		...u32(0),
 		...u32(0),
-		...u32(2),
+		...u32(4),
 		...u32(0),
 		1,
 		0,
@@ -138,7 +138,25 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		14,
 		1,
 		0,
-		0
+		0,
+		...u32(2),
+		0,
+		0,
+		64,
+		16,
+		22,
+		0x13,
+		11,
+		0x18,
+		...u32(3),
+		0,
+		0,
+		64,
+		16,
+		22,
+		0x01,
+		11,
+		0x46
 	];
 	const later = [
 		...u32(0),
@@ -225,6 +243,27 @@ describe('ftm import', () => {
 		expect(pulse[1]!.note.name).toBe(NoteName.Off);
 		expect(pulse[1]!.instrument).toBe(0);
 		expect(pulse[1]!.effects[0]).toBeNull();
+		expect(pulse[2]!.note.name).toBe(NoteName.None);
+		expect(pulse[2]!.effects[0]).toMatchObject({
+			effect: EffectType.VolumeSlide,
+			delay: 4,
+			parameter: 0x01
+		});
+		expect(pulse[2]!.effects[1]).toMatchObject({
+			effect: EffectType.Vibrato,
+			delay: 2,
+			parameter: 0x8d
+		});
+		expect(pulse[3]!.effects[0]).toMatchObject({
+			effect: EffectType.VolumeSlide,
+			delay: 8,
+			parameter: 0x01
+		});
+		expect(pulse[3]!.effects[1]).toMatchObject({
+			effect: EffectType.Vibrato,
+			delay: 1,
+			parameter: 0x49
+		});
 		expect(song.patterns[1]!.channels[0]!.rows[0]!.note.name).toBe(NoteName.D);
 		expect(song.patterns[1]!.channels[0]!.rows[0]!.note.octave).toBe(3);
 

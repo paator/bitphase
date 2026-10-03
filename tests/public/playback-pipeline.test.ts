@@ -16,12 +16,7 @@ function runOneTick(
 		processor.parsePatternRow(pattern, state.timeline.currentRow, registerState);
 		processor.processSpeedTable();
 	}
-	processor.processTables();
-	processor.processEffectTables();
-	processor.processArpeggio();
-	driver.processInstruments(state, registerState);
-	processor.processVibrato();
-	processor.processSlides();
+	processor.processTrackerTick(registerState);
 	state.advancePosition();
 }
 

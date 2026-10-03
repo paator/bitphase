@@ -306,12 +306,7 @@ export class AYChipRenderer implements ChipRenderer {
 					patternProcessor.processSpeedTable();
 				}
 
-				patternProcessor.processTables();
-				patternProcessor.processArpeggio();
-				patternProcessor.processEffectTables();
-				audioDriver.processInstruments(state, registerState);
-				patternProcessor.processVibrato();
-				patternProcessor.processSlides();
+				patternProcessor.processTrackerTick(registerState);
 
 				if (mixer.hasVirtualChannels()) {
 					const hwState = mixer.merge(registerState, state);
@@ -461,12 +456,7 @@ export class AYChipRenderer implements ChipRenderer {
 				}
 
 				for (const ctx of contexts) {
-					ctx.patternProcessor.processTables();
-					ctx.patternProcessor.processArpeggio();
-					ctx.patternProcessor.processEffectTables();
-					ctx.audioDriver.processInstruments(ctx.state, ctx.registerState);
-					ctx.patternProcessor.processVibrato();
-					ctx.patternProcessor.processSlides();
+					ctx.patternProcessor.processTrackerTick(ctx.registerState);
 
 					if (ctx.mixer.hasVirtualChannels()) {
 						const hwState = ctx.mixer.merge(ctx.registerState, ctx.state);

@@ -29,11 +29,7 @@ type ExportLane = {
 	patternProcessor: {
 		parsePatternRow: (pattern: Pattern, rowIndex: number, registerState: unknown) => void;
 		processSpeedTable: () => void;
-		processTables: () => void;
-		processArpeggio: () => void;
-		processEffectTables: () => void;
-		processVibrato: () => void;
-		processSlides: () => void;
+		processTrackerTick: (registerState: unknown) => void;
 	};
 	engine: { dispose: () => void };
 	apuPtr: number;
@@ -139,14 +135,9 @@ function runWavExportTicks(lane: ExportLane, tickCount: number): number[] {
 				patternProcessor.processSpeedTable();
 			}
 
-			patternProcessor.processTables();
-			patternProcessor.processArpeggio();
-			patternProcessor.processEffectTables();
-			audioDriver.processInstruments(state, registerState);
+			patternProcessor.processTrackerTick(registerState);
 			duties.push(registerState.channels[0].duty);
 			audioDriver.advancePulseWidthTable(state);
-			patternProcessor.processVibrato();
-			patternProcessor.processSlides();
 
 			state.timeline.advancePosition();
 			tl.tickAccumulator -= 1.0;

@@ -38,6 +38,9 @@ const CHANNEL_ARRAY_SPECS = [
 	['channelVibratoCounter', 0],
 	['channelVibratoPosition', 0],
 	['channelDetune', 0],
+	['channelVolumeSlide', 0],
+	['channelVolumeSlideDelay', 0],
+	['channelVolumeSlideCounter', 0],
 	['channelNoteDelayArmed', false],
 	['channelNoteDelayCounter', 0]
 ];

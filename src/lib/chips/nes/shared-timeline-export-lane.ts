@@ -82,15 +82,10 @@ function createNesLaneHandle(
 				patternProcessor.parsePatternRow(state.currentPattern, tl.currentRow, registerState);
 				patternProcessor.processSpeedTable();
 			}
-			patternProcessor.processTables();
-			patternProcessor.processArpeggio();
-			patternProcessor.processEffectTables();
-			audioDriver.processInstruments(state, registerState);
+			patternProcessor.processTrackerTick(registerState);
 			audioDriver.advancePulseWidthTable(state);
 			audioDriver.advanceSweepTable(state);
 			audioDriver.syncSweepTableRegisterState(state, registerState);
-			patternProcessor.processVibrato();
-			patternProcessor.processSlides();
 			apuEngine.applyRegisterState(registerState);
 		},
 		onPatternOrderAdvanced(needsChange) {
