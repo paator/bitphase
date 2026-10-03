@@ -120,6 +120,27 @@ describe('NesApuEngine', () => {
 		expect(renderSquarePeak(engine)).toBeGreaterThan(0.01);
 	});
 
+	it('keeps the last written APU registers for the debug view', () => {
+		const wasmModule = createMockWasmModule();
+		const engine = createTestEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+
+		registerState.channels[0].enabled = true;
+		registerState.channels[0].period = 428;
+		registerState.channels[0].volume = 15;
+		registerState.channels[0].duty = 2;
+		registerState.channels[0].retrigger = true;
+
+		engine.applyRegisterState(registerState);
+
+		const registers = engine.getApuRegisters();
+		expect(registers).toHaveLength(0x18);
+		expect(registers[0]).toBe(0xbf);
+		expect(registers[1]).toBe(0x08);
+		expect(registers[2]).toBe(0xab);
+		expect(registers[0x15]).toBe(NES_APU_STATUS_PULSE | NES_APU_STATUS_TRIANGLE_NOISE);
+	});
+
 	it('writes sweep disable for pulse channels by default', async () => {
 		const wasmModule = await loadWasm();
 		const { engine } = createNesApuEngine(wasmModule);

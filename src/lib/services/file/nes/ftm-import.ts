@@ -1,3 +1,4 @@
+import { AY_CHIP_SCHEMA, resolveAYTuningTable } from '../../../chips/ay/schema';
 import { NES_CHIP_SCHEMA, resolveNesCpuFrequency, resolveNesTuningTable } from '../../../chips/nes/schema';
 import type { NesSystem } from '../../../chips/nes/schema';
 import {
@@ -6,7 +7,7 @@ import {
 	type NesDpcmAssignment,
 	type NesDpcmSample
 } from '../../../chips/nes/dpcm';
-import { applySchemaDefaults } from '../../../chips/base/schema';
+import { applySchemaDefaults, type ChipSchema } from '../../../chips/base/schema';
 import { syncSharedEffectColumnLayout } from '../../../chips/base/channel-effect-columns';
 import { Project, Table } from '../../../models/project';
 import {
@@ -22,7 +23,16 @@ import {
 import { numberToInstrumentId } from '../../../utils/instrument-id';
 
 const FILE_HEADER = 'FamiTracker Module';
+const DN_FILE_HEADER = 'Dn-FamiTracker Module';
 const NES_CHANNEL_COUNT = 5;
+const S5B_CHANNEL_COUNT = 3;
+const S5B_EXPANSION = 0x20;
+const SUNSOFT_5B_CLOCK = 894886;
+const INST_2A03 = 1;
+const INST_S5B = 6;
+const S5B_MODE_ENVELOPE = 0x20;
+const S5B_MODE_SQUARE = 0x40;
+const S5B_MODE_NOISE = 0x80;
 const MAX_FT_INSTRUMENTS = 64;
 const MAX_FT_SAMPLES = 64;
 const MAX_SEQUENCE_ITEMS = 253;
@@ -75,7 +85,19 @@ const EXPANSION_NAMES: [number, string][] = [
 
 const INST_TYPE_NAMES = ['', '2A03', 'VRC6', 'VRC7', 'FDS', 'N163', '5B'];
 
-const QUIET_BLOCKS = new Set(['COMMENTS', 'PARAMS', 'INFO', 'HEADER', 'INSTRUMENTS', 'SEQUENCES', 'FRAMES', 'PATTERNS', 'DPCM SAMPLES', 'END']);
+const QUIET_BLOCKS = new Set([
+	'COMMENTS',
+	'PARAMS',
+	'INFO',
+	'HEADER',
+	'INSTRUMENTS',
+	'SEQUENCES',
+	'SEQUENCES_S5B',
+	'FRAMES',
+	'PATTERNS',
+	'DPCM SAMPLES',
+	'END'
+]);
 
 export class FtmFormatError extends Error {
 	constructor(message: string) {
@@ -197,18 +219,28 @@ function blockName(bytes: Uint8Array): string {
 	return latin1(slice);
 }
 
-export function isFtmBuffer(buffer: ArrayBuffer): boolean {
-	if (buffer.byteLength < FILE_HEADER.length + 4) return false;
-	const bytes = new Uint8Array(buffer, 0, FILE_HEADER.length);
-	return latin1(bytes) === FILE_HEADER;
+function headerLength(buffer: ArrayBuffer): number {
+	const bytes = new Uint8Array(buffer);
+	if (bytes.length >= DN_FILE_HEADER.length && latin1(bytes.subarray(0, DN_FILE_HEADER.length)) === DN_FILE_HEADER) {
+		return DN_FILE_HEADER.length;
+	}
+	if (bytes.length >= FILE_HEADER.length && latin1(bytes.subarray(0, FILE_HEADER.length)) === FILE_HEADER) {
+		return FILE_HEADER.length;
+	}
+	return 0;
 }
 
-function readBlocks(buffer: ArrayBuffer): { version: number; blocks: FtmBlock[] } {
-	if (!isFtmBuffer(buffer)) {
+export function isFtmBuffer(buffer: ArrayBuffer): boolean {
+	return headerLength(buffer) > 0 && buffer.byteLength >= headerLength(buffer) + 4;
+}
+
+function readBlocks(buffer: ArrayBuffer): { version: number; blocks: FtmBlock[]; dnModule: boolean } {
+	const header = headerLength(buffer);
+	if (header === 0) {
 		throw new FtmFormatError('Not a FamiTracker module');
 	}
 	const bytes = new Uint8Array(buffer);
-	let offset = FILE_HEADER.length;
+	let offset = header;
 	if (offset + 4 > bytes.length) {
 		throw new FtmFormatError('FamiTracker module header is truncated');
 	}
@@ -243,7 +275,7 @@ function readBlocks(buffer: ArrayBuffer): { version: number; blocks: FtmBlock[] 
 		if (name === 'END') break;
 		blocks.push({ name, version: blockVersion, data });
 	}
-	return { version, blocks };
+	return { version, blocks, dnModule: header === DN_FILE_HEADER.length };
 }
 
 function findBlock(blocks: FtmBlock[], name: string): FtmBlock | undefined {
@@ -271,7 +303,7 @@ function sampleSequence(sequence: FtmSequence, index: number): number {
 }
 
 export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImportResult {
-	const { version, blocks } = readBlocks(buffer);
+	const { version, blocks, dnModule } = readBlocks(buffer);
 	const warnings: string[] = [];
 	const warnOnce = new Set<string>();
 	const note = (message: string) => {
@@ -288,7 +320,13 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 
 	const params = readParams(findBlock(blocks, 'PARAMS'));
 	const info = readInfo(findBlock(blocks, 'INFO'));
-	if (params.expansion !== 0) {
+	if (dnModule && params.expansion !== S5B_EXPANSION) {
+		throw new FtmFormatError('Only NES + 5B Dn-FamiTracker modules can be imported');
+	}
+	if (dnModule && params.channels !== NES_CHANNEL_COUNT + S5B_CHANNEL_COUNT) {
+		throw new FtmFormatError('NES + 5B module does not have 8 channels');
+	}
+	if (!dnModule && params.expansion !== 0) {
 		const names = EXPANSION_NAMES.filter(([bit]) => params.expansion & bit).map(([, name]) => name);
 		note(
 			`Expansion chip ${names.join(', ') || params.expansion.toString(16)} was skipped; only 2A03 channels were imported`
@@ -297,6 +335,7 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 
 	const header = readHeader(findBlock(blocks, 'HEADER'), params.channels);
 	const sequences = readSequences(findBlock(blocks, 'SEQUENCES'));
+	const s5bSequences = dnModule ? readS5bSequences(findBlock(blocks, 'SEQUENCES_S5B')) : [];
 	const instruments = readInstruments(findBlock(blocks, 'INSTRUMENTS'));
 	const frames = readFrames(findBlock(blocks, 'FRAMES'), header.trackCount, params.machine, params.channels);
 	const samples = readSamples(findBlock(blocks, 'DPCM SAMPLES'), note);
@@ -309,24 +348,24 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 		note('Bitphase keeps one order list, taken from the first song');
 	}
 	const skippedEffects = new Set<string>();
-	const arpTables = buildArpTables(instruments, sequences, note);
+	const arpTables = buildArpTables(instruments, sequences, s5bSequences, note);
 	const projectInstruments = instruments.map((instrument) =>
-		toInstrument(instrument, sequences, samples, note)
+		toInstrument(instrument, sequences, s5bSequences, samples, note)
 	);
 	if (projectInstruments.length === 0) {
 		projectInstruments.push(new Instrument('01', 'Instrument 01', 'nes'));
 	}
 
-	const songs = frames.map((track, trackIndex) =>
-		toSong(
-			track,
-			header.effectColumns[trackIndex] ?? header.effectColumns[0] ?? [],
-			cells.get(trackIndex) ?? new Map(),
-			params,
-			skippedEffects,
-			arpTables.byInstrument
-		)
-	);
+	const songs = frames.flatMap((track, trackIndex) => {
+		const columns = header.effectColumns[trackIndex] ?? header.effectColumns[0] ?? [];
+		const trackCells = cells.get(trackIndex) ?? new Map();
+		const nesSong = toSong(track, columns, trackCells, params, skippedEffects, arpTables.byInstrument);
+		if (!dnModule) return [nesSong];
+		return [
+			nesSong,
+			toAySong(track, columns, trackCells, params, skippedEffects, arpTables.byInstrument, note)
+		];
+	});
 
 	if (skippedEffects.size > 0) {
 		note(`Skipped FamiTracker effects ${[...skippedEffects].sort().join(', ')}`);
@@ -513,6 +552,38 @@ function readSequences(block: FtmBlock | undefined): FtmSequence[][] {
 	return sequences;
 }
 
+function readS5bSequences(block: FtmBlock | undefined): FtmSequence[][] {
+	const sequences: FtmSequence[][] = Array.from({ length: 128 }, () =>
+		Array.from({ length: SEQUENCE_TYPES }, () => ({
+			values: [],
+			loopPoint: -1,
+			releasePoint: -1,
+			settings: 0
+		}))
+	);
+	if (!block) return sequences;
+	const reader = new BlockReader(block.data);
+	const count = reader.i32();
+	for (let i = 0; i < count; i++) {
+		const index = reader.i32();
+		const type = reader.i32();
+		const seqCount = reader.u8();
+		let loopPoint = reader.i32();
+		if (loopPoint === seqCount) loopPoint = -1;
+		const releasePoint = reader.i32();
+		const settings = reader.i32();
+		const values: number[] = [];
+		for (let item = 0; item < seqCount; item++) {
+			const value = reader.i8();
+			if (values.length < MAX_SEQUENCE_ITEMS) values.push(value);
+		}
+		if (index >= 0 && index < 128 && type >= 0 && type < SEQUENCE_TYPES) {
+			sequences[index]![type] = { values, loopPoint, releasePoint, settings };
+		}
+	}
+	return sequences;
+}
+
 function readInstruments(block: FtmBlock | undefined): FtmInstrument[] {
 	if (!block) return [];
 	const reader = new BlockReader(block.data);
@@ -521,14 +592,16 @@ function readInstruments(block: FtmBlock | undefined): FtmInstrument[] {
 	for (let i = 0; i < count; i++) {
 		const index = reader.i32();
 		const type = reader.u8();
-		const seqCount = type === 1 ? reader.i32() : 0;
 		const seqEnable: boolean[] = [];
 		const seqIndex: number[] = [];
-		if (type === 1) {
+		if (type === INST_2A03 || type === INST_S5B) {
+			const seqCount = reader.i32();
 			for (let seq = 0; seq < seqCount; seq++) {
 				seqEnable.push(reader.u8() !== 0);
 				seqIndex.push(reader.u8());
 			}
+		}
+		if (type === INST_2A03) {
 			const octaves = block.version === 1 ? 6 : 8;
 			const samples: number[] = [];
 			const pitch: number[] = [];
@@ -549,6 +622,21 @@ function readInstruments(block: FtmBlock | undefined): FtmInstrument[] {
 			const nameSize = reader.i32();
 			const name = latin1(reader.bytes(Math.max(0, nameSize)));
 			instruments.push({ index, type, name, seqEnable, seqIndex, samples, pitch, delta });
+			continue;
+		}
+		if (type === INST_S5B) {
+			const nameSize = reader.i32();
+			const name = latin1(reader.bytes(Math.max(0, nameSize)));
+			instruments.push({
+				index,
+				type,
+				name,
+				seqEnable,
+				seqIndex,
+				samples: [],
+				pitch: [],
+				delta: []
+			});
 			continue;
 		}
 		throw new FtmFormatError(
@@ -601,7 +689,7 @@ function readFrames(
 			for (let channel = 0; channel < channels; channel++) {
 				row.push(reader.u8());
 			}
-			frames.push(row.slice(0, NES_CHANNEL_COUNT));
+			frames.push(row);
 		}
 		tracks.push({
 			frameCount,
@@ -668,7 +756,6 @@ function readPatterns(
 				effects.push({ number: effect, param });
 			}
 			if (volume > 0x10) volume &= 0x0f;
-			if (channel >= NES_CHANNEL_COUNT) continue;
 			let trackMap = tracks.get(track);
 			if (!trackMap) {
 				trackMap = new Map();
@@ -693,12 +780,16 @@ function readPatterns(
 function toInstrument(
 	source: FtmInstrument,
 	sequences: FtmSequence[][],
+	s5bSequences: FtmSequence[][],
 	samples: Array<FtmSample | null>,
 	note: (message: string) => void
 ): Instrument {
 	const id = numberToInstrumentId(source.index + 1);
+	if (source.type === INST_S5B) {
+		return toAyInstrument(source, s5bSequences, id);
+	}
 	const instrument = new Instrument(id, source.name || `Instrument ${id}`, 'nes');
-	if (source.type !== 1) {
+	if (source.type !== INST_2A03) {
 		note(`Instrument ${source.name || id} is not a 2A03 instrument and was left empty`);
 		return instrument;
 	}
@@ -718,7 +809,8 @@ function toInstrument(
 	const tone = mergePitch(pitch, hiPitch);
 	if (tone) {
 		macros.toneAdd = { values: tone.values, loop: tone.loop };
-		macros.toneAccumulation = { values: tone.values.map(() => true), loop: tone.loop };
+		const accumulate = (pitch?.settings ?? 0) !== 1;
+		macros.toneAccumulation = { values: tone.values.map(() => accumulate), loop: tone.loop };
 	}
 	const duty = enabledSequence(source, sequences, 4);
 	if (duty && duty.values.length > 0) {
@@ -758,6 +850,38 @@ function toInstrument(
 	return instrument;
 }
 
+function toAyInstrument(source: FtmInstrument, sequences: FtmSequence[][], id: string): Instrument {
+	const instrument = new Instrument(id, source.name || `Instrument ${id}`, 'ay');
+	const macros: NonNullable<Instrument['macros']> = {};
+	const volume = enabledSequence(source, sequences, 0);
+	if (volume && volume.values.length > 0) {
+		macros.volume = {
+			values: volume.values.map((value) => Math.max(0, Math.min(15, value))),
+			loop: holdLoop(volume.loopPoint, volume.values.length)
+		};
+	}
+	const pitch = enabledSequence(source, sequences, 2);
+	const hiPitch = enabledSequence(source, sequences, 3);
+	const tone = mergePitch(pitch, hiPitch);
+	if (tone) {
+		macros.toneAdd = { values: tone.values, loop: tone.loop };
+		macros.toneAccumulation = { values: tone.values.map(() => true), loop: tone.loop };
+	}
+	const mode = enabledSequence(source, sequences, 4);
+	if (mode && mode.values.length > 0) {
+		const loop = holdLoop(mode.loopPoint, mode.values.length);
+		macros.tone = { values: mode.values.map((value) => (value & S5B_MODE_SQUARE) !== 0), loop };
+		macros.noise = { values: mode.values.map((value) => (value & S5B_MODE_NOISE) !== 0), loop };
+		macros.envelope = {
+			values: mode.values.map((value) => (value & S5B_MODE_ENVELOPE) !== 0),
+			loop
+		};
+		macros.noiseAdd = { values: mode.values.map((value) => value & 0x1f), loop };
+	}
+	if (Object.keys(macros).length > 0) instrument.macros = macros;
+	return instrument;
+}
+
 function enabledSequence(
 	instrument: FtmInstrument,
 	sequences: FtmSequence[][],
@@ -792,6 +916,7 @@ function mergePitch(
 function buildArpTables(
 	instruments: FtmInstrument[],
 	sequences: FtmSequence[][],
+	s5bSequences: FtmSequence[][],
 	note: (message: string) => void
 ): { tables: Table[]; byInstrument: Map<number, number> } {
 	const byInstrument = new Map<number, number>();
@@ -799,8 +924,9 @@ function buildArpTables(
 	const seen = new Map<string, number>();
 	let fixedWarned = false;
 	for (const source of instruments) {
-		if (source.type !== 1) continue;
-		const arpeggio = enabledSequence(source, sequences, 1);
+		if (source.type !== INST_2A03 && source.type !== INST_S5B) continue;
+		const table = source.type === INST_S5B ? s5bSequences : sequences;
+		const arpeggio = enabledSequence(source, table, 1);
 		if (!arpeggio || arpeggio.values.length === 0) continue;
 		if (arpeggio.settings === 1) {
 			if (!fixedWarned) {
@@ -867,9 +993,10 @@ function toSong(
 							skippedEffects,
 							channel,
 							latchedInstrument,
-							arpByInstrument
+							arpByInstrument,
+							false
 						)
-					: emptyRow(columnCount);
+					: emptyRow(NES_CHIP_SCHEMA.fields, columnCount);
 			}
 		}
 		return pattern;
@@ -878,8 +1005,73 @@ function toSong(
 	return song;
 }
 
-function emptyRow(columnCount: number): Row {
-	const row = new Row(NES_CHIP_SCHEMA.fields);
+function toAySong(
+	track: FtmTrack,
+	effectColumns: number[],
+	cells: Map<number, Map<number, Map<number, FtmCell>>>,
+	params: FtmParams,
+	skippedEffects: Set<string>,
+	arpByInstrument: Map<number, number>,
+	warn: (message: string) => void
+): Song {
+	const song = new Song(AY_CHIP_SCHEMA);
+	song.chipType = 'ay';
+	song.chipVariant = 'YM';
+	song.initialSpeed = track.speed;
+	song.defaultPatternLength = track.patternLength;
+	applySchemaDefaults(song, AY_CHIP_SCHEMA);
+	song.chipVariant = 'YM';
+	song.chipFrequency = SUNSOFT_5B_CLOCK;
+	song.tuningTableIndex = 5;
+	song.a4TuningHz = 440;
+	song.interruptFrequency = params.engineHz;
+	song.tempo = track.tempo > 0 ? track.tempo : 0;
+	song.tuningTable = resolveAYTuningTable(5, SUNSOFT_5B_CLOCK, 440);
+
+	const latchedInstrument = Array.from({ length: S5B_CHANNEL_COUNT }, () => -1);
+	song.patterns = track.frames.map((frame, frameIndex) => {
+		const pattern = new Pattern(frameIndex, track.patternLength, AY_CHIP_SCHEMA);
+		for (let channel = 0; channel < S5B_CHANNEL_COUNT; channel++) {
+			const sourceChannel = NES_CHANNEL_COUNT + channel;
+			const columnCount = effectColumns[sourceChannel] ?? 1;
+			const patternChannel = pattern.channels[channel]!;
+			patternChannel.effectColumnCount = columnCount;
+			const patternIndex = frame[sourceChannel] ?? 0;
+			const rows = cells.get(sourceChannel)?.get(patternIndex);
+			for (let rowIndex = 0; rowIndex < track.patternLength; rowIndex++) {
+				const cell = rows?.get(rowIndex);
+				patternChannel.rows[rowIndex] = cell
+					? toRow(
+							cell,
+							columnCount,
+							params.speedSplit,
+							skippedEffects,
+							channel,
+							latchedInstrument,
+							arpByInstrument,
+							true,
+							warn
+						)
+					: emptyRow(AY_CHIP_SCHEMA.fields, columnCount);
+			}
+		}
+		return pattern;
+	});
+	syncSharedEffectColumnLayout(song.patterns);
+	return song;
+}
+
+function ayNoteOctave(fileOctave: number, warn: (message: string) => void): number {
+	const octave = fileOctave + 1;
+	if (octave <= 1) {
+		warn('5B notes in the lowest octave were left on octave 1');
+		return 1;
+	}
+	return octave - 1;
+}
+
+function emptyRow(fields: ChipSchema['fields'], columnCount: number): Row {
+	const row = new Row(fields);
 	row.note = new Note(NoteName.None, 0);
 	row.effects = Array.from({ length: columnCount }, () => null);
 	return row;
@@ -892,12 +1084,14 @@ function toRow(
 	skippedEffects: Set<string>,
 	channel: number,
 	latchedInstrument: number[],
-	arpByInstrument: Map<number, number>
+	arpByInstrument: Map<number, number>,
+	ayChannel: boolean,
+	warn: (message: string) => void = () => {}
 ): Row {
-	const row = emptyRow(columnCount);
+	const row = emptyRow(ayChannel ? AY_CHIP_SCHEMA.fields : NES_CHIP_SCHEMA.fields, columnCount);
 	const noteOn = cell.note >= 1 && cell.note <= 12;
 	if (noteOn) {
-		row.note = new Note((cell.note + 1) as NoteName, cell.octave + 1);
+		row.note = new Note((cell.note + 1) as NoteName, ayChannel ? ayNoteOctave(cell.octave, warn) : cell.octave + 1);
 	} else if (cell.note === 13 || cell.note === 14) {
 		row.note = new Note(NoteName.Off, 0);
 		if (cell.note === 13) skippedEffects.add('===');
@@ -917,7 +1111,15 @@ function toRow(
 	const effects: (Effect | null)[] = [];
 	for (const effect of cell.effects) {
 		if (effects.length >= columnCount) break;
-		const mapped = mapEffect(effect.number, effect.param, speedSplit, channel, row, skippedEffects);
+		const mapped = mapEffect(
+			effect.number,
+			effect.param,
+			speedSplit,
+			channel,
+			row,
+			skippedEffects,
+			ayChannel
+		);
 		if (mapped) effects.push(mapped);
 	}
 	while (effects.length < columnCount) effects.push(null);
@@ -937,7 +1139,8 @@ function mapEffect(
 	speedSplit: number,
 	channel: number,
 	row: Row,
-	skippedEffects: Set<string>
+	skippedEffects: Set<string>,
+	ayChannel: boolean
 ): Effect | null {
 	const byte = param & 0xff;
 	switch (number) {
@@ -956,7 +1159,7 @@ function mapEffect(
 			return new Effect(EffectType.Portamento, 0, byte);
 		case 8:
 		case 9:
-			if (channel > 1) {
+			if (ayChannel || channel > 1) {
 				skippedEffects.add(EFFECT_LETTERS[number - 1] || String(number));
 				return null;
 			}
@@ -968,11 +1171,11 @@ function mapEffect(
 		case 13:
 			return new Effect(EffectType.Detune, 0, byte);
 		case 16:
-			return new Effect(channel === 3 ? PERIOD_UP : PERIOD_DOWN, 0, byte);
+			return new Effect(!ayChannel && channel === 3 ? PERIOD_UP : PERIOD_DOWN, 0, byte);
 		case 17:
-			return new Effect(channel === 3 ? PERIOD_DOWN : PERIOD_UP, 0, byte);
+			return new Effect(!ayChannel && channel === 3 ? PERIOD_DOWN : PERIOD_UP, 0, byte);
 		case 18:
-			if (channel > 1 && channel !== 3) {
+			if (ayChannel || (channel > 1 && channel !== 3)) {
 				skippedEffects.add('V');
 				return null;
 			}

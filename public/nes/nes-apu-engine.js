@@ -23,6 +23,11 @@ import {
 const SQUARE_BASE = [0x4000, 0x4004];
 const TRIANGLE_BASE = 0x4008;
 const NOISE_BASE = 0x400c;
+const APU_REGISTER_BASE = 0x4000;
+const APU_REGISTER_COUNT = 0x18;
+const APU_STATUS = 0x4015;
+const APU_STATUS_PULSE_MASK = 0x03;
+const APU_STATUS_DMC_MASK = 0x1c;
 const NES_EXPORT_CHANNEL_COUNT = 5;
 const NES_OUTPUT_DC_POLE = 0.995;
 
@@ -81,6 +86,45 @@ class NesApuEngine {
 		this._exportDcOut = emptyExportChannels();
 		this._exportChannelSamples = emptyExportChannels();
 		this.sampleMemPtr = 0;
+		this.apuRegisters = new Array(APU_REGISTER_COUNT).fill(0);
+	}
+
+	getApuRegisters() {
+		return this.apuRegisters.slice();
+	}
+
+	_rememberApuWrite(address, value) {
+		const index = address - APU_REGISTER_BASE;
+		if (index < 0 || index >= APU_REGISTER_COUNT) return;
+		const byte = value & 0xff;
+		if (address === APU_STATUS) {
+			this.apuRegisters[index] =
+				(this.apuRegisters[index] & ~APU_STATUS_PULSE_MASK) | (byte & APU_STATUS_PULSE_MASK);
+			return;
+		}
+		this.apuRegisters[index] = byte;
+	}
+
+	_rememberDmcWrite(address, value) {
+		const index = address - APU_REGISTER_BASE;
+		if (index < 0 || index >= APU_REGISTER_COUNT) return;
+		const byte = value & 0xff;
+		if (address === APU_STATUS) {
+			this.apuRegisters[index] =
+				(this.apuRegisters[index] & ~APU_STATUS_DMC_MASK) | (byte & APU_STATUS_DMC_MASK);
+			return;
+		}
+		this.apuRegisters[index] = byte;
+	}
+
+	_writeApu(address, value) {
+		this._rememberApuWrite(address, value);
+		this.wasmModule.nes_apu_Write(this.apuPtr, address, value);
+	}
+
+	_writeDmc(address, value) {
+		this._rememberDmcWrite(address, value);
+		this.wasmModule.nes_dmc_Write(this.dmcPtr, address, value);
 	}
 
 	setCpuFrequency(frequency) {
@@ -117,19 +161,20 @@ class NesApuEngine {
 		this._exportDcIn = emptyExportChannels();
 		this._exportDcOut = emptyExportChannels();
 		this._exportChannelSamples = emptyExportChannels();
+		this.apuRegisters.fill(0);
 		this._parkTriangleDacAtZero();
 	}
 
 	_parkTriangleDacAtZero() {
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, 0x81);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 2, 1);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 3, 0x08);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4017, 0x80);
+		this._writeDmc( 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
+		this._writeDmc( TRIANGLE_BASE, 0x81);
+		this._writeDmc( TRIANGLE_BASE + 2, 1);
+		this._writeDmc( TRIANGLE_BASE + 3, 0x08);
+		this._writeDmc( 0x4017, 0x80);
 		this.wasmModule.nes_dmc_Tick(this.dmcPtr, 32);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, 0);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 2, 0);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4017, 0x40);
+		this._writeDmc( TRIANGLE_BASE, 0);
+		this._writeDmc( TRIANGLE_BASE + 2, 0);
+		this._writeDmc( 0x4017, 0x40);
 	}
 
 	_applyOutputMasks(registerState, forceApply) {
@@ -149,8 +194,8 @@ class NesApuEngine {
 		const last = this.lastState.channels[channelIndex];
 		const base = SQUARE_BASE[channelIndex];
 		const volumeReg = buildSquareSilentVolumeReg(channel.duty);
-		this.wasmModule.nes_apu_Write(this.apuPtr, base, volumeReg);
-		this.wasmModule.nes_apu_Write(this.apuPtr, base + 1, NES_SQUARE_SWEEP_DISABLED);
+		this._writeApu( base, volumeReg);
+		this._writeApu( base + 1, NES_SQUARE_SWEEP_DISABLED);
 		last.volumeReg = volumeReg;
 		last.volume = 0;
 		last.duty = channel.duty;
@@ -163,7 +208,7 @@ class NesApuEngine {
 	_writeTriangleSilent() {
 		const last = this.lastState.channels[2];
 		const linearReg = buildTriangleSilentLinearReg();
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, linearReg);
+		this._writeDmc( TRIANGLE_BASE, linearReg);
 		last.linearReg = linearReg;
 		last.retrigger = false;
 	}
@@ -171,7 +216,7 @@ class NesApuEngine {
 	_writeNoiseSilent() {
 		const last = this.lastState.channels[3];
 		const volumeReg = buildNoiseSilentVolumeReg();
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, NOISE_BASE, volumeReg);
+		this._writeDmc( NOISE_BASE, volumeReg);
 		last.volumeReg = volumeReg;
 		last.volume = 0;
 		last.lengthNibble = NES_REGISTER_UNCHANGED;
@@ -212,7 +257,7 @@ class NesApuEngine {
 				!last.enabled ||
 				volumeReg !== last.volumeReg)
 		) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, base, volumeReg);
+			this._writeApu( base, volumeReg);
 			last.volumeReg = volumeReg;
 			last.volume = channel.volume;
 			last.duty = channel.duty;
@@ -229,7 +274,7 @@ class NesApuEngine {
 			sweepActive && (triggerChannel || channel.retrigger) && !sweepUpdateOnly;
 		const sweepChannelRetrigger = sweepChanged && !sweepUpdateOnly;
 		if (forceApply || sweepChanged || sweepRetrigger) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, base + 1, sweepReg);
+			this._writeApu( base + 1, sweepReg);
 			last.sweepReg = sweepReg;
 		}
 
@@ -239,7 +284,7 @@ class NesApuEngine {
 			sweepChannelRetrigger ||
 			(channel.retrigger && sweepActive && !sweepUpdateOnly)
 		) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, base + 2, periodLow);
+			this._writeApu( base + 2, periodLow);
 		}
 
 		if (
@@ -251,7 +296,7 @@ class NesApuEngine {
 			(channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
 				lengthNibble !== lastLengthNibble)
 		) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, base + 3, periodHigh);
+			this._writeApu( base + 3, periodHigh);
 		}
 
 		last.period = period;
@@ -288,11 +333,11 @@ class NesApuEngine {
 		const linearRegChanged =
 			channel.linearReg !== NES_REGISTER_UNCHANGED && linearReg !== last.linearReg;
 		if (forceApply || triggerChannel || channel.retrigger || linearRegChanged) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE, linearReg);
+			this._writeDmc( TRIANGLE_BASE, linearReg);
 			last.linearReg = linearReg;
 		}
 		if (forceApply || periodLow !== (last.period & 0xff)) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 2, periodLow);
+			this._writeDmc( TRIANGLE_BASE + 2, periodLow);
 		}
 		if (
 			forceApply ||
@@ -302,7 +347,7 @@ class NesApuEngine {
 			(channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
 				lengthNibble !== lastLengthNibble)
 		) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, TRIANGLE_BASE + 3, periodHigh);
+			this._writeDmc( TRIANGLE_BASE + 3, periodHigh);
 		}
 		last.period = period;
 		last.lengthNibble = channel.lengthNibble;
@@ -335,12 +380,12 @@ class NesApuEngine {
 				!last.enabled ||
 				volumeReg !== last.volumeReg)
 		) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, NOISE_BASE, volumeReg);
+			this._writeDmc( NOISE_BASE, volumeReg);
 			last.volumeReg = volumeReg;
 			last.volume = channel.volume;
 		}
 		if (forceApply || periodReg !== ((last.noiseMode ? 0x80 : 0) | (last.noisePeriod & 15))) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, NOISE_BASE + 2, periodReg);
+			this._writeDmc( NOISE_BASE + 2, periodReg);
 			last.noisePeriod = channel.noisePeriod;
 			last.noiseMode = channel.noiseMode;
 		}
@@ -351,7 +396,7 @@ class NesApuEngine {
 			(channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
 				lengthNibble !== last.lengthNibble)
 		) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, NOISE_BASE + 3, lengthNibble << 3);
+			this._writeDmc( NOISE_BASE + 3, lengthNibble << 3);
 			last.lengthNibble = channel.lengthNibble;
 			last.retrigger = channel.retrigger;
 		}
@@ -362,7 +407,7 @@ class NesApuEngine {
 		this.forceFullApply = false;
 
 		if (forceApply || this._lastApu4015 !== NES_APU_STATUS_PULSE) {
-			this.wasmModule.nes_apu_Write(this.apuPtr, 0x4015, NES_APU_STATUS_PULSE);
+			this._writeApu( 0x4015, NES_APU_STATUS_PULSE);
 			this._lastApu4015 = NES_APU_STATUS_PULSE;
 		}
 		const dpcmChannel = registerState.channels[4];
@@ -373,13 +418,13 @@ class NesApuEngine {
 			!dpcmChannel?.enabled &&
 			(forceApply || this._lastDmc4015 !== NES_APU_STATUS_TRIANGLE_NOISE)
 		) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
+			this._writeDmc( 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
 			this._lastDmc4015 = NES_APU_STATUS_TRIANGLE_NOISE;
 		} else if (
 			dpcmRetrigger &&
 			this._lastDmc4015 !== NES_APU_STATUS_TRIANGLE_NOISE
 		) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
+			this._writeDmc( 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
 			this._lastDmc4015 = NES_APU_STATUS_TRIANGLE_NOISE;
 		}
 
@@ -439,17 +484,13 @@ class NesApuEngine {
 		const pitch = channel.dpcmPitch & 15;
 		const loopBit = channel.dpcmLoop ? 0x40 : 0;
 		if (channel.dpcmDelta != null && channel.dpcmDelta >= 0) {
-			this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4011, channel.dpcmDelta & 127);
+			this._writeDmc( 0x4011, channel.dpcmDelta & 127);
 		}
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4010, loopBit | pitch);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4012, 0);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4013, lengthReg);
-		this.wasmModule.nes_dmc_Write(this.dmcPtr, 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
-		this.wasmModule.nes_dmc_Write(
-			this.dmcPtr,
-			0x4015,
-			NES_APU_STATUS_TRIANGLE_NOISE | NES_APU_STATUS_DPCM
-		);
+		this._writeDmc( 0x4010, loopBit | pitch);
+		this._writeDmc( 0x4012, 0);
+		this._writeDmc( 0x4013, lengthReg);
+		this._writeDmc( 0x4015, NES_APU_STATUS_TRIANGLE_NOISE);
+		this._writeDmc(0x4015, NES_APU_STATUS_TRIANGLE_NOISE | NES_APU_STATUS_DPCM);
 		this._lastDmc4015 = NES_APU_STATUS_TRIANGLE_NOISE | NES_APU_STATUS_DPCM;
 	}
 

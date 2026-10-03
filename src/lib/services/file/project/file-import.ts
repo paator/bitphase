@@ -500,7 +500,7 @@ export class FileImportService {
 		try {
 			const input = document.createElement('input');
 			input.type = 'file';
-			input.accept = '.pt3,.vt2,.taym,.psg,.ftm';
+			input.accept = '.pt3,.vt2,.taym,.psg,.ftm,.dnm';
 			input.style.display = 'none';
 
 			document.body.appendChild(input);
@@ -532,7 +532,7 @@ export class FileImportService {
 						const isFtm = isFtmBuffer(buffer);
 						if (!isPT3 && !isVT2 && !isTaym && !isPsg && !isFtm) {
 							throw new Error(
-								'Unknown format. Expected PT3, VT2, TAYM, PSG or FTM module (.pt3, .vt2, .taym, .psg, .ftm).'
+								'Unknown format. Expected PT3, VT2, TAYM, PSG, FTM or DNM module (.pt3, .vt2, .taym, .psg, .ftm, .dnm).'
 							);
 						}
 						const project = isFtm

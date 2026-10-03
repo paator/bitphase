@@ -20,7 +20,7 @@ function block(name: string, version: number, data: number[]): number[] {
 	return [...padded(name, 16), ...u32(version), ...u32(data.length), ...data];
 }
 
-function moduleBytes(expansion = 0, withArp = false): Uint8Array {
+function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uint8Array {
 	const params = [
 		expansion,
 		...u32(5),
@@ -50,8 +50,8 @@ function moduleBytes(expansion = 0, withArp = false): Uint8Array {
 		0,
 		withArp ? 1 : 0,
 		withArp ? 1 : 0,
-		0,
-		0,
+		pitchAbsolute ? 1 : 0,
+		pitchAbsolute ? 1 : 0,
 		0,
 		0,
 		0,
@@ -81,18 +81,40 @@ function moduleBytes(expansion = 0, withArp = false): Uint8Array {
 				...u32(-1),
 				...u32(0)
 			]
-		: [
-				...u32(1),
-				...u32(0),
-				...u32(0),
-				3,
-				...u32(-1),
-				15,
-				12,
-				8,
-				...u32(-1),
-				...u32(0)
-			];
+		: pitchAbsolute
+			? [
+					...u32(2),
+					...u32(0),
+					...u32(0),
+					3,
+					...u32(-1),
+					15,
+					12,
+					8,
+					...u32(1),
+					...u32(2),
+					3,
+					...u32(-1),
+					4,
+					0,
+					-4,
+					...u32(-1),
+					...u32(0),
+					...u32(-1),
+					...u32(1)
+				]
+			: [
+					...u32(1),
+					...u32(0),
+					...u32(0),
+					3,
+					...u32(-1),
+					15,
+					12,
+					8,
+					...u32(-1),
+					...u32(0)
+				];
 	const frames = [...u32(2), ...u32(6), ...u32(150), ...u32(4), 0, 1, 0, 0, 0, 1, 1, 0, 0, 0];
 	const patterns = [
 		...u32(0),
@@ -237,6 +259,15 @@ describe('ftm import', () => {
 		expect(project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!.table).toBe(1);
 	});
 
+	it('keeps an absolute pitch sequence from accumulating', () => {
+		const { project } = importFtmBuffer(moduleBytes(0, false, true).buffer);
+		expect(project.instruments[0]!.macros?.toneAdd).toEqual({ values: [4, 0, -4], loop: 2 });
+		expect(project.instruments[0]!.macros?.toneAccumulation).toEqual({
+			values: [false, false, false],
+			loop: 2
+		});
+	});
+
 	it('warns when an expansion chip is present', () => {
 		const { warnings } = importFtmBuffer(moduleBytes(1).buffer);
 		expect(warnings.some((warning) => warning.includes('VRC6'))).toBe(true);
@@ -245,5 +276,121 @@ describe('ftm import', () => {
 	it('rejects a truncated module', () => {
 		const bytes = moduleBytes();
 		expect(() => importFtmBuffer(bytes.buffer.slice(0, 50))).toThrow();
+	});
+});
+
+function dnmBytes(expansion = 0x20): Uint8Array {
+	const channels = expansion === 0x20 ? 8 : 5;
+	const params = [
+		expansion,
+		...u32(channels),
+		...u32(0),
+		...u32(0),
+		...u32(0),
+		...u32(0),
+		...u32(0),
+		...u32(32)
+	];
+	const info = [...padded('Gimmick', 32), ...padded('Sunsoft', 32), ...padded('', 32)];
+	const header = [0, ...ascii('Song'), 0];
+	for (let channel = 0; channel < channels; channel++) {
+		header.push(channel, 0);
+	}
+	const s5bInstrument = [
+		...u32(1),
+		...u32(0),
+		6,
+		...u32(5),
+		1,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		1,
+		1,
+		...u32(4),
+		...ascii('Bass')
+	];
+	const sequences = [
+		...u32(2),
+		...u32(0),
+		...u32(0),
+		2,
+		...u32(-1),
+		...u32(-1),
+		...u32(0),
+		15,
+		8,
+		...u32(1),
+		...u32(4),
+		1,
+		...u32(-1),
+		...u32(-1),
+		...u32(0),
+		0xc3
+	];
+	const frames = [...u32(1), ...u32(6), ...u32(150), ...u32(1), ...Array(channels).fill(0)];
+	const nesNote = [...u32(0), ...u32(0), ...u32(0), ...u32(1), ...u32(0), 1, 3, 0, 15, 0, 0];
+	const ayNote = [...u32(0), ...u32(5), ...u32(0), ...u32(1), ...u32(0), 1, 3, 0, 12, 0, 0];
+	return Uint8Array.from([
+		...ascii('Dn-FamiTracker Module'),
+		...u32(0x0450),
+		...block('PARAMS', 6, params),
+		...block('INFO', 1, info),
+		...block('HEADER', 3, header),
+		...block('INSTRUMENTS', 6, s5bInstrument),
+		...block('SEQUENCES_S5B', 1, sequences),
+		...block('FRAMES', 3, frames),
+		...block('PATTERNS', 5, [...nesNote, ...ayNote]),
+		...block('END', 0, [])
+	]);
+}
+
+describe('dnm import', () => {
+	it('recognizes a Dn-FamiTracker module', () => {
+		expect(isFtmBuffer(dnmBytes().buffer)).toBe(true);
+	});
+
+	it('imports NES + 5B as NES and AY at the Sunsoft clock', () => {
+		const { project } = importFtmBuffer(dnmBytes().buffer, 'fallback');
+		expect(project.name).toBe('Gimmick');
+		expect(project.songs).toHaveLength(2);
+
+		const nes = project.songs[0]!;
+		const ay = project.songs[1]!;
+		expect(nes.chipType).toBe('nes');
+		expect(nes.patterns[0]!.channels[0]!.rows[0]!.note).toMatchObject({
+			name: NoteName.C,
+			octave: 4
+		});
+
+		expect(ay.chipType).toBe('ay');
+		expect(ay.chipVariant).toBe('YM');
+		expect(ay.chipFrequency).toBe(894886);
+		expect(ay.tuningTableIndex).toBe(5);
+		expect(ay.tuningTable[45]).toBe(Math.round(894886 / 16 / 440));
+		expect(ay.initialSpeed).toBe(6);
+		expect(ay.tempo).toBe(150);
+		expect(ay.interruptFrequency).toBe(60);
+		const ayRow = ay.patterns[0]!.channels[0]!.rows[0]!;
+		expect(ayRow.note).toMatchObject({ name: NoteName.C, octave: 3 });
+		expect(ayRow.volume).toBe(12);
+		expect(ayRow.instrument).toBe(1);
+
+		const instrument = project.instruments[0]!;
+		expect(instrument.chipType).toBe('ay');
+		expect(instrument.name).toBe('Bass');
+		expect(instrument.macros?.volume).toEqual({ values: [15, 8], loop: 1 });
+		expect(instrument.macros?.tone).toEqual({ values: [true], loop: 0 });
+		expect(instrument.macros?.noise).toEqual({ values: [true], loop: 0 });
+		expect(instrument.macros?.envelope).toEqual({ values: [false], loop: 0 });
+		expect(instrument.macros?.noiseAdd).toEqual({ values: [3], loop: 0 });
+	});
+
+	it('rejects a Dn-FamiTracker module that is not NES + 5B', () => {
+		expect(() => importFtmBuffer(dnmBytes(0).buffer)).toThrow(/NES \+ 5B/);
 	});
 });

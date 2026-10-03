@@ -514,7 +514,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 				frequencies: playbackHz.toneHz,
 				sidTimerHz: [],
 				syncbuzzerTimerHz: [],
-				registers: []
+				registers: this.apuEngine?.getApuRegisters?.() ?? []
 			});
 		}
 		this.finishAudioBlockFlushTransport(numSamples, this.paused);
