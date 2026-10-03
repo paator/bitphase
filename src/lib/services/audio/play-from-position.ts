@@ -3,9 +3,20 @@ import type { Table } from '../../models/project';
 import type { ChipSchema, ChipField } from '../../chips/base/schema';
 import { readLastSpeedCommandOnRow, resolveSpeedCommand } from './playback-speed';
 
+const DETUNE_EFFECT_TYPE = 'D'.charCodeAt(0);
+
+export type PlaybackDetuneEffect = {
+	effect: number;
+	delay: number;
+	parameter: number;
+	tableIndex?: number;
+};
+
 export interface PlaybackCarryState {
 	channelFields?: Array<Record<string, unknown>>;
 	globalFields?: Record<string, unknown>;
+	channelDetune?: Array<PlaybackDetuneEffect | null>;
+	envelopeDetune?: PlaybackDetuneEffect;
 	speed?: number;
 	speedTable?: number;
 	speedTablePosition?: number;
@@ -39,6 +50,41 @@ function isChannelFieldValueSet(key: string, value: unknown, field: ChipField): 
 	const when = field.backtrackWhen ?? 'any';
 	if (when === 'nonZero') return n !== 0;
 	return true;
+}
+
+type EffectSlot = {
+	effect?: unknown;
+	delay?: unknown;
+	parameter?: unknown;
+	tableIndex?: unknown;
+};
+
+function readDetuneEffect(slot: unknown): PlaybackDetuneEffect | null {
+	if (!slot || typeof slot !== 'object') return null;
+	const effect = slot as EffectSlot;
+	if (effect.effect !== DETUNE_EFFECT_TYPE) return null;
+	const parameter = toNum(effect.parameter);
+	const delay = toNum(effect.delay);
+	const tableIndex = toNum(effect.tableIndex);
+	const command: PlaybackDetuneEffect = {
+		effect: DETUNE_EFFECT_TYPE,
+		delay: Number.isNaN(delay) ? 0 : delay,
+		parameter: Number.isNaN(parameter) ? 0 : parameter & 0xff
+	};
+	if (!Number.isNaN(tableIndex) && tableIndex >= 0) {
+		command.tableIndex = tableIndex;
+	}
+	return command;
+}
+
+function readLastDetuneOnRow(effects: unknown): PlaybackDetuneEffect | null {
+	if (!Array.isArray(effects)) return null;
+	let found: PlaybackDetuneEffect | null = null;
+	for (const slot of effects) {
+		const command = readDetuneEffect(slot);
+		if (command) found = command;
+	}
+	return found;
 }
 
 function isPersistChannelField(key: string, field: ChipField): boolean {
@@ -81,11 +127,21 @@ export function collectPlaybackCarry(
 		() => ({}) as Record<string, unknown>
 	);
 	const globalFields: Record<string, unknown> = {};
+	const channelDetune: Array<PlaybackDetuneEffect | null> = Array.from(
+		{ length: channelCount },
+		() => null
+	);
+	const trackEnvelopeDetune = Boolean(schema.globalFields?.envelopeEffect);
+	let envelopeDetune: PlaybackDetuneEffect | undefined;
 	let speed: number | undefined;
 	let speedTable: number | undefined;
 	let speedTablePosition: number | undefined;
 	let remaining =
-		channelCount * channelFieldEntries.length + globalFieldEntries.length + 1;
+		channelCount * channelFieldEntries.length +
+		globalFieldEntries.length +
+		channelCount +
+		(trackEnvelopeDetune ? 1 : 0) +
+		1;
 	if (remaining === 0) return null;
 
 	for (let orderIndex = targetOrderIndex; orderIndex >= 0 && remaining > 0; orderIndex--) {
@@ -104,6 +160,13 @@ export function collectPlaybackCarry(
 				if (!isGlobalFieldValueSet(key, value, field)) continue;
 				globalFields[key] = value;
 				remaining--;
+			}
+			if (trackEnvelopeDetune && !envelopeDetune) {
+				const command = readDetuneEffect(patternRow?.envelopeEffect);
+				if (command) {
+					envelopeDetune = command;
+					remaining--;
+				}
 			}
 			if (speed === undefined && speedTable === undefined) {
 				const command = readLastSpeedCommandOnRow(pattern.channels, rowIndex);
@@ -130,6 +193,13 @@ export function collectPlaybackCarry(
 					carryForChannel[key] = value;
 					remaining--;
 				}
+				if (!channelDetune[ch]) {
+					const command = readLastDetuneOnRow(row.effects);
+					if (command) {
+						channelDetune[ch] = command;
+						remaining--;
+					}
+				}
 			}
 		}
 	}
@@ -138,9 +208,12 @@ export function collectPlaybackCarry(
 		(fields) => Object.keys(fields).length > 0
 	);
 	const hasGlobalFields = Object.keys(globalFields).length > 0;
+	const hasChannelDetune = channelDetune.some((command) => command !== null);
 	if (
 		!hasChannelFields &&
 		!hasGlobalFields &&
+		!hasChannelDetune &&
+		!envelopeDetune &&
 		speed === undefined &&
 		speedTable === undefined
 	) {
@@ -150,6 +223,8 @@ export function collectPlaybackCarry(
 	const carry: PlaybackCarryState = {};
 	if (hasChannelFields) carry.channelFields = channelFields;
 	if (hasGlobalFields) carry.globalFields = globalFields;
+	if (hasChannelDetune) carry.channelDetune = channelDetune;
+	if (envelopeDetune) carry.envelopeDetune = envelopeDetune;
 	if (speed !== undefined) carry.speed = speed;
 	if (speedTable !== undefined) {
 		carry.speedTable = speedTable;

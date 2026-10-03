@@ -192,6 +192,76 @@ describe('collectPlaybackCarry', () => {
 		).toBe(8);
 	});
 
+	it('carries the last detune effect per channel', () => {
+		const first = makePattern(0, [2, 2]);
+		first.channels[0]!.rows[0]!.effects = [
+			{ effect: 'D'.charCodeAt(0), delay: 0, parameter: 0x70 }
+		];
+		first.channels[0]!.rows[1]!.effects = [
+			{ effect: '1'.charCodeAt(0), delay: 0, parameter: 0x10 },
+			{ effect: 'D'.charCodeAt(0), delay: 0, parameter: 0x85 }
+		];
+		const second = makePattern(1, [2]);
+
+		expect(
+			collectPlaybackCarry([0, 1], (id) => (id === 0 ? first : second), 1, 0, schema)
+				?.channelDetune
+		).toEqual([{ effect: 'D'.charCodeAt(0), delay: 0, parameter: 0x85 }]);
+	});
+
+	it('carries a detune table and an explicit zero offset', () => {
+		const first = makePattern(0, [2]);
+		first.channels[0]!.rows[0]!.effects = [
+			{ effect: 'D'.charCodeAt(0), delay: 2, parameter: 0, tableIndex: 3 }
+		];
+		const later = makePattern(1, [2, 2]);
+		later.channels[0]!.rows[0]!.effects = [
+			{ effect: 'D'.charCodeAt(0), delay: 0, parameter: 0x80 }
+		];
+
+		expect(
+			collectPlaybackCarry([0, 1], (id) => (id === 0 ? first : later), 1, 0, schema)
+				?.channelDetune?.[0]
+		).toEqual({
+			effect: 'D'.charCodeAt(0),
+			delay: 2,
+			parameter: 0,
+			tableIndex: 3
+		});
+		expect(
+			collectPlaybackCarry([0, 1], (id) => (id === 0 ? first : later), 1, 1, schema)
+				?.channelDetune?.[0]
+		).toEqual({ effect: 'D'.charCodeAt(0), delay: 0, parameter: 0x80 });
+	});
+
+	it('carries an AY envelope detune command', () => {
+		const first = makePattern(0, [2]);
+		(first.patternRows[0] as Record<string, unknown>).envelopeEffect = {
+			effect: 'D'.charCodeAt(0),
+			delay: 0,
+			parameter: 0x90
+		};
+		const second = makePattern(1, [2]);
+		(second.patternRows[0] as Record<string, unknown>).envelopeEffect = {
+			effect: '1'.charCodeAt(0),
+			delay: 0,
+			parameter: 4
+		};
+
+		const carry = collectPlaybackCarry(
+			[0, 1],
+			(id) => (id === 0 ? first : second),
+			1,
+			0,
+			AY_CHIP_SCHEMA
+		);
+		expect(carry?.envelopeDetune).toEqual({
+			effect: 'D'.charCodeAt(0),
+			delay: 0,
+			parameter: 0x90
+		});
+	});
+
 	it('carries S.TY table speed from a previous pattern', () => {
 		const first = makePattern(0, [2]);
 		first.channels[0]!.rows[0]!.effects = [

@@ -55,34 +55,44 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		}
 		const channelFields = carry.channelFields;
 		const globalFields = carry.globalFields;
+		const channelDetune = carry.channelDetune;
 		const hasChannelFields = channelFields?.some(
 			(fields) => fields && Object.keys(fields).length > 0
 		);
 		const hasGlobalFields = Boolean(
 			globalFields && Object.keys(globalFields).length > 0
 		);
-		if (!hasChannelFields && !hasGlobalFields) return;
+		const hasDetune =
+			channelDetune?.some((command) => command) || Boolean(carry.envelopeDetune);
+		if (!hasChannelFields && !hasGlobalFields && !hasDetune) return;
 		if (!this._chipEngineReady()) return;
 
-		const channelCount = Math.max(channelFields?.length ?? 0, 1);
+		const channelCount = Math.max(
+			channelFields?.length ?? 0,
+			channelDetune?.length ?? 0,
+			1
+		);
 		this._resizeForPatternChannels(channelCount);
 		const channels = [];
 		for (let ch = 0; ch < channelCount; ch++) {
+			const detune = channelDetune?.[ch];
 			channels.push({
 				rows: [
 					{
 						note: { name: 0, octave: 0 },
-						effects: [null],
+						effects: detune ? [detune] : [null],
 						...(channelFields?.[ch] ?? {})
 					}
 				]
 			});
 		}
+		const patternRow = { ...(globalFields ?? {}) };
+		if (carry.envelopeDetune) patternRow.envelopeEffect = carry.envelopeDetune;
 		this.patternProcessor.parsePatternRow(
 			{
 				length: 1,
 				channels,
-				patternRows: [globalFields ?? {}]
+				patternRows: [patternRow]
 			},
 			0,
 			this.registerState
