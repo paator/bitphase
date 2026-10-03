@@ -8,7 +8,12 @@
 
 [Bitphase](https://bitphase.app/)
 
-A modern web-based chiptune tracker designed for creating music on retro sound chips. Currently supports the AY-3-8910 / YM2149F chip (used in ZX Spectrum and other 8-bit computers), with plans to support additional chips in the future.
+A modern web-based chiptune tracker for composing on retro sound chips. A project can hold several songs, and each song uses its own chip.
+
+- **AY-3-8910 / YM2149F** - ZX Spectrum, MSX, Atari ST, and other 8-bit machines
+- **2A03 / 2A07** - NES / Famicom
+
+User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
 ## Features
 
@@ -16,15 +21,16 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
 
 - Canvas-based pattern editor with order list
 - Field-based editing with selection, copy/cut/paste, and magic paste
-- Virtual channels — map multiple pattern columns onto a single hardware channel
+- Virtual channels - map multiple pattern columns onto a single hardware channel
 - Transpose, increment/decrement, and channel swap editing tools
-- Auto envelope and envelope-as-note modes
+- AY auto envelope and envelope-as-note modes
 - Customizable keybindings
 
 ### Instruments and tables
 
 - AY/YM instrument editor with tone, noise, envelope, and sample playback
 - Timer effects (waveform, PWM, and related AY timer instruments)
+- NES instrument editor for the five 2A03 channels: two pulses, triangle, noise, and DPCM
 - Tables (known as Ornaments in Vortex Tracker 2)
 - Built-in instrument presets
 - Instrument preview playground
@@ -38,10 +44,12 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
 ### Project I/O
 
 - Open and save Bitphase projects (`.btp`)
-- Import Pro Tracker 3 (`.pt3`) and Vortex Tracker 2 (`.vt2`) modules
-- Export WAV, PSG, TAYM, VGM, and SNDH (not supporting timer effects yet)
-- Multi-chip PSG and TAYM export as ZIP
-- Command-line `.btp` to WAV export (`pnpm btp-to-wav`)
+- Import ProTracker 3 (`.pt3`), Vortex Tracker 2 (`.vt2`), TAYM (`.taym`), and PSG (`.psg`)
+- Import FamiTracker (`.ftm`) as a 2A03 song, and Dn-FamiTracker (`.dnm`) when the module is NES plus Sunsoft 5B
+- Export WAV for any project, PSG / TAYM / SNDH for AY songs, and VGM for AY and NES (at most two of each)
+- AY timer effects are rendered in WAV and written into TAYM and VGM. PSG and SNDH stay one register frame per interrupt
+- Several AY songs export as a ZIP of PSG or TAYM files
+- Command-line export: `pnpm btp-to-wav`, `pnpm btp-to-psg`, `pnpm btp-to-taym`
 
 ### Workflow
 
@@ -55,7 +63,7 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
 - **Node.js** (v18 or higher; v20 recommended)
 - **pnpm** (v10.11.0 or higher)
 - **Emscripten SDK** - required for building WebAssembly modules (AY and NES)
-- **Git submodules** - the Ayumi emulator lives in `external/ayumi`
+- **Git submodules** - the Ayumi emulator lives in `external/ayumi`. NES APU sources ship in `external/nsfplug`
 
 ### Installing Emscripten
 
@@ -108,6 +116,8 @@ A modern web-based chiptune tracker designed for creating music on retro sound c
 - `pnpm test` - run tests in watch mode
 - `pnpm test:run` - run tests once
 - `pnpm btp-to-wav` - export a `.btp` project to WAV from the command line
+- `pnpm btp-to-psg` - export a `.btp` project to PSG from the command line
+- `pnpm btp-to-taym` - export a `.btp` project to TAYM from the command line
 
 ## Project Structure
 
@@ -117,13 +127,12 @@ bitphase/
 ├── docs/                    # User docs (VitePress) and format specs
 ├── external/
 │   ├── ayumi/               # AY-8910 emulator C source (git submodule)
-│   └── nsfplug/             # NES APU / MMC5 C sources used for WASM
+│   └── nsfplug/             # NES APU C sources compiled to WASM
 ├── public/                  # Static assets and runtime audio code
-│   ├── ay/ayumi.wasm        # Compiled AY chip emulator
-│   ├── nes/*.wasm           # Compiled NES chip emulators
-│   ├── bitphase-audio-processor.js
-│   ├── tracker-*.js         # AudioWorklet tracker pipeline
-│   ├── ay-*.js              # AY chip audio runtime
+│   ├── audio/               # AudioWorklet processor
+│   ├── ay/                  # AY runtime and ayumi.wasm
+│   ├── nes/                 # 2A03 runtime and nes_apu.wasm
+│   ├── tracker/             # Shared tracker playback pipeline
 │   ├── fonts/
 │   └── worklet/
 ├── src/
@@ -135,6 +144,7 @@ bitphase/
 │   └── lib/
 │       ├── chips/           # Chip implementations and registry
 │       │   ├── ay/          # AY-8910 (schema, adapter, renderer, processor)
+│       │   ├── nes/         # 2A03 (schema, adapter, renderer, processor)
 │       │   └── base/        # Shared chip interfaces
 │       ├── components/      # Svelte UI components
 │       │   ├── AppLayout/
@@ -158,7 +168,7 @@ bitphase/
 │       │   ├── app/         # Menu actions and app context
 │       │   ├── audio/       # Playback and AudioWorklet bridge
 │       │   ├── backup/      # Autobackup
-│       │   ├── file/        # Import/export (BTP, PT3, VT2, WAV, PSG, TAYM, VGM, SNDH)
+│       │   ├── file/        # Import/export (BTP, PT3, VT2, TAYM, PSG, FTM, DNM, WAV, VGM, SNDH)
 │       │   ├── history/     # Undo/redo diff tracking
 │       │   ├── midi/        # MIDI input
 │       │   ├── modal/
