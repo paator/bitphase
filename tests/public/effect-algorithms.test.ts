@@ -245,6 +245,10 @@ describe('EffectAlgorithms', () => {
 			expect(EffectAlgorithms.SPEED).toBe('S'.charCodeAt(0));
 		});
 
+		it('SONG_END is char code of Q', () => {
+			expect(EffectAlgorithms.SONG_END).toBe('Q'.charCodeAt(0));
+		});
+
 		it('AUTO_ENVELOPE is char code of E', () => {
 			expect(EffectAlgorithms.AUTO_ENVELOPE).toBe('E'.charCodeAt(0));
 		});

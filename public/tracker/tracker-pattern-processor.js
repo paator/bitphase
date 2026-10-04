@@ -29,6 +29,7 @@ class TrackerPatternProcessor {
 		const patternRow = pattern.patternRows[rowIndex];
 		if (!patternRow) return;
 
+		this._noteSongEnd(pattern, rowIndex);
 		this._registerState = registerState;
 
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
@@ -348,8 +349,31 @@ class TrackerPatternProcessor {
 		}
 	}
 
+	_noteSongEnd(pattern, rowIndex) {
+		let hasEnd = false;
+		const channels = pattern.channels ?? [];
+		for (let channelIndex = 0; channelIndex < channels.length && !hasEnd; channelIndex++) {
+			const effects = channels[channelIndex]?.rows?.[rowIndex]?.effects;
+			if (!effects) continue;
+			for (const effect of effects) {
+				if (effect && effect.effect === EffectAlgorithms.SONG_END) {
+					hasEnd = true;
+					break;
+				}
+			}
+		}
+		if (!hasEnd) {
+			const envelopeEffect = pattern.patternRows?.[rowIndex]?.envelopeEffect;
+			if (envelopeEffect && envelopeEffect.effect === EffectAlgorithms.SONG_END) {
+				hasEnd = true;
+			}
+		}
+		this.state.timeline.noteSongEnd(rowIndex, hasEnd);
+	}
+
 	_processOneEffect(channelIndex, row, effect, skipSpeed = false) {
 		if (effect.effect === EffectAlgorithms.NOTE_DELAY) return;
+		if (effect.effect === EffectAlgorithms.SONG_END) return;
 		const hasTableIndex = effect.tableIndex !== undefined && effect.tableIndex >= 0;
 		const usesChannelEffectTable =
 			effect.effect !== EffectAlgorithms.SPEED &&

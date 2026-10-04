@@ -34,6 +34,7 @@ enum EffectType {
 	NoteDelay = 7,
 	VolumeSlide = 8,
 	Speed = 'S'.charCodeAt(0),
+	SongEnd = 'Q'.charCodeAt(0),
 	Vibrato = 'V'.charCodeAt(0),
 	AutoEnvelope = 'E'.charCodeAt(0),
 	Detune = 'D'.charCodeAt(0)

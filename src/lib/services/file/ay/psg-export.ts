@@ -342,13 +342,16 @@ class PsgExportService {
 				timeline.currentPatternOrderIndex >= timeline.patternOrder.length - 1;
 			const isLastRow = timeline.currentRow >= leaderLen - 1;
 			const isLastTick = timeline.isLastFrameOfRow();
-			if (isLastPattern && isLastRow && isLastTick) {
+			if (!timeline.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 				break;
 			}
 
 			const needsPatternChange = singleChip
 				? leader.state.advancePosition()
 				: leader.state.advancePosition(leaderLen);
+			if (timeline.songEnded) {
+				break;
+			}
 			if (needsPatternChange) {
 				if (timeline.currentPatternOrderIndex >= timeline.patternOrder.length) {
 					break;

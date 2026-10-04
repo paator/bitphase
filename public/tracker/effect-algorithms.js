@@ -10,6 +10,7 @@ class EffectAlgorithms {
 	static NOTE_DELAY = 7;
 	static VOLUME_SLIDE = 8;
 	static SPEED = 'S'.charCodeAt(0);
+	static SONG_END = 'Q'.charCodeAt(0);
 	static AUTO_ENVELOPE = 'E'.charCodeAt(0);
 	static DETUNE = 'D'.charCodeAt(0);
 

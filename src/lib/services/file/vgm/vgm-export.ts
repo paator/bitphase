@@ -288,11 +288,9 @@ export async function exportToVGM(
 			...nesCaptures.map((c) => c.frames.length)
 		);
 		const patternOrder = project.patternOrder || [0];
-		const loopFrameIndex = findLoopFrameIndex(
-			captured.orderIndices,
-			project.loopPointId,
-			patternOrder.length
-		);
+		const loopFrameIndex = captured.songEnded
+			? null
+			: findLoopFrameIndex(captured.orderIndices, project.loopPointId, patternOrder.length);
 
 		const commands: number[] = [];
 		const ayPrev = ayCaptures.map(() => new Array(14).fill(-1));

@@ -12,7 +12,19 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 		super();
 		this.slots = [];
 		this.sharedTimeline = null;
+		this._songEndAnnounced = false;
 		this.port.onmessage = (event) => this.onPortMessage(event);
+	}
+
+	announceSongEnd(slots) {
+		if (this._songEndAnnounced) return;
+		this._songEndAnnounced = true;
+		this.port.postMessage({ type: 'song_end', chipIndex: 0 });
+		for (const slot of slots) {
+			if (slot && typeof slot.handleMessage === 'function') {
+				void slot.handleMessage({ type: 'stop' });
+			}
+		}
 	}
 
 	onPortMessage(event) {
@@ -76,6 +88,7 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 			: active.filter((s) => s.shouldAccumulateStereoOutput());
 		const quantumSlots = sortPlaySlotsForQuantum(playSlots);
 		const leaderLen = leaderPatternLengthFromSlots(slots.filter(Boolean));
+		let playbackHalted = false;
 
 		for (let i = 0; i < numSamples; i++) {
 			tl.tickAccumulator += tl.tickStep;
@@ -88,12 +101,16 @@ class BitphaseAudioProcessor extends AudioWorkletProcessor {
 						s.accumulateStereoOutput(i, mix);
 					}
 				}
-			} else if (playSlots.length > 0 && tl.tickAccumulator >= 1.0) {
+			} else if (!playbackHalted && tl.songEnded && tl.tickAccumulator >= 1.0) {
+				playbackHalted = true;
+				this.announceSongEnd(slots);
+			} else if (!playbackHalted && playSlots.length > 0 && tl.tickAccumulator >= 1.0) {
+				this._songEndAnnounced = false;
 				runSharedTimelineQuantum(quantumSlots, slots.filter(Boolean), tl, leaderLen);
 				tl.tickAccumulator -= 1.0;
 			}
 
-			if (!anyPreview) {
+			if (!anyPreview && !playbackHalted) {
 				for (const s of outputSlots) {
 					s.accumulateStereoOutput(i, mix);
 				}

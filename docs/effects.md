@@ -108,6 +108,12 @@ Changes song playback speed (`S.XY` / `S.TY`).
 
 **Example:** `S.03` - set speed to 3.
 
+### Q - Song end
+
+Stops the song after this row (`Q...`).
+
+**Example:** `Q...`
+
 ## AY-3-8910 / YM2149F
 
 Envelope effects use the same codes but are entered in the **envelope effect** column.

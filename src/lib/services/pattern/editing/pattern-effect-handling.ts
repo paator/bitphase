@@ -16,6 +16,7 @@ export class PatternEffectHandling {
 		return (
 			effect === 'D'.charCodeAt(0) ||
 			effect === 'S'.charCodeAt(0) ||
+			effect === 'Q'.charCodeAt(0) ||
 			effect === 4 ||
 			effect === 5 ||
 			effect === 6 ||
@@ -42,6 +43,7 @@ export class PatternEffectHandling {
 			| undefined
 	): string {
 		if (!effect) return '....';
+		if (effect.effect === 'Q'.charCodeAt(0)) return 'Q...';
 		let type: string;
 		if (effect.effect === 0) {
 			type = '.';
@@ -106,6 +108,8 @@ export class PatternEffectHandling {
 			type = 'V'.charCodeAt(0);
 		} else if (typeChar === 'S' || typeChar === 's') {
 			type = 'S'.charCodeAt(0);
+		} else if (typeChar === 'Q' || typeChar === 'q') {
+			type = 'Q'.charCodeAt(0);
 		} else if (typeChar === 'P' || typeChar === 'p') {
 			type = 'P'.charCodeAt(0);
 		} else if (typeChar === 'E' || typeChar === 'e') {
@@ -116,6 +120,9 @@ export class PatternEffectHandling {
 			type = parseInt(typeChar, 16) || 0;
 		}
 		const delay = parseInt(value[1] || '0', 16) || 0;
+		if (type === 'Q'.charCodeAt(0)) {
+			return { effect: type, delay: 0, parameter: 0 };
+		}
 
 		const char2 = value[2] || '.';
 		const noTableSyntax = type === 4 || type === 5 || type === 7;

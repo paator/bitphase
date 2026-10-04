@@ -212,6 +212,7 @@ export class PatternValueUpdates {
 		const effectValue = currentValue as Partial<EffectValue>;
 		if (typeof effectValue.effect !== 'number') return null;
 		const effect = effectValue.effect;
+		if (effect === 'Q'.charCodeAt(0)) return null;
 		const currentTableIndex = effectValue.tableIndex;
 		const hasTableParameter =
 			currentTableIndex !== undefined &&

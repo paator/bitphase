@@ -329,11 +329,14 @@ async function captureRegisterFrames(
 			state.timeline.currentPatternOrderIndex >= state.timeline.patternOrder.length - 1;
 		const isLastRow = state.timeline.currentRow >= state.currentPattern.length - 1;
 		const isLastTick = state.timeline.isLastFrameOfRow();
-		if (isLastPattern && isLastRow && isLastTick) {
+		if (!state.timeline.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 			break;
 		}
 
 		const needsPatternChange = state.advancePosition();
+		if (state.timeline.songEnded) {
+			break;
+		}
 		if (needsPatternChange) {
 			if (state.timeline.currentPatternOrderIndex >= state.timeline.patternOrder.length) {
 				break;

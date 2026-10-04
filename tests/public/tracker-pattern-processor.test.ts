@@ -76,6 +76,31 @@ describe('TrackerPatternProcessor', () => {
 			expect(processPatternRow).not.toHaveBeenCalled();
 		});
 
+		it('requests song end from Q on a channel or the envelope column', () => {
+			const state = createMockState();
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			const pattern = createMockPattern(2);
+			const registerState = new AYChipRegisterState();
+			pattern.channels[2].rows[0].effects = [
+				{ effect: 'Q'.charCodeAt(0), delay: 9, parameter: 0xff }
+			];
+
+			proc.parsePatternRow(pattern, 0, registerState);
+			expect(state.timeline.songEndPending).toBe(true);
+
+			proc.parsePatternRow(pattern, 1, registerState);
+			expect(state.timeline.songEndPending).toBe(false);
+
+			pattern.patternRows[0] = {
+				noiseValue: null,
+				envelopeEffect: { effect: 'Q'.charCodeAt(0), delay: 0, parameter: 0 }
+			};
+			pattern.channels[2].rows[0].effects = [null];
+			proc.parsePatternRow(pattern, 0, registerState);
+			expect(state.timeline.songEndPending).toBe(true);
+		});
+
 		it('calls chipAudioDriver.processPatternRow when pattern and row valid', () => {
 			const state = createMockState();
 			const driver = new AYAudioDriver();

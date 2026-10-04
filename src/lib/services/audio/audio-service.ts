@@ -8,6 +8,7 @@ import type { Table } from '../../models/project';
 import { ChipSettingsRegistry } from './chip-settings';
 import type { PlaybackCarryState } from './play-from-position';
 import { channelMuteStore } from '../../stores/channel-mute.svelte';
+import { playbackStore } from '../../stores/playback.svelte';
 import { waveformStore } from '../../stores/waveform.svelte';
 import { playbackToneDebugStore } from '../../stores/playback-tone-debug.svelte';
 import { filterInstrumentsForChip } from '../instrument/instrument-filter';
@@ -58,7 +59,12 @@ export class AudioService {
 	}
 
 	private _dispatchWorkletFromMixer(event: MessageEvent): void {
-		const data = event.data as { chipIndex?: number };
+		const data = event.data as { chipIndex?: number; type?: string };
+		if (data?.type === 'song_end') {
+			playbackStore.isPlaying = false;
+			this.stop();
+			return;
+		}
 		const chipIndex = data.chipIndex;
 		if (typeof chipIndex !== 'number' || chipIndex < 0 || chipIndex >= this.chipProcessors.length) {
 			return;

@@ -15,6 +15,8 @@ export type OfflineSharedTimeline = {
 	patternOrder: number[];
 	advancePosition: (leaderPatternLength: number) => boolean;
 	isLastFrameOfRow: () => boolean;
+	isSongEndFrame: () => boolean;
+	songEnded: boolean;
 };
 
 export type OfflineSharedTimelineRenderOptions = {
@@ -70,6 +72,8 @@ export async function renderOfflineSharedTimeline({
 		timeline.tickAccumulator += timeline.tickStep;
 
 		if (timeline.tickAccumulator >= 1.0) {
+			if (timeline.songEnded) break;
+			const finishingSong = timeline.isSongEndFrame();
 			const playSlots = sortPlaySlotsForQuantum(lanes);
 			const leaderLen = leaderPatternLengthFromSlots(lanes);
 			runSharedTimelineQuantum(playSlots, lanes, timeline, leaderLen);
@@ -80,7 +84,7 @@ export async function renderOfflineSharedTimeline({
 			const isLastRow = timeline.currentRow >= leaderRowCount - 1;
 			const isLastTick = timeline.isLastFrameOfRow();
 
-			if (isLastPattern && isLastRow && isLastTick) {
+			if (!finishingSong && !timeline.songEnded && isLastPattern && isLastRow && isLastTick) {
 				completedLoops++;
 				if (completedLoops >= loopCount) {
 					break;

@@ -297,6 +297,7 @@ export class AYChipRenderer implements ChipRenderer {
 			state.timeline.tickAccumulator += state.timeline.tickStep;
 
 			if (state.timeline.tickAccumulator >= 1.0) {
+				if (state.timeline.songEnded) break;
 				if (state.timeline.currentTick === 0 && state.currentPattern) {
 					patternProcessor.parsePatternRow(
 						state.currentPattern,
@@ -322,7 +323,7 @@ export class AYChipRenderer implements ChipRenderer {
 				const isLastRow = state.timeline.currentRow >= state.currentPattern.length - 1;
 				const isLastTick = state.timeline.isLastFrameOfRow();
 
-				if (isLastPattern && isLastRow && isLastTick) {
+				if (!state.timeline.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
 					if (completedLoops >= loopCount) {
 						break;
@@ -444,6 +445,7 @@ export class AYChipRenderer implements ChipRenderer {
 			tl.tickAccumulator += tl.tickStep;
 
 			if (tl.tickAccumulator >= 1.0) {
+				if (tl.songEnded) break;
 				for (const ctx of contexts) {
 					if (tl.currentTick === 0 && ctx.state.currentPattern) {
 						ctx.patternProcessor.parsePatternRow(
@@ -475,7 +477,7 @@ export class AYChipRenderer implements ChipRenderer {
 						: false;
 				const isLastTick = tl.isLastFrameOfRow();
 
-				if (isLastPattern && isLastRow && isLastTick) {
+				if (!tl.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
 					if (completedLoops >= loopCount) {
 						break;

@@ -18,6 +18,9 @@ class SongTimeline {
 		this.tempoAccum = 0;
 		this.tempoDecrement = 0;
 		this.tempoRemainder = 0;
+		this.songEndPending = false;
+		this.songEnded = false;
+		this._songEndRow = -1;
 	}
 
 	reset() {
@@ -27,7 +30,23 @@ class SongTimeline {
 		this.currentTick = 0;
 		this.currentSpeed = DEFAULT_SPEED;
 		this.tempoAccum = 0;
+		this.songEndPending = false;
+		this.songEnded = false;
+		this._songEndRow = -1;
 		this._setupTempo();
+	}
+
+	noteSongEnd(rowIndex, hasEnd) {
+		if (this._songEndRow !== rowIndex) {
+			this._songEndRow = rowIndex;
+			this.songEndPending = Boolean(hasEnd);
+			return;
+		}
+		if (hasEnd) this.songEndPending = true;
+	}
+
+	isSongEndFrame() {
+		return this.songEndPending && this.isLastFrameOfRow();
 	}
 
 	updateSamplesPerTick(sampleRate) {
@@ -115,6 +134,7 @@ class SongTimeline {
 	}
 
 	advancePosition(leaderPatternLength) {
+		if (this.songEnded) return false;
 		const len = leaderPatternLength > 0 ? leaderPatternLength : 1;
 		this.currentTick++;
 		if (this.tempo > 0 && this.tempoDecrement > 0) {
@@ -124,6 +144,11 @@ class SongTimeline {
 			this.tempoAccum -= this.tempoDecrement;
 			if (this.tempoAccum > 0) return false;
 		} else if (this.currentTick < this.currentSpeed) {
+			return false;
+		}
+		if (this.songEndPending) {
+			this.songEnded = true;
+			this.songEndPending = false;
 			return false;
 		}
 		this.currentTick = 0;

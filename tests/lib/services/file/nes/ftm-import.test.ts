@@ -137,8 +137,8 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		16,
 		14,
 		1,
-		0,
-		0,
+		4,
+		0xab,
 		...u32(2),
 		0,
 		0,
@@ -242,7 +242,14 @@ describe('ftm import', () => {
 		});
 		expect(pulse[1]!.note.name).toBe(NoteName.Off);
 		expect(pulse[1]!.instrument).toBe(0);
-		expect(pulse[1]!.effects[0]).toBeNull();
+		expect(pulse[1]!.effects[0]).toMatchObject({
+			effect: EffectType.SongEnd,
+			delay: 0,
+			parameter: 0
+		});
+		expect(warnings.some((warning) => warning.includes('Skipped') && /\bC\b/.test(warning))).toBe(
+			false
+		);
 		expect(pulse[2]!.note.name).toBe(NoteName.None);
 		expect(pulse[2]!.effects[0]).toMatchObject({
 			effect: EffectType.VolumeSlide,

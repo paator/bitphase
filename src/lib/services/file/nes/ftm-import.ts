@@ -1199,6 +1199,8 @@ function mapEffect(
 	switch (number) {
 		case 0:
 			return null;
+		case 4:
+			return new Effect(EffectType.SongEnd, 0, 0);
 		case 1:
 			if (byte >= speedSplit) {
 				skippedEffects.add('tempo');

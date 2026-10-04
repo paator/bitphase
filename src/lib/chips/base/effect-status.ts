@@ -34,7 +34,8 @@ const GENERAL_EFFECT_HINTS: Record<number, EffectStatusHint> = {
 	7: { format: '7.XY', name: 'Note Delay', params: 'XY: ticks' },
 	8: { format: '8XYZ', name: 'Volume Slide', params: 'X: delay; Y: up; Z: down' },
 	['D'.charCodeAt(0)]: { format: 'D.XY', name: 'Detune', params: 'XY: signed, 80=0' },
-	['S'.charCodeAt(0)]: { format: 'S.XY', name: 'Speed', params: 'XY: ticks' }
+	['S'.charCodeAt(0)]: { format: 'S.XY', name: 'Speed', params: 'XY: ticks' },
+	['Q'.charCodeAt(0)]: { format: 'Q...', name: 'Song End', params: 'stops after this row' }
 };
 
 const GENERAL_TABLE_HINTS: Record<number, EffectStatusHint> = {
@@ -73,7 +74,8 @@ const GENERAL_EFFECT_CODE_ORDER = [
 	7,
 	8,
 	'D'.charCodeAt(0),
-	'S'.charCodeAt(0)
+	'S'.charCodeAt(0),
+	'Q'.charCodeAt(0)
 ];
 
 export function formatEffectStatusHint(hint: EffectStatusHint): string {

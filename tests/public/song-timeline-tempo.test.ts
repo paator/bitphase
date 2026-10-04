@@ -17,6 +17,50 @@ function rowLengths(timeline: SongTimeline, count: number): number[] {
 	return lengths;
 }
 
+describe('SongTimeline song end', () => {
+	it('finishes the current row and does not advance', () => {
+		const timeline = new SongTimeline();
+		timeline.setSpeed(3);
+		timeline.setPatternOrder([0, 1]);
+		timeline.noteSongEnd(0, true);
+
+		timeline.advancePosition(16);
+		timeline.advancePosition(16);
+		expect(timeline.songEnded).toBe(false);
+		expect(timeline.currentRow).toBe(0);
+		expect(timeline.currentPatternOrderIndex).toBe(0);
+
+		timeline.advancePosition(16);
+		expect(timeline.songEnded).toBe(true);
+		expect(timeline.currentRow).toBe(0);
+		expect(timeline.currentPatternOrderIndex).toBe(0);
+
+		timeline.advancePosition(16);
+		expect(timeline.currentRow).toBe(0);
+		expect(timeline.currentPatternOrderIndex).toBe(0);
+	});
+
+	it('lets a later chip on the same row request the end', () => {
+		const timeline = new SongTimeline();
+		timeline.setSpeed(1);
+		timeline.noteSongEnd(4, false);
+		timeline.noteSongEnd(4, true);
+		timeline.advancePosition(8);
+		expect(timeline.songEnded).toBe(true);
+		expect(timeline.currentRow).toBe(0);
+	});
+
+	it('replaces a pending end when a different row is parsed', () => {
+		const timeline = new SongTimeline();
+		timeline.setSpeed(1);
+		timeline.noteSongEnd(0, true);
+		timeline.noteSongEnd(1, false);
+		timeline.advancePosition(8);
+		expect(timeline.songEnded).toBe(false);
+		expect(timeline.currentRow).toBe(1);
+	});
+});
+
 describe('SongTimeline tempo', () => {
 	it('keeps one frame per speed tick when tempo is off', () => {
 		const timeline = new SongTimeline();

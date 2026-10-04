@@ -285,6 +285,8 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		}
 
 		this.state.reset({ resetTimeline: false });
+		const songEndPending = this.state.timeline.songEndPending;
+		const songEndRow = this.state.timeline._songEndRow;
 		this.registerState.reset();
 		this._resetEnginesForPreview();
 
@@ -313,6 +315,8 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			}
 		}
 		this.previewTickSampleCounter = 0;
+		this.state.timeline.songEndPending = songEndPending;
+		this.state.timeline._songEndRow = songEndRow;
 	}
 
 	handleStopPreview(channel) {

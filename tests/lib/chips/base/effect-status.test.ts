@@ -78,6 +78,7 @@ describe('effect status descriptions', () => {
 		expect(lines).toContain('7.XY: Note Delay (XY: ticks)');
 		expect(lines).toContain('8XYZ: Volume Slide (X: delay; Y: up; Z: down)');
 		expect(lines).toContain('S.TY: Speed (Y: table)');
+		expect(lines).toContain('Q...: Song End (stops after this row)');
 		expect(lines).not.toContain('E1XY: PWM Min (XY: duty)');
 
 		const ayLines = listPatternEffectStatusLines({

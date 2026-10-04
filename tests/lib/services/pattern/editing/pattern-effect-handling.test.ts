@@ -172,6 +172,18 @@ describe('PatternEffectHandling', () => {
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('6.T3');
 		});
 
+		it('Song end Q... ignores the parameter', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('Q12F');
+			expect(parsed).not.toBeNull();
+			expect(parsed!.effect).toBe('Q'.charCodeAt(0));
+			expect(parsed!.delay).toBe(0);
+			expect(parsed!.parameter).toBe(0);
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('Q...');
+			expect(PatternEffectHandling.parseEffectFromString('q...')!.effect).toBe(
+				'Q'.charCodeAt(0)
+			);
+		});
+
 		it('Speed formats unused delay as dot', () => {
 			expect(
 				PatternEffectHandling.formatEffectAsString({

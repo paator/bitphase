@@ -33,6 +33,8 @@ type NesSlotLane = {
 			patternOrder: number[];
 			loopPointId: number;
 			isLastFrameOfRow: () => boolean;
+			isSongEndFrame: () => boolean;
+			songEnded: boolean;
 		};
 		advancePosition: (leaderPatternLength?: number) => boolean;
 	};
@@ -265,6 +267,7 @@ export class NESChipRenderer implements ChipRenderer {
 			tl.tickAccumulator += tl.tickStep;
 
 			if (tl.tickAccumulator >= 1.0) {
+				if (tl.songEnded) break;
 				if (tl.currentTick === 0 && lane.state.currentPattern) {
 					lane.patternProcessor.parsePatternRow(
 						lane.state.currentPattern,
@@ -287,7 +290,7 @@ export class NESChipRenderer implements ChipRenderer {
 					tl.currentRow >= lane.state.currentPattern.length - 1;
 				const isLastTick = tl.isLastFrameOfRow();
 
-				if (isLastPattern && isLastRow && isLastTick) {
+				if (!tl.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
 					if (completedLoops >= loopCount) {
 						break;
@@ -370,6 +373,7 @@ export class NESChipRenderer implements ChipRenderer {
 			tl.tickAccumulator += tl.tickStep;
 
 			if (tl.tickAccumulator >= 1.0) {
+				if (tl.songEnded) break;
 				for (const ctx of contexts) {
 					if (tl.currentTick === 0 && ctx.state.currentPattern) {
 						ctx.patternProcessor.parsePatternRow(
@@ -392,7 +396,7 @@ export class NESChipRenderer implements ChipRenderer {
 					tl.currentRow >= leader.state.currentPattern.length - 1;
 				const isLastTick = tl.isLastFrameOfRow();
 
-				if (isLastPattern && isLastRow && isLastTick) {
+				if (!tl.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 					completedLoops++;
 					if (completedLoops >= loopCount) {
 						break;

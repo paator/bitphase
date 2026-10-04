@@ -44,6 +44,7 @@ export type VgmProjectCapture = {
 	nesCaptures: NesCaptureResult[];
 	interruptFrequency: number;
 	orderIndices: number[];
+	songEnded: boolean;
 };
 
 export type VgmProjectCaptureOptions = {
@@ -588,6 +589,8 @@ async function captureSharedProject(
 		patternOrder: number[];
 		advancePosition: (leaderLen: number) => boolean;
 		isLastFrameOfRow: () => boolean;
+		isSongEndFrame: () => boolean;
+		songEnded: boolean;
 	};
 
 	const leaderSongIndex = orderedSlots[0]!.songIndex;
@@ -647,11 +650,14 @@ async function captureSharedProject(
 			timeline.currentPatternOrderIndex >= timeline.patternOrder.length - 1;
 		const isLastRow = timeline.currentRow >= leaderLen - 1;
 		const isLastTick = timeline.isLastFrameOfRow();
-		if (isLastPattern && isLastRow && isLastTick) {
+		if (!timeline.isSongEndFrame() && isLastPattern && isLastRow && isLastTick) {
 			break;
 		}
 
 		const needsOrderWrap = timeline.advancePosition(leaderLen);
+		if (timeline.songEnded) {
+			break;
+		}
 		for (const slot of slots) {
 			slot.onPatternOrderAdvanced(needsOrderWrap);
 		}
@@ -670,7 +676,8 @@ async function captureSharedProject(
 		ayCaptures: ayResults,
 		nesCaptures: nesResults,
 		interruptFrequency,
-		orderIndices
+		orderIndices,
+		songEnded: timeline.songEnded
 	};
 }
 
