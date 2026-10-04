@@ -76,7 +76,7 @@ function applyNesSweepOverrideFromParameter(state, channelIndex, parameter, swee
 	if (shift === 0) {
 		state.channelSweepOverrideReg[channelIndex] = NES_SQUARE_SWEEP_DISABLED;
 	} else {
-		const signedShift = sweepDown ? -shift : shift;
+		const signedShift = sweepDown ? shift : -shift;
 		state.channelSweepOverrideReg[channelIndex] = buildSquareSweepReg(true, rate, signedShift);
 	}
 }
@@ -129,7 +129,7 @@ function applyNesSweepEffect(state, channelIndex, effect) {
 				resetNesChannelSweepOverride(state, channelIndex);
 			} else {
 				state.channelSweepOverrideActive[channelIndex] = true;
-				state.channelSweepOverrideReg[channelIndex] = buildSquareSweepReg(true, rate, shift);
+				state.channelSweepOverrideReg[channelIndex] = buildSquareSweepReg(true, rate, -shift);
 				requestNesSweepHardwareRetrigger(state, channelIndex);
 			}
 		}
@@ -158,7 +158,7 @@ function applyNesSweepEffect(state, channelIndex, effect) {
 				resetNesChannelSweepOverride(state, channelIndex);
 			} else {
 				state.channelSweepOverrideActive[channelIndex] = true;
-				state.channelSweepOverrideReg[channelIndex] = buildSquareSweepReg(true, rate, -shift);
+				state.channelSweepOverrideReg[channelIndex] = buildSquareSweepReg(true, rate, shift);
 				requestNesSweepHardwareRetrigger(state, channelIndex);
 			}
 		}

@@ -2,21 +2,42 @@
 	import IconCarbonVolumeMute from '~icons/carbon/volume-mute';
 	import { waveformStore } from '../../stores/waveform.svelte';
 
+	const channelMinRem = 3.8;
 	const triggerWidth = 0.1;
 	const STROKE_COLOR_CACHE_FRAMES = 60;
 	const ZERO_SAMPLES = new Float32Array(512);
 
+	type OscilloscopeChannel = {
+		label: string;
+		title: string;
+		muted: boolean;
+	};
+
+	type OscilloscopeGroup = {
+		title: string;
+		channels: OscilloscopeChannel[];
+	};
+
+	const defaultGroups: OscilloscopeGroup[] = [
+		{
+			title: '',
+			channels: [
+				{ label: 'A', title: 'A', muted: false },
+				{ label: 'B', title: 'B', muted: false },
+				{ label: 'C', title: 'C', muted: false }
+			]
+		}
+	];
+
 	let {
-		channelLabels = ['A', 'B', 'C'],
-		channelMuted = [],
+		groups = defaultGroups,
 		height = 80,
 		zoom = 1,
 		amplify = 1,
 		escapeBoundary = false,
 		onChannelClick
 	}: {
-		channelLabels?: string[];
-		channelMuted?: boolean[];
+		groups?: OscilloscopeGroup[];
 		height?: number;
 		zoom?: number;
 		amplify?: number;
@@ -125,11 +146,7 @@
 		const midY = height / 2;
 		const halfHeight = (height / 2) * 0.85;
 		const outWidth = Math.max(2, width - 2);
-		const aligned = shiftBufferToDCCrossing(
-			samples,
-			triggerWidth,
-			getScratch(samples.length)
-		);
+		const aligned = shiftBufferToDCCrossing(samples, triggerWidth, getScratch(samples.length));
 		const resampled = resampleToWidth(aligned, outWidth, getScratch(outWidth));
 		let min = resampled[0];
 		let max = resampled[0];
@@ -165,7 +182,7 @@
 
 	$effect(() => {
 		const canvases = canvasEls;
-		const mutedFlags = channelMuted;
+		const scopeGroups = groups;
 		if (canvases.length === 0) return;
 
 		let rafId: number;
@@ -187,15 +204,20 @@
 			}
 
 			const ch = waveformStore.channels;
+			const mutedFlags = scopeGroups.flatMap((group) =>
+				group.channels.map((channel) => channel.muted)
+			);
 
 			for (let index = 0; index < canvases.length; index++) {
 				const canvas = canvases[index];
-				if (!canvas) continue;
-				const rect = canvas.getBoundingClientRect();
-				if (rect.width === 0 || rect.height === 0) continue;
+				const box = canvas?.parentElement;
+				if (!canvas || !box) continue;
+				const cssWidth = box.clientWidth;
+				const cssHeight = box.clientHeight;
+				if (cssWidth < 2 || cssHeight < 2) continue;
 				const dpr = window.devicePixelRatio ?? 1;
-				const w = Math.floor(rect.width * dpr);
-				const h = Math.floor(rect.height * dpr);
+				const w = Math.min(2048, Math.floor(cssWidth * dpr));
+				const h = Math.min(512, Math.floor(cssHeight * dpr));
 				if (canvas.width !== w || canvas.height !== h) {
 					canvas.width = w;
 					canvas.height = h;
@@ -203,9 +225,7 @@
 				const ctx = canvas.getContext('2d');
 				if (!ctx) continue;
 				const samples =
-					ch.length > 0 && index < ch.length && ch[index]
-						? ch[index]
-						: ZERO_SAMPLES;
+					ch.length > 0 && index < ch.length && ch[index] ? ch[index] : ZERO_SAMPLES;
 				const isMuted = mutedFlags[index] ?? false;
 				drawChannel(
 					ctx,
@@ -223,31 +243,60 @@
 </script>
 
 <div
-	class="flex shrink-0 gap-px border-t border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
+	class="overflow-x-auto border-t border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)]"
 	style="height: {height}px">
-	{#each channelLabels as label, i (i)}
-		{@const muted = channelMuted[i] ?? false}
-		<button
-			type="button"
-			class="relative flex min-w-0 flex-1 cursor-pointer flex-col overflow-hidden border-0 bg-transparent p-0"
-			onclick={() => onChannelClick?.(i)}>
+	<div
+		class="flex h-full w-full"
+		style="min-width: {groups.reduce((sum, group) => sum + group.channels.length, 0) *
+			channelMinRem}rem">
+		{#each groups as group, groupIndex (groupIndex)}
+			{@const flatOffset = groups
+				.slice(0, groupIndex)
+				.reduce((sum, item) => sum + item.channels.length, 0)}
 			<div
-				class="text-center text-xs text-[var(--color-app-text-muted)] {muted
-					? 'opacity-45'
-					: ''}">{label}</div>
-			<div class="relative min-h-0 flex-1">
-				<canvas
-					bind:this={canvasEls[i]}
-					class="pointer-events-none block h-full w-full {muted ? 'opacity-45' : ''}"
-					style="height: {height - 20}px"></canvas>
-				{#if muted}
+				class="flex h-full min-w-0 flex-1 flex-col overflow-hidden {groupIndex > 0
+					? 'border-l border-[var(--color-app-border)]'
+					: ''}"
+				style="min-width: {group.channels.length * channelMinRem}rem">
+				{#if group.title}
 					<div
-						class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-0.5">
-						<IconCarbonVolumeMute
-							class="h-3.5 w-3.5 text-[var(--color-pattern-note-off)] opacity-45" />
+						class="truncate px-1 text-center text-[0.6rem] leading-4 text-[var(--color-app-text-muted)]"
+						title={group.title}>
+						{group.title}
 					</div>
 				{/if}
+				<div class="flex min-h-0 flex-1">
+					{#each group.channels as channel, channelIndex (`${groupIndex}-${channelIndex}`)}
+						{@const flatIndex = flatOffset + channelIndex}
+						<button
+							type="button"
+							class="relative flex min-w-0 flex-1 cursor-pointer flex-col overflow-hidden border-0 bg-transparent p-0"
+							title={channel.title}
+							onclick={() => onChannelClick?.(flatIndex)}>
+							<div
+								class="truncate px-0.5 text-center text-xs whitespace-nowrap text-[var(--color-app-text-muted)] {channel.muted
+									? 'opacity-45'
+									: ''}">
+								{channel.label}
+							</div>
+							<div class="relative min-h-0 flex-1 overflow-hidden">
+								<canvas
+									bind:this={canvasEls[flatIndex]}
+									class="pointer-events-none absolute inset-0 h-full w-full {channel.muted
+										? 'opacity-45'
+										: ''}"></canvas>
+								{#if channel.muted}
+									<div
+										class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-0.5">
+										<IconCarbonVolumeMute
+											class="h-3.5 w-3.5 text-[var(--color-pattern-note-off)] opacity-45" />
+									</div>
+								{/if}
+							</div>
+						</button>
+					{/each}
+				</div>
 			</div>
-		</button>
-	{/each}
+		{/each}
+	</div>
 </div>

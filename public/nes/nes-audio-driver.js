@@ -207,6 +207,7 @@ class NesAudioDriver {
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = true;
 			this._resetToneAccumulator(state, channelIndex);
+			resetNesChannelSweepOverride(state, channelIndex);
 		}
 	}
 

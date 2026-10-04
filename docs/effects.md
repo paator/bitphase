@@ -200,12 +200,12 @@ Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists until note
 
 Hardware pitch sweep up on Pulse 1 / Pulse 2 (`E2XY` / `E2TX`).
 
-`X` = sweep time (`0`-`7`), `Y` = shift (`0`-`7`). `Y = 0` disables.
+`X` = sweep time (`0`-`7`), `Y` = shift (`0`-`7`). `Y = 0` disables. A new note clears the sweep unless that note has `E2` or `E3`.
 
 **Examples:** `E247`, `E2T1`, `E200`.
 
 ### E3 - Sweep down
 
-Same format as `E2`, sweeping down (`E3XY` / `E3TX`).
+Same format as `E2`, sweeping down (`E3XY` / `E3TX`). A new note clears it the same way.
 
 **Examples:** `E317`, `E3T1`, `E300`.

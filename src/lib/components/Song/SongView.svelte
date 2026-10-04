@@ -182,6 +182,23 @@
 		return chipProcessors[chipIndex]?.chip.schema.channelLabels ?? ['A', 'B', 'C'];
 	}
 
+	function oscilloscopeChannelLabel(label: string): string {
+		const parts = label.split(' ');
+		if (parts.length === 2 && /^\d+$/.test(parts[1] ?? '')) {
+			return `${parts[0]?.[0] ?? ''}${parts[1]}`;
+		}
+		if (label.length <= 4) return label;
+		return label.slice(0, 3);
+	}
+
+	function oscilloscopeChipNumber(songIndex: number): number | null {
+		const type = chipProcessors[songIndex]?.chip.type;
+		if (!type) return null;
+		const count = chipProcessors.filter((processor) => processor.chip.type === type).length;
+		if (count < 2) return null;
+		return songIndex + 1;
+	}
+
 	function getVirtualIndicesForOscilloscopeChannel(chipIndex: number, hwIndex: number): number[] {
 		return getVirtualIndicesForHardwareChannel(
 			hwIndex,
@@ -768,10 +785,7 @@
 					aria-label="Collapse panel"></button>
 			{/if}
 		</div>
-		<SelectionPalette
-			chip={previewChip}
-			chips={paletteChips}
-			chipType={instrumentsChipType} />
+		<SelectionPalette chip={previewChip} chips={paletteChips} chipType={instrumentsChipType} />
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
@@ -817,7 +831,8 @@
 					{#if settingsStore.showInstrumentPreview && previewChip?.previewRow}
 						{#key previewChip.type}
 							{@const PreviewRow = previewChip.previewRow}
-							<div class="flex flex-col gap-2 bg-[var(--color-app-surface)] px-2 py-3">
+							<div
+								class="flex flex-col gap-2 bg-[var(--color-app-surface)] px-2 py-3">
 								<PreviewRow
 									chip={previewChip}
 									instrumentId={previewInstrumentId}
@@ -829,22 +844,23 @@
 						{@const muteTick = channelMuteStore.muteState}
 						<div class="border-t border-[var(--color-app-border)]/50">
 							<ChannelOscilloscopes
-								channelLabels={projectStore.songs.flatMap((_, i) =>
-									(
-										chipProcessors[i]?.chip.schema.channelLabels ?? [
-											'A',
-											'B',
-											'C'
-										]
-									).map((l) =>
-										projectStore.songs.length > 1 ? `${i + 1}${l}` : l
-									)
-								)}
-								channelMuted={projectStore.songs.flatMap((_, i) => {
+								groups={projectStore.songs.map((_, songIndex) => {
 									muteTick;
-									return getHardwareChannelLabels(i).map((__, hw) =>
-										isHardwareChannelMuted(i, hw)
-									);
+									const labels = getHardwareChannelLabels(songIndex);
+									const multiple = projectStore.songs.length > 1;
+									const ordinal = oscilloscopeChipNumber(songIndex);
+									const chipName = chipProcessors[songIndex]?.chip.name ?? '';
+									const numberedChipName = ordinal
+										? `${ordinal} ${chipName}`
+										: chipName;
+									return {
+										title: multiple ? numberedChipName : '',
+										channels: labels.map((label, hwIndex) => ({
+											label: oscilloscopeChannelLabel(label),
+											title: ordinal ? `${ordinal} ${label}` : label,
+											muted: isHardwareChannelMuted(songIndex, hwIndex)
+										}))
+									};
 								})}
 								onChannelClick={toggleOscilloscopeChannelMute} />
 						</div>

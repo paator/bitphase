@@ -63,7 +63,7 @@ describe('nes-sweep-effect', () => {
 		});
 		expect(state.channelSweepOverrideActive[0]).toBe(true);
 		expect(state.channelSweepTableMode[0]).toBe(false);
-		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, 7));
+		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, -7));
 		expect(state.channelKeyOn[0]).toBe(true);
 	});
 
@@ -74,7 +74,7 @@ describe('nes-sweep-effect', () => {
 		});
 		expect(state.channelSweepOverrideActive[0]).toBe(true);
 		expect(state.channelSweepDown[0]).toBe(true);
-		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 1, -7));
+		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 1, 7));
 	});
 
 	it('initializes sweep up table mode from E2TX', () => {
@@ -85,7 +85,7 @@ describe('nes-sweep-effect', () => {
 		expect(state.channelSweepOverrideActive[0]).toBe(true);
 		expect(state.channelSweepTableMode[0]).toBe(true);
 		expect(state.channelSweepDown[0]).toBe(false);
-		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 2, 3));
+		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 2, -3));
 	});
 
 	it('advances sweep table each tick with loop', () => {
@@ -96,13 +96,13 @@ describe('nes-sweep-effect', () => {
 
 		advanceNesSweepTable(state);
 		expect(state.channelSweepTablePosition[0]).toBe(1);
-		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, -7));
+		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, 7));
 		expect(state.channelSweepTableTick[0]).toBe(true);
 		expect(state.channelKeyOn?.[0]).not.toBe(true);
 
 		advanceNesSweepTable(state);
 		expect(state.channelSweepTablePosition[0]).toBe(1);
-		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, -7));
+		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, 7));
 		expect(state.channelSweepTableTick[0]).toBe(true);
 	});
 
@@ -112,7 +112,7 @@ describe('nes-sweep-effect', () => {
 			effects: [{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 0x47 }]
 		});
 		advanceNesSweepTable(state);
-		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, 7));
+		expect(state.channelSweepOverrideReg[0]).toBe(buildSquareSweepReg(true, 4, -7));
 	});
 
 	it('disables sweep when shift is zero', () => {

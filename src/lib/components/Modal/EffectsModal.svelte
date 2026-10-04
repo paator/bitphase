@@ -629,7 +629,7 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Sweep Up</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Hardware pitch sweep up on Pulse 1 / Pulse 2 (E2XY / E2TX).
+					Hardware pitch sweep up on Pulse 1 / Pulse 2 (E2XY / E2TX). A new note clears the sweep unless that note has E2 or E3.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
@@ -672,7 +672,7 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Sweep Down</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Same format as E2, sweeping down (E3XY / E3TX).
+					Same format as E2, sweeping down (E3XY / E3TX). A new note clears it the same way.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>

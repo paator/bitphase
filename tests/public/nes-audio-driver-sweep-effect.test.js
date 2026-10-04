@@ -72,7 +72,7 @@ describe('NesAudioDriver E2/E3 sweep override', () => {
 		driver.processPatternRow(state, pattern, 0, pattern.channels[0].rows[0], registerState);
 		driver.processInstruments(state, registerState);
 
-		expect(registerState.channels[0].sweepReg).toBe(buildSquareSweepReg(true, 4, 7));
+		expect(registerState.channels[0].sweepReg).toBe(buildSquareSweepReg(true, 4, -7));
 	});
 
 	it('uses E3 sweep down override', () => {
@@ -95,7 +95,7 @@ describe('NesAudioDriver E2/E3 sweep override', () => {
 		driver.processPatternRow(state, pattern, 0, pattern.channels[0].rows[0], registerState);
 		driver.processInstruments(state, registerState);
 
-		expect(registerState.channels[0].sweepReg).toBe(buildSquareSweepReg(true, 2, -3));
+		expect(registerState.channels[0].sweepReg).toBe(buildSquareSweepReg(true, 2, 3));
 	});
 
 	it('clears sweep override on note off', () => {
@@ -108,6 +108,25 @@ describe('NesAudioDriver E2/E3 sweep override', () => {
 			channels: [
 				{
 					rows: [{ note: { name: 1, octave: 0 }, effects: [null] }]
+				}
+			]
+		};
+
+		driver.processPatternRow(state, pattern, 0, pattern.channels[0].rows[0], registerState);
+
+		expect(state.channelSweepOverrideActive[0]).toBe(false);
+	});
+
+	it('clears sweep override on a new note without a sweep effect', () => {
+		const driver = new NesAudioDriver();
+		const registerState = new NesChipRegisterState();
+		const state = createSweepOverrideState();
+		state.channelSweepOverrideActive[0] = true;
+		state.channelSweepOverrideReg[0] = buildSquareSweepReg(true, 4, -4);
+		const pattern = {
+			channels: [
+				{
+					rows: [{ note: { name: 60, octave: 0 }, effects: [null] }]
 				}
 			]
 		};
