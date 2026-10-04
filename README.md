@@ -187,3 +187,7 @@ bitphase/
     ├── public/              # Tests for public/ runtime scripts
     └── psg/
 ```
+
+## License
+
+Bitphase is [MIT licensed](LICENSE). Third-party software distributed with the app is listed in [`public/THIRD_PARTY_NOTICES.txt`](public/THIRD_PARTY_NOTICES.txt). The running app links to that file from About.
