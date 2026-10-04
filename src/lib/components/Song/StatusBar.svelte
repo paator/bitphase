@@ -11,6 +11,7 @@
 		resolveSchemaField
 	} from '../../chips/base/channel-effect-columns';
 	import { describePatternEffect, getEffectFromPattern } from '../../chips/base/effect-status';
+	import { createTempoRowClock } from '../../services/playback/tempo-row-frames';
 
 	let {
 		songIndex,
@@ -39,6 +40,10 @@
 	const interruptFrequency = $derived(
 		projectStore.songs[TIMELINE_SONG_INDEX]?.interruptFrequency ?? 50
 	);
+	const tempo = $derived.by(() => {
+		const value = Number(projectStore.settings.tempo);
+		return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+	});
 	const pattern = $derived(
 		activePatterns.find((p) => p.id === patternOrder[currentPatternOrderIndex]) ?? null
 	);
@@ -257,12 +262,14 @@
 		targetPatternOrderIndex: number,
 		targetRow: number,
 		initialSpeed: number,
-		interruptFrequency: number
+		interruptFrequency: number,
+		tempo: number
 	): number {
 		let totalTime = 0;
 		let currentSpeed = initialSpeed;
 		let speedTableId = -1;
 		let speedTablePosition = 0;
+		const clock = createTempoRowClock(tempo, interruptFrequency);
 
 		for (let orderIdx = 0; orderIdx <= targetPatternOrderIndex; orderIdx++) {
 			if (orderIdx >= patternOrder.length) break;
@@ -287,8 +294,7 @@
 				speedTableId = result.nextTableId;
 				speedTablePosition = result.nextTablePosition;
 
-				const rowDuration = currentSpeed / interruptFrequency;
-				totalTime += rowDuration;
+				totalTime += clock.secondsForSpeed(currentSpeed);
 			}
 		}
 
@@ -307,7 +313,8 @@
 			currentPatternOrderIndex,
 			timelineRowForDisplay,
 			speed,
-			interruptFrequency
+			interruptFrequency,
+			tempo
 		);
 	});
 
@@ -428,7 +435,8 @@
 			lastPatternIndex,
 			lastPattern.length - 1,
 			speed,
-			interruptFrequency
+			interruptFrequency,
+			tempo
 		);
 	});
 
