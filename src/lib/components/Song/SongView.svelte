@@ -253,6 +253,7 @@
 		return chipInstruments[0]?.id ?? '';
 	});
 	const previewTuningTable = $derived.by(() => {
+		void tuningTableVersion;
 		const chipType = previewChip?.type;
 		if (!chipType) return [];
 		const songIndex = chipProcessors.findIndex((processor) => processor.chip.type === chipType);

@@ -30,6 +30,22 @@ describe('export formats', () => {
 		expect(labels).not.toContain('SNDH');
 	});
 
+	it('shows NSF for one NES, one AY, or both', () => {
+		const single = buildExportMenuItems(buildChipConfiguration(['nes']));
+		expect(single.map((item) => item.label)).toContain('NSF');
+		expect(single.find((item) => item.label === 'NSF')?.action).toBe('export-nsf');
+		expect(buildExportMenuItems(buildChipConfiguration(['ay'])).map((i) => i.label)).toContain('NSF');
+		expect(buildExportMenuItems(buildChipConfiguration(['ay', 'nes'])).map((i) => i.label)).toContain(
+			'NSF'
+		);
+		expect(buildExportMenuItems(buildChipConfiguration(['nes', 'nes'])).map((i) => i.label)).not.toContain(
+			'NSF'
+		);
+		expect(buildExportMenuItems(buildChipConfiguration(['ay', 'ay'])).map((i) => i.label)).not.toContain(
+			'NSF'
+		);
+	});
+
 	it('shows VGM for NES and mixed chips within dual limits', () => {
 		expect(buildExportMenuItems(buildChipConfiguration(['nes'])).map((i) => i.label)).toContain(
 			'VGM'

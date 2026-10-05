@@ -2,6 +2,7 @@ import type { ChipSchema } from '../base/schema';
 import { PT3TuneTables, generate12TETTuningTable } from '../../models/pt3/tuning-tables';
 
 export const ATARI_ST_CHIP_FREQUENCY = 2_000_000;
+export const SUNSOFT_5B_CHIP_FREQUENCY = 894_886;
 
 export const AY_CHIP_SCHEMA: ChipSchema = {
 	chipType: 'ay',
@@ -114,6 +115,7 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			type: 'select',
 			options: [
 				{ label: 'Sinclair QL (0.75 MHz)', value: 750000 },
+				{ label: 'Sunsoft 5B (0.8949 MHz)', value: SUNSOFT_5B_CHIP_FREQUENCY },
 				{ label: 'Amstrad CPC (1 MHz)', value: 1000000 },
 				{ label: 'ZX Spectrum (1.7734 MHz)', value: 1773400 },
 				{ label: 'Pentagon (1.75 MHz)', value: 1750000 },

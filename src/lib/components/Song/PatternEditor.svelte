@@ -154,7 +154,10 @@
 
 	const patterns = $derived(projectStore.patterns[songIndex] ?? []);
 	const patternOrder = $derived(projectStore.patternOrder);
-	const tuningTable = $derived(projectStore.songs[songIndex]?.tuningTable ?? []);
+	const tuningTable = $derived.by(() => {
+		void tuningTableVersion;
+		return projectStore.songs[songIndex]?.tuningTable ?? [];
+	});
 	const speed = $derived(projectStore.songs[songIndex]?.initialSpeed ?? 3);
 	const instruments = $derived(filterInstrumentsForChip(projectStore.instruments, chip.type));
 	const instrumentColorFingerprint = $derived(

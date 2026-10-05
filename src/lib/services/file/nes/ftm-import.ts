@@ -1,4 +1,8 @@
-import { AY_CHIP_SCHEMA, resolveAYTuningTable } from '../../../chips/ay/schema';
+import {
+	AY_CHIP_SCHEMA,
+	SUNSOFT_5B_CHIP_FREQUENCY,
+	resolveAYTuningTable
+} from '../../../chips/ay/schema';
 import { NES_CHIP_SCHEMA, resolveNesCpuFrequency, resolveNesTuningTable } from '../../../chips/nes/schema';
 import type { NesSystem } from '../../../chips/nes/schema';
 import {
@@ -27,7 +31,6 @@ const DN_FILE_HEADER = 'Dn-FamiTracker Module';
 const NES_CHANNEL_COUNT = 5;
 const S5B_CHANNEL_COUNT = 3;
 const S5B_EXPANSION = 0x20;
-const SUNSOFT_5B_CLOCK = 894886;
 const INST_2A03 = 1;
 const INST_S5B = 6;
 const S5B_MODE_ENVELOPE = 0x20;
@@ -1029,12 +1032,12 @@ function toAySong(
 	song.defaultPatternLength = track.patternLength;
 	applySchemaDefaults(song, AY_CHIP_SCHEMA);
 	song.chipVariant = 'YM';
-	song.chipFrequency = SUNSOFT_5B_CLOCK;
+	song.chipFrequency = SUNSOFT_5B_CHIP_FREQUENCY;
 	song.tuningTableIndex = 5;
 	song.a4TuningHz = 440;
 	song.interruptFrequency = params.engineHz;
 	song.tempo = track.tempo > 0 ? track.tempo : 0;
-	song.tuningTable = resolveAYTuningTable(5, SUNSOFT_5B_CLOCK, 440);
+	song.tuningTable = resolveAYTuningTable(5, SUNSOFT_5B_CHIP_FREQUENCY, 440);
 
 	const latchedInstrument = Array.from({ length: S5B_CHANNEL_COUNT }, () => -1);
 	song.patterns = track.frames.map((frame, frameIndex) => {
@@ -1211,6 +1214,7 @@ function mapEffect(
 			if (row.volume === 0) row.volume = ftVolume(byte & 0x0f);
 			return null;
 		case 6:
+			if (byte === 0 && row.note.name > NoteName.Off) return null;
 			return new Effect(EffectType.Portamento, 0, byte);
 		case 8:
 		case 9:

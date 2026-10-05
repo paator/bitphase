@@ -8,6 +8,14 @@ export interface ExportFormat {
 	isAvailable: (config: ChipConfiguration) => boolean;
 }
 
+function chipTotal(config: ChipConfiguration): number {
+	let total = 0;
+	for (const count of Object.values(config)) {
+		total += count;
+	}
+	return total;
+}
+
 const EXPORT_FORMATS: ExportFormat[] = [
 	{ label: 'WAV', action: 'export-wav', isAvailable: () => true },
 	{ label: 'PSG', action: 'export-psg', isAvailable: (c) => c['ay'] === 1 },
@@ -22,6 +30,15 @@ const EXPORT_FORMATS: ExportFormat[] = [
 			const ay = c['ay'] ?? 0;
 			const nes = c['nes'] ?? 0;
 			return ay <= 2 && nes <= 2 && ay + nes >= 1;
+		}
+	},
+	{
+		label: 'NSF',
+		action: 'export-nsf',
+		isAvailable: (c) => {
+			const ay = c['ay'] ?? 0;
+			const nes = c['nes'] ?? 0;
+			return ay + nes >= 1 && ay <= 1 && nes <= 1 && chipTotal(c) === ay + nes;
 		}
 	}
 ];

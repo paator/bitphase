@@ -28,6 +28,7 @@ export type NesCaptureResult = {
 	orderIndices: number[];
 	chipFrequency: number;
 	interruptFrequency: number;
+	songEnded: boolean;
 };
 
 export type NesExportModules = {
@@ -267,6 +268,7 @@ async function captureRegisterFrames(
 	dpcmFrames: Array<NesDpcmCapture | null>;
 	lengthReloads: number[][];
 	orderIndices: number[];
+	songEnded: boolean;
 }> {
 	const frames: number[][] = [];
 	const dpcmFrames: Array<NesDpcmCapture | null> = [];
@@ -351,7 +353,13 @@ async function captureRegisterFrames(
 		totalTicks++;
 	}
 
-	return { frames, dpcmFrames, lengthReloads, orderIndices };
+	return {
+		frames,
+		dpcmFrames,
+		lengthReloads,
+		orderIndices,
+		songEnded: Boolean(state.timeline.songEnded)
+	};
 }
 
 export async function captureNesRegisterFrames(
@@ -444,6 +452,7 @@ export async function captureNesRegisterFrames(
 		lengthReloads: framesResult.lengthReloads,
 		orderIndices: framesResult.orderIndices,
 		chipFrequency,
-		interruptFrequency
+		interruptFrequency,
+		songEnded: framesResult.songEnded
 	};
 }

@@ -338,17 +338,17 @@ function createAyCaptureSlot(
 						? mixer.getHardwareChannelIndex(channelIndex)
 						: channelIndex
 			);
+			const writeEnvelopeShape = Boolean(stateToConvert.forceEnvelopeShapeWrite);
 			framesOut.push({
 				registers: [...convertRegisterStateToAYRegisters(stateToConvert)],
 				sid: extractHardwareSidStates(stateToConvert),
 				syncbuzzer: extractHardwareSyncBuzzerStates(stateToConvert),
 				fm: extractHardwareFmStates(stateToConvert),
 				envFm: extractHardwareEnvFmStates(stateToConvert),
-				sample
+				sample,
+				writeEnvelopeShape
 			});
-			if (mixer.hasVirtualChannels()) {
-				registerState.forceEnvelopeShapeWrite = false;
-			}
+			registerState.forceEnvelopeShapeWrite = false;
 			advanceAyDigiSamples(state, audioDriver, modules, samplesPerInterrupt);
 		},
 		onPatternOrderAdvanced(needsChange) {
@@ -483,7 +483,8 @@ function createNesCaptureSlot(
 			lengthReloads: lengthReloadsOut,
 			orderIndices: [],
 			chipFrequency,
-			interruptFrequency
+			interruptFrequency,
+			songEnded: false
 		}
 	};
 }
@@ -670,6 +671,7 @@ async function captureSharedProject(
 	}
 	for (const result of nesResults) {
 		result.orderIndices = [...orderIndices];
+		result.songEnded = timeline.songEnded;
 	}
 
 	return {

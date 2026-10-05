@@ -162,13 +162,22 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		...u32(0),
 		...u32(0),
 		...u32(1),
-		...u32(1),
+		...u32(2),
 		...u32(0),
 		3,
 		2,
 		0,
 		16,
+		6,
 		0,
+		6,
+		0x12,
+		...u32(1),
+		0,
+		0,
+		64,
+		16,
+		6,
 		0,
 		0,
 		0
@@ -271,8 +280,24 @@ describe('ftm import', () => {
 			delay: 1,
 			parameter: 0x49
 		});
-		expect(song.patterns[1]!.channels[0]!.rows[0]!.note.name).toBe(NoteName.D);
-		expect(song.patterns[1]!.channels[0]!.rows[0]!.note.octave).toBe(3);
+		const porta = song.patterns[1]!.channels[0]!.rows;
+		expect(porta[0]!.note.name).toBe(NoteName.D);
+		expect(porta[0]!.note.octave).toBe(3);
+		expect(porta[0]!.effects[0]).toMatchObject({
+			effect: EffectType.Portamento,
+			delay: 0,
+			parameter: 0x12
+		});
+		expect(porta[0]!.effects[1]).toBeNull();
+		expect(porta[1]!.note.name).toBe(NoteName.None);
+		expect(porta[1]!.effects[0]).toMatchObject({
+			effect: EffectType.Portamento,
+			delay: 0,
+			parameter: 0
+		});
+		expect(warnings.some((warning) => warning.includes('Skipped') && /\b3\b/.test(warning))).toBe(
+			false
+		);
 
 		const noise = song.patterns[0]!.channels[3]!.rows[0]!;
 		expect(noise.effects[0]).toMatchObject({ effect: EffectType.AutoEnvelope, delay: 1, parameter: 2 });

@@ -119,6 +119,7 @@ export type SongCaptureFrame = {
 	envFm: HardwareEnvFmState[];
 	sample: HardwareSampleState[];
 	samples?: HardwareTaymSampleState[];
+	writeEnvelopeShape?: boolean;
 };
 
 export function convertRegisterStateToAYRegisters(registerState: {

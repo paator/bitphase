@@ -7,6 +7,7 @@
 	import { exportToTaym } from '../../services/file/taym/taym-export';
 	import { exportToSNDH } from '../../services/file/ay/sndh-export';
 	import { exportToVGM } from '../../services/file/vgm/vgm-export';
+	import { exportToNSF } from '../../services/file/nes/nsf-export';
 	import type { Project } from '../../models/project';
 	import type { WavExportSettings } from '../../services/file/wav/wav-export-settings';
 
@@ -18,7 +19,7 @@
 		dismiss
 	} = $props<{
 		project: Project;
-		exportType?: 'wav' | 'psg' | 'sndh' | 'taym' | 'vgm';
+		exportType?: 'wav' | 'psg' | 'sndh' | 'taym' | 'vgm' | 'nsf';
 		wavSettings?: WavExportSettings;
 		resolve?: (value?: any) => void;
 		dismiss?: (error?: any) => void;
@@ -73,6 +74,15 @@
 				await exportToVGM(
 					project,
 					0,
+					(progressValue, messageValue) => {
+						progress = progressValue;
+						message = messageValue;
+					},
+					abortController.signal
+				);
+			} else if (exportType === 'nsf') {
+				await exportToNSF(
+					project,
 					(progressValue, messageValue) => {
 						progress = progressValue;
 						message = messageValue;

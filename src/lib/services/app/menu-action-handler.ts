@@ -353,6 +353,14 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				return;
 			}
 
+			if (data.action === 'export-nsf') {
+				await ctx.open(ProgressModal, {
+					project: ctx.getCurrentProject(),
+					exportType: 'nsf'
+				});
+				return;
+			}
+
 			if (data.action.startsWith('open-demo:')) {
 				const path = data.action.slice('open-demo:'.length);
 				const project = await loadDemoProject(path);
