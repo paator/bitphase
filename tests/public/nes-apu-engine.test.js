@@ -174,6 +174,35 @@ describe('NesApuEngine', () => {
 		expect(engine.lastState.channels[0].sweepReg).toBe(0x84);
 	});
 
+	it('keeps the swept period when the tracker period changes', () => {
+		const wasmModule = createMockWasmModule();
+		const engine = createTestEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+		const channel = registerState.channels[0];
+
+		channel.enabled = true;
+		channel.period = 240;
+		channel.volume = 10;
+		channel.duty = 2;
+		channel.sweepReg = 0x92;
+		channel.retrigger = true;
+		engine.applyRegisterState(registerState);
+
+		wasmModule.apuWrites.length = 0;
+		channel.period = 320;
+		channel.retrigger = false;
+		engine.applyRegisterState(registerState);
+
+		const periodWrites = wasmModule.apuWrites.filter(
+			(write) => write.addr === 0x4002 || write.addr === 0x4003
+		);
+		expect(periodWrites).toEqual([]);
+
+		channel.sweepReg = 0x08;
+		engine.applyRegisterState(registerState);
+		expect(wasmModule.apuWrites.some((write) => write.addr === 0x4002)).toBe(true);
+	});
+
 	it('rewrites triangle linear counter register on retrigger when linear value is unchanged', () => {
 		const wasmModule = createMockWasmModule();
 		const engine = createTestEngine(wasmModule);

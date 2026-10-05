@@ -273,34 +273,42 @@ class NesApuEngine {
 		const sweepRetrigger =
 			sweepActive && (triggerChannel || channel.retrigger) && !sweepUpdateOnly;
 		const sweepChannelRetrigger = sweepChanged && !sweepUpdateOnly;
+		const sweepHoldsPeriod = sweepActive && !forceApply;
 		if (forceApply || sweepChanged || sweepRetrigger) {
 			this._writeApu( base + 1, sweepReg);
 			last.sweepReg = sweepReg;
 		}
 
+		let wrotePeriod = false;
 		if (
 			forceApply ||
-			periodLow !== (last.period & 0xff) ||
+			triggerChannel ||
+			(!sweepHoldsPeriod && periodLow !== (last.period & 0xff)) ||
 			sweepChannelRetrigger ||
 			(channel.retrigger && sweepActive && !sweepUpdateOnly)
 		) {
 			this._writeApu( base + 2, periodLow);
+			wrotePeriod = true;
 		}
 
 		if (
 			forceApply ||
 			triggerChannel ||
 			channel.retrigger ||
-			periodHigh !== lastPeriodHigh ||
+			(!sweepHoldsPeriod && periodHigh !== lastPeriodHigh) ||
 			sweepChannelRetrigger ||
-			(channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
+			(!sweepHoldsPeriod &&
+				channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
 				lengthNibble !== lastLengthNibble)
 		) {
 			this._writeApu( base + 3, periodHigh);
+			wrotePeriod = true;
 		}
 
-		last.period = period;
-		last.lengthNibble = channel.lengthNibble;
+		if (wrotePeriod || !sweepHoldsPeriod) {
+			last.period = period;
+			last.lengthNibble = channel.lengthNibble;
+		}
 		last.retrigger = channel.retrigger;
 	}
 
