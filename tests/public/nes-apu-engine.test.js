@@ -157,6 +157,23 @@ describe('NesApuEngine', () => {
 		expect(engine.lastState.channels[0].sweepReg).toBe(0x08);
 	});
 
+	it('keeps a DPCM delta change and a stopped sample from clicking', async () => {
+		const wasmModule = await loadWasm();
+		const { engine, dmcPtr } = createNesApuEngine(wasmModule);
+		for (let i = 0; i < 20; i++) engine.process(44100);
+		const before = engine._readMixOut(4);
+
+		wasmModule.nes_dmc_Write(dmcPtr, 0x4011, 80);
+		engine.process(44100);
+
+		expect(engine.getChannelRawOut(4)).toBe(80);
+		expect(Math.abs(engine._readMixOut(4) - before)).toBeLessThan(2);
+
+		engine.applyRegisterState(new NesChipRegisterState());
+		engine.process(44100);
+		expect(engine.getChannelRawOut(4)).toBe(80);
+	});
+
 	it('writes enabled hardware sweep register for pulse channels', async () => {
 		const wasmModule = await loadWasm();
 		const { engine } = createNesApuEngine(wasmModule);

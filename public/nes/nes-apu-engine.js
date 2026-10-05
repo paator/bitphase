@@ -30,6 +30,7 @@ const APU_STATUS_PULSE_MASK = 0x03;
 const APU_STATUS_DMC_MASK = 0x1c;
 const NES_EXPORT_CHANNEL_COUNT = 5;
 const NES_OUTPUT_DC_POLE = 0.995;
+const NES_DMC_OPT_DPCM_ANTI_CLICK = 3;
 
 function emptyExportChannels() {
 	return [0, 0, 0, 0, 0];
@@ -56,11 +57,6 @@ function buildApuOutputMask(registerState) {
 	if (!isSquareChannelActive(registerState.channels[0])) mask |= 1;
 	if (!isSquareChannelActive(registerState.channels[1])) mask |= 2;
 	return mask;
-}
-
-function buildDmcOutputMask(registerState) {
-	const dpcm = registerState.channels[4];
-	return dpcm?.enabled ? 0 : 4;
 }
 
 class NesApuEngine {
@@ -179,7 +175,7 @@ class NesApuEngine {
 
 	_applyOutputMasks(registerState, forceApply) {
 		const apuOutputMask = buildApuOutputMask(registerState);
-		const dmcOutputMask = buildDmcOutputMask(registerState);
+		const dmcOutputMask = 0;
 		if (forceApply || apuOutputMask !== this._lastApuOutputMask) {
 			this.wasmModule.nes_apu_SetMask(this.apuPtr, apuOutputMask);
 			this._lastApuOutputMask = apuOutputMask;
@@ -596,19 +592,18 @@ export function createNesApuEngine(wasmModule) {
 	wasmModule.nes_apu_Init(apuPtr);
 	wasmModule.nes_dmc_Init(dmcPtr);
 	wasmModule.nes_dmc_SetAPU(dmcPtr, apuPtr);
+	wasmModule.nes_dmc_SetOption(dmcPtr, NES_DMC_OPT_DPCM_ANTI_CLICK, 1);
 	wasmModule.nes_apu_SetMask(apuPtr, 3);
-	wasmModule.nes_dmc_SetMask(dmcPtr, 4);
+	wasmModule.nes_dmc_SetMask(dmcPtr, 0);
 	wasmModule.nes_apu_SetStereoMix(apuPtr, 0, 128, 128);
 	wasmModule.nes_apu_SetStereoMix(apuPtr, 1, 128, 128);
 	wasmModule.nes_dmc_SetStereoMix(dmcPtr, 0, 128, 128);
 	wasmModule.nes_dmc_SetStereoMix(dmcPtr, 1, 128, 128);
 	wasmModule.nes_dmc_SetStereoMix(dmcPtr, 2, 128, 128);
 	const engine = new NesApuEngine(wasmModule, apuPtr, dmcPtr);
-	if (typeof wasmModule.nes_dmc_SetSampleMemory === 'function' && typeof wasmModule.malloc === 'function') {
-		const sampleMemPtr = wasmModule.malloc(NES_DPCM_WINDOW_SIZE);
-		wasmModule.nes_dmc_SetSampleMemory(dmcPtr, sampleMemPtr, NES_DPCM_WINDOW_SIZE);
-		engine.sampleMemPtr = sampleMemPtr;
-	}
+	const sampleMemPtr = wasmModule.malloc(NES_DPCM_WINDOW_SIZE);
+	wasmModule.nes_dmc_SetSampleMemory(dmcPtr, sampleMemPtr, NES_DPCM_WINDOW_SIZE);
+	engine.sampleMemPtr = sampleMemPtr;
 	engine.reset();
 	return { engine, apuPtr, dmcPtr };
 }
