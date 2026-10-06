@@ -20,7 +20,12 @@ function block(name: string, version: number, data: number[]): number[] {
 	return [...padded(name, 16), ...u32(version), ...u32(data.length), ...data];
 }
 
-function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uint8Array {
+function moduleBytes(
+	expansion = 0,
+	withArp = false,
+	pitchAbsolute = false,
+	noteCuts = false
+): Uint8Array {
 	const params = [
 		expansion,
 		...u32(5),
@@ -162,7 +167,7 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		...u32(0),
 		...u32(0),
 		...u32(1),
-		...u32(2),
+		...u32(noteCuts ? 4 : 2),
 		...u32(0),
 		3,
 		2,
@@ -180,7 +185,29 @@ function moduleBytes(expansion = 0, withArp = false, pitchAbsolute = false): Uin
 		6,
 		0,
 		0,
-		0
+		0,
+		...(noteCuts
+			? [
+					...u32(2),
+					1,
+					0,
+					64,
+					16,
+					23,
+					0x06,
+					23,
+					0x10,
+					...u32(3),
+					1,
+					0,
+					64,
+					16,
+					23,
+					0x00,
+					0,
+					0
+				]
+			: [])
 	];
 	const noise = [
 		...u32(0),
@@ -337,6 +364,24 @@ describe('ftm import', () => {
 			values: [false, false, false],
 			loop: 2
 		});
+	});
+
+	it('maps delayed note cuts onto the on/off command', () => {
+		const { project, warnings } = importFtmBuffer(moduleBytes(0, false, false, true).buffer);
+		const rows = project.songs[0]!.patterns[1]!.channels[0]!.rows;
+		expect(rows[2]!.note.name).toBe(NoteName.C);
+		expect(rows[2]!.note.octave).toBe(1);
+		expect(rows[2]!.effects[0]).toMatchObject({
+			effect: EffectType.OnOff,
+			delay: 0,
+			parameter: 0x60
+		});
+		expect(rows[2]!.effects[1]).toBeNull();
+		expect(rows[3]!.note.name).toBe(NoteName.Off);
+		expect(rows[3]!.effects[0]).toBeNull();
+		expect(warnings.some((warning) => warning.includes('Skipped') && /\bS\b/.test(warning))).toBe(
+			true
+		);
 	});
 
 	it('warns when an expansion chip is present', () => {

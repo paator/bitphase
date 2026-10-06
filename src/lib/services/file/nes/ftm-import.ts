@@ -3,7 +3,11 @@ import {
 	SUNSOFT_5B_CHIP_FREQUENCY,
 	resolveAYTuningTable
 } from '../../../chips/ay/schema';
-import { NES_CHIP_SCHEMA, resolveNesCpuFrequency, resolveNesTuningTable } from '../../../chips/nes/schema';
+import {
+	NES_CHIP_SCHEMA,
+	resolveNesCpuFrequency,
+	resolveNesTuningTable
+} from '../../../chips/nes/schema';
 import type { NesSystem } from '../../../chips/nes/schema';
 import {
 	copyNesDpcmFields,
@@ -224,10 +228,16 @@ function blockName(bytes: Uint8Array): string {
 
 function headerLength(buffer: ArrayBuffer): number {
 	const bytes = new Uint8Array(buffer);
-	if (bytes.length >= DN_FILE_HEADER.length && latin1(bytes.subarray(0, DN_FILE_HEADER.length)) === DN_FILE_HEADER) {
+	if (
+		bytes.length >= DN_FILE_HEADER.length &&
+		latin1(bytes.subarray(0, DN_FILE_HEADER.length)) === DN_FILE_HEADER
+	) {
 		return DN_FILE_HEADER.length;
 	}
-	if (bytes.length >= FILE_HEADER.length && latin1(bytes.subarray(0, FILE_HEADER.length)) === FILE_HEADER) {
+	if (
+		bytes.length >= FILE_HEADER.length &&
+		latin1(bytes.subarray(0, FILE_HEADER.length)) === FILE_HEADER
+	) {
 		return FILE_HEADER.length;
 	}
 	return 0;
@@ -237,7 +247,11 @@ export function isFtmBuffer(buffer: ArrayBuffer): boolean {
 	return headerLength(buffer) > 0 && buffer.byteLength >= headerLength(buffer) + 4;
 }
 
-function readBlocks(buffer: ArrayBuffer): { version: number; blocks: FtmBlock[]; dnModule: boolean } {
+function readBlocks(buffer: ArrayBuffer): {
+	version: number;
+	blocks: FtmBlock[];
+	dnModule: boolean;
+} {
 	const header = headerLength(buffer);
 	if (header === 0) {
 		throw new FtmFormatError('Not a FamiTracker module');
@@ -330,7 +344,9 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 		throw new FtmFormatError('NES + 5B module does not have 8 channels');
 	}
 	if (!dnModule && params.expansion !== 0) {
-		const names = EXPANSION_NAMES.filter(([bit]) => params.expansion & bit).map(([, name]) => name);
+		const names = EXPANSION_NAMES.filter(([bit]) => params.expansion & bit).map(
+			([, name]) => name
+		);
 		note(
 			`Expansion chip ${names.join(', ') || params.expansion.toString(16)} was skipped; only 2A03 channels were imported`
 		);
@@ -340,7 +356,12 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 	const sequences = readSequences(findBlock(blocks, 'SEQUENCES'));
 	const s5bSequences = dnModule ? readS5bSequences(findBlock(blocks, 'SEQUENCES_S5B')) : [];
 	const instruments = readInstruments(findBlock(blocks, 'INSTRUMENTS'));
-	const frames = readFrames(findBlock(blocks, 'FRAMES'), header.trackCount, params.machine, params.channels);
+	const frames = readFrames(
+		findBlock(blocks, 'FRAMES'),
+		header.trackCount,
+		params.machine,
+		params.channels
+	);
 	const samples = readSamples(findBlock(blocks, 'DPCM SAMPLES'), note);
 	const cells = readPatterns(findBlock(blocks, 'PATTERNS'), header.effectColumns, version);
 
@@ -362,11 +383,26 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 	const songs = frames.flatMap((track, trackIndex) => {
 		const columns = header.effectColumns[trackIndex] ?? header.effectColumns[0] ?? [];
 		const trackCells = cells.get(trackIndex) ?? new Map();
-		const nesSong = toSong(track, columns, trackCells, params, skippedEffects, arpTables.byInstrument);
+		const nesSong = toSong(
+			track,
+			columns,
+			trackCells,
+			params,
+			skippedEffects,
+			arpTables.byInstrument
+		);
 		if (!dnModule) return [nesSong];
 		return [
 			nesSong,
-			toAySong(track, columns, trackCells, params, skippedEffects, arpTables.byInstrument, note)
+			toAySong(
+				track,
+				columns,
+				trackCells,
+				params,
+				skippedEffects,
+				arpTables.byInstrument,
+				note
+			)
 		];
 	});
 
@@ -486,7 +522,9 @@ function readSequences(block: FtmBlock | undefined): FtmSequence[][] {
 	const reader = new BlockReader(block.data);
 	const count = reader.i32();
 	if (block.version < 2) {
-		throw new FtmFormatError('This FamiTracker module uses a sequence format Bitphase cannot read');
+		throw new FtmFormatError(
+			'This FamiTracker module uses a sequence format Bitphase cannot read'
+		);
 	}
 	if (block.version === 2) {
 		for (let i = 0; i < count; i++) {
@@ -711,7 +749,10 @@ function readFrames(
 	return tracks;
 }
 
-function readSamples(block: FtmBlock | undefined, note: (message: string) => void): Array<FtmSample | null> {
+function readSamples(
+	block: FtmBlock | undefined,
+	note: (message: string) => void
+): Array<FtmSample | null> {
 	const samples: Array<FtmSample | null> = Array(MAX_FT_SAMPLES).fill(null);
 	if (!block) return samples;
 	const reader = new BlockReader(block.data);
@@ -854,7 +895,10 @@ function toInstrument(
 	}
 	copyNesDpcmFields(
 		{ dpcmSamples: localSamples, dpcmAssignments: assignments },
-		instrument as Instrument & { dpcmSamples?: NesDpcmSample[]; dpcmAssignments?: (NesDpcmAssignment | null)[] }
+		instrument as Instrument & {
+			dpcmSamples?: NesDpcmSample[];
+			dpcmAssignments?: (NesDpcmAssignment | null)[];
+		}
 	);
 	return instrument;
 }
@@ -952,9 +996,7 @@ function buildArpTables(
 		if (id === undefined) {
 			id = tables.length;
 			seen.set(key, id);
-			tables.push(
-				new Table(id, rows, loop, source.name || `Arp ${id + 1}`, additive)
-			);
+			tables.push(new Table(id, rows, loop, source.name || `Arp ${id + 1}`, additive));
 		}
 		byInstrument.set(source.index, id);
 	}
@@ -1104,7 +1146,10 @@ function toRow(
 	const row = emptyRow(ayChannel ? AY_CHIP_SCHEMA.fields : NES_CHIP_SCHEMA.fields, columnCount);
 	const noteOn = cell.note >= 1 && cell.note <= 12;
 	if (noteOn) {
-		row.note = new Note((cell.note + 1) as NoteName, ayChannel ? ayNoteOctave(cell.octave, warn) : cell.octave + 1);
+		row.note = new Note(
+			(cell.note + 1) as NoteName,
+			ayChannel ? ayNoteOctave(cell.octave, warn) : cell.octave + 1
+		);
 	} else if (cell.note === 13 || cell.note === 14) {
 		row.note = new Note(NoteName.Off, 0);
 		if (cell.note === 13) skippedEffects.add('===');
@@ -1235,6 +1280,16 @@ function mapEffect(
 			return new Effect(!ayChannel && channel === 3 ? PERIOD_DOWN : PERIOD_UP, 0, byte);
 		case 22:
 			return famitrackerVolumeSlide(byte);
+		case 23:
+			if (byte === 0) {
+				row.note = new Note(NoteName.Off, 0);
+				return null;
+			}
+			if (byte > 0x0f) {
+				skippedEffects.add('S');
+				return null;
+			}
+			return new Effect(EffectType.OnOff, 0, byte << 4);
 		case 18:
 			if (ayChannel || (channel > 1 && channel !== 3)) {
 				skippedEffects.add('V');
