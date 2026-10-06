@@ -44,10 +44,15 @@ export class PatternVisibleRowsService {
 			return { rows: cache.result, cache };
 		}
 
-		const visibleCount = Math.floor(context.canvasHeight / context.lineHeight);
-		const halfVisible = Math.floor(visibleCount / 2);
-		const startRow = context.selectedRow - halfVisible;
-		const endRow = context.selectedRow + halfVisible;
+		const fittedRowCount = Math.floor(context.canvasHeight / context.lineHeight);
+		const rowsAbove = Math.floor(fittedRowCount / 2);
+		let rowsBelow = rowsAbove;
+		const nextRowTop = (rowsAbove + rowsBelow + 1) * context.lineHeight;
+		if (context.canvasHeight - nextRowTop >= 1) {
+			rowsBelow += 1;
+		}
+		const startRow = context.selectedRow - rowsAbove;
+		const endRow = context.selectedRow + rowsBelow;
 
 		const rows: VisibleRow[] = [];
 		let displayIndex = 0;
