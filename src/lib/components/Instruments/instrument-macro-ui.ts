@@ -420,6 +420,91 @@ export function integerMacroBarStyle(
 	return `bottom: calc(${MACRO_BAR_INSET}px + (${range}) * ${bottomNorm}); left: 2px; right: 2px; height: calc((${range}) * ${heightNorm}); background: ${accent}`;
 }
 
+export function instrumentMacroFlagFields(
+	fields: readonly InstrumentMacroField[]
+): InstrumentMacroField[] {
+	if (fields.some((field) => field.kind === 'integer')) return [];
+	const flags = fields.filter((field) => field.kind === 'boolean');
+	return flags.length > 1 ? flags : [];
+}
+
+export function instrumentMacroSequenceTextFields(
+	fields: readonly InstrumentMacroField[]
+): InstrumentMacroField[] {
+	const integers = fields.filter((field) => field.kind === 'integer');
+	if (integers.length > 0) return integers;
+	if (instrumentMacroFlagFields(fields).length > 1) return [];
+	return fields.filter((field) => field.kind === 'boolean');
+}
+
+export function instrumentMacroFlagField(flags: readonly InstrumentMacroField[]): InstrumentMacroField {
+	return {
+		id: 'flags',
+		label: 'Flags',
+		title: flags.map((field, bit) => `${field.label} ${1 << bit}`).join(', '),
+		kind: 'integer',
+		min: 0,
+		max: flags.length === 0 ? 0 : (1 << flags.length) - 1,
+		defaultValue: 0
+	};
+}
+
+export function instrumentMacroFlagMasks(
+	macros: InstrumentMacros,
+	flags: readonly InstrumentMacroField[]
+): number[] {
+	const length = Math.max(
+		1,
+		...flags.map((field) => macros[field.id]?.values.length ?? 0)
+	);
+	return Array.from({ length }, (_, index) => {
+		let mask = 0;
+		flags.forEach((field, bit) => {
+			if (macros[field.id]?.values[index]) mask |= 1 << bit;
+		});
+		return mask;
+	});
+}
+
+export function applyInstrumentMacroFlagText(
+	macros: InstrumentMacros,
+	fields: readonly InstrumentMacroField[],
+	text: string
+): InstrumentMacros | null {
+	const flags = instrumentMacroFlagFields(fields);
+	if (flags.length === 0) return null;
+	const parsed = parseMacroSequenceText(text, instrumentMacroFlagField(flags), false);
+	if (!parsed) return null;
+	const anchor = macros[flags[0]!.id];
+	const masks = instrumentMacroFlagMasks(macros, flags);
+	if (
+		anchor &&
+		instrumentMacroSequenceEquals(
+			masks,
+			anchor.loop,
+			clampInstrumentMacroRelease(anchor.release, masks.length),
+			parsed
+		)
+	) {
+		return macros;
+	}
+	const resized = setSharedSequenceLength(macros, fields, parsed.values.length);
+	const withValues: InstrumentMacros = { ...resized };
+	for (const [bit, field] of flags.entries()) {
+		const current = withValues[field.id];
+		if (!current) continue;
+		withValues[field.id] = {
+			...current,
+			values: parsed.values.map((mask) => ((Number(mask) >> bit) & 1) === 1)
+		};
+	}
+	return setSharedSequenceRelease(
+		setSharedSequenceLoop(withValues, fields, parsed.loop),
+		fields,
+		parsed.release
+	);
+}
+
 export function formatMacroSequenceText(
 	values: readonly InstrumentMacroValue[],
 	loop: number,

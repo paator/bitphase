@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { InstrumentMacroField } from '@/lib/chips/base/instrument-macros';
 import { AY_MIXER_MACRO_FIELDS } from '@/lib/chips/ay/mixer-macros';
 import {
+	applyInstrumentMacroFlagText,
 	applyInstrumentMacroSequenceText,
+	instrumentMacroFlagField,
+	instrumentMacroFlagFields,
+	instrumentMacroFlagMasks,
+	instrumentMacroSequenceTextFields,
 	clampMacroBarViewMin,
 	cycleInstrumentMacroEnum,
 	defaultMacroBarViewMin,
@@ -389,6 +394,43 @@ describe('macro sequence text', () => {
 		expect(next?.volume).toEqual({ values: [15, 12, 8, 4], loop: 2 });
 		expect(next?.retrigger?.values).toHaveLength(4);
 		expect(next?.retrigger?.loop).toBe(2);
+	});
+
+	it('encodes combined boolean rows as one flag number', () => {
+		const tone: InstrumentMacroField = {
+			...booleanField,
+			id: 'tone',
+			label: 'Tone',
+			defaultValue: true
+		};
+		const noise: InstrumentMacroField = { ...booleanField, id: 'noise', label: 'Noise' };
+		const envelope: InstrumentMacroField = {
+			...booleanField,
+			id: 'envelope',
+			label: 'Envelope'
+		};
+		const fields = [tone, noise, envelope];
+		const macros = {
+			tone: { values: [true, true], loop: 1 },
+			noise: { values: [true, false], loop: 1 },
+			envelope: { values: [false, false], loop: 1 }
+		};
+		const flags = instrumentMacroFlagFields(fields);
+		expect(instrumentMacroFlagField(flags).title).toBe('Tone 1, Noise 2, Envelope 4');
+		expect(
+			formatMacroSequenceText(instrumentMacroFlagMasks(macros, flags), 1, instrumentMacroFlagField(flags), false)
+		).toBe('3 | 1');
+		expect(applyInstrumentMacroFlagText(macros, fields, '3 | 1')).toBe(macros);
+		const next = applyInstrumentMacroFlagText(macros, fields, '5 | / 7 1');
+		expect(next?.tone).toEqual({ values: [true, true, true], loop: 1, release: 1 });
+		expect(next?.noise).toEqual({ values: [false, true, false], loop: 1, release: 1 });
+		expect(next?.envelope).toEqual({ values: [true, true, false], loop: 1, release: 1 });
+		expect(instrumentMacroFlagFields([integerField, booleanField])).toEqual([]);
+		expect(instrumentMacroSequenceTextFields(fields)).toEqual([]);
+		expect(instrumentMacroSequenceTextFields([booleanField])).toEqual([booleanField]);
+		expect(instrumentMacroSequenceTextFields([integerField, booleanField])).toEqual([
+			integerField
+		]);
 	});
 
 	it('leaves macros unchanged when the text matches the current sequence', () => {

@@ -12,6 +12,8 @@
 		loop,
 		release = INSTRUMENT_MACRO_NO_RELEASE,
 		asHex = false,
+		title = 'Space-separated values. | marks the loop start. / marks the release point.',
+		placeholder = '| 15 12 / 8',
 		onCommit
 	}: {
 		field: InstrumentMacroField;
@@ -19,6 +21,8 @@
 		loop: number;
 		release?: number;
 		asHex?: boolean;
+		title?: string;
+		placeholder?: string;
 		onCommit: (text: string) => void;
 	} = $props();
 
@@ -62,8 +66,8 @@
 	value={text}
 	spellcheck="false"
 	aria-label="{field.title} sequence"
-	title="Space-separated values. | marks the loop start. / marks the release point."
-	placeholder="| 15 12 / 8"
+	{title}
+	{placeholder}
 	onfocus={handleFocus}
 	oninput={handleInput}
 	onkeydown={handleKeydown}

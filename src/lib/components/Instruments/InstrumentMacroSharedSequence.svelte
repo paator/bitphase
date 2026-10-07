@@ -16,7 +16,12 @@
 		type InstrumentMacros
 	} from '../../chips/base/instrument-macros';
 	import {
+		applyInstrumentMacroFlagText,
 		applyInstrumentMacroSequenceText,
+		instrumentMacroFlagField,
+		instrumentMacroFlagFields,
+		instrumentMacroFlagMasks,
+		instrumentMacroSequenceTextFields,
 		cycleInstrumentMacroEnum,
 		formatInstrumentMacroValue,
 		integerFromMacroBarNormalized,
@@ -102,7 +107,10 @@
 		}
 		return offsets;
 	});
-	const textFields = $derived(fields.filter((field) => field.kind !== 'waveform'));
+	const textFields = $derived(instrumentMacroSequenceTextFields(fields));
+	const flagFields = $derived(instrumentMacroFlagFields(fields));
+	const flagField = $derived(instrumentMacroFlagField(flagFields));
+	const flagMasks = $derived(instrumentMacroFlagMasks(macros, flagFields));
 	const scaleFields = $derived(fields.filter(macroBarNeedsScroll));
 	const sequenceWidth = $derived(stepWidthPx * sequenceLength);
 	const loopHandleLeft = $derived(stepWidthPx * loopIndex - MACRO_LOOP_HANDLE_WIDTH / 2);
@@ -478,6 +486,11 @@
 		if (next && next !== macros) onChange(next);
 	}
 
+	function commitFlagText(text: string): void {
+		const next = applyInstrumentMacroFlagText(macros, fields, text);
+		if (next && next !== macros) onChange(next);
+	}
+
 	function handleWheel(event: WheelEvent): void {
 		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
 		const field = fieldFromClientY(event.clientY);
@@ -603,7 +616,7 @@
 			</div>
 		{/if}
 	</div>
-	{#if textFields.length > 0}
+	{#if textFields.length > 0 || flagFields.length > 1}
 		<div class="flex flex-col gap-1 px-2 pt-1 pb-2">
 			{#each textFields as field (field.id)}
 				<InstrumentMacroSequenceText
@@ -614,6 +627,17 @@
 					{asHex}
 					onCommit={(text) => commitSequenceText(field, text)} />
 			{/each}
+			{#if flagFields.length > 1}
+				<InstrumentMacroSequenceText
+					field={flagField}
+					values={flagMasks}
+					loop={loopIndex}
+					release={releaseIndex}
+					asHex={false}
+					title="{flagField.title}. | marks the loop start. / marks the release point."
+					placeholder="| 3"
+					onCommit={commitFlagText} />
+			{/if}
 		</div>
 	{/if}
 	<InstrumentMacroHoverTooltip
