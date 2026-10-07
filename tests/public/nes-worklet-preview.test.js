@@ -127,6 +127,49 @@ describe('NesWorkletSlot preview', () => {
 		expect(slot.apuEngine.applyRegisterState).toHaveBeenCalled();
 	});
 
+	it('keeps the held preview instrument when the full instrument list arrives', () => {
+		const slot = createPreviewSlot();
+		slot.audioDriver.refreshSoundingRow = vi.fn();
+		const lead = {
+			id: '08',
+			macros: { pulseWidth: { values: [3], loop: 0 }, volumeOrRate: { values: [8], loop: 0 } }
+		};
+		slot.handlePreviewRow({
+			pattern: previewPattern,
+			rowIndex: 0,
+			channelIndex: 0,
+			instrument: lead
+		});
+		slot.handlePreviewRow({
+			pattern: previewPattern,
+			rowIndex: 0,
+			channelIndex: 0,
+			instrument: lead
+		});
+		slot.state.instrumentPositions[0] = 4;
+		slot.audioDriver.refreshSoundingRow.mockClear();
+		slot.apuEngine.applyRegisterState.mockClear();
+
+		slot.handleInitInstruments({
+			instruments: [
+				{
+					id: '01',
+					macros: {
+						pulseWidth: { values: [0], loop: 0 },
+						volumeOrRate: { values: [15], loop: 0 }
+					}
+				},
+				lead
+			]
+		});
+
+		expect(slot.state.channelInstruments[0]).toBe(1);
+		expect(slot.state.instruments[1].id).toBe('08');
+		expect(slot.state.instrumentPositions[0]).toBe(4);
+		expect(slot.audioDriver.refreshSoundingRow).toHaveBeenCalled();
+		expect(slot.apuEngine.reset).not.toHaveBeenCalled();
+	});
+
 	it('does not rewrite registers on every preview sample', () => {
 		const slot = createPreviewSlot();
 		slot.handlePreviewRow({

@@ -245,8 +245,38 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this.state.setTables(tables);
 	}
 
+	_previewChannelInstrumentIds() {
+		const ids = [];
+		const assigned = this.state.channelInstruments;
+		if (!assigned) return ids;
+		for (let channel = 0; channel < assigned.length; channel++) {
+			const index = assigned[channel];
+			ids[channel] = index >= 0 ? (this.state.instruments?.[index]?.id ?? null) : null;
+		}
+		return ids;
+	}
+
+	_rebindPreviewInstruments(instrumentIds) {
+		const instruments = this.state.instruments ?? [];
+		const assigned = this.state.channelInstruments;
+		if (!assigned) return;
+		for (const channel of this.previewActiveChannels) {
+			const id = instrumentIds[channel];
+			if (!id) continue;
+			const index = instruments.findIndex((instrument) => instrument?.id === id);
+			if (index >= 0) assigned[channel] = index;
+		}
+	}
+
 	handleInitInstruments({ instruments }) {
+		const previewInstrumentIds = this.isPreviewActive()
+			? this._previewChannelInstrumentIds()
+			: null;
 		this.state.setInstruments(instruments);
+		if (!previewInstrumentIds) return;
+		this._rebindPreviewInstruments(previewInstrumentIds);
+		this.audioDriver?.refreshSoundingRow?.(this.state, this.registerState);
+		this._applyRegisterStateToEngine();
 	}
 
 	_canPreview() {
