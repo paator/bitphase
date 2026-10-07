@@ -299,7 +299,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			? controlLayout.width * 2 + controlLayout.gap + controlLayout.margin * 2
 			: 0;
 		const textAreaWidth = Math.max(0, buttonWidth - controlsWidth);
-		const textX = buttonX + Math.max(0, (textAreaWidth - labelWidth) / 2);
+		const textX = buttonX + Math.max(0, (textAreaWidth - (labelWidth-8)) / 2);
 		const headerColor = this.patternColors.patternRowNum || this.patternColors.patternText;
 		const textColor = isMuted ? this.patternColors.patternEmpty : headerColor;
 		const borderColor = isMuted
