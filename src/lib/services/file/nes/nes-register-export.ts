@@ -149,12 +149,19 @@ function writeNoiseRegs(regs: number[], channel: any): void {
 }
 
 function writeDpcmRegs(regs: number[], channel: any): void {
-	if (!channel?.enabled || !channel.dpcmBytes?.length) return;
+	const held =
+		channel?.dpcmDeltaHold != null && channel.dpcmDeltaHold >= 0
+			? channel.dpcmDeltaHold & 127
+			: null;
+	if (!channel?.enabled || !channel.dpcmBytes?.length) {
+		if (held != null) regs[0x11] = held;
+		return;
+	}
 	const pitch = channel.dpcmPitch & 15;
 	const loopBit = channel.dpcmLoop ? 0x40 : 0;
 	regs[0x10] = loopBit | pitch;
-	regs[0x11] =
-		channel.dpcmDelta != null && channel.dpcmDelta >= 0 ? channel.dpcmDelta & 127 : -1;
+	const delta = channel.retrigger ? channel.dpcmDelta : channel.dpcmDeltaHold;
+	regs[0x11] = delta != null && delta >= 0 ? delta & 127 : -1;
 	regs[0x12] = 0;
 	regs[0x13] = channel.dpcmLengthReg & 0xff;
 	regs[0x15] |= NES_APU_STATUS_DPCM;
@@ -317,6 +324,7 @@ async function captureRegisterFrames(
 		patternProcessor.processTrackerTick(registerState);
 		audioDriver.advancePulseWidthTable(state);
 		audioDriver.advanceSweepTable(state);
+		audioDriver.advanceDeltaCounterTable(state);
 		audioDriver.syncSweepTableRegisterState(state, registerState);
 
 		const stateToConvert = mixer.hasVirtualChannels()

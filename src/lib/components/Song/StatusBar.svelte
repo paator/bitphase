@@ -92,7 +92,7 @@
 		const fieldType = field.type;
 
 		if (fieldType === 'note') {
-			return 'Note: Enter a note. You can enter OFF to stop playback.';
+			return 'Note: Enter a note. You can enter OFF to stop playback, or RELEASE to jump to the instrument release.';
 		}
 
 		if (selectedFieldKey === 'instrument') {

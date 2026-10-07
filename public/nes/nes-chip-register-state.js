@@ -18,6 +18,7 @@ function createDefaultChannel() {
 		dpcmPitch: 15,
 		dpcmLoop: false,
 		dpcmDelta: null,
+		dpcmDeltaWrite: false,
 		dpcmLengthReg: 0,
 		dpcmBytes: null
 	};

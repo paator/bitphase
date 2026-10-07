@@ -3,6 +3,7 @@ import { formatEffectStatusHint, type EffectStatusHint } from '../base/effect-st
 export const NES_PULSE_WIDTH_CYCLE_SUBCOMMAND = 1;
 export const NES_SWEEP_UP_SUBCOMMAND = 2;
 export const NES_SWEEP_DOWN_SUBCOMMAND = 3;
+export const NES_DELTA_COUNTER_SUBCOMMAND = 4;
 
 export function isNesPulseWidthCycleEffect(effect: { effect: number; delay: number }): boolean {
 	return effect.effect === 'E'.charCodeAt(0) && effect.delay === NES_PULSE_WIDTH_CYCLE_SUBCOMMAND;
@@ -50,6 +51,22 @@ export function isNesSweepEffect(effect: { effect: number; delay: number }): boo
 	return isNesSweepUpEffect(effect) || isNesSweepDownEffect(effect);
 }
 
+export function isNesDeltaCounterEffect(effect: { effect: number; delay: number }): boolean {
+	return effect.effect === 'E'.charCodeAt(0) && effect.delay === NES_DELTA_COUNTER_SUBCOMMAND;
+}
+
+export function isNesDeltaCounterTableEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): boolean {
+	return (
+		isNesDeltaCounterEffect(effect) &&
+		effect.tableIndex !== undefined &&
+		effect.tableIndex >= 0
+	);
+}
+
 const NES_PULSE_WIDTH_HINT: EffectStatusHint = {
 	format: 'E1XY',
 	name: 'Pulse Width',
@@ -80,6 +97,16 @@ const NES_SWEEP_DOWN_TABLE_HINT: EffectStatusHint = {
 	name: 'Sweep Down',
 	params: 'Y: table'
 };
+const NES_DELTA_COUNTER_HINT: EffectStatusHint = {
+	format: 'E4XY',
+	name: 'Delta Counter',
+	params: 'XY: 00-7F, DPCM'
+};
+const NES_DELTA_COUNTER_TABLE_HINT: EffectStatusHint = {
+	format: 'E4TY',
+	name: 'Delta Counter',
+	params: 'Y: table'
+};
 
 const NES_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	NES_PULSE_WIDTH_HINT,
@@ -87,7 +114,9 @@ const NES_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	NES_SWEEP_UP_HINT,
 	NES_SWEEP_UP_TABLE_HINT,
 	NES_SWEEP_DOWN_HINT,
-	NES_SWEEP_DOWN_TABLE_HINT
+	NES_SWEEP_DOWN_TABLE_HINT,
+	NES_DELTA_COUNTER_HINT,
+	NES_DELTA_COUNTER_TABLE_HINT
 ];
 
 export function describeNesEffect(effect: {
@@ -104,6 +133,11 @@ export function describeNesEffect(effect: {
 	}
 	if (isNesSweepDownEffect(effect)) {
 		return formatEffectStatusHint(table ? NES_SWEEP_DOWN_TABLE_HINT : NES_SWEEP_DOWN_HINT);
+	}
+	if (isNesDeltaCounterEffect(effect)) {
+		return formatEffectStatusHint(
+			table ? NES_DELTA_COUNTER_TABLE_HINT : NES_DELTA_COUNTER_HINT
+		);
 	}
 	return null;
 }

@@ -252,5 +252,11 @@ describe('PatternEffectHandling', () => {
 			expect(start!.tableIndex).toBe(1);
 			expect(PatternEffectHandling.formatEffectAsString(start!)).toBe('E5T2');
 		});
+
+		it('E4XY delta counter parses and formats as an E subcommand', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E47F');
+			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 4, parameter: 0x7f });
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E47F');
+		});
 	});
 });

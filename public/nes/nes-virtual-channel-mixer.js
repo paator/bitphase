@@ -18,6 +18,8 @@ function copyNesChannelFields(src, dst) {
 	dst.dpcmPitch = src.dpcmPitch;
 	dst.dpcmLoop = src.dpcmLoop;
 	dst.dpcmDelta = src.dpcmDelta;
+	dst.dpcmDeltaHold = src.dpcmDeltaHold;
+	dst.dpcmDeltaWrite = src.dpcmDeltaWrite === true;
 	dst.dpcmLengthReg = src.dpcmLengthReg;
 	dst.dpcmBytes = src.dpcmBytes;
 }
@@ -34,7 +36,11 @@ function createNesVirtualChannelAdapters() {
 		isChannelActive(vch, registerState) {
 			const channel = registerState.channels[vch];
 			if (!channel) return false;
-			return Boolean(channel.enabled) || (channel.volume ?? 0) > 0;
+			return (
+				Boolean(channel.enabled) ||
+				(channel.volume ?? 0) > 0 ||
+				channel.dpcmDeltaWrite === true
+			);
 		},
 		copyChannel(srcState, srcIdx, dstState, dstIdx) {
 			const src = srcState.channels[srcIdx];

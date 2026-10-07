@@ -1523,6 +1523,12 @@ function mapEffect(
 				return null;
 			}
 			return new Effect(EffectType.OnOff, 0, byte << 4);
+		case 15:
+			if (ayChannel || channel !== 4) {
+				skippedEffects.add('Z');
+				return null;
+			}
+			return new Effect(EffectType.AutoEnvelope, 4, byte & 0x7f);
 		case 18:
 			if (ayChannel || (channel > 1 && channel !== 3)) {
 				skippedEffects.add('V');

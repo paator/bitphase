@@ -464,6 +464,7 @@ class NesApuEngine {
 		this._writeNoise(noiseChannel, forceApply, noiseTrigger);
 		noiseLast.enabled = noiseActive;
 
+		this._writeDpcmDeltaCounter(dpcmChannel, dpcmRetrigger);
 		this._writeDpcm(dpcmChannel, dpcmRetrigger);
 		if (dpcmChannel) {
 			this.lastState.channels[4].enabled = Boolean(dpcmChannel.enabled);
@@ -484,6 +485,14 @@ class NesApuEngine {
 			heap[i] = bytes[i] & 0xff;
 		}
 		return dpcmLengthRegister(bytes.length);
+	}
+
+	_writeDpcmDeltaCounter(channel, sampleWillWriteDelta) {
+		if (!channel?.dpcmDeltaWrite) return;
+		channel.dpcmDeltaWrite = false;
+		if (sampleWillWriteDelta) return;
+		if (channel.dpcmDelta == null || channel.dpcmDelta < 0) return;
+		this._writeDmc(0x4011, channel.dpcmDelta & 127);
 	}
 
 	_writeDpcm(channel, retrigger) {

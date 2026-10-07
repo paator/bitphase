@@ -371,6 +371,18 @@ describe('NSF player', () => {
 		expect(play(halted, ending)).toEqual([]);
 	});
 
+	it('writes $4011 when the delta counter changes and leaves it until the next change', () => {
+		const file = song([
+			{ regs: apuRegs({ 0x11: 0x5a, 0x15: 0x0f }) },
+			{ regs: apuRegs({ 0x11: 0x5a, 0x15: 0x0f }) },
+			{ regs: apuRegs({ 0x11: 0x00, 0x15: 0x0f }) }
+		]);
+		const player = boot(file);
+		expect(play(player, file).filter(([addr]) => addr === 0x4011)).toEqual([[0x4011, 0x5a]]);
+		expect(play(player, file).some(([addr]) => addr === 0x4011)).toBe(false);
+		expect(play(player, file).filter(([addr]) => addr === 0x4011)).toEqual([[0x4011, 0x00]]);
+	});
+
 	it('places DPCM at $C000 and retriggers without rewriting the address later', () => {
 		const first = new Uint8Array(16).fill(0xab);
 		const second = new Uint8Array(16).fill(0xcd);

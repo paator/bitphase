@@ -461,6 +461,11 @@ function frameWrites(
 		const length = next[0x13];
 		if (length != null && length >= 0) writes.push([0x13, length & 0xff]);
 		writes.push([0x15, nextStatus | 0x10]);
+	} else {
+		const delta = next[0x11];
+		if (delta != null && delta >= 0 && previous[0x11] !== (delta & 0x7f)) {
+			writes.push([0x11, delta & 0x7f]);
+		}
 	}
 
 	if (writes.length >= NSF_5B_COMMAND) {

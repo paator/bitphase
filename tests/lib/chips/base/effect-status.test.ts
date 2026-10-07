@@ -49,6 +49,12 @@ describe('effect status descriptions', () => {
 		expect(describePatternEffect(ayEffect, { describeEffect: describeNesEffect })).toBe(
 			'E1XY: Pulse Width (XY: duty, 00=inst)'
 		);
+		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 4 })).toBe(
+			'E4XY: Delta Counter (XY: 00-7F, DPCM)'
+		);
+		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 4, tableIndex: 0 })).toBe(
+			'E4TY: Delta Counter (Y: table)'
+		);
 		expect(
 			describePatternEffect(
 				{ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 },

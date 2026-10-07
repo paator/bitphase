@@ -215,3 +215,14 @@ Hardware pitch sweep up on Pulse 1 / Pulse 2 (`E2XY` / `E2TX`).
 Same format as `E2`, sweeping down (`E3XY` / `E3TX`). A new note clears it the same way.
 
 **Examples:** `E317`, `E3T1`, `E300`.
+
+### E4 - Delta counter
+
+Writes the DPCM delta counter (`$4011`) on the DPCM channel. Values above the center pull the triangle, noise, and DPCM mix down. The level stays until the next `E4`. It does not restart a playing sample. Other channels ignore it.
+
+|               |                                              |
+| ------------- | -------------------------------------------- |
+| **Format**    | `E4XY` or `E4TX`                             |
+| **Parameter** | `XY` - delta counter, `00`-`7F`              |
+| **Table**     | `TX` - level from table `X` each tick        |
+| **Example**   | `E400` restores the mix; `E47F` attenuates it; `E4T1` - table 1 |

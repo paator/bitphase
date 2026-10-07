@@ -47,6 +47,7 @@ type NesSlotLane = {
 		processInstruments: (state: unknown, registerState: unknown) => void;
 		advancePulseWidthTable: (state: unknown) => void;
 		advanceSweepTable: (state: unknown) => void;
+		advanceDeltaCounterTable: (state: unknown) => void;
 		syncSweepTableRegisterState: (state: unknown, registerState: unknown) => void;
 	};
 	apuEngine: {
@@ -280,6 +281,7 @@ export class NESChipRenderer implements ChipRenderer {
 				lane.patternProcessor.processTrackerTick(lane.registerState);
 				lane.audioDriver.advancePulseWidthTable(lane.state);
 				lane.audioDriver.advanceSweepTable(lane.state);
+				lane.audioDriver.advanceDeltaCounterTable(lane.state);
 				lane.audioDriver.syncSweepTableRegisterState(lane.state, lane.registerState);
 				lane.apuEngine.applyRegisterState(lane.registerState);
 
@@ -386,6 +388,7 @@ export class NESChipRenderer implements ChipRenderer {
 					ctx.patternProcessor.processTrackerTick(ctx.registerState);
 					ctx.audioDriver.advancePulseWidthTable(ctx.state);
 					ctx.audioDriver.advanceSweepTable(ctx.state);
+					ctx.audioDriver.advanceDeltaCounterTable(ctx.state);
 					ctx.audioDriver.syncSweepTableRegisterState(ctx.state, ctx.registerState);
 					ctx.apuEngine.applyRegisterState(ctx.registerState);
 				}

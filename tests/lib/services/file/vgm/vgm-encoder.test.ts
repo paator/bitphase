@@ -178,6 +178,20 @@ describe('nes register conversion', () => {
 		expect(regs[0x15]).toBe(0x0f);
 	});
 
+	it('keeps a DPCM delta-counter write in $4011 without enabling the sample', () => {
+		const regs = convertNesRegisterStateToApuRegs({
+			channels: [
+				{ enabled: false, period: 0, volume: 0, duty: 2 },
+				{ enabled: false, period: 0, volume: 0, duty: 2 },
+				{ enabled: false, period: 0 },
+				{ enabled: false },
+				{ enabled: false, dpcmDeltaHold: 0x5a, dpcmDeltaWrite: true }
+			]
+		});
+		expect(regs[0x11]).toBe(0x5a);
+		expect(regs[0x15] & 0x10).toBe(0);
+	});
+
 	it('maps a retriggered DPCM channel to $4010-$4013 and sets $4015 bit 4', () => {
 		const regs = convertNesRegisterStateToApuRegs({
 			channels: [

@@ -11,6 +11,7 @@ function createPreviewSlot() {
 		processInstruments() {},
 		advancePulseWidthTable() {},
 		advanceSweepTable() {},
+		advanceDeltaCounterTable() {},
 		syncSweepTableRegisterState() {},
 		_silenceChannel() {},
 		resizeChannels() {}

@@ -37,6 +37,11 @@ import {
 	resetNesChannelSweepOverride,
 	advanceNesSweepTable
 } from './nes-sweep-effect.js';
+import {
+	NES_DPCM_HARDWARE_CHANNEL,
+	advanceNesDeltaCounterTable,
+	processNesDeltaCounterEffect
+} from './nes-delta-counter.js';
 
 const NES_NOISE_PERIOD_COUNT = 16;
 
@@ -91,6 +96,12 @@ class NesAudioDriver {
 				processNesPulseWidthCycleEffect(state, channelIndex, row);
 				processNesSweepEffect(state, channelIndex, row);
 			}
+			processNesDeltaCounterEffect(
+				state,
+				channelIndex,
+				row,
+				this._getHardwareChannelType(channelIndex)
+			);
 		}
 	}
 
@@ -381,6 +392,26 @@ class NesAudioDriver {
 		}
 
 		processChannelOnOffCounters(state, channelCount);
+		this._syncDpcmDeltaCounter(state, registerState);
+	}
+
+	_syncDpcmDeltaCounter(state, registerState) {
+		const writes = state.channelDpcmDeltaWrite;
+		if (!writes) return;
+		const channelCount = registerState.channelCount ?? writes.length;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			const channel = registerState.channels[channelIndex];
+			if (!writes[channelIndex]) {
+				if (channel) channel.dpcmDeltaWrite = false;
+				continue;
+			}
+			writes[channelIndex] = false;
+			if (!channel) continue;
+			if (this._getHardwareChannelType(channelIndex) !== NES_DPCM_HARDWARE_CHANNEL) continue;
+			channel.dpcmDelta = state.channelDpcmDelta[channelIndex] & 0x7f;
+			channel.dpcmDeltaHold = channel.dpcmDelta;
+			channel.dpcmDeltaWrite = true;
+		}
 	}
 
 	advancePulseWidthTable(state) {
@@ -389,6 +420,10 @@ class NesAudioDriver {
 
 	advanceSweepTable(state) {
 		advanceNesSweepTable(state);
+	}
+
+	advanceDeltaCounterTable(state) {
+		advanceNesDeltaCounterTable(state);
 	}
 
 	syncSweepTableRegisterState(state, registerState) {

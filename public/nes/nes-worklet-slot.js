@@ -165,6 +165,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		super._processTrackerTick();
 		this.audioDriver.advancePulseWidthTable(this.state);
 		this.audioDriver.advanceSweepTable(this.state);
+		this.audioDriver.advanceDeltaCounterTable(this.state);
 		this.audioDriver.syncSweepTableRegisterState(this.state, this.registerState);
 	}
 
@@ -177,6 +178,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 				this.audioDriver.processInstruments(this.state, this.registerState);
 				this.audioDriver.advancePulseWidthTable(this.state);
 				this.audioDriver.advanceSweepTable(this.state);
+				this.audioDriver.advanceDeltaCounterTable(this.state);
 				this.audioDriver.syncSweepTableRegisterState(this.state, this.registerState);
 			}
 			this._applyRegisterStateToEngine();

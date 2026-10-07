@@ -420,4 +420,45 @@ describe('NesApuEngine', () => {
 			expect(peak).toBeLessThan(pulsePeak * 0.05);
 		}
 	});
+
+	it('writes $4011 for a delta counter without restarting DPCM', () => {
+		const wasmModule = createMockWasmModule();
+		const engine = createTestEngine(wasmModule);
+		wasmModule.dmcWrites.length = 0;
+		const registerState = new NesChipRegisterState();
+		registerState.channels[4].enabled = false;
+		registerState.channels[4].dpcmDelta = 0x40;
+		registerState.channels[4].dpcmDeltaWrite = true;
+
+		engine.applyRegisterState(registerState);
+
+		expect(wasmModule.dmcWrites.filter((write) => write.addr === 0x4011)).toEqual([
+			{ addr: 0x4011, val: 0x40 }
+		]);
+		expect(registerState.channels[4].dpcmDeltaWrite).toBe(false);
+
+		wasmModule.dmcWrites.length = 0;
+		engine.applyRegisterState(registerState);
+		expect(wasmModule.dmcWrites.filter((write) => write.addr === 0x4011)).toEqual([]);
+	});
+
+	it('writes $4011 once when a sample retrigger carries the delta counter', () => {
+		const wasmModule = createMockWasmModule();
+		const engine = createTestEngine(wasmModule);
+		wasmModule.dmcWrites.length = 0;
+		const registerState = new NesChipRegisterState();
+		const channel = registerState.channels[4];
+		channel.enabled = true;
+		channel.retrigger = true;
+		channel.dpcmDelta = 0x22;
+		channel.dpcmDeltaWrite = true;
+		channel.dpcmBytes = [0xaa];
+		channel.dpcmPitch = 15;
+
+		engine.applyRegisterState(registerState);
+
+		expect(wasmModule.dmcWrites.filter((write) => write.addr === 0x4011)).toEqual([
+			{ addr: 0x4011, val: 0x22 }
+		]);
+	});
 });

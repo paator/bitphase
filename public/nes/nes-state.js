@@ -29,7 +29,12 @@ const NES_CHANNEL_ARRAY_SPECS = [
 	['channelSweepTableIndex', -1],
 	['channelSweepTablePosition', 0],
 	['channelSweepDown', false],
-	['channelSweepTableTick', false]
+	['channelSweepTableTick', false],
+	['channelDpcmDelta', 0],
+	['channelDpcmDeltaWrite', false],
+	['channelDpcmDeltaTableMode', false],
+	['channelDpcmDeltaTableIndex', -1],
+	['channelDpcmDeltaTablePosition', 0]
 ];
 
 class NesState extends TrackerState {

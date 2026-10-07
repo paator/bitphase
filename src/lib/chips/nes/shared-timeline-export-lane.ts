@@ -85,6 +85,7 @@ function createNesLaneHandle(
 			patternProcessor.processTrackerTick(registerState);
 			audioDriver.advancePulseWidthTable(state);
 			audioDriver.advanceSweepTable(state);
+			audioDriver.advanceDeltaCounterTable(state);
 			audioDriver.syncSweepTableRegisterState(state, registerState);
 			apuEngine.applyRegisterState(registerState);
 		},

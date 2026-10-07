@@ -197,7 +197,7 @@ function moduleBytes(
 	]);
 }
 
-function tinySong(rows: number[][], length = rows.length): Uint8Array {
+function tinySong(rows: number[][], length = rows.length, channel = 0): Uint8Array {
 	const params = [
 		0,
 		...u32(5),
@@ -212,7 +212,7 @@ function tinySong(rows: number[][], length = rows.length): Uint8Array {
 	const header = [0, ...ascii('Song'), 0];
 	for (let channel = 0; channel < 5; channel++) header.push(channel, 0);
 	const frames = [...u32(1), ...u32(6), ...u32(150), ...u32(length), 0, 0, 0, 0, 0];
-	const patterns = [...u32(0), ...u32(0), ...u32(0), ...u32(rows.length), ...rows.flat()];
+	const patterns = [...u32(0), ...u32(channel), ...u32(0), ...u32(rows.length), ...rows.flat()];
 	return Uint8Array.from([
 		...ascii('FamiTracker Module'),
 		...u32(0x0440),
@@ -640,5 +640,26 @@ describe('dnm import', () => {
 
 	it('rejects a Dn-FamiTracker module with an unsupported expansion', () => {
 		expect(() => importFtmBuffer(dnmBytes(1).buffer)).toThrow(/NES and NES \+ 5B/);
+	});
+
+	it('imports Zxx as E4XY on the DPCM channel', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 15, 0xff)], 1, 4).buffer
+		);
+		const row = project.songs[0]!.patterns[0]!.channels[4]!.rows[0]!;
+		expect(row.effects[0]).toMatchObject({
+			effect: EffectType.AutoEnvelope,
+			delay: 4,
+			parameter: 0x7f
+		});
+		expect(warnings.some((warning) => warning.includes('Z'))).toBe(false);
+	});
+
+	it('skips Zxx on pulse channels', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 15, 0x40)]).buffer
+		);
+		expect(project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!.effects[0]).toBeNull();
+		expect(warnings.some((warning) => /\bZ\b/.test(warning))).toBe(true);
 	});
 });
