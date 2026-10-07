@@ -281,6 +281,31 @@ class NesAudioDriver {
 		);
 	}
 
+	refreshSoundingRow(state, registerState) {
+		const channelCount = registerState.channelCount ?? NES_CHANNEL_COUNT;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			const channel = registerState.channels[channelIndex];
+			if (!channel?.enabled) continue;
+			if (state.channelMuted?.[channelIndex] || !state.channelSoundEnabled?.[channelIndex]) {
+				continue;
+			}
+			if (!channelHasAssignedInstrument(state, channelIndex)) continue;
+			if (this._getHardwareChannelType(channelIndex) === 4) continue;
+
+			const row = this.resolveInstrumentRow(state, channelIndex);
+			const patternVolume = state.channelPatternVolumes?.[channelIndex] ?? 15;
+			const period = channel.period;
+			const noisePeriod = channel.noisePeriod;
+			const sweepReg = channel.sweepReg;
+			this._applyEnvelopeAndLength(channel, channelIndex, row, patternVolume, state);
+			channel.retrigger = false;
+			channel.period = period;
+			channel.noisePeriod = noisePeriod;
+			channel.sweepReg = sweepReg;
+			channel.sweepUpdateOnly = false;
+		}
+	}
+
 	processInstruments(state, registerState) {
 		const channelCount = registerState.channelCount ?? NES_CHANNEL_COUNT;
 		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {

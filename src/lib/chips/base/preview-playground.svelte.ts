@@ -54,8 +54,6 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 	let hadActiveNotes = false;
 	let wasPlaying = false;
 	let releaseTimer = 0;
-	let prevInstruments: typeof projectStore.instruments | undefined;
-	let prevTables: typeof projectStore.tables | undefined;
 	let savedStereoLayout: string | undefined;
 
 	function channelCount() {
@@ -173,25 +171,6 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 			isPreviewPlaying = false;
 		}
 		wasPlaying = isDisabled;
-	});
-
-	$effect(() => {
-		const instruments = projectStore.instruments;
-		const tables = projectStore.tables;
-		const playing = isPreviewPlaying;
-		if (!playing) {
-			prevInstruments = instruments;
-			prevTables = tables;
-			return;
-		}
-		if (prevInstruments !== instruments || prevTables !== tables) {
-			prevInstruments = instruments;
-			prevTables = tables;
-			isPreviewPlaying = false;
-			queueMicrotask(() => {
-				isPreviewPlaying = true;
-			});
-		}
 	});
 
 	$effect(() => {

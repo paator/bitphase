@@ -103,6 +103,30 @@ describe('NesAudioDriver envelope and length macro', () => {
 		expect(registerState.channels[2].linearReg).toBe(0);
 	});
 
+	it('updates the sounding volume without retriggering or changing duty', () => {
+		const driver = new NesAudioDriver();
+		const registerState = new NesChipRegisterState();
+		const state = createEnvelopeState({ envelope: false, volumeOrRate: 12, pulseWidth: 1 });
+
+		driver.processInstruments(state, registerState);
+		const period = registerState.channels[0].period;
+		const position = state.instrumentPositions[0];
+		state.instruments[0].macros.volumeOrRate.values[0] = 4;
+		state.channelKeyOn[0] = true;
+		registerState.channels[0].retrigger = true;
+
+		driver.refreshSoundingRow(state, registerState);
+
+		expect(registerState.channels[0].duty).toBe(1);
+		expect(registerState.channels[0].volumeReg).toBe(
+			buildSquareEnvelopeVolumeReg(1, false, 4, 40)
+		);
+		expect(registerState.channels[0].retrigger).toBe(false);
+		expect(registerState.channels[0].period).toBe(period);
+		expect(state.instrumentPositions[0]).toBe(position);
+		expect(state.channelKeyOn[0]).toBe(true);
+	});
+
 	it('writes constant volume register when envelope is off', () => {
 		const driver = new NesAudioDriver();
 		const registerState = new NesChipRegisterState();

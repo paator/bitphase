@@ -93,6 +93,40 @@ describe('NesWorkletSlot preview', () => {
 		expect(slot.shouldAccumulateStereoOutput()).toBe(true);
 	});
 
+	it('does not retrigger a held preview note when the row is sent again', () => {
+		const slot = createPreviewSlot();
+		slot.patternProcessor.parsePatternRow = vi.fn();
+		slot.patternProcessor._processVolume = vi.fn();
+		slot.audioDriver.refreshSoundingRow = vi.fn();
+		const reset = vi.spyOn(slot.state, 'reset');
+
+		slot.handlePreviewRow({
+			pattern: previewPattern,
+			rowIndex: 0,
+			channelIndex: 0
+		});
+		reset.mockClear();
+		slot.patternProcessor.parsePatternRow.mockClear();
+		slot.apuEngine.applyRegisterState.mockClear();
+		slot.state.instrumentPositions[0] = 4;
+		slot.state.channelKeyOn[0] = false;
+
+		slot.handlePreviewRow({
+			pattern: previewPattern,
+			rowIndex: 0,
+			channelIndex: 0,
+			instrument: { id: '01', macros: { volumeOrRate: { values: [8] } } }
+		});
+
+		expect(reset).not.toHaveBeenCalled();
+		expect(slot.patternProcessor.parsePatternRow).not.toHaveBeenCalled();
+		expect(slot.apuEngine.reset).not.toHaveBeenCalled();
+		expect(slot.state.instrumentPositions[0]).toBe(4);
+		expect(slot.state.channelKeyOn[0]).toBe(false);
+		expect(slot.audioDriver.refreshSoundingRow).toHaveBeenCalled();
+		expect(slot.apuEngine.applyRegisterState).toHaveBeenCalled();
+	});
+
 	it('does not rewrite registers on every preview sample', () => {
 		const slot = createPreviewSlot();
 		slot.handlePreviewRow({

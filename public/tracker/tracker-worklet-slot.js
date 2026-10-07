@@ -6,6 +6,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		super(port, chipIndex);
 		this.previewActiveChannels = new Set();
 		this.previewTickSampleCounter = 0;
+		this.previewIdentity = '';
 		this._rowParsePrimed = -1;
 	}
 
@@ -260,11 +261,76 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 
 	_silencePreviewChannel(_channelIndex) {}
 
+	_previewIdentity(pattern, rowIndex, channelIndex) {
+		const channels = pattern?.channels;
+		if (!channels || rowIndex < 0 || rowIndex >= (pattern.length ?? 0)) return '';
+		const singleChannel = typeof channelIndex === 'number' && channelIndex >= 0;
+		const notes = [];
+		for (let ch = 0; ch < channels.length; ch++) {
+			if (singleChannel && ch !== channelIndex) {
+				notes.push('_');
+				continue;
+			}
+			const row = channels[ch]?.rows?.[rowIndex];
+			const note = row?.note;
+			const instrumentId = row?.instrument ?? 0;
+			if (!note || note.name === 0 || note.name === 1) {
+				notes.push(`${instrumentId}:off`);
+			} else {
+				notes.push(`${instrumentId}:${note.name}.${note.octave}`);
+			}
+		}
+		return `${singleChannel ? `ch${channelIndex}` : 'all'}:${notes.join('|')}`;
+	}
+
+	_syncPreviewTable(channelIndex, row) {
+		if (!this.patternProcessor || row?.table === undefined) return;
+		const current = this.state.channelTables?.[channelIndex];
+		if (row.table === -1) {
+			if (current !== -1) this.patternProcessor._disableTable?.(channelIndex);
+			return;
+		}
+		if (row.table > 0 && current !== row.table - 1) {
+			this.patternProcessor._enableTable?.(channelIndex, row.table - 1);
+		}
+	}
+
+	_updateLivePreview({ pattern, rowIndex, instrument, channelIndex }) {
+		if (instrument) {
+			this.state.setInstruments([instrument]);
+			for (const channel of this.previewActiveChannels) {
+				if (this.state.channelInstruments) {
+					this.state.channelInstruments[channel] = 0;
+				}
+			}
+		}
+		if (pattern.channels.length) {
+			this._resizeForPatternChannels(pattern.channels.length);
+		}
+		const singleChannel = typeof channelIndex === 'number' && channelIndex >= 0;
+		for (let ch = 0; ch < pattern.channels.length; ch++) {
+			if (singleChannel && ch !== channelIndex) continue;
+			if (!this.previewActiveChannels.has(ch)) continue;
+			const row = pattern.channels[ch]?.rows?.[rowIndex];
+			if (!row) continue;
+			this.patternProcessor?._processVolume?.(ch, row);
+			this._syncPreviewTable(ch, row);
+		}
+		this.audioDriver?.refreshSoundingRow?.(this.state, this.registerState);
+		this._applyRegisterStateToEngine();
+	}
+
 	handlePreviewRow({ pattern, rowIndex, instrument, channelIndex }) {
 		if (!this._canPreview()) {
 			return;
 		}
-		this._beforePreviewRow({ pattern, rowIndex, instrument, channelIndex });
+		const previewData = { pattern, rowIndex, instrument, channelIndex };
+		const identity = this._previewIdentity(pattern, rowIndex, channelIndex);
+		const liveUpdate =
+			this.isPreviewActive() && identity !== '' && identity === this.previewIdentity;
+		if (!liveUpdate) {
+			this._beforePreviewRow(previewData);
+		}
 		this.paused = true;
 		if (!pattern?.channels || !pattern.patternRows || rowIndex < 0) {
 			return;
@@ -273,6 +339,10 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			return;
 		}
 		if (!this._chipEngineReady()) {
+			return;
+		}
+		if (liveUpdate) {
+			this._updateLivePreview(previewData);
 			return;
 		}
 		if (pattern.channels.length) {
@@ -312,6 +382,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			}
 		}
 		this.previewTickSampleCounter = 0;
+		this.previewIdentity = identity;
 		this.state.timeline.songEndPending = songEndPending;
 		this.state.timeline._songEndRow = songEndRow;
 	}
@@ -330,6 +401,9 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			this.registerState.reset();
 			this._resetEnginesForPreview();
 			this._applyRegisterStateToEngine();
+		}
+		if (this.previewActiveChannels.size === 0) {
+			this.previewIdentity = '';
 		}
 	}
 
