@@ -99,7 +99,7 @@ export const settingsItems: SettingsItem[] = [
 		label: 'Pattern Editor Font Family',
 		description: 'Choose the font for the pattern editor',
 		type: 'select',
-		defaultValue: 'monospace',
+		defaultValue: 'JetBrains Mono',
 		setting: 'patternEditorFontFamily',
 		category: 'appearance',
 		options: [...MONOSPACE_FONTS]

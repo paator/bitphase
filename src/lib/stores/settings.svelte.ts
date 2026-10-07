@@ -9,7 +9,7 @@ class SettingsStore {
 	autoEnterInstrument = $state(true);
 	midiInputDeviceId = $state('');
 	patternEditorFontSize = $state(14);
-	patternEditorFontFamily = $state('monospace');
+	patternEditorFontFamily = $state('JetBrains Mono');
 	uiFontFamily = $state('Fira Code');
 	channelSeparatorWidth = $state(1);
 	decimalRowNumbers = $state(false);
