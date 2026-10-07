@@ -1039,7 +1039,6 @@ function buildArpTables(
 type EffectCarry = {
 	pitch: Effect | null;
 	vibrato: Effect | null;
-	sweep: Effect | null;
 	volumeSlide: Effect | null;
 	detune: Effect | null;
 	gate: boolean;
@@ -1049,7 +1048,6 @@ function freshEffectCarry(): EffectCarry {
 	return {
 		pitch: null,
 		vibrato: null,
-		sweep: null,
 		volumeSlide: null,
 		detune: null,
 		gate: false
@@ -1069,10 +1067,6 @@ function isContinuingPitchEffect(effect: number): boolean {
 	);
 }
 
-function isSweepEffect(effect: Effect): boolean {
-	return effect.effect === EffectType.AutoEnvelope && (effect.delay === 2 || effect.delay === 3);
-}
-
 function rememberImportedEffect(carry: EffectCarry, effect: Effect): void {
 	if (isContinuingPitchEffect(effect.effect)) {
 		carry.pitch = effect.parameter === 0 ? null : cloneImportedEffect(effect);
@@ -1080,10 +1074,6 @@ function rememberImportedEffect(carry: EffectCarry, effect: Effect): void {
 	}
 	if (effect.effect === EffectType.Vibrato) {
 		carry.vibrato = effect.parameter === 0 ? null : cloneImportedEffect(effect);
-		return;
-	}
-	if (isSweepEffect(effect)) {
-		carry.sweep = (effect.parameter & 0x0f) === 0 ? null : cloneImportedEffect(effect);
 		return;
 	}
 	if (effect.effect === EffectType.VolumeSlide) {
@@ -1183,9 +1173,6 @@ function sustainImportedEffects(
 		carry.vibrato,
 		rowHasImportedEffect(row, (effect) => effect.effect === EffectType.Vibrato)
 	);
-	if (!ayChannel && channelIndex <= 1) {
-		resume(carry.sweep, rowHasImportedEffect(row, isSweepEffect));
-	}
 	if (!gateWasOpen) {
 		resume(
 			carry.volumeSlide,

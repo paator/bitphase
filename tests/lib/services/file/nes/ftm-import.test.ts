@@ -387,6 +387,34 @@ describe('ftm import', () => {
 		).toBe(true);
 	});
 
+	it('copies pitch slides onto later notes and leaves hardware sweep on its row', () => {
+		const { project } = importFtmBuffer(
+			tinySong([
+				patternCell(0, 1, 3, 9, 0x12),
+				patternCell(1, 5, 3, 0, 0),
+				patternCell(2, 8, 3, 17, 0x20),
+				patternCell(3, 10, 3, 0, 0)
+			]).buffer
+		);
+		const rows = project.songs[0]!.patterns[0]!.channels[0]!.rows;
+		expect(rows[0]!.effects[0]).toMatchObject({
+			effect: EffectType.AutoEnvelope,
+			delay: 3,
+			parameter: 0x12
+		});
+		expect(rows[1]!.effects[0]).toBeNull();
+		expect(rows[2]!.effects[0]).toMatchObject({
+			effect: EffectType.SlideUp,
+			delay: 1,
+			parameter: 0x20
+		});
+		expect(rows[3]!.effects[0]).toMatchObject({
+			effect: EffectType.SlideUp,
+			delay: 1,
+			parameter: 0x20
+		});
+	});
+
 	it('repeats slides, vibrato, and arpeggio on later notes', () => {
 		const { project } = importFtmBuffer(
 			tinySong([
