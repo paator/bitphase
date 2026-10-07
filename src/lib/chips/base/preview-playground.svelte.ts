@@ -101,6 +101,32 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 		releaseTimer = 0;
 	}
 
+	function previewIsSounding(): boolean {
+		return (
+			hadActiveNotes ||
+			isPreviewPlaying ||
+			activeNotes.length > 0 ||
+			playbackNotes.length > 0
+		);
+	}
+
+	function silencePreview(): void {
+		cancelReleaseTail();
+		const processors = currentPreviewProcessors() as unknown as PreviewNoteSupport[];
+		for (const processor of processors) {
+			processor.stopPreviewNote();
+		}
+		if (processors.length > 0) {
+			audioService.setPreviewActiveForChips(null);
+		}
+		if (savedStereoLayout !== undefined) {
+			audioService.chipSettings
+				.forChip(options.getChip().type)
+				.set('stereoLayout', savedStereoLayout);
+			savedStereoLayout = undefined;
+		}
+	}
+
 	function armReleaseTail(): void {
 		cancelReleaseTail();
 		const ms = previewReleaseTailMs(currentInstrumentMacros(), interruptHz());
@@ -175,13 +201,8 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 
 	$effect(() => {
 		return () => {
-			cancelReleaseTail();
-			if (savedStereoLayout !== undefined) {
-				audioService.chipSettings
-					.forChip(options.getChip().type)
-					.set('stereoLayout', savedStereoLayout);
-				savedStereoLayout = undefined;
-			}
+			if (!previewIsSounding()) return;
+			silencePreview();
 		};
 	});
 
@@ -195,12 +216,7 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 		if (!hasNotes) {
 			if (hadActiveNotes) {
 				hadActiveNotes = false;
-				processors.forEach((proc) => proc.stopPreviewNote());
-				audioService.setPreviewActiveForChips(null);
-				if (savedStereoLayout !== undefined) {
-					chipSettings.set('stereoLayout', savedStereoLayout);
-					savedStereoLayout = undefined;
-				}
+				silencePreview();
 			}
 			return;
 		}
