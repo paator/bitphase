@@ -5,7 +5,9 @@ import NesApuEngine, { createNesApuEngine } from '../../public/nes/nes-apu-engin
 import NesChipRegisterState from '../../public/nes/nes-chip-register-state.js';
 import {
 	NES_APU_STATUS_PULSE,
-	NES_APU_STATUS_TRIANGLE_NOISE
+	NES_APU_STATUS_TRIANGLE_NOISE,
+	NES_NTSC_CPU_FREQUENCY,
+	NES_RENDER_CLOCK_DIVIDER
 } from '../../public/nes/nes-constants.js';
 
 async function loadWasm() {
@@ -24,6 +26,18 @@ function renderSquarePeak(engine, sampleRate = 44100) {
 		peak = Math.max(peak, Math.abs(left));
 	}
 	return peak;
+}
+
+function goertzelPower(samples, frequency, sampleRate) {
+	const coeff = 2 * Math.cos((2 * Math.PI * frequency) / sampleRate);
+	let s1 = 0;
+	let s2 = 0;
+	for (let i = 0; i < samples.length; i++) {
+		const s0 = samples[i] + coeff * s1 - s2;
+		s2 = s1;
+		s1 = s0;
+	}
+	return s1 * s1 + s2 * s2 - coeff * s1 * s2;
 }
 
 function renderChannelPeak(engine, channelIndex, sampleRate = 44100) {
@@ -104,6 +118,37 @@ describe('NesApuEngine', () => {
 		expect(peak).toBeLessThan(0.001);
 	});
 
+	it('keeps high pulse harmonics from folding into the audible band', async () => {
+		const wasmModule = await loadWasm();
+		const { engine } = createNesApuEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+		const sampleRate = 44100;
+		const period = 16;
+		const fundamental = NES_NTSC_CPU_FREQUENCY / (16 * period);
+		const alias = sampleRate - fundamental * 5;
+
+		registerState.channels[0].enabled = true;
+		registerState.channels[0].period = period;
+		registerState.channels[0].volume = 15;
+		registerState.channels[0].duty = 2;
+		registerState.channels[0].retrigger = true;
+		engine.applyRegisterState(registerState);
+
+		const samples = [];
+		let stemPeak = 0;
+		for (let i = 0; i < 8192; i++) {
+			samples.push(engine.process(sampleRate).left);
+			stemPeak = Math.max(stemPeak, Math.abs(engine.getExportChannelSamples()[0]));
+		}
+		const steady = samples.slice(1024);
+		const fundamentalPower = goertzelPower(steady, fundamental, sampleRate);
+		const aliasPower = goertzelPower(steady, alias, sampleRate);
+
+		expect(fundamentalPower).toBeGreaterThan(1);
+		expect(aliasPower / fundamentalPower).toBeLessThan(0.002);
+		expect(stemPeak).toBeGreaterThan(0.01);
+	});
+
 	it('plays square waves after channel enable and register writes', async () => {
 		const wasmModule = await loadWasm();
 		const { engine } = createNesApuEngine(wasmModule);
@@ -167,7 +212,8 @@ describe('NesApuEngine', () => {
 		engine.process(44100);
 
 		expect(engine.getChannelRawOut(4)).toBe(80);
-		expect(Math.abs(engine._readMixOut(4) - before)).toBeLessThan(2);
+		const slicesPerSample = NES_NTSC_CPU_FREQUENCY / NES_RENDER_CLOCK_DIVIDER / 44100;
+		expect(Math.abs(engine._readMixOut(4) - before)).toBeLessThan(slicesPerSample + 2);
 
 		engine.applyRegisterState(new NesChipRegisterState());
 		engine.process(44100);
@@ -237,7 +283,9 @@ describe('NesApuEngine', () => {
 		registerState.channels[2].retrigger = true;
 		engine.applyRegisterState(registerState);
 
-		const linearWrites = wasmModule.dmcWrites.filter((write) => write.addr === 0x4008 && write.val === 64);
+		const linearWrites = wasmModule.dmcWrites.filter(
+			(write) => write.addr === 0x4008 && write.val === 64
+		);
 		expect(linearWrites.length).toBeGreaterThanOrEqual(2);
 	});
 
