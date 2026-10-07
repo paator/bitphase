@@ -1,5 +1,5 @@
 import type { Project } from '../../../models/project';
-import { EffectType } from '../../../models/song';
+import { EffectType, NoteName } from '../../../models/song';
 import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 import { getTotalVirtualChannelCount } from '../../../models/virtual-channels';
 import JSZip from 'jszip';
@@ -21,6 +21,7 @@ import {
 	type SongCaptureFrame
 } from './ay-export-utils';
 import { filterInstrumentsForChip } from '../../instrument/instrument-filter';
+import { isPitchedNoteName } from '../../../utils/note-utils';
 
 const DEFAULT_SPEED = 6;
 const CAPTURE_OUTPUT_SAMPLE_RATE = 44100;
@@ -166,7 +167,7 @@ class PsgExportService {
 			if (
 				row &&
 				row.note &&
-				row.note.name >= 2 &&
+				isPitchedNoteName(row.note.name as NoteName) &&
 				!this.rowHasPortamentoCommand(row) &&
 				!state.channelPortamentoActive?.[channelIndex]
 			) {

@@ -6,6 +6,8 @@ import {
 	notesForProcessor,
 	parseClampedHex,
 	parseTableChar,
+	previewMacrosReleaseOnKeyUp,
+	previewReleaseTailMs,
 	previewVolumeValue,
 	sanitizeHexInput,
 	sanitizeTableInput
@@ -41,6 +43,21 @@ describe('preview-row-utils', () => {
 		expect(previewVolumeValue('')).toBe(15);
 		expect(previewVolumeValue('0')).toBe(1);
 		expect(previewVolumeValue('A')).toBe(10);
+	});
+
+	it('plays a release tail once when the loop is a single final step', () => {
+		const values = [13, 11, 10, 9, 7, 3, 4, 5, 5, 5, 4, 4, 3, 2, 1, 1, 0];
+		expect(previewMacrosReleaseOnKeyUp([{ values, loop: 16, release: 4 }])).toBe(true);
+		expect(previewMacrosReleaseOnKeyUp([{ values, loop: 16 }])).toBe(false);
+		expect(previewReleaseTailMs([{ values, loop: 16, release: 4 }], 50)).toBe(
+			Math.ceil((14 / 50) * 1000) + 40
+		);
+	});
+
+	it('leaves a multi-step release loop running', () => {
+		expect(
+			previewReleaseTailMs([{ values: [9, 8, 7, 1, 2, 3], loop: 3, release: 3 }], 50)
+		).toBeNull();
 	});
 
 	it('splits notes across processors by channel count', () => {

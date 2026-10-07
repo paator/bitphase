@@ -3,8 +3,12 @@ import { sampleNesApuRow } from '../tracker/tracker-instrument-macros.js';
 import {
 	assignPatternRowInstrument,
 	channelHasAssignedInstrument,
+	channelInstrumentReleaseTick,
+	clearChannelInstrumentRelease,
 	isChannelOnOffHalted,
-	processChannelOnOffCounters
+	NOTE_RELEASE,
+	processChannelOnOffCounters,
+	releaseChannelInstrument
 } from '../tracker/tracker-instrument-channel.js';
 import {
 	buildLengthCounterNibble,
@@ -81,6 +85,9 @@ class NesAudioDriver {
 			} else {
 				this._processNote(state, channelIndex, row);
 				this._processInstrument(state, channelIndex, row);
+				if (row.note?.name === NOTE_RELEASE) {
+					releaseChannelInstrument(state, channelIndex);
+				}
 				processNesPulseWidthCycleEffect(state, channelIndex, row);
 				processNesSweepEffect(state, channelIndex, row);
 			}
@@ -195,7 +202,12 @@ class NesAudioDriver {
 	_processNote(state, channelIndex, row) {
 		if (state.channelMuted[channelIndex]) return;
 
+		if (row.note.name === NOTE_RELEASE) {
+			return;
+		}
+
 		if (row.note.name === 1) {
+			clearChannelInstrumentRelease(state, channelIndex);
 			state.channelSoundEnabled[channelIndex] = false;
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = false;
@@ -203,6 +215,7 @@ class NesAudioDriver {
 			resetNesChannelPulseWidthCycle(state, channelIndex);
 			resetNesChannelSweepOverride(state, channelIndex);
 		} else if (row.note.name !== 0) {
+			clearChannelInstrumentRelease(state, channelIndex);
 			state.channelSoundEnabled[channelIndex] = true;
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = true;
@@ -261,7 +274,11 @@ class NesAudioDriver {
 	resolveInstrumentRow(state, channelIndex) {
 		const instrumentIndex = state.channelInstruments[channelIndex];
 		const instrument = state.instruments[instrumentIndex];
-		return sampleNesApuRow(instrument, state.instrumentPositions[channelIndex]);
+		return sampleNesApuRow(
+			instrument,
+			state.instrumentPositions[channelIndex],
+			channelInstrumentReleaseTick(state, channelIndex)
+		);
 	}
 
 	processInstruments(state, registerState) {

@@ -1,3 +1,4 @@
+import { releaseChannelInstrument } from './tracker-instrument-channel.js';
 import { WorkletSlotBase } from './worklet-slot-base.js';
 
 export class TrackerWorkletSlot extends WorkletSlotBase {
@@ -59,19 +60,13 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		const hasChannelFields = channelFields?.some(
 			(fields) => fields && Object.keys(fields).length > 0
 		);
-		const hasGlobalFields = Boolean(
-			globalFields && Object.keys(globalFields).length > 0
-		);
+		const hasGlobalFields = Boolean(globalFields && Object.keys(globalFields).length > 0);
 		const hasDetune =
 			channelDetune?.some((command) => command) || Boolean(carry.envelopeDetune);
 		if (!hasChannelFields && !hasGlobalFields && !hasDetune) return;
 		if (!this._chipEngineReady()) return;
 
-		const channelCount = Math.max(
-			channelFields?.length ?? 0,
-			channelDetune?.length ?? 0,
-			1
-		);
+		const channelCount = Math.max(channelFields?.length ?? 0, channelDetune?.length ?? 0, 1);
 		this._resizeForPatternChannels(channelCount);
 		const channels = [];
 		for (let ch = 0; ch < channelCount; ch++) {
@@ -215,6 +210,9 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			case 'stop_preview':
 				this.handleStopPreview(data.channel);
 				break;
+			case 'release_preview':
+				this.handleReleasePreview(data.channel);
+				break;
 			case 'set_channel_mute':
 				this.handleSetChannelMute(data);
 				break;
@@ -299,8 +297,7 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 		this._applyRegisterStateToEngine();
 
 		this.previewActiveChannels = new Set();
-		const singleChannelPreview =
-			typeof channelIndex === 'number' && channelIndex >= 0;
+		const singleChannelPreview = typeof channelIndex === 'number' && channelIndex >= 0;
 		if (singleChannelPreview) {
 			this.previewActiveChannels.add(channelIndex);
 			for (let ch = 0; ch < this.registerState.channelCount; ch++) {
@@ -333,6 +330,15 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 			this.registerState.reset();
 			this._resetEnginesForPreview();
 			this._applyRegisterStateToEngine();
+		}
+	}
+
+	handleReleasePreview(channel) {
+		if (!this.isPreviewActive()) return;
+		const channels = channel === undefined ? [...this.previewActiveChannels] : [channel];
+		for (const channelIndex of channels) {
+			if (!this.previewActiveChannels.has(channelIndex)) continue;
+			releaseChannelInstrument(this.state, channelIndex);
 		}
 	}
 

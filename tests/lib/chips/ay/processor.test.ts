@@ -5,6 +5,21 @@ import { legacyInstrument } from '../../../helpers/instrument-fixtures';
 import { MAX_INSTRUMENT_SAMPLE_BYTES } from '@/lib/utils/audio-sample-decode';
 
 describe('sanitizeInstrumentForWorklet', () => {
+	it('keeps a macro release point for playback', () => {
+		const instrument = legacyInstrument({ id: '01', rows: [] });
+		instrument.macros = {
+			volume: { values: [13, 11, 10, 9, 7, 0], loop: 5, release: 4 }
+		};
+
+		const sanitized = sanitizeInstrumentForWorklet(instrument);
+
+		expect(sanitized.macros?.volume).toEqual({
+			values: [13, 11, 10, 9, 7, 0],
+			loop: 5,
+			release: 4
+		});
+	});
+
 	it('includes pwm fields for preview playback', () => {
 		const instrument = legacyInstrument({
 			rows: [{ tone: true, noise: false, envelope: false, volume: 15 }],
@@ -32,7 +47,10 @@ describe('sanitizeInstrumentForWorklet', () => {
 
 	it('includes sample data for worklet playback', () => {
 		const instrument = legacyInstrument({ id: '02', rows: [] });
-		const extended = instrument as typeof instrument & { sampleData?: number[]; sampleRate?: number };
+		const extended = instrument as typeof instrument & {
+			sampleData?: number[];
+			sampleRate?: number;
+		};
 		extended.sampleData = [0, 128, 255];
 		extended.sampleRate = 22_050;
 

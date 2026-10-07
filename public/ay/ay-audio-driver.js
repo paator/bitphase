@@ -5,9 +5,13 @@ import { sampleAyMixerRow, sampleAyTimerRow } from '../tracker/tracker-instrumen
 import {
 	assignPatternRowInstrument,
 	channelHasAssignedInstrument,
+	channelInstrumentReleaseTick,
+	clearChannelInstrumentRelease,
 	getChannelInstrument,
 	isChannelOnOffHalted,
-	processChannelOnOffCounters
+	NOTE_RELEASE,
+	processChannelOnOffCounters,
+	releaseChannelInstrument
 } from '../tracker/tracker-instrument-channel.js';
 import {
 	normalizeAyInstrumentFields,
@@ -107,11 +111,20 @@ class AYAudioDriver {
 		if (!instrument) {
 			return false;
 		}
-		const timerRow = sampleAyTimerRow(instrument, state.instrumentPositions[channelIndex]);
+		const releaseTick = channelInstrumentReleaseTick(state, channelIndex);
+		const timerRow = sampleAyTimerRow(
+			instrument,
+			state.instrumentPositions[channelIndex],
+			releaseTick
+		);
 		if (!timerRow?.syncbuzzer) {
 			return false;
 		}
-		const instrumentRow = sampleAyMixerRow(instrument, state.instrumentPositions[channelIndex]);
+		const instrumentRow = sampleAyMixerRow(
+			instrument,
+			state.instrumentPositions[channelIndex],
+			releaseTick
+		);
 		return !!instrumentRow?.envelope;
 	}
 
@@ -212,6 +225,9 @@ class AYAudioDriver {
 			} else {
 				this._processNote(state, channelIndex, row, registerState);
 				this._processInstrument(state, channelIndex, row);
+				if (row.note?.name === NOTE_RELEASE) {
+					releaseChannelInstrument(state, channelIndex);
+				}
 				this._applySamplePosition(state, channelIndex, row);
 				processAyTimerPwmEffect(state, channelIndex, row);
 				this._processEnvelope(state, channelIndex, row, patternRow, registerState);
@@ -249,7 +265,12 @@ class AYAudioDriver {
 		const preserveTimerPwmSweep = this.shouldPreserveTimerPwmSweep(state, channelIndex, row);
 		const preserveSamplePlayback = this.shouldPreserveSamplePlayback(state, channelIndex, row);
 
+		if (row.note.name === NOTE_RELEASE) {
+			return;
+		}
+
 		if (row.note.name === 1) {
+			clearChannelInstrumentRelease(state, channelIndex);
 			state.channelSoundEnabled[channelIndex] = false;
 			registerState.channels[channelIndex].tone = 0;
 			const preserveTimerPwmSweep = this.shouldPreserveTimerPwmSweep(
@@ -275,6 +296,7 @@ class AYAudioDriver {
 				state.channelSamplePhase[channelIndex] = 0;
 			}
 		} else if (row.note.name !== 0) {
+			clearChannelInstrumentRelease(state, channelIndex);
 			state.channelSoundEnabled[channelIndex] = true;
 			const noteValue = row.note.name - 2 + (row.note.octave - 1) * 12;
 			if (noteValue >= 0 && noteValue < state.currentTuningTable.length) {
@@ -869,7 +891,8 @@ class AYAudioDriver {
 			const timerPlayback = this.resolveTimerRowPlayback(instrument);
 			const instrumentRow = sampleAyMixerRow(
 				instrument,
-				state.instrumentPositions[channelIndex]
+				state.instrumentPositions[channelIndex],
+				channelInstrumentReleaseTick(state, channelIndex)
 			);
 			if (!instrumentRow) {
 				registerState.channels[channelIndex].mixer.tone = false;
@@ -985,7 +1008,8 @@ class AYAudioDriver {
 				const ayFields = normalizeAyInstrumentFields(instrument);
 				const timerRow = sampleAyTimerRow(
 					instrument,
-					state.instrumentPositions[channelIndex]
+					state.instrumentPositions[channelIndex],
+					channelInstrumentReleaseTick(state, channelIndex)
 				) ?? {
 					sid: false,
 					syncbuzzer: false,

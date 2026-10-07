@@ -49,6 +49,37 @@ export function previewVolumeValue(volume: string): number {
 	return volume ? Math.max(1, Math.min(15, parseClampedHex(volume, 1, 15))) : 15;
 }
 
+type PreviewMacro = { values: unknown[]; loop: number; release?: number };
+
+export function previewMacrosReleaseOnKeyUp(macros: PreviewMacro[] | undefined): boolean {
+	if (!macros) return false;
+	return macros.some((macro) => {
+		const release = macro.release ?? -1;
+		return release >= 0 && release < macro.values.length;
+	});
+}
+
+export function previewReleaseTailMs(
+	macros: PreviewMacro[] | undefined,
+	interruptFrequency: number
+): number | null {
+	if (!macros?.length) return null;
+	const hz = interruptFrequency > 0 ? interruptFrequency : 50;
+	let ticks = 0;
+	let found = false;
+	for (const macro of macros) {
+		const len = macro.values.length;
+		const release = macro.release ?? -1;
+		if (release < 0 || release >= len) continue;
+		found = true;
+		const loopStart = macro.loop > 0 && macro.loop < len ? macro.loop : 0;
+		if (loopStart >= release && len - loopStart > 1) return null;
+		ticks = Math.max(ticks, len - release);
+	}
+	if (!found) return null;
+	return Math.ceil(((ticks + 1) / hz) * 1000) + 40;
+}
+
 export function notesForProcessor(
 	noteStrings: string[],
 	processorIndex: number,

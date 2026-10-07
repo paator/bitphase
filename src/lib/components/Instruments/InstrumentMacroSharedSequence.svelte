@@ -5,9 +5,11 @@
 		INSTRUMENT_MACRO_MAX_LENGTH,
 		INSTRUMENT_MACRO_MIN_LENGTH,
 		instrumentMacroAccentColor,
+		INSTRUMENT_MACRO_NO_RELEASE,
 		setInstrumentMacroValue,
 		setSharedSequenceLength,
 		setSharedSequenceLoop,
+		setSharedSequenceRelease,
 		type InstrumentMacro,
 		type InstrumentMacroField,
 		type InstrumentMacroValue,
@@ -17,7 +19,6 @@
 		applyInstrumentMacroSequenceText,
 		cycleInstrumentMacroEnum,
 		formatInstrumentMacroValue,
-		instrumentMacroUsesBarChart,
 		integerFromMacroBarNormalized,
 		MACRO_BAR_INSET,
 		MACRO_LENGTH_HANDLE_WIDTH,
@@ -36,6 +37,7 @@
 	import InstrumentMacroHoverTooltip from './InstrumentMacroHoverTooltip.svelte';
 	import InstrumentMacroLengthHandle from './InstrumentMacroLengthHandle.svelte';
 	import InstrumentMacroLoopHandle from './InstrumentMacroLoopHandle.svelte';
+	import InstrumentMacroReleaseHandle from './InstrumentMacroReleaseHandle.svelte';
 	import InstrumentMacroSequenceHeader from './InstrumentMacroSequenceHeader.svelte';
 	import InstrumentMacroSequenceText from './InstrumentMacroSequenceText.svelte';
 
@@ -77,6 +79,15 @@
 	const loopIndex = $derived(
 		Math.max(0, Math.min(sequenceLength - 1, macros[fields[0]?.id ?? '']?.loop ?? 0))
 	);
+	const releaseIndex = $derived(
+		Math.max(
+			INSTRUMENT_MACRO_NO_RELEASE,
+			Math.min(
+				sequenceLength - 1,
+				macros[fields[0]?.id ?? '']?.release ?? INSTRUMENT_MACRO_NO_RELEASE
+			)
+		)
+	);
 	const canRemove = $derived(sequenceLength > INSTRUMENT_MACRO_MIN_LENGTH);
 	const canAdd = $derived(sequenceLength < INSTRUMENT_MACRO_MAX_LENGTH);
 	const stackHeight = $derived.by(() =>
@@ -91,18 +102,25 @@
 		}
 		return offsets;
 	});
-	const textFields = $derived(fields.filter(instrumentMacroUsesBarChart));
+	const textFields = $derived(fields.filter((field) => field.kind !== 'waveform'));
 	const scaleFields = $derived(fields.filter(macroBarNeedsScroll));
 	const sequenceWidth = $derived(stepWidthPx * sequenceLength);
 	const loopHandleLeft = $derived(stepWidthPx * loopIndex - MACRO_LOOP_HANDLE_WIDTH / 2);
+	const releaseHandleLeft = $derived(
+		stepWidthPx * releaseIndex -
+			MACRO_LOOP_HANDLE_WIDTH / 2 +
+			(releaseIndex === loopIndex ? MACRO_LOOP_HANDLE_WIDTH / 2 : 0)
+	);
 	const lengthHandleLeft = $derived(sequenceWidth);
 	const lengthHandleHeight = $derived(Math.max(16, stackHeight - 4));
 
 	let scrollerEl = $state<HTMLDivElement | null>(null);
 	let sequenceEl = $state<HTMLDivElement | null>(null);
 	let loopHandleEl = $state<HTMLDivElement | null>(null);
+	let releaseHandleEl = $state<HTMLDivElement | null>(null);
 	let lengthHandleEl = $state<HTMLDivElement | null>(null);
 	let isDraggingLoop = $state(false);
+	let isDraggingRelease = $state(false);
 	let isDraggingLength = $state(false);
 	let paintFieldId = $state<string | null>(null);
 	let paintValue = $state<InstrumentMacroValue | null>(null);
@@ -125,7 +143,13 @@
 	});
 
 	function fieldMacro(field: InstrumentMacroField): InstrumentMacro {
-		return macros[field.id] ?? { values: [field.defaultValue], loop: loopIndex };
+		return (
+			macros[field.id] ?? {
+				values: [field.defaultValue],
+				loop: loopIndex,
+				release: releaseIndex >= 0 ? releaseIndex : undefined
+			}
+		);
 	}
 
 	function viewMinFor(field: InstrumentMacroField): number {
@@ -142,13 +166,7 @@
 		const row = sequenceEl?.querySelector(`[data-shared-row="${CSS.escape(field.id)}"]`);
 		if (!(row instanceof HTMLElement)) return;
 		const rect = row.getBoundingClientRect();
-		const next = panMacroBarViewMin(
-			field,
-			viewMinFor(field),
-			clientY,
-			rect.top,
-			rect.bottom
-		);
+		const next = panMacroBarViewMin(field, viewMinFor(field), clientY, rect.top, rect.bottom);
 		if (next !== viewMinFor(field)) setViewMin(field, next);
 	}
 
@@ -179,7 +197,8 @@
 	}
 
 	function clearTooltip(): void {
-		if (paintFieldId !== null || isDraggingLoop || isDraggingLength) return;
+		if (paintFieldId !== null || isDraggingLoop || isDraggingRelease || isDraggingLength)
+			return;
 		hoverTooltip = null;
 	}
 
@@ -249,13 +268,17 @@
 		onChange(setSharedSequenceLoop(macros, fields, index));
 	}
 
+	function setRelease(index: number): void {
+		onChange(setSharedSequenceRelease(macros, fields, index));
+	}
+
 	function beginPaint(
 		field: InstrumentMacroField,
 		index: number,
 		event: PointerEvent,
 		fromY: boolean
 	): void {
-		if (field.kind === 'waveform') return;
+		if (event.button !== 0 || field.kind === 'waveform') return;
 		event.preventDefault();
 		const sequence = sequenceEl;
 		if (!sequence) return;
@@ -297,8 +320,7 @@
 			setValue(field, index, integerFromClientY(field, clientY));
 			return;
 		}
-		const field =
-			fieldFromClientY(clientY) ?? fields.find((item) => item.id === paintFieldId);
+		const field = fieldFromClientY(clientY) ?? fields.find((item) => item.id === paintFieldId);
 		if (!field || !canPaintField(field) || paintValue === null) return;
 		setValue(field, index, paintValue);
 	}
@@ -307,6 +329,12 @@
 		const index = stepIndexFromClientX(clientX);
 		if (index === null) return;
 		setLoop(index);
+	}
+
+	function applyReleaseFromClientX(clientX: number): void {
+		const index = stepIndexFromClientX(clientX);
+		if (index === null) return;
+		setRelease(index);
 	}
 
 	function applyLengthFromClientX(clientX: number): void {
@@ -338,6 +366,17 @@
 				accentColor
 			};
 			applyLoopFromClientX(event.clientX);
+			return;
+		}
+		if (isDraggingRelease) {
+			hoverTooltip = {
+				x: event.clientX,
+				y: event.clientY,
+				label: `${label} release`,
+				detail: `Step ${releaseIndex}`,
+				accentColor: 'var(--color-pattern-note-off)'
+			};
+			applyReleaseFromClientX(event.clientX);
 			return;
 		}
 		if (paintFieldId !== null) {
@@ -372,6 +411,11 @@
 			loopHandleEl?.releasePointerCapture(event.pointerId);
 			return;
 		}
+		if (isDraggingRelease) {
+			isDraggingRelease = false;
+			releaseHandleEl?.releasePointerCapture(event.pointerId);
+			return;
+		}
 		if (paintFieldId === null) return;
 		const stoppedField = fields.find((f) => f.id === paintFieldId);
 		paintFieldId = null;
@@ -389,7 +433,19 @@
 		}
 	}
 
+	function handleReleasePointerDown(event: PointerEvent): void {
+		if (event.button !== 0) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const handle = releaseHandleEl;
+		if (!handle) return;
+		isDraggingRelease = true;
+		handle.setPointerCapture(event.pointerId);
+		applyReleaseFromClientX(event.clientX);
+	}
+
 	function handleLoopPointerDown(event: PointerEvent): void {
+		if (event.button !== 0) return;
 		event.preventDefault();
 		event.stopPropagation();
 		const handle = loopHandleEl;
@@ -400,6 +456,7 @@
 	}
 
 	function handleLengthPointerDown(event: PointerEvent): void {
+		if (event.button !== 0) return;
 		event.preventDefault();
 		event.stopPropagation();
 		const handle = lengthHandleEl;
@@ -407,6 +464,13 @@
 		isDraggingLength = true;
 		handle.setPointerCapture(event.pointerId);
 		applyLengthFromClientX(event.clientX);
+	}
+
+	function handleContextMenu(event: MouseEvent): void {
+		const index = stepIndexFromClientX(event.clientX);
+		if (index === null) return;
+		event.preventDefault();
+		setRelease(index === releaseIndex ? INSTRUMENT_MACRO_NO_RELEASE : index);
 	}
 
 	function commitSequenceText(field: InstrumentMacroField, text: string): void {
@@ -419,10 +483,7 @@
 		const field = fieldFromClientY(event.clientY);
 		if (!field || !macroBarNeedsScroll(field)) return;
 		event.preventDefault();
-		const step = Math.max(
-			macroBarViewStep(field),
-			Math.round(Math.abs(event.deltaY) / 24)
-		);
+		const step = Math.max(macroBarViewStep(field), Math.round(Math.abs(event.deltaY) / 24));
 		setViewMin(field, viewMinFor(field) - Math.sign(event.deltaY) * step);
 	}
 </script>
@@ -445,6 +506,7 @@
 		{accentColor}
 		{isExpanded}
 		{loopIndex}
+		{releaseIndex}
 		{sequenceLength}
 		{canRemove}
 		{canAdd}
@@ -452,18 +514,20 @@
 		onAddStep={() => setLength(sequenceLength + 1)} />
 
 	<div class="flex min-w-0 items-stretch">
-		<div
-			bind:this={scrollerEl}
-			class="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pr-2">
+		<div bind:this={scrollerEl} class="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pr-2">
 			<div
 				bind:this={sequenceEl}
 				class="relative w-fit"
-				style="width: {Math.max(sequenceWidth, lengthHandleLeft + MACRO_LENGTH_HANDLE_WIDTH)}px"
+				style="width: {Math.max(
+					sequenceWidth,
+					lengthHandleLeft + MACRO_LENGTH_HANDLE_WIDTH
+				)}px"
 				role="group"
 				aria-label="{label} sequence"
 				onpointermove={handlePointerMove}
 				onpointerup={stopDrag}
 				onpointercancel={stopDrag}
+				oncontextmenu={handleContextMenu}
 				onwheel={handleWheel}>
 				{#each rowDividerOffsets as top (top)}
 					<div
@@ -484,6 +548,20 @@
 						{onStepClick}
 						{isStepEnabled} />
 				{/each}
+				{#if releaseIndex >= 0}
+					<InstrumentMacroReleaseHandle
+						bind:handleEl={releaseHandleEl}
+						left={releaseHandleLeft}
+						height={stackHeight}
+						{releaseIndex}
+						maxIndex={Math.max(0, sequenceLength - 1)}
+						{label}
+						isDragging={isDraggingRelease}
+						onpointerdown={handleReleasePointerDown}
+						onpointermove={handlePointerMove}
+						onpointerup={stopDrag}
+						onpointercancel={stopDrag} />
+				{/if}
 				<InstrumentMacroLoopHandle
 					bind:handleEl={loopHandleEl}
 					left={loopHandleLeft}
@@ -532,6 +610,7 @@
 					{field}
 					values={fieldMacro(field).values}
 					loop={fieldMacro(field).loop}
+					release={fieldMacro(field).release ?? INSTRUMENT_MACRO_NO_RELEASE}
 					{asHex}
 					onCommit={(text) => commitSequenceText(field, text)} />
 			{/each}

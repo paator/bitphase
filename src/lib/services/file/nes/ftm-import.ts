@@ -16,7 +16,10 @@ import {
 	type NesDpcmSample
 } from '../../../chips/nes/dpcm';
 import { applySchemaDefaults, type ChipSchema } from '../../../chips/base/schema';
-import { syncSharedEffectColumnLayout } from '../../../chips/base/channel-effect-columns';
+import {
+	MAX_CHANNEL_EFFECT_COLUMNS,
+	syncSharedEffectColumnLayout
+} from '../../../chips/base/channel-effect-columns';
 import { Project, Table } from '../../../models/project';
 import {
 	Effect,
@@ -337,13 +340,13 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 
 	const params = readParams(findBlock(blocks, 'PARAMS'));
 	const info = readInfo(findBlock(blocks, 'INFO'));
-	if (dnModule && params.expansion !== S5B_EXPANSION) {
-		throw new FtmFormatError('Only NES + 5B Dn-FamiTracker modules can be imported');
+	const s5bModule =
+		(params.expansion & S5B_EXPANSION) !== 0 &&
+		params.channels === NES_CHANNEL_COUNT + S5B_CHANNEL_COUNT;
+	if (dnModule && params.expansion !== 0 && !s5bModule) {
+		throw new FtmFormatError('Only NES and NES + 5B Dn-FamiTracker modules can be imported');
 	}
-	if (dnModule && params.channels !== NES_CHANNEL_COUNT + S5B_CHANNEL_COUNT) {
-		throw new FtmFormatError('NES + 5B module does not have 8 channels');
-	}
-	if (!dnModule && params.expansion !== 0) {
+	if (!s5bModule && params.expansion !== 0) {
 		const names = EXPANSION_NAMES.filter(([bit]) => params.expansion & bit).map(
 			([, name]) => name
 		);
@@ -354,7 +357,7 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 
 	const header = readHeader(findBlock(blocks, 'HEADER'), params.channels);
 	const sequences = readSequences(findBlock(blocks, 'SEQUENCES'));
-	const s5bSequences = dnModule ? readS5bSequences(findBlock(blocks, 'SEQUENCES_S5B')) : [];
+	const s5bSequences = s5bModule ? readS5bSequences(findBlock(blocks, 'SEQUENCES_S5B')) : [];
 	const instruments = readInstruments(findBlock(blocks, 'INSTRUMENTS'));
 	const frames = readFrames(
 		findBlock(blocks, 'FRAMES'),
@@ -391,7 +394,7 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 			skippedEffects,
 			arpTables.byInstrument
 		);
-		if (!dnModule) return [nesSong];
+		if (!s5bModule) return [nesSong];
 		return [
 			nesSong,
 			toAySong(
@@ -846,28 +849,28 @@ function toInstrument(
 	const macros: NonNullable<Instrument['macros']> = {};
 	const volume = enabledSequence(source, sequences, 0);
 	if (volume && volume.values.length > 0) {
-		if (volume.releasePoint >= 0 && volume.releasePoint < volume.values.length) {
-			note('Instrument release points were left in the sequence');
-		}
-		macros.volumeOrRate = {
-			values: volume.values.map((value) => Math.max(0, Math.min(15, value))),
-			loop: holdLoop(volume.loopPoint, volume.values.length)
-		};
+		const values = volume.values.map((value) => Math.max(0, Math.min(15, value)));
+		macros.volumeOrRate = sequenceMacro(values, volume.loopPoint, volume.releasePoint);
 	}
 	const pitch = enabledSequence(source, sequences, 2);
 	const hiPitch = enabledSequence(source, sequences, 3);
 	const tone = mergePitch(pitch, hiPitch);
 	if (tone) {
-		macros.toneAdd = { values: tone.values, loop: tone.loop };
+		macros.toneAdd = sequenceMacro(tone.values, tone.loopPoint, tone.releasePoint);
 		const accumulate = (pitch?.settings ?? 0) !== 1;
-		macros.toneAccumulation = { values: tone.values.map(() => accumulate), loop: tone.loop };
+		macros.toneAccumulation = sequenceMacro(
+			tone.values.map(() => accumulate),
+			tone.loopPoint,
+			tone.releasePoint
+		);
 	}
 	const duty = enabledSequence(source, sequences, 4);
 	if (duty && duty.values.length > 0) {
-		macros.pulseWidth = {
-			values: duty.values.map((value) => value & 3),
-			loop: holdLoop(duty.loopPoint, duty.values.length)
-		};
+		macros.pulseWidth = sequenceMacro(
+			duty.values.map((value) => value & 3),
+			duty.loopPoint,
+			duty.releasePoint
+		);
 	}
 	if (Object.keys(macros).length > 0) instrument.macros = macros;
 
@@ -908,28 +911,45 @@ function toAyInstrument(source: FtmInstrument, sequences: FtmSequence[][], id: s
 	const macros: NonNullable<Instrument['macros']> = {};
 	const volume = enabledSequence(source, sequences, 0);
 	if (volume && volume.values.length > 0) {
-		macros.volume = {
-			values: volume.values.map((value) => Math.max(0, Math.min(15, value))),
-			loop: holdLoop(volume.loopPoint, volume.values.length)
-		};
+		macros.volume = sequenceMacro(
+			volume.values.map((value) => Math.max(0, Math.min(15, value))),
+			volume.loopPoint,
+			volume.releasePoint
+		);
 	}
 	const pitch = enabledSequence(source, sequences, 2);
 	const hiPitch = enabledSequence(source, sequences, 3);
 	const tone = mergePitch(pitch, hiPitch);
 	if (tone) {
-		macros.toneAdd = { values: tone.values, loop: tone.loop };
-		macros.toneAccumulation = { values: tone.values.map(() => true), loop: tone.loop };
+		macros.toneAdd = sequenceMacro(tone.values, tone.loopPoint, tone.releasePoint);
+		macros.toneAccumulation = sequenceMacro(
+			tone.values.map(() => true),
+			tone.loopPoint,
+			tone.releasePoint
+		);
 	}
 	const mode = enabledSequence(source, sequences, 4);
 	if (mode && mode.values.length > 0) {
-		const loop = holdLoop(mode.loopPoint, mode.values.length);
-		macros.tone = { values: mode.values.map((value) => (value & S5B_MODE_SQUARE) !== 0), loop };
-		macros.noise = { values: mode.values.map((value) => (value & S5B_MODE_NOISE) !== 0), loop };
-		macros.envelope = {
-			values: mode.values.map((value) => (value & S5B_MODE_ENVELOPE) !== 0),
-			loop
-		};
-		macros.noiseAdd = { values: mode.values.map((value) => value & 0x1f), loop };
+		macros.tone = sequenceMacro(
+			mode.values.map((value) => (value & S5B_MODE_SQUARE) !== 0),
+			mode.loopPoint,
+			mode.releasePoint
+		);
+		macros.noise = sequenceMacro(
+			mode.values.map((value) => (value & S5B_MODE_NOISE) !== 0),
+			mode.loopPoint,
+			mode.releasePoint
+		);
+		macros.envelope = sequenceMacro(
+			mode.values.map((value) => (value & S5B_MODE_ENVELOPE) !== 0),
+			mode.loopPoint,
+			mode.releasePoint
+		);
+		macros.noiseAdd = sequenceMacro(
+			mode.values.map((value) => value & 0x1f),
+			mode.loopPoint,
+			mode.releasePoint
+		);
 	}
 	if (Object.keys(macros).length > 0) instrument.macros = macros;
 	return instrument;
@@ -945,10 +965,20 @@ function enabledSequence(
 	return sequences[index]?.[type] ?? null;
 }
 
+function sequenceMacro<T extends boolean | number>(
+	values: T[],
+	loopPoint: number,
+	releasePoint: number
+): { values: T[]; loop: number; release?: number } {
+	const loop = holdLoop(loopPoint, values.length);
+	if (releasePoint < 0 || releasePoint >= values.length) return { values, loop };
+	return { values, loop, release: releasePoint };
+}
+
 function mergePitch(
 	pitch: FtmSequence | null,
 	hiPitch: FtmSequence | null
-): { values: number[]; loop: number } | null {
+): { values: number[]; loop: number; loopPoint: number; releasePoint: number } | null {
 	const primary = pitch && pitch.values.length > 0 ? pitch : null;
 	const coarse = hiPitch && hiPitch.values.length > 0 ? hiPitch : null;
 	if (!primary && !coarse) return null;
@@ -962,7 +992,9 @@ function mergePitch(
 	const loopSource = primary ?? coarse!;
 	return {
 		values,
-		loop: holdLoop(loopSource.loopPoint, values.length)
+		loop: holdLoop(loopSource.loopPoint, values.length),
+		loopPoint: loopSource.loopPoint,
+		releasePoint: loopSource.releasePoint
 	};
 }
 
@@ -1004,6 +1036,189 @@ function buildArpTables(
 	return { tables, byInstrument };
 }
 
+type EffectCarry = {
+	pitch: Effect | null;
+	vibrato: Effect | null;
+	sweep: Effect | null;
+	volumeSlide: Effect | null;
+	detune: Effect | null;
+	gate: boolean;
+};
+
+function freshEffectCarry(): EffectCarry {
+	return {
+		pitch: null,
+		vibrato: null,
+		sweep: null,
+		volumeSlide: null,
+		detune: null,
+		gate: false
+	};
+}
+
+function cloneImportedEffect(effect: Effect): Effect {
+	return new Effect(effect.effect, effect.delay, effect.parameter);
+}
+
+function isContinuingPitchEffect(effect: number): boolean {
+	return (
+		effect === EffectType.SlideUp ||
+		effect === EffectType.SlideDown ||
+		effect === EffectType.Portamento ||
+		effect === EffectType.Arpeggio
+	);
+}
+
+function isSweepEffect(effect: Effect): boolean {
+	return effect.effect === EffectType.AutoEnvelope && (effect.delay === 2 || effect.delay === 3);
+}
+
+function rememberImportedEffect(carry: EffectCarry, effect: Effect): void {
+	if (isContinuingPitchEffect(effect.effect)) {
+		carry.pitch = effect.parameter === 0 ? null : cloneImportedEffect(effect);
+		return;
+	}
+	if (effect.effect === EffectType.Vibrato) {
+		carry.vibrato = effect.parameter === 0 ? null : cloneImportedEffect(effect);
+		return;
+	}
+	if (isSweepEffect(effect)) {
+		carry.sweep = (effect.parameter & 0x0f) === 0 ? null : cloneImportedEffect(effect);
+		return;
+	}
+	if (effect.effect === EffectType.VolumeSlide) {
+		carry.volumeSlide = effect.parameter === 0 ? null : cloneImportedEffect(effect);
+		return;
+	}
+	if (effect.effect === EffectType.Detune) {
+		carry.detune = cloneImportedEffect(effect);
+	}
+}
+
+function rowHasImportedEffect(row: Row, match: (effect: Effect) => boolean): boolean {
+	return (row.effects ?? []).some((effect) => effect != null && match(effect));
+}
+
+function placeImportedEffect(
+	channel: { effectColumnCount?: number },
+	row: Row,
+	effect: Effect
+): void {
+	const effects = row.effects ?? [null];
+	row.effects = effects;
+	const empty = effects.findIndex((slot) => slot == null);
+	if (empty >= 0) {
+		effects[empty] = effect;
+		return;
+	}
+	if (effects.length >= MAX_CHANNEL_EFFECT_COLUMNS) return;
+	effects.push(effect);
+	channel.effectColumnCount = Math.max(channel.effectColumnCount ?? 1, effects.length);
+}
+
+function updateEffectCarry(
+	carry: EffectCarry,
+	cell: FtmCell | undefined,
+	row: Row,
+	channel: number,
+	ayChannel: boolean,
+	params: FtmParams,
+	skippedEffects: Set<string>
+): void {
+	const scratch = emptyRow(ayChannel ? AY_CHIP_SCHEMA.fields : NES_CHIP_SCHEMA.fields, 1);
+	scratch.note = row.note;
+	for (const raw of cell?.effects ?? []) {
+		if (raw.number === 20 || raw.number === 21) {
+			carry.pitch = null;
+			continue;
+		}
+		const mapped = mapEffect(
+			raw.number,
+			raw.param,
+			params.speedSplit,
+			channel,
+			scratch,
+			skippedEffects,
+			ayChannel,
+			params.vibratoNew
+		);
+		if (mapped) {
+			rememberImportedEffect(carry, mapped);
+		} else if (
+			raw.param === 0 &&
+			(raw.number === 6 || raw.number === 10 || raw.number === 16 || raw.number === 17)
+		) {
+			carry.pitch = null;
+		}
+	}
+}
+
+function sustainImportedEffects(
+	channel: { effectColumnCount?: number },
+	row: Row,
+	cell: FtmCell | undefined,
+	carry: EffectCarry,
+	params: FtmParams,
+	channelIndex: number,
+	ayChannel: boolean,
+	skippedEffects: Set<string>
+): void {
+	const pitched = row.note.name >= NoteName.C && row.note.name <= NoteName.B;
+	const gateWasOpen = carry.gate;
+	updateEffectCarry(carry, cell, row, channelIndex, ayChannel, params, skippedEffects);
+	if (!pitched) {
+		if (row.note.name === NoteName.Off) carry.gate = false;
+		return;
+	}
+	const resume = (effect: Effect | null, present: boolean) => {
+		if (!effect || present) return;
+		placeImportedEffect(channel, row, cloneImportedEffect(effect));
+	};
+	const portamentoAfterCut = !gateWasOpen && carry.pitch?.effect === EffectType.Portamento;
+	resume(
+		portamentoAfterCut ? null : carry.pitch,
+		rowHasImportedEffect(row, (effect) => isContinuingPitchEffect(effect.effect))
+	);
+	resume(
+		carry.vibrato,
+		rowHasImportedEffect(row, (effect) => effect.effect === EffectType.Vibrato)
+	);
+	if (!ayChannel && channelIndex <= 1) {
+		resume(carry.sweep, rowHasImportedEffect(row, isSweepEffect));
+	}
+	if (!gateWasOpen) {
+		resume(
+			carry.volumeSlide,
+			rowHasImportedEffect(row, (effect) => effect.effect === EffectType.VolumeSlide)
+		);
+		resume(
+			carry.detune,
+			rowHasImportedEffect(row, (effect) => effect.effect === EffectType.Detune)
+		);
+	}
+	carry.gate = true;
+}
+
+function patternLengthForFrame(
+	frame: number[],
+	cells: Map<number, Map<number, Map<number, FtmCell>>>,
+	fullLength: number
+): number {
+	let cut = fullLength;
+	for (let channel = 0; channel < frame.length; channel++) {
+		const rows = cells.get(channel)?.get(frame[channel] ?? 0);
+		if (!rows) continue;
+		for (const [rowIndex, cell] of rows) {
+			if (rowIndex < 0 || rowIndex >= cut) continue;
+			const endsFrame = cell.effects.some(
+				(effect) => effect.number === 2 || effect.number === 3
+			);
+			if (endsFrame) cut = rowIndex + 1;
+		}
+	}
+	return cut > 0 ? cut : 1;
+}
+
 function toSong(
 	track: FtmTrack,
 	effectColumns: number[],
@@ -1026,17 +1241,19 @@ function toSong(
 	song.tuningTable = resolveNesTuningTable(song.chipFrequency, song.a4TuningHz);
 
 	const latchedInstrument = Array.from({ length: NES_CHANNEL_COUNT }, () => -1);
+	const carriedEffects = Array.from({ length: NES_CHANNEL_COUNT }, () => freshEffectCarry());
 	song.patterns = track.frames.map((frame, frameIndex) => {
-		const pattern = new Pattern(frameIndex, track.patternLength, NES_CHIP_SCHEMA);
+		const length = patternLengthForFrame(frame, cells, track.patternLength);
+		const pattern = new Pattern(frameIndex, length, NES_CHIP_SCHEMA);
 		for (let channel = 0; channel < NES_CHANNEL_COUNT; channel++) {
 			const columnCount = effectColumns[channel] ?? 1;
 			const patternChannel = pattern.channels[channel]!;
 			patternChannel.effectColumnCount = columnCount;
 			const patternIndex = frame[channel] ?? 0;
 			const rows = cells.get(channel)?.get(patternIndex);
-			for (let rowIndex = 0; rowIndex < track.patternLength; rowIndex++) {
+			for (let rowIndex = 0; rowIndex < length; rowIndex++) {
 				const cell = rows?.get(rowIndex);
-				patternChannel.rows[rowIndex] = cell
+				const row = cell
 					? toRow(
 							cell,
 							columnCount,
@@ -1050,6 +1267,17 @@ function toSong(
 							params.vibratoNew
 						)
 					: emptyRow(NES_CHIP_SCHEMA.fields, columnCount);
+				sustainImportedEffects(
+					patternChannel,
+					row,
+					cell,
+					carriedEffects[channel]!,
+					params,
+					channel,
+					false,
+					skippedEffects
+				);
+				patternChannel.rows[rowIndex] = row;
 			}
 		}
 		return pattern;
@@ -1082,8 +1310,10 @@ function toAySong(
 	song.tuningTable = resolveAYTuningTable(5, SUNSOFT_5B_CHIP_FREQUENCY, 440);
 
 	const latchedInstrument = Array.from({ length: S5B_CHANNEL_COUNT }, () => -1);
+	const carriedEffects = Array.from({ length: S5B_CHANNEL_COUNT }, () => freshEffectCarry());
 	song.patterns = track.frames.map((frame, frameIndex) => {
-		const pattern = new Pattern(frameIndex, track.patternLength, AY_CHIP_SCHEMA);
+		const length = patternLengthForFrame(frame, cells, track.patternLength);
+		const pattern = new Pattern(frameIndex, length, AY_CHIP_SCHEMA);
 		for (let channel = 0; channel < S5B_CHANNEL_COUNT; channel++) {
 			const sourceChannel = NES_CHANNEL_COUNT + channel;
 			const columnCount = effectColumns[sourceChannel] ?? 1;
@@ -1091,9 +1321,9 @@ function toAySong(
 			patternChannel.effectColumnCount = columnCount;
 			const patternIndex = frame[sourceChannel] ?? 0;
 			const rows = cells.get(sourceChannel)?.get(patternIndex);
-			for (let rowIndex = 0; rowIndex < track.patternLength; rowIndex++) {
+			for (let rowIndex = 0; rowIndex < length; rowIndex++) {
 				const cell = rows?.get(rowIndex);
-				patternChannel.rows[rowIndex] = cell
+				const row = cell
 					? toRow(
 							cell,
 							columnCount,
@@ -1107,6 +1337,17 @@ function toAySong(
 							params.vibratoNew
 						)
 					: emptyRow(AY_CHIP_SCHEMA.fields, columnCount);
+				sustainImportedEffects(
+					patternChannel,
+					row,
+					cell,
+					carriedEffects[channel]!,
+					params,
+					channel,
+					true,
+					skippedEffects
+				);
+				patternChannel.rows[rowIndex] = row;
 			}
 		}
 		return pattern;
@@ -1150,9 +1391,10 @@ function toRow(
 			(cell.note + 1) as NoteName,
 			ayChannel ? ayNoteOctave(cell.octave, warn) : cell.octave + 1
 		);
-	} else if (cell.note === 13 || cell.note === 14) {
+	} else if (cell.note === 13) {
+		row.note = new Note(NoteName.Release, 0);
+	} else if (cell.note === 14) {
 		row.note = new Note(NoteName.Off, 0);
-		if (cell.note === 13) skippedEffects.add('===');
 	}
 	let instrumentSet = false;
 	if (cell.instrument < MAX_FT_INSTRUMENTS) {
@@ -1255,11 +1497,15 @@ function mapEffect(
 				return null;
 			}
 			return new Effect(EffectType.Speed, 0, byte);
+		case 2:
+		case 3:
+			return null;
 		case 5:
 			if (row.volume === 0) row.volume = ftVolume(byte & 0x0f);
 			return null;
 		case 6:
-			if (byte === 0 && row.note.name > NoteName.Off) return null;
+			if (byte === 0 && row.note.name >= NoteName.C && row.note.name <= NoteName.B)
+				return null;
 			return new Effect(EffectType.Portamento, 0, byte);
 		case 8:
 		case 9:
@@ -1275,9 +1521,9 @@ function mapEffect(
 		case 13:
 			return new Effect(EffectType.Detune, 0, byte);
 		case 16:
-			return new Effect(!ayChannel && channel === 3 ? PERIOD_UP : PERIOD_DOWN, 0, byte);
+			return new Effect(!ayChannel && channel === 3 ? PERIOD_UP : PERIOD_DOWN, 1, byte);
 		case 17:
-			return new Effect(!ayChannel && channel === 3 ? PERIOD_DOWN : PERIOD_UP, 0, byte);
+			return new Effect(!ayChannel && channel === 3 ? PERIOD_DOWN : PERIOD_UP, 1, byte);
 		case 22:
 			return famitrackerVolumeSlide(byte);
 		case 23:

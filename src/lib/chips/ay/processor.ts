@@ -19,8 +19,14 @@ type WorkletInstrument = {
 	id: string;
 	chipType: string;
 	name: string;
-	macros?: Record<string, { values: (boolean | number | string)[]; loop: number }>;
-	timerMacros?: Record<string, { values: (boolean | number | string)[]; loop: number }>;
+	macros?: Record<
+		string,
+		{ values: (boolean | number | string)[]; loop: number; release?: number }
+	>;
+	timerMacros?: Record<
+		string,
+		{ values: (boolean | number | string)[]; loop: number; release?: number }
+	>;
 	timerPwmDuty?: number;
 	timerPwmSweepMin?: number;
 	timerPwmSweep?: number;
@@ -38,11 +44,24 @@ type WorkletInstrument = {
 	sampleLoop?: number;
 };
 
+function copyMacroForWorklet(macro: {
+	values: (boolean | number | string)[];
+	loop: number;
+	release?: number;
+}): { values: (boolean | number | string)[]; loop: number; release?: number } {
+	return {
+		values: [...macro.values],
+		loop: macro.loop,
+		...(typeof macro.release === 'number' && macro.release >= 0
+			? { release: macro.release }
+			: {})
+	};
+}
+
 export function sanitizeInstrumentForWorklet(instrument: Instrument): WorkletInstrument {
 	const extended = instrument as WorkletInstrument;
 	const sampleData =
-		extended.sampleData?.length &&
-		isValidInstrumentSampleByteLength(extended.sampleData.length)
+		extended.sampleData?.length && isValidInstrumentSampleByteLength(extended.sampleData.length)
 			? extended.sampleData.map((value) => value & 0xff)
 			: undefined;
 	return {
@@ -53,7 +72,7 @@ export function sanitizeInstrumentForWorklet(instrument: Instrument): WorkletIns
 			? Object.fromEntries(
 					Object.entries(instrument.macros).map(([id, macro]) => [
 						id,
-						{ values: [...macro.values], loop: macro.loop }
+						copyMacroForWorklet(macro)
 					])
 				)
 			: undefined,
@@ -61,7 +80,7 @@ export function sanitizeInstrumentForWorklet(instrument: Instrument): WorkletIns
 			? Object.fromEntries(
 					Object.entries(extended.timerMacros).map(([id, macro]) => [
 						id,
-						{ values: [...macro.values], loop: macro.loop }
+						copyMacroForWorklet(macro)
 					])
 				)
 			: undefined,
@@ -386,6 +405,10 @@ export class AYProcessor
 
 	stopPreviewNote(channel?: number): void {
 		this.bridge.sendCommand({ type: 'stop_preview', channel });
+	}
+
+	releasePreviewNote(channel?: number): void {
+		this.bridge.sendCommand({ type: 'release_preview', channel });
 	}
 
 	sendVirtualChannelConfig(

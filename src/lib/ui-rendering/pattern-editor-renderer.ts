@@ -981,7 +981,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			}
 
 			if (isNoteField) {
-				if (fieldText === 'OFF') {
+				if (fieldText === 'OFF' || fieldText === '===') {
 					return this.patternColors.patternNoteOff;
 				}
 

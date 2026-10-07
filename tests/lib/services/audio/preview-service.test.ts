@@ -24,22 +24,17 @@ describe('PreviewService', () => {
 	beforeEach(() => {
 		processor = {
 			playPreviewRow: vi.fn(),
-			stopPreviewNote: vi.fn()
+			stopPreviewNote: vi.fn(),
+			releasePreviewNote: vi.fn()
 		};
 	});
 
 	it('previews the full row when previewFullRow is enabled', () => {
 		const pattern = createPatternWithNotes();
 
-		const result = previewService.playFromContext(
-			processor,
-			pattern,
-			1,
-			0,
-			schema,
-			converter,
-			{ previewFullRow: true }
-		);
+		const result = previewService.playFromContext(processor, pattern, 1, 0, schema, converter, {
+			previewFullRow: true
+		});
 
 		expect(result).toBe(-1);
 		expect(processor.playPreviewRow).toHaveBeenCalledWith(pattern, 0, undefined, undefined);
@@ -48,15 +43,9 @@ describe('PreviewService', () => {
 	it('previews only the edited channel when previewFullRow is disabled', () => {
 		const pattern = createPatternWithNotes();
 
-		const result = previewService.playFromContext(
-			processor,
-			pattern,
-			1,
-			0,
-			schema,
-			converter,
-			{ previewFullRow: false }
-		);
+		const result = previewService.playFromContext(processor, pattern, 1, 0, schema, converter, {
+			previewFullRow: false
+		});
 
 		expect(result).toBe(1);
 		expect(processor.playPreviewRow).toHaveBeenCalledTimes(1);
@@ -72,15 +61,10 @@ describe('PreviewService', () => {
 	it('previews the full row for global fields even when previewFullRow is disabled', () => {
 		const pattern = createPatternWithNotes();
 
-		const result = previewService.playFromContext(
-			processor,
-			pattern,
-			0,
-			0,
-			schema,
-			converter,
-			{ previewFullRow: false, isGlobalField: true }
-		);
+		const result = previewService.playFromContext(processor, pattern, 0, 0, schema, converter, {
+			previewFullRow: false,
+			isGlobalField: true
+		});
 
 		expect(result).toBe(-1);
 		expect(processor.playPreviewRow).toHaveBeenCalledWith(pattern, 0, undefined, undefined);

@@ -281,28 +281,64 @@ describe('macro sequence text', () => {
 		expect(formatMacroSequenceText([15, 12], 1, integerField, true)).toBe('F | C');
 	});
 
+	it('formats a release marker', () => {
+		expect(
+			formatMacroSequenceText(
+				[13, 11, 10, 9, 7, 3, 4, 5, 5, 5, 4, 4, 3, 2, 1, 1],
+				1,
+				integerField,
+				false,
+				4
+			)
+		).toBe('13 | 11 10 9 / 7 3 4 5 5 5 4 4 3 2 1 1');
+	});
+
 	it('parses space-separated values and a loop marker', () => {
 		expect(parseMacroSequenceText('15 12 | 8 4', integerField, false)).toEqual({
 			values: [15, 12, 8, 4],
-			loop: 2
+			loop: 2,
+			release: -1
 		});
 		expect(parseMacroSequenceText('15 12 8', integerField, false)).toEqual({
 			values: [15, 12, 8],
-			loop: 0
+			loop: 0,
+			release: -1
 		});
 		expect(parseMacroSequenceText('15 12|8', integerField, false)).toEqual({
 			values: [15, 12, 8],
-			loop: 2
+			loop: 2,
+			release: -1
 		});
 		expect(parseMacroSequenceText('F C | 8', integerField, true)).toEqual({
 			values: [15, 12, 8],
-			loop: 2
+			loop: 2,
+			release: -1
+		});
+	});
+
+	it('parses a release marker', () => {
+		expect(parseMacroSequenceText('13 | 11 10 9 / 7 3', integerField, false)).toEqual({
+			values: [13, 11, 10, 9, 7, 3],
+			loop: 1,
+			release: 4
+		});
+		expect(parseMacroSequenceText('15 12/8', integerField, false)).toEqual({
+			values: [15, 12, 8],
+			loop: 0,
+			release: 2
+		});
+		expect(parseMacroSequenceText('| / 8 4', integerField, false)).toEqual({
+			values: [8, 4],
+			loop: 0,
+			release: 0
 		});
 	});
 
 	it('rejects invalid tokens and extra loop markers', () => {
 		expect(parseMacroSequenceText('15 x 8', integerField, false)).toBeNull();
 		expect(parseMacroSequenceText('15 | 8 | 4', integerField, false)).toBeNull();
+		expect(parseMacroSequenceText('15 / 8 / 4', integerField, false)).toBeNull();
+		expect(parseMacroSequenceText('15 12 /', integerField, false)).toBeNull();
 		expect(parseMacroSequenceText('|', integerField, false)).toBeNull();
 		expect(parseMacroSequenceText('   ', integerField, false)).toBeNull();
 	});
@@ -310,7 +346,8 @@ describe('macro sequence text', () => {
 	it('clamps values to the field range', () => {
 		expect(parseMacroSequenceText('15 20 | -3', integerField, false)).toEqual({
 			values: [15, 15, 0],
-			loop: 2
+			loop: 2,
+			release: -1
 		});
 	});
 
@@ -328,11 +365,13 @@ describe('macro sequence text', () => {
 		};
 		expect(parseMacroSequenceText('12.5% | 50%', pulseField, false)).toEqual({
 			values: [0, 2],
-			loop: 1
+			loop: 1,
+			release: -1
 		});
 		expect(parseMacroSequenceText('0 1 | 2', pulseField, false)).toEqual({
 			values: [0, 1, 2],
-			loop: 2
+			loop: 2,
+			release: -1
 		});
 	});
 

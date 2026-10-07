@@ -17,8 +17,10 @@ import type { NESInstrumentFields } from './instrument';
 
 export function sanitizeInstrumentForWorklet(instrument: Instrument) {
 	const extended = instrument as Instrument & Partial<NESInstrumentFields>;
-	const dpcmTarget: { dpcmSamples?: NesDpcmSample[]; dpcmAssignments?: (NesDpcmAssignment | null)[] } =
-		{};
+	const dpcmTarget: {
+		dpcmSamples?: NesDpcmSample[];
+		dpcmAssignments?: (NesDpcmAssignment | null)[];
+	} = {};
 	copyNesDpcmFields(extended, dpcmTarget);
 	return {
 		id: instrument.id,
@@ -28,7 +30,13 @@ export function sanitizeInstrumentForWorklet(instrument: Instrument) {
 			? Object.fromEntries(
 					Object.entries(instrument.macros).map(([id, macro]) => [
 						id,
-						{ values: [...macro.values], loop: macro.loop }
+						{
+							values: [...macro.values],
+							loop: macro.loop,
+							...(typeof macro.release === 'number' && macro.release >= 0
+								? { release: macro.release }
+								: {})
+						}
 					])
 				)
 			: undefined,
@@ -194,9 +202,7 @@ export class NESProcessor
 	}
 
 	sendInitInstruments(instruments: Instrument[]): void {
-		const sanitized = instruments.map((instrument) =>
-			sanitizeInstrumentForWorklet(instrument)
-		);
+		const sanitized = instruments.map((instrument) => sanitizeInstrumentForWorklet(instrument));
 		this.bridge.sendCommand({
 			type: 'init_instruments',
 			instruments: sanitized as unknown as Instrument[]
@@ -240,6 +246,10 @@ export class NESProcessor
 
 	stopPreviewNote(channel?: number): void {
 		this.bridge.sendCommand({ type: 'stop_preview', channel });
+	}
+
+	releasePreviewNote(channel?: number): void {
+		this.bridge.sendCommand({ type: 'release_preview', channel });
 	}
 
 	sendUpdateCpuFrequency(cpuFrequency: number): void {

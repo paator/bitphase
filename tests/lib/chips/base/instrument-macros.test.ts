@@ -29,6 +29,29 @@ describe('sampleInstrumentMacroIndex', () => {
 		expect(sampleInstrumentMacroIndex(4, 4, 0)).toBe(0);
 		expect(sampleInstrumentMacroIndex(5, 4, 0)).toBe(1);
 	});
+
+	it('loops before the release point until the note is released', () => {
+		const values = [13, 11, 10, 9, 7, 3, 4, 5, 5, 5, 4, 4, 3, 2, 1, 1];
+		const held = [0, 1, 2, 3, 4, 5, 6].map((tick) =>
+			sampleInstrumentMacroIndex(tick, values.length, 1, 4, -1)
+		);
+		expect(held.map((index) => values[index])).toEqual([13, 11, 10, 9, 11, 10, 9]);
+		const releasedAt = 4;
+		const released = [4, 5, 6, 7, 18].map((tick) =>
+			sampleInstrumentMacroIndex(tick, values.length, 1, 4, releasedAt)
+		);
+		expect(released.map((index) => values[index])).toEqual([7, 3, 4, 5, 1]);
+	});
+
+	it('loops the release section when the loop point is after the release point', () => {
+		expect(sampleInstrumentMacroIndex(0, 5, 3, 1, -1)).toBe(0);
+		expect(sampleInstrumentMacroIndex(1, 5, 3, 1, -1)).toBe(0);
+		expect(sampleInstrumentMacroIndex(2, 5, 3, 1, 2)).toBe(1);
+		expect(sampleInstrumentMacroIndex(3, 5, 3, 1, 2)).toBe(2);
+		expect(sampleInstrumentMacroIndex(4, 5, 3, 1, 2)).toBe(3);
+		expect(sampleInstrumentMacroIndex(5, 5, 3, 1, 2)).toBe(4);
+		expect(sampleInstrumentMacroIndex(6, 5, 3, 1, 2)).toBe(3);
+	});
 });
 
 describe('instrument row macro conversion', () => {
@@ -88,8 +111,12 @@ describe('instrument row macro conversion', () => {
 		const field = AY_MIXER_MACRO_FIELDS.find((item) => item.id === 'envelopeAdd')!;
 		expect(field.min).toBe(-255);
 		expect(field.max).toBe(255);
-		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, 400).values[0]).toBe(255);
-		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, -400).values[0]).toBe(-255);
+		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, 400).values[0]).toBe(
+			255
+		);
+		expect(setInstrumentMacroValue({ values: [0], loop: 0 }, field, 0, -400).values[0]).toBe(
+			-255
+		);
 	});
 
 	it('clamps AY noise offset to the 5-bit period range', () => {
@@ -272,9 +299,7 @@ describe('groupInstrumentMacroFields', () => {
 		const groups = groupInstrumentMacroFields(AY_MIXER_MACRO_FIELDS);
 		expect(groups.find((group) => group.label === 'Waveform')?.shareSequence).toBe(true);
 		expect(groups.find((group) => group.label === 'Volume')?.shareSequence).toBe(true);
-		expect(groups.find((group) => group.label === 'Tone parameters')?.shareSequence).toBe(
-			true
-		);
+		expect(groups.find((group) => group.label === 'Tone parameters')?.shareSequence).toBe(true);
 		expect(groups.find((group) => group.label === 'Noise parameters')?.shareSequence).toBe(
 			true
 		);

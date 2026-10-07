@@ -10,6 +10,8 @@ import { NES_CHANNEL_COUNT, NES_NTSC_CPU_FREQUENCY } from './nes-constants.js';
 const NES_CHANNEL_ARRAY_SPECS = [
 	['channelInstruments', -1],
 	['instrumentPositions', 0],
+	['channelMacroReleased', false],
+	['channelMacroReleaseTick', -1],
 	['channelInstrumentVolumes', 0],
 	['channelPatternVolumes', 15],
 	['channelMuted', false],

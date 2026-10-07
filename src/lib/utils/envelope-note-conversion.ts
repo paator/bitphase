@@ -37,12 +37,16 @@ export function noteStringToEnvelopePeriod(
 	tuningTable: number[],
 	currentOctave: number
 ): number {
-	if (noteStr === '---' || noteStr === 'OFF') {
+	if (noteStr === '---' || noteStr === 'OFF' || noteStr === '===') {
 		return 0;
 	}
 
 	const parsed = parseNoteFromString(noteStr);
-	if (parsed.noteName === NoteName.None || parsed.noteName === NoteName.Off) {
+	if (
+		parsed.noteName === NoteName.None ||
+		parsed.noteName === NoteName.Off ||
+		parsed.noteName === NoteName.Release
+	) {
 		return 0;
 	}
 

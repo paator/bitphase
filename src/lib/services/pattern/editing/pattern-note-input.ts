@@ -90,6 +90,11 @@ export class PatternNoteInput {
 			return { updatedPattern, shouldMoveNext: false };
 		}
 
+		if (key === '\\' || code === 'Backslash') {
+			const updatedPattern = PatternValueUpdates.updateFieldValue(context, fieldInfo, '===');
+			return { updatedPattern, shouldMoveNext: false };
+		}
+
 		if (this.LETTER_NOTE_MAP[upperKey]) {
 			const currentOctave = editorStateStore.octave;
 			const noteStr = formatNoteFromEnum(this.LETTER_NOTE_MAP[upperKey], currentOctave);

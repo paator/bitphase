@@ -1,11 +1,14 @@
 import {
 	clampInstrumentMacroLength,
 	clampInstrumentMacroLoop,
+	clampInstrumentMacroRelease,
 	clampMacroValue,
 	INSTRUMENT_MACRO_MAX_LENGTH,
 	INSTRUMENT_MACRO_MIN_LENGTH,
+	INSTRUMENT_MACRO_NO_RELEASE,
 	setSharedSequenceLength,
 	setSharedSequenceLoop,
+	setSharedSequenceRelease,
 	type InstrumentMacroField,
 	type InstrumentMacroValue,
 	type InstrumentMacros
@@ -24,6 +27,7 @@ export const MACRO_BAR_SCALE_CENTER_HOLD_MOVES = 2;
 export type ParsedMacroSequenceText = {
 	values: InstrumentMacroValue[];
 	loop: number;
+	release: number;
 };
 
 export function macroStepWidthPx(isExpanded: boolean): number {
@@ -300,8 +304,7 @@ export function macroBarScaleShouldCatchCenter(
 
 export function macroBarScaleShouldHoldCenter(travelPx: number, holdMoves: number): boolean {
 	return (
-		holdMoves < MACRO_BAR_SCALE_CENTER_HOLD_MOVES ||
-		travelPx <= MACRO_BAR_SCALE_CENTER_HOLD_PX
+		holdMoves < MACRO_BAR_SCALE_CENTER_HOLD_MOVES || travelPx <= MACRO_BAR_SCALE_CENTER_HOLD_PX
 	);
 }
 
@@ -317,10 +320,7 @@ export function macroBarScalePointerNearCenter(
 	);
 }
 
-export function macroBarScaleUnitsPerPx(
-	field: InstrumentMacroField,
-	trackHeight: number
-): number {
+export function macroBarScaleUnitsPerPx(field: InstrumentMacroField, trackHeight: number): number {
 	const span = macroBarVisibleSpan(field);
 	const { min, max } = macroBarNumericRange(field);
 	return Math.max(0, max - min - span) / Math.max(1, trackHeight);
@@ -424,16 +424,35 @@ export function formatMacroSequenceText(
 	values: readonly InstrumentMacroValue[],
 	loop: number,
 	field: InstrumentMacroField,
-	asHex: boolean
+	asHex: boolean,
+	release: number = INSTRUMENT_MACRO_NO_RELEASE
 ): string {
 	const tokens =
 		values.length > 0
-			? values.map((value) => formatRowEditorNumber(Number(value), asHex))
-			: [formatRowEditorNumber(Number(field.defaultValue), asHex)];
+			? values.map((value) => formatMacroSequenceToken(value, field, asHex))
+			: [formatMacroSequenceToken(field.defaultValue, field, asHex)];
 	const loopAt = clampInstrumentMacroLoop(loop, tokens.length);
-	const tail = tokens.slice(loopAt).join(' ');
-	if (loopAt === 0) return `| ${tail}`;
-	return `${tokens.slice(0, loopAt).join(' ')} | ${tail}`;
+	const releaseAt = clampInstrumentMacroRelease(release, tokens.length);
+	const parts: string[] = [];
+	for (let index = 0; index < tokens.length; index++) {
+		if (index === loopAt) parts.push('|');
+		if (index === releaseAt) parts.push('/');
+		parts.push(tokens[index]!);
+	}
+	return parts.join(' ');
+}
+
+function formatMacroSequenceToken(
+	value: InstrumentMacroValue,
+	field: InstrumentMacroField,
+	asHex: boolean
+): string {
+	if (field.kind === 'boolean') return value ? '1' : '0';
+	if (field.kind === 'enum' && field.enumValues?.length) {
+		const option = field.enumValues.find((item) => item.value === value);
+		if (option?.label) return option.label;
+	}
+	return formatRowEditorNumber(Number(value), asHex);
 }
 
 function parseMacroSequenceToken(
@@ -463,38 +482,55 @@ export function parseMacroSequenceText(
 ): ParsedMacroSequenceText | null {
 	const tokens = text
 		.trim()
-		.replace(/\|/g, ' | ')
+		.replace(/[|/]/g, ' $& ')
 		.split(/\s+/)
 		.filter((token) => token.length > 0);
 	if (tokens.length === 0) return null;
 	const values: number[] = [];
 	let loop: number | null = null;
+	let release: number | null = null;
 	for (const token of tokens) {
 		if (token === '|') {
-			if (loop !== null) return null;
+			if (loop !== null || values.length >= INSTRUMENT_MACRO_MAX_LENGTH) return null;
 			loop = values.length;
+			continue;
+		}
+		if (token === '/') {
+			if (release !== null || values.length >= INSTRUMENT_MACRO_MAX_LENGTH) return null;
+			release = values.length;
 			continue;
 		}
 		const value = parseMacroSequenceToken(token, field, asHex);
 		if (value === null) return null;
 		values.push(value);
 	}
-	if (values.length === 0) return null;
+	if (values.length === 0 || (release !== null && release >= values.length)) return null;
 	const clampedValues = values
 		.slice(0, clampInstrumentMacroLength(values.length))
 		.map((value) => clampMacroValue(value, field));
 	return {
 		values: clampedValues,
-		loop: clampInstrumentMacroLoop(loop ?? 0, clampedValues.length)
+		loop: clampInstrumentMacroLoop(loop ?? 0, clampedValues.length),
+		release: clampInstrumentMacroRelease(
+			release ?? INSTRUMENT_MACRO_NO_RELEASE,
+			clampedValues.length
+		)
 	};
 }
 
 export function instrumentMacroSequenceEquals(
 	values: readonly InstrumentMacroValue[],
 	loop: number,
+	release: number,
 	parsed: ParsedMacroSequenceText
 ): boolean {
-	if (parsed.loop !== loop || parsed.values.length !== values.length) return false;
+	if (
+		parsed.loop !== loop ||
+		parsed.release !== release ||
+		parsed.values.length !== values.length
+	) {
+		return false;
+	}
 	return parsed.values.every((value, index) => value === values[index]);
 }
 
@@ -508,14 +544,26 @@ export function applyInstrumentMacroSequenceText(
 	const parsed = parseMacroSequenceText(text, field, asHex);
 	if (!parsed) return null;
 	const current = macros[field.id];
-	if (current && instrumentMacroSequenceEquals(current.values, current.loop, parsed)) {
+	if (
+		current &&
+		instrumentMacroSequenceEquals(
+			current.values,
+			current.loop,
+			clampInstrumentMacroRelease(current.release, current.values.length),
+			parsed
+		)
+	) {
 		return macros;
 	}
 	const resized = setSharedSequenceLength(macros, fields, parsed.values.length);
-	return setSharedSequenceLoop(
-		{ ...resized, [field.id]: { values: parsed.values, loop: parsed.loop } },
+	const withValues = {
+		...resized,
+		[field.id]: { values: parsed.values, loop: parsed.loop, release: parsed.release }
+	};
+	return setSharedSequenceRelease(
+		setSharedSequenceLoop(withValues, fields, parsed.loop),
 		fields,
-		parsed.loop
+		parsed.release
 	);
 }
 

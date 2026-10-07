@@ -108,18 +108,7 @@ function moduleBytes(
 					...u32(-1),
 					...u32(1)
 				]
-			: [
-					...u32(1),
-					...u32(0),
-					...u32(0),
-					3,
-					...u32(-1),
-					15,
-					12,
-					8,
-					...u32(-1),
-					...u32(0)
-				];
+			: [...u32(1), ...u32(0), ...u32(0), 3, ...u32(-1), 15, 12, 8, ...u32(-1), ...u32(0)];
 	const frames = [...u32(2), ...u32(6), ...u32(150), ...u32(4), 0, 1, 0, 0, 0, 1, 1, 0, 0, 0];
 	const patterns = [
 		...u32(0),
@@ -187,41 +176,10 @@ function moduleBytes(
 		0,
 		0,
 		...(noteCuts
-			? [
-					...u32(2),
-					1,
-					0,
-					64,
-					16,
-					23,
-					0x06,
-					23,
-					0x10,
-					...u32(3),
-					1,
-					0,
-					64,
-					16,
-					23,
-					0x00,
-					0,
-					0
-				]
+			? [...u32(2), 1, 0, 64, 16, 23, 0x06, 23, 0x10, ...u32(3), 1, 0, 64, 16, 23, 0x00, 0, 0]
 			: [])
 	];
-	const noise = [
-		...u32(0),
-		...u32(3),
-		...u32(0),
-		...u32(1),
-		...u32(0),
-		0,
-		0,
-		64,
-		16,
-		18,
-		1
-	];
+	const noise = [...u32(0), ...u32(3), ...u32(0), ...u32(1), ...u32(0), 0, 0, 64, 16, 18, 1];
 	const samples = [1, 0, ...u32(4), ...ascii('Kick'), ...u32(4), 0xff, 0xff, 0xff, 0xff];
 	return Uint8Array.from([
 		...ascii('FamiTracker Module'),
@@ -237,6 +195,45 @@ function moduleBytes(
 		...block('GROOVES', 1, [0]),
 		...block('END', 0, [])
 	]);
+}
+
+function tinySong(rows: number[][], length = rows.length): Uint8Array {
+	const params = [
+		0,
+		...u32(5),
+		...u32(0),
+		...u32(0),
+		...u32(1),
+		...u32(4),
+		...u32(16),
+		...u32(32)
+	];
+	const info = [...padded('Carry', 32), ...padded('', 32), ...padded('', 32)];
+	const header = [0, ...ascii('Song'), 0];
+	for (let channel = 0; channel < 5; channel++) header.push(channel, 0);
+	const frames = [...u32(1), ...u32(6), ...u32(150), ...u32(length), 0, 0, 0, 0, 0];
+	const patterns = [...u32(0), ...u32(0), ...u32(0), ...u32(rows.length), ...rows.flat()];
+	return Uint8Array.from([
+		...ascii('FamiTracker Module'),
+		...u32(0x0440),
+		...block('PARAMS', 6, params),
+		...block('INFO', 1, info),
+		...block('HEADER', 3, header),
+		...block('INSTRUMENTS', 6, u32(0)),
+		...block('FRAMES', 3, frames),
+		...block('PATTERNS', 5, patterns),
+		...block('END', 0, [])
+	]);
+}
+
+function patternCell(
+	row: number,
+	note: number,
+	octave: number,
+	effect: number,
+	param: number
+): number[] {
+	return [...u32(row), note, octave, 64, 16, effect, param];
 }
 
 describe('ftm import', () => {
@@ -283,9 +280,9 @@ describe('ftm import', () => {
 			delay: 0,
 			parameter: 0
 		});
-		expect(warnings.some((warning) => warning.includes('Skipped') && /\bC\b/.test(warning))).toBe(
-			false
-		);
+		expect(
+			warnings.some((warning) => warning.includes('Skipped') && /\bC\b/.test(warning))
+		).toBe(false);
 		expect(pulse[2]!.note.name).toBe(NoteName.None);
 		expect(pulse[2]!.effects[0]).toMatchObject({
 			effect: EffectType.VolumeSlide,
@@ -315,19 +312,25 @@ describe('ftm import', () => {
 			delay: 0,
 			parameter: 0x12
 		});
-		expect(porta[0]!.effects[1]).toBeNull();
+		expect(porta[0]!.effects.some((effect) => effect?.effect === EffectType.Vibrato)).toBe(
+			true
+		);
 		expect(porta[1]!.note.name).toBe(NoteName.None);
 		expect(porta[1]!.effects[0]).toMatchObject({
 			effect: EffectType.Portamento,
 			delay: 0,
 			parameter: 0
 		});
-		expect(warnings.some((warning) => warning.includes('Skipped') && /\b3\b/.test(warning))).toBe(
-			false
-		);
+		expect(
+			warnings.some((warning) => warning.includes('Skipped') && /\b3\b/.test(warning))
+		).toBe(false);
 
 		const noise = song.patterns[0]!.channels[3]!.rows[0]!;
-		expect(noise.effects[0]).toMatchObject({ effect: EffectType.AutoEnvelope, delay: 1, parameter: 2 });
+		expect(noise.effects[0]).toMatchObject({
+			effect: EffectType.AutoEnvelope,
+			delay: 1,
+			parameter: 2
+		});
 
 		const instrument = project.instruments[0]!;
 		expect(instrument.name).toBe('Lead');
@@ -376,12 +379,96 @@ describe('ftm import', () => {
 			delay: 0,
 			parameter: 0x60
 		});
-		expect(rows[2]!.effects[1]).toBeNull();
+		expect(rows[2]!.effects[1]).toMatchObject({ effect: EffectType.Vibrato });
 		expect(rows[3]!.note.name).toBe(NoteName.Off);
 		expect(rows[3]!.effects[0]).toBeNull();
-		expect(warnings.some((warning) => warning.includes('Skipped') && /\bS\b/.test(warning))).toBe(
-			true
+		expect(
+			warnings.some((warning) => warning.includes('Skipped') && /\bS\b/.test(warning))
+		).toBe(true);
+	});
+
+	it('repeats slides, vibrato, and arpeggio on later notes', () => {
+		const { project } = importFtmBuffer(
+			tinySong([
+				patternCell(0, 1, 3, 16, 0x20),
+				patternCell(1, 5, 3, 0, 0),
+				patternCell(2, 8, 3, 16, 0),
+				patternCell(3, 10, 3, 0, 0)
+			]).buffer
 		);
+		const rows = project.songs[0]!.patterns[0]!.channels[0]!.rows;
+		expect(rows[0]!.effects[0]).toMatchObject({
+			effect: EffectType.SlideDown,
+			delay: 1,
+			parameter: 0x20
+		});
+		expect(rows[1]!.effects[0]).toMatchObject({
+			effect: EffectType.SlideDown,
+			delay: 1,
+			parameter: 0x20
+		});
+		expect(rows[2]!.effects[0]).toMatchObject({
+			effect: EffectType.SlideDown,
+			delay: 1,
+			parameter: 0
+		});
+		expect(rows[3]!.effects[0]).toBeNull();
+	});
+
+	it('keeps portamento across notes and retriggers it after a cut', () => {
+		const { project } = importFtmBuffer(
+			tinySong([
+				patternCell(0, 1, 3, 6, 0x10),
+				patternCell(1, 5, 3, 0, 0),
+				patternCell(2, 14, 0, 0, 0),
+				patternCell(3, 8, 3, 0, 0),
+				patternCell(4, 10, 3, 0, 0)
+			]).buffer
+		);
+		const rows = project.songs[0]!.patterns[0]!.channels[0]!.rows;
+		expect(rows[1]!.effects[0]).toMatchObject({
+			effect: EffectType.Portamento,
+			parameter: 0x10
+		});
+		expect(rows[3]!.effects[0]).toBeNull();
+		expect(rows[4]!.effects[0]).toMatchObject({
+			effect: EffectType.Portamento,
+			parameter: 0x10
+		});
+	});
+
+	it('leaves a volume slide on later notes and restores it after a cut', () => {
+		const { project } = importFtmBuffer(
+			tinySong([
+				patternCell(0, 1, 3, 22, 0x01),
+				patternCell(1, 5, 3, 0, 0),
+				patternCell(2, 14, 0, 0, 0),
+				patternCell(3, 8, 3, 0, 0)
+			]).buffer
+		);
+		const rows = project.songs[0]!.patterns[0]!.channels[0]!.rows;
+		expect(rows[1]!.effects[0]).toBeNull();
+		expect(rows[3]!.effects[0]).toMatchObject({ effect: EffectType.VolumeSlide });
+	});
+
+	it('ends a pattern on the first B or D row', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong(
+				[
+					patternCell(0, 1, 3, 0, 0),
+					patternCell(1, 5, 3, 3, 0x10),
+					patternCell(3, 8, 3, 2, 0x02)
+				],
+				6
+			).buffer
+		);
+		const pattern = project.songs[0]!.patterns[0]!;
+		expect(pattern.length).toBe(2);
+		expect(pattern.channels[0]!.rows).toHaveLength(2);
+		expect(pattern.channels[0]!.rows[1]!.note.name).toBe(NoteName.E);
+		expect(
+			warnings.some((warning) => warning.includes('Skipped') && /\b[BD]\b/.test(warning))
+		).toBe(false);
 	});
 
 	it('warns when an expansion chip is present', () => {
@@ -395,7 +482,7 @@ describe('ftm import', () => {
 	});
 });
 
-function dnmBytes(expansion = 0x20): Uint8Array {
+function dnmBytes(expansion = 0x20, fileHeader = 'Dn-FamiTracker Module'): Uint8Array {
 	const channels = expansion === 0x20 ? 8 : 5;
 	const params = [
 		expansion,
@@ -452,7 +539,7 @@ function dnmBytes(expansion = 0x20): Uint8Array {
 	const nesNote = [...u32(0), ...u32(0), ...u32(0), ...u32(1), ...u32(0), 1, 3, 0, 15, 0, 0];
 	const ayNote = [...u32(0), ...u32(5), ...u32(0), ...u32(1), ...u32(0), 1, 3, 0, 12, 0, 0];
 	return Uint8Array.from([
-		...ascii('Dn-FamiTracker Module'),
+		...ascii(fileHeader),
 		...u32(0x0450),
 		...block('PARAMS', 6, params),
 		...block('INFO', 1, info),
@@ -506,7 +593,24 @@ describe('dnm import', () => {
 		expect(instrument.macros?.noiseAdd).toEqual({ values: [3], loop: 0 });
 	});
 
-	it('rejects a Dn-FamiTracker module that is not NES + 5B', () => {
-		expect(() => importFtmBuffer(dnmBytes(0).buffer)).toThrow(/NES \+ 5B/);
+	it('imports a FamiTracker-header NES + 5B module as NES and AY', () => {
+		const { project, warnings } = importFtmBuffer(
+			dnmBytes(0x20, 'FamiTracker Module').buffer,
+			'fallback'
+		);
+		expect(project.songs).toHaveLength(2);
+		expect(project.songs[0]!.chipType).toBe('nes');
+		expect(project.songs[1]!.chipType).toBe('ay');
+		expect(warnings.some((warning) => warning.includes('skipped'))).toBe(false);
+	});
+
+	it('imports a plain NES Dn-FamiTracker module', () => {
+		const { project } = importFtmBuffer(dnmBytes(0).buffer, 'fallback');
+		expect(project.songs).toHaveLength(1);
+		expect(project.songs[0]!.chipType).toBe('nes');
+	});
+
+	it('rejects a Dn-FamiTracker module with an unsupported expansion', () => {
+		expect(() => importFtmBuffer(dnmBytes(1).buffer)).toThrow(/NES and NES \+ 5B/);
 	});
 });

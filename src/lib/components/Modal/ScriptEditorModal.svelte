@@ -131,7 +131,7 @@
 				<div class="grid grid-cols-2 gap-x-4 gap-y-1">
 					<div><code>row.rowIndex</code> - position (0-based)</div>
 					<div><code>row.channelIndex</code> - 0, 1, or 2</div>
-					<div><code>row.note</code> - "C-4", "---", "OFF"</div>
+					<div><code>row.note</code> - "C-4", "---", "OFF", "==="</div>
 					<div><code>row.volume</code> - empty is 0 (<code>.</code>), mute is -1 (<code>0</code>), levels 1-15</div>
 					<div><code>row.instrument</code> - number</div>
 					<div><code>row.table</code> - number</div>

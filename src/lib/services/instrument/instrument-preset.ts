@@ -1,5 +1,8 @@
 import { Instrument } from '../../models/song';
-import { migrateLegacyInstrument, type LegacyInstrument } from '../instrument/instrument-legacy-migration';
+import {
+	migrateLegacyInstrument,
+	type LegacyInstrument
+} from '../instrument/instrument-legacy-migration';
 import { parseHexColor } from '../../utils/hex-color';
 import {
 	copyNesDpcmFields,
@@ -8,7 +11,10 @@ import {
 	type NesDpcmSample
 } from '../../chips/nes/dpcm';
 
-type InstrumentMacroBag = Record<string, { values: (boolean | number | string)[]; loop: number }>;
+type InstrumentMacroBag = Record<
+	string,
+	{ values: (boolean | number | string)[]; loop: number; release?: number }
+>;
 
 export type InstrumentPresetPayload = {
 	chipType?: string;
@@ -52,12 +58,19 @@ type PresetInstrument = Instrument & {
 	dpcmAssignments?: (NesDpcmAssignment | null)[];
 };
 
+function cloneMacroEntry(macro: InstrumentMacroBag[string]): InstrumentMacroBag[string] {
+	return {
+		values: [...macro.values],
+		loop: macro.loop,
+		...(typeof macro.release === 'number' && macro.release >= 0
+			? { release: macro.release }
+			: {})
+	};
+}
+
 function cloneMacros(macros: InstrumentMacroBag): InstrumentMacroBag {
 	return Object.fromEntries(
-		Object.entries(macros).map(([id, macro]) => [
-			id,
-			{ values: [...macro.values], loop: macro.loop }
-		])
+		Object.entries(macros).map(([id, macro]) => [id, cloneMacroEntry(macro)])
 	);
 }
 
@@ -72,7 +85,9 @@ export function serializeInstrumentPreset(instrument: Instrument): InstrumentPre
 		...(instrument.macros ? { macros: cloneMacros(instrument.macros) } : {}),
 		...(extra.timerMacros ? { timerMacros: cloneMacros(extra.timerMacros) } : {}),
 		...(extra.timerPwmDuty !== undefined ? { timerPwmDuty: extra.timerPwmDuty } : {}),
-		...(extra.timerPwmSweepMin !== undefined ? { timerPwmSweepMin: extra.timerPwmSweepMin } : {}),
+		...(extra.timerPwmSweepMin !== undefined
+			? { timerPwmSweepMin: extra.timerPwmSweepMin }
+			: {}),
 		...(extra.timerPwmSweep !== undefined ? { timerPwmSweep: extra.timerPwmSweep } : {}),
 		...(extra.timerPwmPreserveOnNewNote !== undefined
 			? { timerPwmPreserveOnNewNote: extra.timerPwmPreserveOnNewNote }
@@ -80,13 +95,19 @@ export function serializeInstrumentPreset(instrument: Instrument): InstrumentPre
 		...(extra.timerPwmSweepStartPhase !== undefined
 			? { timerPwmSweepStartPhase: extra.timerPwmSweepStartPhase }
 			: {}),
-		...(extra.timerPwmSweepShape !== undefined ? { timerPwmSweepShape: extra.timerPwmSweepShape } : {}),
-		...(extra.sampleData?.length ? { sampleData: extra.sampleData.map((value) => value & 0xff) } : {}),
+		...(extra.timerPwmSweepShape !== undefined
+			? { timerPwmSweepShape: extra.timerPwmSweepShape }
+			: {}),
+		...(extra.sampleData?.length
+			? { sampleData: extra.sampleData.map((value) => value & 0xff) }
+			: {}),
 		...(extra.sampleRate !== undefined ? { sampleRate: extra.sampleRate } : {}),
 		...(extra.sampleStart !== undefined ? { sampleStart: extra.sampleStart } : {}),
 		...(extra.sampleEnd !== undefined ? { sampleEnd: extra.sampleEnd } : {}),
 		...(extra.sampleLoopStart !== undefined ? { sampleLoopStart: extra.sampleLoopStart } : {}),
-		...(extra.sampleLoopEnabled !== undefined ? { sampleLoopEnabled: extra.sampleLoopEnabled } : {}),
+		...(extra.sampleLoopEnabled !== undefined
+			? { sampleLoopEnabled: extra.sampleLoopEnabled }
+			: {}),
 		...(dpcm.dpcmSamples?.length ? dpcm : {})
 	};
 }
@@ -98,13 +119,22 @@ export function parseInstrumentPreset(parsed: unknown): InstrumentPresetPayload 
 	const record = item as Record<string, unknown>;
 	const macros = parseInstrumentMacros(record.macros);
 	const timerMacros = parseTimerMacros(record.timerMacros);
-	const rows = Array.isArray(record.rows) ? (record.rows as Record<string, unknown>[]) : undefined;
+	const rows = Array.isArray(record.rows)
+		? (record.rows as Record<string, unknown>[])
+		: undefined;
 	const sampleData = parseSampleData(record.sampleData);
 	const pwm = parsePwmFields(record);
 	const sample = parseSampleFields(record, sampleData);
 	const dpcmSamples = normalizeDpcmSamples(record.dpcmSamples);
 	const color = typeof record.color === 'string' ? parseHexColor(record.color) : null;
-	if (!rows && !macros && !timerMacros && !sampleData && dpcmSamples.length === 0 && Object.keys(pwm).length === 0) {
+	if (
+		!rows &&
+		!macros &&
+		!timerMacros &&
+		!sampleData &&
+		dpcmSamples.length === 0 &&
+		Object.keys(pwm).length === 0
+	) {
 		return null;
 	}
 
@@ -131,18 +161,21 @@ export function parseInstrumentPreset(parsed: unknown): InstrumentPresetPayload 
 
 function parseInstrumentMacros(
 	value: unknown
-): Record<string, { values: (boolean | number)[]; loop: number }> | undefined {
+): Record<string, { values: (boolean | number)[]; loop: number; release?: number }> | undefined {
 	if (value == null || typeof value !== 'object') return undefined;
-	const macros: Record<string, { values: (boolean | number)[]; loop: number }> = {};
+	const macros: Record<string, { values: (boolean | number)[]; loop: number; release?: number }> =
+		{};
 	for (const [id, macro] of Object.entries(value as Record<string, unknown>)) {
 		if (!macro || typeof macro !== 'object') continue;
-		const record = macro as { values?: unknown; loop?: unknown };
+		const record = macro as { values?: unknown; loop?: unknown; release?: unknown };
 		if (!Array.isArray(record.values)) continue;
+		const release = typeof record.release === 'number' ? record.release : undefined;
 		macros[id] = {
 			values: record.values.map((entry) =>
 				typeof entry === 'boolean' || typeof entry === 'number' ? entry : 0
 			),
-			loop: typeof record.loop === 'number' ? record.loop : 0
+			loop: typeof record.loop === 'number' ? record.loop : 0,
+			...(release !== undefined && release >= 0 ? { release } : {})
 		};
 	}
 	return Object.keys(macros).length > 0 ? macros : undefined;
@@ -153,15 +186,17 @@ function parseTimerMacros(value: unknown): InstrumentMacroBag | undefined {
 	const macros: InstrumentMacroBag = {};
 	for (const [id, macro] of Object.entries(value as Record<string, unknown>)) {
 		if (!macro || typeof macro !== 'object') continue;
-		const record = macro as { values?: unknown; loop?: unknown };
+		const record = macro as { values?: unknown; loop?: unknown; release?: unknown };
 		if (!Array.isArray(record.values)) continue;
+		const release = typeof record.release === 'number' ? record.release : undefined;
 		macros[id] = {
 			values: record.values.map((entry) =>
 				typeof entry === 'boolean' || typeof entry === 'number' || typeof entry === 'string'
 					? entry
 					: 0
 			),
-			loop: typeof record.loop === 'number' ? record.loop : 0
+			loop: typeof record.loop === 'number' ? record.loop : 0,
+			...(release !== undefined && release >= 0 ? { release } : {})
 		};
 	}
 	return Object.keys(macros).length > 0 ? macros : undefined;
@@ -219,7 +254,7 @@ export function instrumentFromPreset(
 		instrument.macros = Object.fromEntries(
 			Object.entries(payload.macros).map(([macroId, macro]) => [
 				macroId,
-				{ values: [...macro.values], loop: macro.loop }
+				cloneMacroEntry(macro)
 			])
 		);
 	}
@@ -231,7 +266,8 @@ export function instrumentFromPreset(
 	}
 	if (chipType === 'ay') {
 		if (payload.timerPwmDuty !== undefined) extras.timerPwmDuty = payload.timerPwmDuty;
-		if (payload.timerPwmSweepMin !== undefined) extras.timerPwmSweepMin = payload.timerPwmSweepMin;
+		if (payload.timerPwmSweepMin !== undefined)
+			extras.timerPwmSweepMin = payload.timerPwmSweepMin;
 		if (payload.timerPwmSweep !== undefined) extras.timerPwmSweep = payload.timerPwmSweep;
 		if (payload.timerPwmPreserveOnNewNote !== undefined) {
 			extras.timerPwmPreserveOnNewNote = payload.timerPwmPreserveOnNewNote;
@@ -248,9 +284,16 @@ export function instrumentFromPreset(
 	if (payload.sampleStart !== undefined) extras.sampleStart = payload.sampleStart;
 	if (payload.sampleEnd !== undefined) extras.sampleEnd = payload.sampleEnd;
 	if (payload.sampleLoopStart !== undefined) extras.sampleLoopStart = payload.sampleLoopStart;
-	if (payload.sampleLoopEnabled !== undefined) extras.sampleLoopEnabled = payload.sampleLoopEnabled;
+	if (payload.sampleLoopEnabled !== undefined)
+		extras.sampleLoopEnabled = payload.sampleLoopEnabled;
 	if (payload.dpcmSamples?.length) {
-		copyNesDpcmFields(payload, extras as { dpcmSamples?: NesDpcmSample[]; dpcmAssignments?: (NesDpcmAssignment | null)[] });
+		copyNesDpcmFields(
+			payload,
+			extras as {
+				dpcmSamples?: NesDpcmSample[];
+				dpcmAssignments?: (NesDpcmAssignment | null)[];
+			}
+		);
 	}
 	return migrateLegacyInstrument({ ...instrument, ...extras });
 }

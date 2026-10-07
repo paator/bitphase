@@ -5,15 +5,56 @@ export function clampInstrumentMacroLoop(loop, length) {
 	return Math.max(0, Math.min(loop | 0, length - 1));
 }
 
-export function sampleInstrumentMacroIndex(tick, length, loop) {
+export const INSTRUMENT_MACRO_NO_RELEASE = -1;
+
+function clampInstrumentMacroRelease(release, length) {
+	if (release === undefined || !Number.isFinite(release) || release < 0 || length <= 0) {
+		return INSTRUMENT_MACRO_NO_RELEASE;
+	}
+	return Math.min(release | 0, length - 1);
+}
+
+function macroLoopStart(loop, length) {
+	return loop > 0 && loop < length ? loop : 0;
+}
+
+export function sampleInstrumentMacroIndex(
+	tick,
+	length,
+	loop,
+	release = INSTRUMENT_MACRO_NO_RELEASE,
+	releaseTick = INSTRUMENT_MACRO_NO_RELEASE
+) {
 	const len = length > 0 ? length : 1;
 	const t = tick | 0;
 	if (t < 0) return 0;
+	const loopStart = macroLoopStart(loop, len);
+	const releaseAt = clampInstrumentMacroRelease(release, len);
+	if (releaseAt >= 0 && releaseTick >= 0) {
+		const into = t - (releaseTick | 0);
+		const pos = releaseAt + (into > 0 ? into : 0);
+		if (pos < len) return pos;
+		if (loopStart >= releaseAt) {
+			const span = len - loopStart;
+			if (span <= 0) return len - 1;
+			return loopStart + ((pos - len) % span);
+		}
+		return len - 1;
+	}
+	if (releaseAt === 0) return 0;
+	if (releaseAt > 0) {
+		if (t < releaseAt) return t;
+		if (loopStart < releaseAt) {
+			const span = releaseAt - loopStart;
+			if (span <= 0) return releaseAt - 1;
+			return loopStart + ((t - releaseAt) % span);
+		}
+		return releaseAt - 1;
+	}
 	if (t < len) return t;
-	const start = loop > 0 && loop < len ? loop : 0;
-	const span = len - start;
+	const span = len - loopStart;
 	if (span <= 0) return len - 1;
-	return start + ((t - len) % span);
+	return loopStart + ((t - len) % span);
 }
 
 function clampBoolean(value, fallback) {
@@ -254,10 +295,13 @@ function normalizeMacro(macro, field) {
 					.slice(0, INSTRUMENT_MACRO_MAX_LENGTH)
 					.map((value) => clampFieldValue(value, field))
 			: [field.defaultValue];
-	return {
+	const release = clampInstrumentMacroRelease(macro?.release, values.length);
+	const normalized = {
 		values,
 		loop: clampInstrumentMacroLoop(macro?.loop ?? 0, values.length)
 	};
+	if (release >= 0) normalized.release = release;
+	return normalized;
 }
 
 function createDefaultMacros(fields) {
@@ -292,12 +336,18 @@ function resolveTimerMacros(instrument) {
 	return createDefaultMacros(AY_TIMER_FIELDS);
 }
 
-function sampleRow(macros, tick, fields) {
+function sampleRow(macros, tick, fields, releaseTick = INSTRUMENT_MACRO_NO_RELEASE) {
 	const row = createDefaultRow(fields);
 	for (const field of fields) {
 		const macro = macros[field.id];
 		const values = macro?.values ?? [field.defaultValue];
-		const index = sampleInstrumentMacroIndex(tick, values.length, macro?.loop ?? 0);
+		const index = sampleInstrumentMacroIndex(
+			tick,
+			values.length,
+			macro?.loop ?? 0,
+			macro?.release ?? INSTRUMENT_MACRO_NO_RELEASE,
+			releaseTick
+		);
 		writeField(row, field, values[index] ?? field.defaultValue);
 	}
 	return row;
@@ -324,18 +374,20 @@ export function resolveAyTimerMacros(instrument) {
 	return resolveTimerMacros(instrument);
 }
 
-export function sampleAyMixerRow(instrument, tick) {
-	return sampleRow(resolveAyMixerMacros(instrument), tick, AY_MIXER_FIELDS);
+export function sampleAyMixerRow(instrument, tick, releaseTick = INSTRUMENT_MACRO_NO_RELEASE) {
+	return sampleRow(resolveAyMixerMacros(instrument), tick, AY_MIXER_FIELDS, releaseTick);
 }
 
-export function sampleAyTimerRow(instrument, tick) {
-	return resolveSidSyncbuzzerExclusive(sampleRow(resolveAyTimerMacros(instrument), tick, AY_TIMER_FIELDS));
+export function sampleAyTimerRow(instrument, tick, releaseTick = INSTRUMENT_MACRO_NO_RELEASE) {
+	return resolveSidSyncbuzzerExclusive(
+		sampleRow(resolveAyTimerMacros(instrument), tick, AY_TIMER_FIELDS, releaseTick)
+	);
 }
 
 export function resolveNesApuMacros(instrument) {
 	return resolveMacros(instrument, NES_APU_FIELDS);
 }
 
-export function sampleNesApuRow(instrument, tick) {
-	return sampleRow(resolveNesApuMacros(instrument), tick, NES_APU_FIELDS);
+export function sampleNesApuRow(instrument, tick, releaseTick = INSTRUMENT_MACRO_NO_RELEASE) {
+	return sampleRow(resolveNesApuMacros(instrument), tick, NES_APU_FIELDS, releaseTick);
 }

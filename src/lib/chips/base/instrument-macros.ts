@@ -7,9 +7,12 @@ export type InstrumentMacroAccent = 'volume' | 'tone' | 'noise' | 'envelope' | '
 
 export type InstrumentMacroValue = boolean | number | string;
 
+export const INSTRUMENT_MACRO_NO_RELEASE = -1;
+
 export type InstrumentMacro = {
 	values: InstrumentMacroValue[];
 	loop: number;
+	release?: number;
 };
 
 export type InstrumentMacros = Record<string, InstrumentMacro>;
@@ -82,19 +85,71 @@ export function clampInstrumentMacroLoop(loop: number, length: number): number {
 	return Math.max(0, Math.min(loop | 0, length - 1));
 }
 
+export function clampInstrumentMacroRelease(release: number | undefined, length: number): number {
+	if (release === undefined || !Number.isFinite(release) || release < 0 || length <= 0) {
+		return INSTRUMENT_MACRO_NO_RELEASE;
+	}
+	return Math.min(release | 0, length - 1);
+}
+
+function macroLoopStart(loop: number, length: number): number {
+	return loop > 0 && loop < length ? loop : 0;
+}
+
+export function instrumentMacroWithRelease(
+	macro: InstrumentMacro,
+	release: number
+): InstrumentMacro {
+	if (release < 0) {
+		if (macro.release === undefined) return macro;
+		const rest = { ...macro };
+		delete rest.release;
+		return rest;
+	}
+	return { ...macro, release };
+}
+
 export function clampInstrumentMacroLength(length: number): number {
 	return Math.max(INSTRUMENT_MACRO_MIN_LENGTH, Math.min(INSTRUMENT_MACRO_MAX_LENGTH, length | 0));
 }
 
-export function sampleInstrumentMacroIndex(tick: number, length: number, loop: number): number {
+export function sampleInstrumentMacroIndex(
+	tick: number,
+	length: number,
+	loop: number,
+	release: number = INSTRUMENT_MACRO_NO_RELEASE,
+	releaseTick: number = INSTRUMENT_MACRO_NO_RELEASE
+): number {
 	const len = length > 0 ? length : 1;
 	const t = tick | 0;
 	if (t < 0) return 0;
+	const loopStart = macroLoopStart(loop, len);
+	const releaseAt = clampInstrumentMacroRelease(release, len);
+	if (releaseAt >= 0 && releaseTick >= 0) {
+		const into = t - (releaseTick | 0);
+		const pos = releaseAt + (into > 0 ? into : 0);
+		if (pos < len) return pos;
+		if (loopStart >= releaseAt) {
+			const span = len - loopStart;
+			if (span <= 0) return len - 1;
+			return loopStart + ((pos - len) % span);
+		}
+		return len - 1;
+	}
+	if (releaseAt === 0) return 0;
+	if (releaseAt > 0) {
+		if (t < releaseAt) return t;
+		if (loopStart < releaseAt) {
+			const span = releaseAt - loopStart;
+			if (span <= 0) return releaseAt - 1;
+			return loopStart + ((t - releaseAt) % span);
+		}
+		return releaseAt - 1;
+	}
 	if (t < len) return t;
-	const start = loop > 0 && loop < len ? loop : 0;
-	const span = len - start;
+	const span = len - loopStart;
 	if (span <= 0) return len - 1;
-	return start + ((t - len) % span);
+	return loopStart + ((t - len) % span);
 }
 
 export function createDefaultInstrumentMacro(field: InstrumentMacroField): InstrumentMacro {
@@ -115,10 +170,13 @@ export function normalizeInstrumentMacro(
 					.slice(0, INSTRUMENT_MACRO_MAX_LENGTH)
 					.map((value) => clampMacroValue(value, field))
 			: [cloneMacroValue(field.defaultValue)];
-	return {
-		values,
-		loop: clampInstrumentMacroLoop(macro?.loop ?? 0, values.length)
-	};
+	return instrumentMacroWithRelease(
+		{
+			values,
+			loop: clampInstrumentMacroLoop(macro?.loop ?? 0, values.length)
+		},
+		clampInstrumentMacroRelease(macro?.release, values.length)
+	);
 }
 
 export function hasKnownInstrumentMacros(
@@ -208,13 +266,20 @@ export function macrosToInstrumentRows(
 export function sampleInstrumentRowFromMacros(
 	macros: InstrumentMacros,
 	tick: number,
-	fields: readonly InstrumentMacroField[]
+	fields: readonly InstrumentMacroField[],
+	releaseTick: number = INSTRUMENT_MACRO_NO_RELEASE
 ): Record<string, unknown> {
 	const row = createDefaultRow(fields);
 	for (const field of fields) {
 		const macro = macros[field.id];
 		const values = macro?.values ?? [field.defaultValue];
-		const index = sampleInstrumentMacroIndex(tick, values.length, macro?.loop ?? 0);
+		const index = sampleInstrumentMacroIndex(
+			tick,
+			values.length,
+			macro?.loop ?? 0,
+			macro?.release ?? INSTRUMENT_MACRO_NO_RELEASE,
+			releaseTick
+		);
 		writeMacroField(row, field, values[index] ?? field.defaultValue);
 	}
 	return row;
@@ -239,10 +304,13 @@ export function cloneInstrumentMacros(
 	if (!macros) return undefined;
 	const cloned: InstrumentMacros = {};
 	for (const [id, macro] of Object.entries(macros)) {
-		cloned[id] = {
-			values: [...macro.values],
-			loop: macro.loop
-		};
+		cloned[id] = instrumentMacroWithRelease(
+			{
+				values: [...macro.values],
+				loop: macro.loop
+			},
+			clampInstrumentMacroRelease(macro.release, macro.values.length)
+		);
 	}
 	return cloned;
 }
@@ -262,10 +330,13 @@ export function resizeInstrumentMacro(
 	} else if (length < values.length) {
 		values.length = length;
 	}
-	return {
-		values,
-		loop: clampInstrumentMacroLoop(macro.loop, values.length)
-	};
+	return instrumentMacroWithRelease(
+		{
+			values,
+			loop: clampInstrumentMacroLoop(macro.loop, values.length)
+		},
+		clampInstrumentMacroRelease(macro.release, values.length)
+	);
 }
 
 export function setInstrumentMacroValue(
@@ -315,6 +386,22 @@ export function setSharedSequenceLength(
 	return syncSharedSequenceGroup(next, fields);
 }
 
+export function setSharedSequenceRelease(
+	macros: InstrumentMacros,
+	fields: readonly InstrumentMacroField[],
+	index: number
+): InstrumentMacros {
+	const aligned = syncSharedSequenceGroup(macros, fields);
+	const length = aligned[fields[0]?.id ?? '']?.values.length ?? INSTRUMENT_MACRO_MIN_LENGTH;
+	const release = clampInstrumentMacroRelease(index, length);
+	const next: InstrumentMacros = { ...aligned };
+	for (const field of fields) {
+		const current = next[field.id] ?? createDefaultInstrumentMacro(field);
+		next[field.id] = instrumentMacroWithRelease(current, release);
+	}
+	return next;
+}
+
 export function setSharedSequenceLoop(
 	macros: InstrumentMacros,
 	fields: readonly InstrumentMacroField[],
@@ -338,21 +425,24 @@ function syncSharedSequenceGroup(
 	if (fields.length === 0) return macros;
 	let length = INSTRUMENT_MACRO_MIN_LENGTH;
 	let loop = 0;
+	let release = INSTRUMENT_MACRO_NO_RELEASE;
 	for (const field of fields) {
 		const macro = macros[field.id];
 		const len = macro?.values.length ?? 0;
 		if (len > length) {
 			length = len;
 			loop = macro?.loop ?? 0;
+			release = macro?.release ?? INSTRUMENT_MACRO_NO_RELEASE;
 		}
 	}
 	length = clampInstrumentMacroLength(length);
 	loop = clampInstrumentMacroLoop(loop, length);
+	release = clampInstrumentMacroRelease(release, length);
 	const next: InstrumentMacros = { ...macros };
 	for (const field of fields) {
 		const current = normalizeInstrumentMacro(macros[field.id], field);
 		const resized = resizeInstrumentMacro(current, field, length);
-		next[field.id] = { ...resized, loop };
+		next[field.id] = instrumentMacroWithRelease({ ...resized, loop }, release);
 	}
 	return next;
 }

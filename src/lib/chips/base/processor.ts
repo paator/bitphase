@@ -40,11 +40,11 @@ export interface MixerWorkletSlotProcessor extends ChipProcessor {
 	acceptWorkletPayload(data: unknown): void;
 }
 
-export function isMixerWorkletSlotProcessor(
-	p: ChipProcessor
-): p is MixerWorkletSlotProcessor {
+export function isMixerWorkletSlotProcessor(p: ChipProcessor): p is MixerWorkletSlotProcessor {
 	const slot = p as MixerWorkletSlotProcessor;
-	return typeof slot.bindChipIndex === 'function' && typeof slot.acceptWorkletPayload === 'function';
+	return (
+		typeof slot.bindChipIndex === 'function' && typeof slot.acceptWorkletPayload === 'function'
+	);
 }
 
 export interface SettingsSubscriber {
@@ -68,6 +68,7 @@ export interface PreviewNoteSupport {
 		channelIndex?: number
 	): void;
 	stopPreviewNote(channel?: number): void;
+	releasePreviewNote(channel?: number): void;
 }
 
 export interface VirtualChannelSupport {

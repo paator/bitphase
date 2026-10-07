@@ -20,7 +20,8 @@ enum NoteName {
 	GSharp,
 	A,
 	ASharp,
-	B
+	B,
+	Release
 }
 
 enum EffectType {
@@ -55,7 +56,10 @@ class Instrument {
 	chipType: string;
 	name: string = '';
 	color?: string;
-	macros?: Record<string, { values: (boolean | number | string)[]; loop: number }>;
+	macros?: Record<
+		string,
+		{ values: (boolean | number | string)[]; loop: number; release?: number }
+	>;
 
 	constructor(id: string, name: string = '', chipType: string = 'ay') {
 		this.id = id;
@@ -210,7 +214,12 @@ class Song {
 	addPattern(): Pattern {
 		const newId = this.patterns.length;
 		const effectiveLabels = this.getEffectiveChannelLabels();
-		const pattern = new Pattern(newId, this.defaultPatternLength, this.#schema, effectiveLabels);
+		const pattern = new Pattern(
+			newId,
+			this.defaultPatternLength,
+			this.#schema,
+			effectiveLabels
+		);
 		if (this.patterns.length > 0) {
 			applySharedEffectColumnCounts(pattern, getSharedEffectColumnCounts(this.patterns));
 		}

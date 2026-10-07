@@ -1,5 +1,10 @@
 import EffectAlgorithms from './effect-algorithms.js';
 import {
+	clearChannelInstrumentRelease,
+	NOTE_RELEASE,
+	releaseChannelInstrument
+} from './tracker-instrument-channel.js';
+import {
 	clearAllEffectTableSlots,
 	clearEffectTableSlot,
 	clearEffectTableSlotsExcept,
@@ -180,6 +185,9 @@ class TrackerPatternProcessor {
 		const row = pending.pattern.channels[channelIndex]?.rows?.[pending.rowIndex];
 		if (!row) return;
 		this._applyChannelContent(channelIndex, row);
+		if (row.note?.name === NOTE_RELEASE) {
+			releaseChannelInstrument(this.state, channelIndex);
+		}
 	}
 
 	tickNoteDelays() {
@@ -202,7 +210,12 @@ class TrackerPatternProcessor {
 			this.state.channelSlideAlreadyApplied = [];
 		}
 
+		if (row.note.name === NOTE_RELEASE) {
+			return;
+		}
+
 		if (row.note.name === 1) {
+			clearChannelInstrumentRelease(this.state, channelIndex);
 			this._resetAllChannelEffects(channelIndex);
 			this.state.channelSoundEnabled[channelIndex] = false;
 			if (this.state.channelKeyOn) {
@@ -211,6 +224,7 @@ class TrackerPatternProcessor {
 			this.state.channelBaseNotes[channelIndex] = 0;
 			this.state.channelCurrentNotes[channelIndex] = 0;
 		} else if (row.note.name !== 0) {
+			clearChannelInstrumentRelease(this.state, channelIndex);
 			this.state.channelSoundEnabled[channelIndex] = true;
 			if (this.state.instrumentPositions) {
 				this.state.instrumentPositions[channelIndex] = 0;
@@ -519,7 +533,7 @@ class TrackerPatternProcessor {
 	}
 
 	_initChannelPortamento(channelIndex, row, effect, hasTableIndex) {
-		if (row.note.name === 0 || row.note.name === 1) return;
+		if (row.note.name === 0 || row.note.name === 1 || row.note.name === NOTE_RELEASE) return;
 
 		const currentNote = this.state.channelBaseNotes[channelIndex];
 		const previousNote = this.state.channelPreviousNotes[channelIndex];

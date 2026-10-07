@@ -258,6 +258,22 @@ describe('PatternNoteInput', () => {
 				expect(result).not.toBeNull();
 				expect(mockUpdateFieldValue).toHaveBeenCalledWith(context, fieldInfo, 'OFF');
 			});
+
+			it('should set note to release when backslash is pressed', () => {
+				const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH);
+				const context = createMockContext(pattern);
+				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
+
+				const result = PatternNoteInput.handleNoteInput(
+					context,
+					fieldInfo,
+					'\\',
+					'Backslash'
+				);
+
+				expect(result).not.toBeNull();
+				expect(mockUpdateFieldValue).toHaveBeenCalledWith(context, fieldInfo, '===');
+			});
 		});
 
 		describe('piano keyboard input', () => {
@@ -393,35 +409,32 @@ describe('PatternNoteInput', () => {
 				});
 				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
 
-				mockGetFieldValue.mockImplementation(
-					(ctx: EditingContext, info: FieldInfo) => {
-						if (info.fieldKey === 'instrument') {
-							return ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow]
-								.instrument;
-						}
-						const row =
-							ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow];
-						if (row.note.name === NoteName.None) return '---';
-						if (row.note.name === NoteName.Off) return 'OFF';
-						const noteNames = [
-							'',
-							'',
-							'C-',
-							'C#',
-							'D-',
-							'D#',
-							'E-',
-							'F-',
-							'F#',
-							'G-',
-							'G#',
-							'A-',
-							'A#',
-							'B-'
-						];
-						return noteNames[row.note.name] + row.note.octave;
+				mockGetFieldValue.mockImplementation((ctx: EditingContext, info: FieldInfo) => {
+					if (info.fieldKey === 'instrument') {
+						return ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow]
+							.instrument;
 					}
-				);
+					const row = ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow];
+					if (row.note.name === NoteName.None) return '---';
+					if (row.note.name === NoteName.Off) return 'OFF';
+					const noteNames = [
+						'',
+						'',
+						'C-',
+						'C#',
+						'D-',
+						'D#',
+						'E-',
+						'F-',
+						'F#',
+						'G-',
+						'G#',
+						'A-',
+						'A#',
+						'B-'
+					];
+					return noteNames[row.note.name] + row.note.octave;
+				});
 
 				const result = PatternNoteInput.handleNoteInput(context, fieldInfo, 'q', 'KeyQ');
 
@@ -449,35 +462,32 @@ describe('PatternNoteInput', () => {
 				});
 				const fieldInfo = createFieldInfo(DEFAULT_CHANNEL_INDEX);
 
-				mockGetFieldValue.mockImplementation(
-					(ctx: EditingContext, info: FieldInfo) => {
-						if (info.fieldKey === 'instrument') {
-							return ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow]
-								.instrument;
-						}
-						const row =
-							ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow];
-						if (row.note.name === NoteName.None) return '---';
-						if (row.note.name === NoteName.Off) return 'OFF';
-						const noteNames = [
-							'',
-							'',
-							'C-',
-							'C#',
-							'D-',
-							'D#',
-							'E-',
-							'F-',
-							'F#',
-							'G-',
-							'G#',
-							'A-',
-							'A#',
-							'B-'
-						];
-						return noteNames[row.note.name] + row.note.octave;
+				mockGetFieldValue.mockImplementation((ctx: EditingContext, info: FieldInfo) => {
+					if (info.fieldKey === 'instrument') {
+						return ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow]
+							.instrument;
 					}
-				);
+					const row = ctx.pattern.channels[info.channelIndex].rows[ctx.selectedRow];
+					if (row.note.name === NoteName.None) return '---';
+					if (row.note.name === NoteName.Off) return 'OFF';
+					const noteNames = [
+						'',
+						'',
+						'C-',
+						'C#',
+						'D-',
+						'D#',
+						'E-',
+						'F-',
+						'F#',
+						'G-',
+						'G#',
+						'A-',
+						'A#',
+						'B-'
+					];
+					return noteNames[row.note.name] + row.note.octave;
+				});
 
 				const result = PatternNoteInput.handleNoteInput(context, fieldInfo, 'q', 'KeyQ');
 

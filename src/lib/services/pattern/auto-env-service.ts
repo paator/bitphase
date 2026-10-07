@@ -1,4 +1,5 @@
-import type { Pattern } from '../../models/song';
+import { NoteName, type Pattern } from '../../models/song';
+import { isPitchedNoteName } from '../../utils/note-utils';
 import type { AutoEnvRatio } from '../../stores/auto-env.svelte';
 
 export class AutoEnvService {
@@ -49,14 +50,16 @@ export class AutoEnvService {
 		}
 
 		const note = noteValue as { name: number; octave: number };
-		if (note.name === 0 || note.name === 1) {
+		if (!isPitchedNoteName(note.name as NoteName)) {
 			return null;
 		}
 
 		const noteIndex = (note.octave - 1) * 12 + (note.name - 2);
 
 		const envelopeShape =
-			typeof row.envelopeShape === 'number' ? row.envelopeShape : parseInt(String(row.envelopeShape) || '0');
+			typeof row.envelopeShape === 'number'
+				? row.envelopeShape
+				: parseInt(String(row.envelopeShape) || '0');
 
 		const envelopeValue = this.calculateEnvelopeValue(
 			noteIndex,

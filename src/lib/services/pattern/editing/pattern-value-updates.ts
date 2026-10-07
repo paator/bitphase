@@ -129,7 +129,7 @@ export class PatternValueUpdates {
 	}
 
 	static incrementNoteValue(currentValue: string, delta: number): string {
-		if (currentValue === '---' || currentValue === 'OFF') {
+		if (currentValue === '---' || currentValue === 'OFF' || currentValue === '===') {
 			return currentValue;
 		}
 

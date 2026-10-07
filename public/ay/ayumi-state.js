@@ -16,6 +16,8 @@ import {
 const AY_CHANNEL_ARRAY_SPECS = [
 	['channelInstruments', -1],
 	['instrumentPositions', 0],
+	['channelMacroReleased', false],
+	['channelMacroReleaseTick', -1],
 	['channelTimerPositions', 0],
 	['channelInstrumentVolumes', 0],
 	['channelToneAccumulator', 0],

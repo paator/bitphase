@@ -83,6 +83,7 @@ export type MixerSlotCommand =
 			channelIndex?: number;
 	  }
 	| { type: 'stop_preview'; channel?: number }
+	| { type: 'release_preview'; channel?: number }
 	| {
 			type: 'set_virtual_channel_config';
 			virtualChannelMap: Record<number, number>;

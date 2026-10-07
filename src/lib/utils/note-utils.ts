@@ -48,7 +48,7 @@ export function isNoteInTuningTable(noteName: NoteName, octave: number): boolean
 }
 
 export function isTrackerNoteStringInTuningTable(noteStr: string): boolean {
-	if (noteStr === '---' || noteStr === 'OFF' || noteStr === 'R--') {
+	if (noteStr === '---' || noteStr === 'OFF' || noteStr === '===' || noteStr === 'R--') {
 		return true;
 	}
 	const { noteName, octave } = parseNoteFromString(noteStr);
@@ -95,7 +95,12 @@ export function formatNoteFromEnum(noteName: NoteName, octave: number): string {
 	];
 	if (noteName === NoteName.None) return '---';
 	if (noteName === NoteName.Off) return 'OFF';
+	if (noteName === NoteName.Release) return '===';
 	return notes[noteName] + octave;
+}
+
+export function isPitchedNoteName(noteName: NoteName): boolean {
+	return noteName >= NoteName.C && noteName <= NoteName.B;
 }
 
 export function parseNoteFromString(noteStr: string): { noteName: NoteName; octave: number } {
@@ -104,6 +109,9 @@ export function parseNoteFromString(noteStr: string): { noteName: NoteName; octa
 	}
 	if (noteStr === 'OFF' || noteStr === 'R--') {
 		return { noteName: NoteName.Off, octave: 0 };
+	}
+	if (noteStr === '===') {
+		return { noteName: NoteName.Release, octave: 0 };
 	}
 
 	const sharpMatch = noteStr.match(/^([A-G]#)(\d)$/);

@@ -316,16 +316,21 @@ function reconstructInstrument(data: any): Instrument {
 		);
 	}
 	if (data.macros && typeof data.macros === 'object') {
-		const macros: Record<string, { values: (boolean | number)[]; loop: number }> = {};
+		const macros: Record<
+			string,
+			{ values: (boolean | number)[]; loop: number; release?: number }
+		> = {};
 		for (const [macroId, macro] of Object.entries(data.macros as Record<string, unknown>)) {
 			if (!macro || typeof macro !== 'object') continue;
-			const record = macro as { values?: unknown; loop?: unknown };
+			const record = macro as { values?: unknown; loop?: unknown; release?: unknown };
 			if (!Array.isArray(record.values)) continue;
+			const release = typeof record.release === 'number' ? record.release : undefined;
 			macros[macroId] = {
 				values: record.values.map((value) =>
 					typeof value === 'boolean' || typeof value === 'number' ? value : 0
 				),
-				loop: typeof record.loop === 'number' ? record.loop : 0
+				loop: typeof record.loop === 'number' ? record.loop : 0,
+				...(release !== undefined && release >= 0 ? { release } : {})
 			};
 		}
 		if (Object.keys(macros).length > 0) {
@@ -333,19 +338,27 @@ function reconstructInstrument(data: any): Instrument {
 		}
 	}
 	if (data.timerMacros && typeof data.timerMacros === 'object') {
-		const timerMacros: Record<string, { values: (boolean | number | string)[]; loop: number }> =
-			{};
-		for (const [macroId, macro] of Object.entries(data.timerMacros as Record<string, unknown>)) {
+		const timerMacros: Record<
+			string,
+			{ values: (boolean | number | string)[]; loop: number; release?: number }
+		> = {};
+		for (const [macroId, macro] of Object.entries(
+			data.timerMacros as Record<string, unknown>
+		)) {
 			if (!macro || typeof macro !== 'object') continue;
-			const record = macro as { values?: unknown; loop?: unknown };
+			const record = macro as { values?: unknown; loop?: unknown; release?: unknown };
 			if (!Array.isArray(record.values)) continue;
+			const release = typeof record.release === 'number' ? record.release : undefined;
 			timerMacros[macroId] = {
 				values: record.values.map((value) =>
-					typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string'
+					typeof value === 'boolean' ||
+					typeof value === 'number' ||
+					typeof value === 'string'
 						? value
 						: 0
 				),
-				loop: typeof record.loop === 'number' ? record.loop : 0
+				loop: typeof record.loop === 'number' ? record.loop : 0,
+				...(release !== undefined && release >= 0 ? { release } : {})
 			};
 		}
 		if (Object.keys(timerMacros).length > 0) {
@@ -397,7 +410,12 @@ function reconstructInstrument(data: any): Instrument {
 	}
 	const dpcmTarget = withSample as typeof withSample & {
 		dpcmSamples?: { name: string; data: number[] }[];
-		dpcmAssignments?: ({ sampleIndex: number; pitch: number; loop: boolean; delta: number } | null)[];
+		dpcmAssignments?: ({
+			sampleIndex: number;
+			pitch: number;
+			loop: boolean;
+			delta: number;
+		} | null)[];
 	};
 	if (Array.isArray(data.dpcmSamples)) {
 		copyNesDpcmFields(

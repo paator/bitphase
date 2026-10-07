@@ -10,6 +10,19 @@ describe('tracker instrument macros', () => {
 	it('matches the TypeScript loop sampler', () => {
 		expect(sampleInstrumentMacroIndex(4, 4, 2)).toBe(2);
 		expect(sampleInstrumentMacroIndex(4, 4, 0)).toBe(0);
+		expect(sampleInstrumentMacroIndex(4, 16, 1, 4, -1)).toBe(1);
+		expect(sampleInstrumentMacroIndex(4, 16, 1, 4, 4)).toBe(4);
+	});
+
+	it('jumps a released macro to its release point', () => {
+		const instrument = {
+			macros: {
+				volume: { values: [13, 11, 10, 9, 7, 1], loop: 1, release: 4 }
+			}
+		};
+		expect(sampleAyMixerRow(instrument, 4).volume).toBe(11);
+		expect(sampleAyMixerRow(instrument, 4, 4).volume).toBe(7);
+		expect(sampleAyMixerRow(instrument, 5, 4).volume).toBe(1);
 	});
 
 	it('samples AY mixer macros independently of the shared row loop', () => {

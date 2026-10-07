@@ -13,6 +13,7 @@
 		accentColor,
 		isExpanded = false,
 		loopIndex,
+		releaseIndex,
 		sequenceLength,
 		canRemove,
 		canAdd,
@@ -25,6 +26,7 @@
 		accentColor?: string;
 		isExpanded?: boolean;
 		loopIndex: number;
+		releaseIndex: number;
 		sequenceLength: number;
 		canRemove: boolean;
 		canAdd: boolean;
@@ -39,8 +41,7 @@
 		'flex h-5 w-5 cursor-pointer items-center justify-center rounded text-[var(--color-app-text-muted)] transition-all duration-150 hover:scale-110 hover:bg-[var(--color-app-surface-hover)] hover:text-[var(--color-app-text-secondary)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100';
 </script>
 
-<header
-	class="flex items-center gap-3 border-b border-[var(--color-app-border)] px-2 py-1 text-xs">
+<header class="flex items-center gap-3 border-b border-[var(--color-app-border)] px-2 py-1 text-xs">
 	{#if Icon}
 		<Icon class="{iconClass} shrink-0" style="color: {accentColor}" />
 	{/if}
@@ -50,6 +51,13 @@
 			<IconCarbonRepeat class="{iconClass} shrink-0" aria-hidden="true" />
 			{loopIndex}
 		</span>
+		{#if releaseIndex >= 0}
+			<span class="flex items-center gap-1" title="Release at {releaseIndex}">
+				<span class="font-mono text-[var(--color-pattern-note-off)]" aria-hidden="true"
+					>/</span>
+				{releaseIndex}
+			</span>
+		{/if}
 		<span class="flex items-center gap-1" title="{sequenceLength} {stepLabel}">
 			<IconCarbonListNumbered class="{iconClass} shrink-0" aria-hidden="true" />
 			{sequenceLength}
