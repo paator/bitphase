@@ -339,9 +339,6 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 
 	function handleNoteBlur() {
 		cancelReleaseTail();
-		if (activeNotes.length > 0) {
-			lastPlayedNotes = activeNotes.map((n) => n.note);
-		}
 		activeNotes = [];
 		playbackNotes = [];
 	}
