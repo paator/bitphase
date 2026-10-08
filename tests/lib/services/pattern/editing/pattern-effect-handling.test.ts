@@ -258,5 +258,11 @@ describe('PatternEffectHandling', () => {
 			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 4, parameter: 0x7f });
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E47F');
 		});
+
+		it('E5XY length counter parses and formats as an E subcommand', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E51F');
+			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 5, parameter: 0x1f });
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E51F');
+		});
 	});
 });

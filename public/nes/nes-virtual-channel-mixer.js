@@ -14,6 +14,7 @@ function copyNesChannelFields(src, dst) {
 	dst.noiseMode = src.noiseMode;
 	dst.volumeReg = src.volumeReg;
 	dst.lengthNibble = src.lengthNibble;
+	dst.lengthReload = src.lengthReload === true;
 	dst.linearReg = src.linearReg;
 	dst.dpcmPitch = src.dpcmPitch;
 	dst.dpcmLoop = src.dpcmLoop;

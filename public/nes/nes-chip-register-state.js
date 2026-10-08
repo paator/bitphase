@@ -14,6 +14,7 @@ function createDefaultChannel() {
 		noiseMode: false,
 		volumeReg: NES_REGISTER_UNCHANGED,
 		lengthNibble: NES_REGISTER_UNCHANGED,
+		lengthReload: false,
 		linearReg: NES_REGISTER_UNCHANGED,
 		dpcmPitch: 15,
 		dpcmLoop: false,

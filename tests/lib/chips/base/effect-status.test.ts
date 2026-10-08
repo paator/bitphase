@@ -55,6 +55,12 @@ describe('effect status descriptions', () => {
 		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 4, tableIndex: 0 })).toBe(
 			'E4TY: Delta Counter (Y: table)'
 		);
+		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 5 })).toBe(
+			'E5XY: Length Counter (XY: 00-1F)'
+		);
+		expect(
+			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 5, tableIndex: 1 })
+		).toBeNull();
 		expect(
 			describePatternEffect(
 				{ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 },

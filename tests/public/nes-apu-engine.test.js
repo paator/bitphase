@@ -421,6 +421,35 @@ describe('NesApuEngine', () => {
 		}
 	});
 
+	it('rewrites the pulse length register when the same E5 index is reloaded', () => {
+		const wasmModule = createMockWasmModule();
+		const engine = createTestEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+		const pulse = registerState.channels[0];
+		pulse.enabled = true;
+		pulse.period = 428;
+		pulse.volume = 15;
+		pulse.duty = 2;
+		pulse.volumeReg = (2 << 6) | 6;
+		pulse.lengthNibble = 1;
+		pulse.retrigger = true;
+		engine.applyRegisterState(registerState);
+
+		wasmModule.apuWrites.length = 0;
+		pulse.retrigger = false;
+		pulse.lengthReload = true;
+		engine.applyRegisterState(registerState);
+
+		expect(wasmModule.apuWrites.filter((write) => write.addr === 0x4003)).toEqual([
+			{ addr: 0x4003, val: (1 << 3) | ((427 >> 8) & 7) }
+		]);
+		expect(pulse.lengthReload).toBe(false);
+
+		wasmModule.apuWrites.length = 0;
+		engine.applyRegisterState(registerState);
+		expect(wasmModule.apuWrites.filter((write) => write.addr === 0x4003)).toEqual([]);
+	});
+
 	it('writes $4011 for a delta counter without restarting DPCM', () => {
 		const wasmModule = createMockWasmModule();
 		const engine = createTestEngine(wasmModule);

@@ -35,14 +35,21 @@ function deltaState() {
 		channelDpcmDeltaWrite: [false, false, false, false, false],
 		channelDpcmDeltaTableMode: [false, false, false, false, false],
 		channelDpcmDeltaTableIndex: [-1, -1, -1, -1, -1],
-		channelDpcmDeltaTablePosition: [0, 0, 0, 0, 0]
+		channelDpcmDeltaTablePosition: [0, 0, 0, 0, 0],
+		channelSweepOverrideActive: [false, false, false, false, false],
+		channelSweepOverrideReg: [0x08, 0x08, 0x08, 0x08, 0x08],
+		channelSweepTableMode: [false, false, false, false, false],
+		channelSweepTableIndex: [-1, -1, -1, -1, -1],
+		channelSweepTablePosition: [0, 0, 0, 0, 0],
+		channelSweepDown: [false, false, false, false, false],
+		channelSweepTableTick: [false, false, false, false, false]
 	};
 }
 
-function patternWith(channelIndex, effect) {
+function patternWith(channelIndex, effect, noteName = 0) {
 	const channels = Array.from({ length: 5 }, () => ({ rows: [emptyRow()] }));
 	channels[channelIndex].rows[0] = {
-		note: { name: 0 },
+		note: { name: noteName },
 		instrument: -1,
 		effects: [effect]
 	};
@@ -92,6 +99,44 @@ describe('NES delta counter', () => {
 		registerState.channels[4].dpcmDeltaWrite = true;
 		driver.processInstruments(state, registerState);
 		expect(registerState.channels[4].dpcmDeltaWrite).toBe(false);
+	});
+
+	it('writes the delta counter back to 0 when the DPCM note is cut', () => {
+		const driver = new NesAudioDriver();
+		const state = deltaState();
+		state.channelDpcmDelta[4] = 0x5a;
+		state.channelDpcmDeltaTableMode[4] = true;
+		state.channelDpcmDeltaTableIndex[4] = 0;
+		const registerState = new NesChipRegisterState();
+		registerState.channels[4].dpcmDeltaHold = 0x5a;
+
+		driver.processPatternRow(state, patternWith(4, null, 1), 0, null, registerState);
+		driver.processInstruments(state, registerState);
+
+		expect(state.channelDpcmDelta[4]).toBe(0);
+		expect(state.channelDpcmDeltaTableMode[4]).toBe(false);
+		expect(registerState.channels[4].dpcmDelta).toBe(0);
+		expect(registerState.channels[4].dpcmDeltaHold).toBe(0);
+		expect(registerState.channels[4].dpcmDeltaWrite).toBe(true);
+		expect(registerState.channels[4].enabled).toBe(false);
+	});
+
+	it('lets a DPCM note cut override E4 on the same row', () => {
+		const driver = new NesAudioDriver();
+		const state = deltaState();
+		const registerState = new NesChipRegisterState();
+
+		driver.processPatternRow(
+			state,
+			patternWith(4, { ...E4, parameter: 0x7f }, 1),
+			0,
+			null,
+			registerState
+		);
+		driver.processInstruments(state, registerState);
+
+		expect(registerState.channels[4].dpcmDelta).toBe(0);
+		expect(registerState.channels[4].dpcmDeltaWrite).toBe(true);
 	});
 
 	it('replaces the instrument delta when E4XY shares a DPCM note', () => {

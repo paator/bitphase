@@ -29,8 +29,7 @@ import { NES_CHANNEL_COUNT } from './nes-constants.js';
 import { resolveNesDpcmAssignment } from './nes-dpcm.js';
 import {
 	advanceNesPulseWidthTable,
-	processNesPulseWidthCycleEffect,
-	resetNesChannelPulseWidthCycle
+	processNesPulseWidthCycleEffect
 } from './nes-pulse-width-cycle.js';
 import {
 	processNesSweepEffect,
@@ -40,8 +39,10 @@ import {
 import {
 	NES_DPCM_HARDWARE_CHANNEL,
 	advanceNesDeltaCounterTable,
+	cutNesDeltaCounter,
 	processNesDeltaCounterEffect
 } from './nes-delta-counter.js';
+import { applyNesLengthCounter, processNesLengthCounterEffect } from './nes-length-counter.js';
 
 const NES_NOISE_PERIOD_COUNT = 16;
 
@@ -96,12 +97,12 @@ class NesAudioDriver {
 				processNesPulseWidthCycleEffect(state, channelIndex, row);
 				processNesSweepEffect(state, channelIndex, row);
 			}
-			processNesDeltaCounterEffect(
-				state,
-				channelIndex,
-				row,
-				this._getHardwareChannelType(channelIndex)
-			);
+			const hardwareType = this._getHardwareChannelType(channelIndex);
+			processNesDeltaCounterEffect(state, channelIndex, row, hardwareType);
+			if (row.note?.name === 1 && hardwareType === NES_DPCM_HARDWARE_CHANNEL) {
+				cutNesDeltaCounter(state, channelIndex);
+			}
+			processNesLengthCounterEffect(state, channelIndex, row, hardwareType);
 		}
 	}
 
@@ -113,6 +114,7 @@ class NesAudioDriver {
 		channel.volume = 0;
 		channel.retrigger = false;
 		channel.lengthNibble = NES_REGISTER_UNCHANGED;
+		channel.lengthReload = false;
 		if (hwType <= 1) {
 			channel.period = 0;
 			channel.volumeReg = buildSquareSilentVolumeReg(channel.duty);
@@ -223,7 +225,6 @@ class NesAudioDriver {
 			state.instrumentPositions[channelIndex] = 0;
 			state.channelKeyOn[channelIndex] = false;
 			this._resetToneAccumulator(state, channelIndex);
-			resetNesChannelPulseWidthCycle(state, channelIndex);
 			resetNesChannelSweepOverride(state, channelIndex);
 		} else if (row.note.name !== 0) {
 			clearChannelInstrumentRelease(state, channelIndex);
@@ -315,6 +316,7 @@ class NesAudioDriver {
 			channel.sweepReg = sweepReg;
 			channel.sweepUpdateOnly = false;
 		}
+		this._syncLengthCounter(state, registerState, false);
 	}
 
 	processInstruments(state, registerState) {
@@ -393,6 +395,28 @@ class NesAudioDriver {
 
 		processChannelOnOffCounters(state, channelCount);
 		this._syncDpcmDeltaCounter(state, registerState);
+		this._syncLengthCounter(state, registerState, true);
+	}
+
+	_syncLengthCounter(state, registerState, consumeReload) {
+		const active = state.channelLengthCounterActive;
+		const reload = state.channelLengthCounterReload;
+		if (!active || !reload) return;
+		const channelCount = registerState.channelCount ?? active.length;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			const reloadNow = consumeReload && reload[channelIndex] === true;
+			if (consumeReload) reload[channelIndex] = false;
+			if (!active[channelIndex]) continue;
+			const channel = registerState.channels[channelIndex];
+			if (!channel?.enabled) continue;
+			const hardwareType = this._getHardwareChannelType(channelIndex);
+			applyNesLengthCounter(
+				channel,
+				hardwareType,
+				state.channelLengthCounterIndex[channelIndex] ?? 0
+			);
+			if (reloadNow) channel.lengthReload = true;
+		}
 	}
 
 	_syncDpcmDeltaCounter(state, registerState) {

@@ -303,6 +303,7 @@ class NesApuEngine {
 			channel.retrigger ||
 			(!sweepHoldsPeriod && periodHigh !== lastPeriodHigh) ||
 			sweepChannelRetrigger ||
+			channel.lengthReload === true ||
 			(!sweepHoldsPeriod &&
 				channel.lengthNibble !== NES_REGISTER_UNCHANGED &&
 				lengthNibble !== lastLengthNibble)
@@ -315,6 +316,7 @@ class NesApuEngine {
 			last.period = period;
 			last.lengthNibble = channel.lengthNibble;
 		}
+		channel.lengthReload = false;
 		last.retrigger = channel.retrigger;
 	}
 
@@ -357,6 +359,7 @@ class NesApuEngine {
 			forceApply ||
 			triggerChannel ||
 			channel.retrigger ||
+			channel.lengthReload === true ||
 			periodHigh !== lastPeriodHigh ||
 			(channel.lengthNibble !== NES_REGISTER_UNCHANGED && lengthNibble !== lastLengthNibble)
 		) {
@@ -364,6 +367,7 @@ class NesApuEngine {
 		}
 		last.period = period;
 		last.lengthNibble = channel.lengthNibble;
+		channel.lengthReload = false;
 		last.retrigger = channel.retrigger;
 	}
 
@@ -406,12 +410,14 @@ class NesApuEngine {
 			forceApply ||
 			triggerChannel ||
 			channel.retrigger ||
+			channel.lengthReload === true ||
 			(channel.lengthNibble !== NES_REGISTER_UNCHANGED && lengthNibble !== last.lengthNibble)
 		) {
 			this._writeDmc(NOISE_BASE + 3, lengthNibble << 3);
 			last.lengthNibble = channel.lengthNibble;
 			last.retrigger = channel.retrigger;
 		}
+		channel.lengthReload = false;
 	}
 
 	applyRegisterState(registerState) {

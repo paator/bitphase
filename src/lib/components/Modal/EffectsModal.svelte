@@ -579,8 +579,8 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Pulse Width</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists until note off or a
-					new E1. Use E100 to restore the instrument duty cycle.
+					Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists through note off
+					until a new E1. Use E100 to restore the instrument duty cycle.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
@@ -711,7 +711,8 @@
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
 					Writes the DPCM delta counter on the DPCM channel. Higher values attenuate triangle,
-					noise, and DPCM. The level stays until the next E4 and does not restart a playing sample.
+					noise, and DPCM. The level stays through a new note until the next E4. A DPCM note cut
+					writes it back to 00. It does not restart a playing sample.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
@@ -744,6 +745,43 @@
 						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E400</code>,
 						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E47F</code>,
 						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E4T1</code>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+				<div class="mb-2 flex items-center gap-2">
+					<code
+						class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+						E5
+					</code>
+					<h3 class="font-bold text-[var(--color-app-text-primary)]">Length Counter</h3>
+				</div>
+				<p class="mb-3 text-[var(--color-app-text-secondary)]">
+					Loads the hardware length counter on pulse, triangle, and noise. The note goes silent
+					when the counter expires, and a new note reloads the same length. The index stays until
+					the next E5.
+				</p>
+				<div class="mb-2 space-y-1">
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+								>5</span
+							><span style="color: {COLOR.parameter}">X</span><span
+								style="color: {COLOR.parameter}">Y</span>
+						</code>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-1F</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E501</code>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E503</code>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E51F</code>
 					</div>
 				</div>
 			</div>

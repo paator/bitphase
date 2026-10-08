@@ -193,7 +193,7 @@ Sets the start position on the PWM sweep automation curve (`0`-`1000`, shown as 
 
 ### E1 - Pulse width
 
-Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists until note off or a new `E1`. Use `E100` to restore the instrument duty cycle.
+Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists through note off until a new `E1`. Use `E100` to restore the instrument duty cycle.
 
 |               |                                                                                        |
 | ------------- | -------------------------------------------------------------------------------------- |
@@ -218,7 +218,7 @@ Same format as `E2`, sweeping down (`E3XY` / `E3TX`). A new note clears it the s
 
 ### E4 - Delta counter
 
-Writes the DPCM delta counter (`$4011`) on the DPCM channel. Values above the center pull the triangle, noise, and DPCM mix down. The level stays until the next `E4`. It does not restart a playing sample. Other channels ignore it.
+Writes the DPCM delta counter (`$4011`) on the DPCM channel. Values above the center pull the triangle, noise, and DPCM mix down. The level stays through a new note until the next `E4`. A DPCM note cut writes it back to `00`. It does not restart a playing sample. Other channels ignore it.
 
 |               |                                              |
 | ------------- | -------------------------------------------- |
@@ -226,3 +226,15 @@ Writes the DPCM delta counter (`$4011`) on the DPCM channel. Values above the ce
 | **Parameter** | `XY` - delta counter, `00`-`7F`              |
 | **Table**     | `TX` - level from table `X` each tick        |
 | **Example**   | `E400` restores the mix; `E47F` attenuates it; `E4T1` - table 1 |
+
+### E5 - Length counter
+
+Loads the hardware length counter on pulse, triangle, and noise, and lets it run. The channel goes silent after that many length-counter clocks even while the note is held. A new note reloads the same length. The index stays until the next `E5`. The DPCM channel ignores it. On triangle the linear counter also runs, and whichever counter ends first silences the channel. `E500` is a real length (10 clocks), not an off switch.
+
+Length-counter clocks are 120 Hz on 2A03. `E501` lasts a little over two seconds. `E503` is two clocks.
+
+|               |                                                        |
+| ------------- | ------------------------------------------------------ |
+| **Format**    | `E5XY`                                                 |
+| **Parameter** | `XY` - length index, `00`-`1F`                         |
+| **Example**   | `E501` long; `E503` very short; `E51F` 30 clocks       |

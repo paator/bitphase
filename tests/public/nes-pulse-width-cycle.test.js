@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import NesAudioDriver from '../../public/nes/nes-audio-driver.js';
+import NesChipRegisterState from '../../public/nes/nes-chip-register-state.js';
+import NesState from '../../public/nes/nes-state.js';
 import {
 	advanceNesPulseWidthTable,
 	isNesPulseWidthCycleEffect,
@@ -161,5 +164,28 @@ describe('nes-pulse-width-cycle', () => {
 		expect(state.channelPulseWidthCurrent[0]).toBe(2);
 		resetNesChannelPulseWidthCycle(state, 0);
 		expect(state.channelPulseWidthCycleActive[0]).toBe(false);
+	});
+
+	it('keeps pulse width through note off', () => {
+		const driver = new NesAudioDriver();
+		const state = new NesState();
+		const registerState = new NesChipRegisterState();
+		state.channelPulseWidthCycleActive[0] = true;
+		state.channelPulseWidthCurrent[0] = 2;
+		driver.processPatternRow(
+			state,
+			{
+				channels: [
+					{
+						rows: [{ note: { name: 1 }, instrument: -1, effects: [null] }]
+					}
+				]
+			},
+			0,
+			null,
+			registerState
+		);
+		expect(state.channelPulseWidthCycleActive[0]).toBe(true);
+		expect(state.channelPulseWidthCurrent[0]).toBe(2);
 	});
 });

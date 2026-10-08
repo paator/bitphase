@@ -4,6 +4,7 @@ export const NES_PULSE_WIDTH_CYCLE_SUBCOMMAND = 1;
 export const NES_SWEEP_UP_SUBCOMMAND = 2;
 export const NES_SWEEP_DOWN_SUBCOMMAND = 3;
 export const NES_DELTA_COUNTER_SUBCOMMAND = 4;
+export const NES_LENGTH_COUNTER_SUBCOMMAND = 5;
 
 export function isNesPulseWidthCycleEffect(effect: { effect: number; delay: number }): boolean {
 	return effect.effect === 'E'.charCodeAt(0) && effect.delay === NES_PULSE_WIDTH_CYCLE_SUBCOMMAND;
@@ -67,6 +68,18 @@ export function isNesDeltaCounterTableEffect(effect: {
 	);
 }
 
+export function isNesLengthCounterEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): boolean {
+	return (
+		effect.effect === 'E'.charCodeAt(0) &&
+		effect.delay === NES_LENGTH_COUNTER_SUBCOMMAND &&
+		(effect.tableIndex === undefined || effect.tableIndex < 0)
+	);
+}
+
 const NES_PULSE_WIDTH_HINT: EffectStatusHint = {
 	format: 'E1XY',
 	name: 'Pulse Width',
@@ -107,6 +120,11 @@ const NES_DELTA_COUNTER_TABLE_HINT: EffectStatusHint = {
 	name: 'Delta Counter',
 	params: 'Y: table'
 };
+const NES_LENGTH_COUNTER_HINT: EffectStatusHint = {
+	format: 'E5XY',
+	name: 'Length Counter',
+	params: 'XY: 00-1F'
+};
 
 const NES_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	NES_PULSE_WIDTH_HINT,
@@ -116,7 +134,8 @@ const NES_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	NES_SWEEP_DOWN_HINT,
 	NES_SWEEP_DOWN_TABLE_HINT,
 	NES_DELTA_COUNTER_HINT,
-	NES_DELTA_COUNTER_TABLE_HINT
+	NES_DELTA_COUNTER_TABLE_HINT,
+	NES_LENGTH_COUNTER_HINT
 ];
 
 export function describeNesEffect(effect: {
@@ -138,6 +157,9 @@ export function describeNesEffect(effect: {
 		return formatEffectStatusHint(
 			table ? NES_DELTA_COUNTER_TABLE_HINT : NES_DELTA_COUNTER_HINT
 		);
+	}
+	if (isNesLengthCounterEffect(effect)) {
+		return formatEffectStatusHint(NES_LENGTH_COUNTER_HINT);
 	}
 	return null;
 }

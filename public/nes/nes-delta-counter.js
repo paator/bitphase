@@ -83,6 +83,12 @@ export function processNesDeltaCounterEffect(state, channelIndex, row, hardwareT
 	}
 }
 
+export function cutNesDeltaCounter(state, channelIndex) {
+	if (!state.channelDpcmDelta || !state.channelDpcmDeltaWrite) return;
+	clearDeltaCounterTable(state, channelIndex);
+	latchDeltaCounter(state, channelIndex, 0);
+}
+
 export function advanceNesDeltaCounterTable(state) {
 	const modes = state.channelDpcmDeltaTableMode;
 	if (!modes) return;
