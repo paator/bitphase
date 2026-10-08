@@ -238,3 +238,13 @@ Length-counter clocks are 120 Hz on 2A03. `E501` lasts a little over two seconds
 | **Format**    | `E5XY`                                                 |
 | **Parameter** | `XY` - length index, `00`-`1F`                         |
 | **Example**   | `E501` long; `E503` very short; `E51F` 30 clocks       |
+
+### E6 - Envelope mode
+
+Sets bits 4 and 5 of the pulse or noise volume register (`$4000`, `$4004`, `$400C`). The mode stays until the next `E6`. Triangle and DPCM ignore it. In modes `00` and `02` the volume nibble is the hardware decay rate. In modes `01` and `03` it is a constant volume.
+
+|               |                                                                 |
+| ------------- | --------------------------------------------------------------- |
+| **Format**    | `E6XY`                                                          |
+| **Parameter** | `00` envelope, `01` length, `02` looping, `03` constant         |
+| **Example**   | `E600` decay with the length counter; `E603` constant volume    |

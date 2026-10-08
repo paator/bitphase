@@ -264,5 +264,11 @@ describe('PatternEffectHandling', () => {
 			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 5, parameter: 0x1f });
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E51F');
 		});
+
+		it('E6XY envelope mode parses and formats as an E subcommand', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E602');
+			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 6, parameter: 0x02 });
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E602');
+		});
 	});
 });

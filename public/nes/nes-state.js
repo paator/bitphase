@@ -37,7 +37,9 @@ const NES_CHANNEL_ARRAY_SPECS = [
 	['channelDpcmDeltaTablePosition', 0],
 	['channelLengthCounterActive', false],
 	['channelLengthCounterIndex', 0],
-	['channelLengthCounterReload', false]
+	['channelLengthCounterReload', false],
+	['channelEnvelopeModeActive', false],
+	['channelEnvelopeMode', 3]
 ];
 
 class NesState extends TrackerState {

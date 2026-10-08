@@ -197,7 +197,12 @@ function moduleBytes(
 	]);
 }
 
-function tinySong(rows: number[][], length = rows.length, channel = 0): Uint8Array {
+function tinySong(
+	rows: number[][],
+	length = rows.length,
+	channel = 0,
+	extraBlocks: number[] = []
+): Uint8Array {
 	const params = [
 		0,
 		...u32(5),
@@ -222,6 +227,7 @@ function tinySong(rows: number[][], length = rows.length, channel = 0): Uint8Arr
 		...block('INSTRUMENTS', 6, u32(0)),
 		...block('FRAMES', 3, frames),
 		...block('PATTERNS', 5, patterns),
+		...extraBlocks,
 		...block('END', 0, [])
 	]);
 }
@@ -327,7 +333,7 @@ describe('ftm import', () => {
 
 		const noise = song.patterns[0]!.channels[3]!.rows[0]!;
 		expect(noise.effects[0]).toMatchObject({
-			effect: EffectType.AutoEnvelope,
+			effect: EffectType.ChipSpecific,
 			delay: 1,
 			parameter: 2
 		});
@@ -398,7 +404,7 @@ describe('ftm import', () => {
 		);
 		const rows = project.songs[0]!.patterns[0]!.channels[0]!.rows;
 		expect(rows[0]!.effects[0]).toMatchObject({
-			effect: EffectType.AutoEnvelope,
+			effect: EffectType.ChipSpecific,
 			delay: 3,
 			parameter: 0x12
 		});
@@ -648,7 +654,7 @@ describe('dnm import', () => {
 		);
 		const row = project.songs[0]!.patterns[0]!.channels[4]!.rows[0]!;
 		expect(row.effects[0]).toMatchObject({
-			effect: EffectType.AutoEnvelope,
+			effect: EffectType.ChipSpecific,
 			delay: 4,
 			parameter: 0x7f
 		});
@@ -661,5 +667,40 @@ describe('dnm import', () => {
 		);
 		expect(project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!.effects[0]).toBeNull();
 		expect(warnings.some((warning) => /\bZ\b/.test(warning))).toBe(true);
+	});
+
+	it('keeps vanilla Exx as a volume command', () => {
+		const { project } = importFtmBuffer(tinySong([patternCell(0, 0, 0, 5, 0x03)]).buffer);
+		const row = project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!;
+		expect(row.volume).toBe(3);
+		expect(row.effects[0]).toBeNull();
+	});
+
+	it('imports 0CC Exx as E5XY', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 5, 0x1f)], 1, 0, block('GROOVES', 1, [0])).buffer
+		);
+		const row = project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!;
+		expect(row.volume).toBe(0);
+		expect(row.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 5,
+			parameter: 0x1f
+		});
+		expect(warnings.some((warning) => warning.includes('EE'))).toBe(false);
+	});
+
+	it('imports 0CC EEx as E6XY', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 5, 0xe1)], 1, 2, block('PARAMS_EXTRA', 2, [0])).buffer
+		);
+		const row = project.songs[0]!.patterns[0]!.channels[2]!.rows[0]!;
+		expect(row.volume).toBe(0);
+		expect(row.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 6,
+			parameter: 2
+		});
+		expect(warnings.some((warning) => warning.includes('EE'))).toBe(false);
 	});
 });

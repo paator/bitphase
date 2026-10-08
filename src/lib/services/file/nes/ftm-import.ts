@@ -109,6 +109,8 @@ const QUIET_BLOCKS = new Set([
 	'END'
 ]);
 
+const ZERO_CC_BLOCKS = new Set(['GROOVES', 'PARAMS_EXTRA', 'DETUNETABLES', 'BOOKMARKS']);
+
 export class FtmFormatError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -375,6 +377,7 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 		note('Bitphase keeps one order list, taken from the first song');
 	}
 	const skippedEffects = new Set<string>();
+	const zeroCc = blocks.some((block) => ZERO_CC_BLOCKS.has(block.name));
 	const arpTables = buildArpTables(instruments, sequences, s5bSequences, note);
 	const projectInstruments = instruments.map((instrument) =>
 		toInstrument(instrument, sequences, s5bSequences, samples, note)
@@ -392,7 +395,8 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 			trackCells,
 			params,
 			skippedEffects,
-			arpTables.byInstrument
+			arpTables.byInstrument,
+			zeroCc
 		);
 		if (!s5bModule) return [nesSong];
 		return [
@@ -404,7 +408,8 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 				params,
 				skippedEffects,
 				arpTables.byInstrument,
-				note
+				note,
+				zeroCc
 			)
 		];
 	});
@@ -1212,7 +1217,8 @@ function toSong(
 	cells: Map<number, Map<number, Map<number, FtmCell>>>,
 	params: FtmParams,
 	skippedEffects: Set<string>,
-	arpByInstrument: Map<number, number>
+	arpByInstrument: Map<number, number>,
+	zeroCc = false
 ): Song {
 	const song = new Song(NES_CHIP_SCHEMA);
 	song.chipType = 'nes';
@@ -1251,7 +1257,8 @@ function toSong(
 							arpByInstrument,
 							false,
 							() => {},
-							params.vibratoNew
+							params.vibratoNew,
+							zeroCc
 						)
 					: emptyRow(NES_CHIP_SCHEMA.fields, columnCount);
 				sustainImportedEffects(
@@ -1280,7 +1287,8 @@ function toAySong(
 	params: FtmParams,
 	skippedEffects: Set<string>,
 	arpByInstrument: Map<number, number>,
-	warn: (message: string) => void
+	warn: (message: string) => void,
+	zeroCc = false
 ): Song {
 	const song = new Song(AY_CHIP_SCHEMA);
 	song.chipType = 'ay';
@@ -1321,7 +1329,8 @@ function toAySong(
 							arpByInstrument,
 							true,
 							warn,
-							params.vibratoNew
+							params.vibratoNew,
+							zeroCc
 						)
 					: emptyRow(AY_CHIP_SCHEMA.fields, columnCount);
 				sustainImportedEffects(
@@ -1369,7 +1378,8 @@ function toRow(
 	arpByInstrument: Map<number, number>,
 	ayChannel: boolean,
 	warn: (message: string) => void = () => {},
-	vibratoNew = false
+	vibratoNew = false,
+	zeroCc = false
 ): Row {
 	const row = emptyRow(ayChannel ? AY_CHIP_SCHEMA.fields : NES_CHIP_SCHEMA.fields, columnCount);
 	const noteOn = cell.note >= 1 && cell.note <= 12;
@@ -1406,7 +1416,8 @@ function toRow(
 			row,
 			skippedEffects,
 			ayChannel,
-			vibratoNew
+			vibratoNew,
+			zeroCc
 		);
 		if (mapped) effects.push(mapped);
 	}
@@ -1470,7 +1481,8 @@ function mapEffect(
 	row: Row,
 	skippedEffects: Set<string>,
 	ayChannel: boolean,
-	vibratoNew = false
+	vibratoNew = false,
+	zeroCc = false
 ): Effect | null {
 	const byte = param & 0xff;
 	switch (number) {
@@ -1488,6 +1500,15 @@ function mapEffect(
 		case 3:
 			return null;
 		case 5:
+			if (!ayChannel && zeroCc && byte <= 0x1f) {
+				return new Effect(EffectType.ChipSpecific, 5, byte);
+			}
+			if (!ayChannel && zeroCc && byte >= 0xe0 && byte <= 0xe3) {
+				const hardwareEnvelope = (byte & 0x01) !== 0;
+				const lengthEnabled = (byte & 0x02) !== 0;
+				const mode = (lengthEnabled ? 0 : 2) | (hardwareEnvelope ? 0 : 1);
+				return new Effect(EffectType.ChipSpecific, 6, mode);
+			}
 			if (row.volume === 0) row.volume = ftVolume(byte & 0x0f);
 			return null;
 		case 6:
@@ -1500,7 +1521,7 @@ function mapEffect(
 				skippedEffects.add(EFFECT_LETTERS[number - 1] || String(number));
 				return null;
 			}
-			return new Effect(EffectType.AutoEnvelope, number === 8 ? 2 : 3, byte);
+			return new Effect(EffectType.ChipSpecific, number === 8 ? 2 : 3, byte);
 		case 10:
 			return new Effect(EffectType.Arpeggio, 0, byte);
 		case 11:
@@ -1528,13 +1549,13 @@ function mapEffect(
 				skippedEffects.add('Z');
 				return null;
 			}
-			return new Effect(EffectType.AutoEnvelope, 4, byte & 0x7f);
+			return new Effect(EffectType.ChipSpecific, 4, byte & 0x7f);
 		case 18:
 			if (ayChannel || (channel > 1 && channel !== 3)) {
 				skippedEffects.add('V');
 				return null;
 			}
-			return new Effect(EffectType.AutoEnvelope, 1, (byte & 3) + 1);
+			return new Effect(EffectType.ChipSpecific, 1, (byte & 3) + 1);
 		default:
 			if (number > 0) skippedEffects.add(EFFECT_LETTERS[number - 1] || String(number));
 			return null;

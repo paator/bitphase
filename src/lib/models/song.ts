@@ -37,7 +37,7 @@ enum EffectType {
 	Speed = 'S'.charCodeAt(0),
 	SongEnd = 'Q'.charCodeAt(0),
 	Vibrato = 'V'.charCodeAt(0),
-	AutoEnvelope = 'E'.charCodeAt(0),
+	ChipSpecific = 'E'.charCodeAt(0),
 	Detune = 'D'.charCodeAt(0)
 }
 

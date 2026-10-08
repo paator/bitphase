@@ -43,6 +43,7 @@ import {
 	processNesDeltaCounterEffect
 } from './nes-delta-counter.js';
 import { applyNesLengthCounter, processNesLengthCounterEffect } from './nes-length-counter.js';
+import { applyNesEnvelopeMode, processNesEnvelopeModeEffect } from './nes-envelope-mode.js';
 
 const NES_NOISE_PERIOD_COUNT = 16;
 
@@ -103,6 +104,7 @@ class NesAudioDriver {
 				cutNesDeltaCounter(state, channelIndex);
 			}
 			processNesLengthCounterEffect(state, channelIndex, row, hardwareType);
+			processNesEnvelopeModeEffect(state, channelIndex, row, hardwareType);
 		}
 	}
 
@@ -317,6 +319,7 @@ class NesAudioDriver {
 			channel.sweepUpdateOnly = false;
 		}
 		this._syncLengthCounter(state, registerState, false);
+		this._syncEnvelopeMode(state, registerState);
 	}
 
 	processInstruments(state, registerState) {
@@ -396,6 +399,23 @@ class NesAudioDriver {
 		processChannelOnOffCounters(state, channelCount);
 		this._syncDpcmDeltaCounter(state, registerState);
 		this._syncLengthCounter(state, registerState, true);
+		this._syncEnvelopeMode(state, registerState);
+	}
+
+	_syncEnvelopeMode(state, registerState) {
+		const active = state.channelEnvelopeModeActive;
+		if (!active) return;
+		const channelCount = registerState.channelCount ?? active.length;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			if (!active[channelIndex]) continue;
+			const channel = registerState.channels[channelIndex];
+			if (!channel?.enabled) continue;
+			applyNesEnvelopeMode(
+				channel,
+				this._getHardwareChannelType(channelIndex),
+				state.channelEnvelopeMode[channelIndex] ?? 3
+			);
+		}
 	}
 
 	_syncLengthCounter(state, registerState, consumeReload) {

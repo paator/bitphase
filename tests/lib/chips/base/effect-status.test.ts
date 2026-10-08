@@ -61,6 +61,12 @@ describe('effect status descriptions', () => {
 		expect(
 			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 5, tableIndex: 1 })
 		).toBeNull();
+		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 6 })).toBe(
+			'E6XY: Envelope Mode (XY: 0-3)'
+		);
+		expect(
+			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 6, tableIndex: 1 })
+		).toBeNull();
 		expect(
 			describePatternEffect(
 				{ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 },
