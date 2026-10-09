@@ -154,6 +154,7 @@ function writeDpcmRegs(regs: number[], channel: any): void {
 			? channel.dpcmDeltaHold & 127
 			: null;
 	if (!channel?.enabled || !channel.dpcmBytes?.length) {
+		regs[0x10] = -1;
 		if (held != null) regs[0x11] = held;
 		return;
 	}
@@ -194,9 +195,14 @@ export function createNesLengthReloadTracker(): (registerState: any) => number[]
 		for (let channelIndex = 0; channelIndex < 4; channelIndex++) {
 			const channel = channels[channelIndex];
 			const active = channelIsActive(channelIndex, channel);
+			const reg = NES_CHANNEL_LENGTH_REG[channelIndex]!;
 			if (channelKeyOn(active, Boolean(channel?.retrigger), wasEnabled[channelIndex]!)) {
-				reloads.push(NES_CHANNEL_LENGTH_REG[channelIndex]!);
+				reloads.push(reg);
 			}
+			if (channel?.lengthReload === true && !reloads.includes(reg)) {
+				reloads.push(reg);
+			}
+			if (channel) channel.lengthReload = false;
 			wasEnabled[channelIndex] = active;
 		}
 		return reloads;
@@ -333,6 +339,11 @@ async function captureRegisterFrames(
 		frames.push(convertNesRegisterStateToApuRegs(stateToConvert));
 		dpcmFrames.push(readNesDpcmCapture(stateToConvert.channels?.[4]));
 		lengthReloads.push(lengthReloadTracker(stateToConvert));
+		if (stateToConvert !== registerState) {
+			for (const channel of registerState?.channels ?? []) {
+				if (channel) channel.lengthReload = false;
+			}
+		}
 		orderIndices.push(state.timeline.currentPatternOrderIndex);
 
 		const isLastPattern =

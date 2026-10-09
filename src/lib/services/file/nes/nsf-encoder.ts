@@ -462,6 +462,15 @@ function frameWrites(
 		if (length != null && length >= 0) writes.push([0x13, length & 0xff]);
 		writes.push([0x15, nextStatus | 0x10]);
 	} else {
+		const freq = next[0x10];
+		if (
+			freq != null &&
+			freq >= 0 &&
+			(previous[0x10] ?? -1) >= 0 &&
+			previous[0x10] !== (freq & 0xff)
+		) {
+			writes.push([0x10, freq & 0xff]);
+		}
 		const delta = next[0x11];
 		if (delta != null && delta >= 0 && previous[0x11] !== (delta & 0x7f)) {
 			writes.push([0x11, delta & 0x7f]);

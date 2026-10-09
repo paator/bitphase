@@ -16,4 +16,21 @@ describe('createNesLengthReloadTracker', () => {
 		expect(track(triangleState(false, false))).toEqual([]);
 		expect(track(triangleState(true, true))).toEqual([0x0b]);
 	});
+
+	it('reloads a held channel when the length counter is loaded again', () => {
+		const track = createNesLengthReloadTracker();
+		track(triangleState(true, true));
+
+		const held = {
+			channels: [{}, {}, { enabled: true, period: 428, retrigger: false, lengthReload: true }, {}]
+		};
+		expect(track(held)).toEqual([0x0b]);
+		expect(held.channels[2]?.lengthReload).toBe(false);
+		expect(track(triangleState(true, false))).toEqual([]);
+
+		const again = {
+			channels: [{}, {}, { enabled: true, period: 428, retrigger: false, lengthReload: true }, {}]
+		};
+		expect(track(again)).toEqual([0x0b]);
+	});
 });

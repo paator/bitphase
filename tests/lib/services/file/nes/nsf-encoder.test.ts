@@ -424,6 +424,25 @@ describe('NSF player', () => {
 		expect(play(player, file).find(([addr]) => addr === 0x4012)?.[1]).toBe(0);
 	});
 
+	it('writes $4010 when the DPCM rate changes without retriggering the sample', () => {
+		const sample = new Uint8Array(16).fill(0xab);
+		const regs = apuRegs({ 0x10: 0x0f, 0x11: 0x40, 0x12: 0, 0x13: 0x01, 0x15: 0x1f });
+		const slower = apuRegs({ 0x10: 0x0a, 0x11: 0x40, 0x12: 0, 0x13: 0x01, 0x15: 0x1f });
+		const file = song([
+			{ regs, dpcm: { retrigger: true, bytes: sample } },
+			{ regs: slower, dpcm: { retrigger: false, bytes: null } },
+			{ regs: slower, dpcm: { retrigger: false, bytes: null } }
+		]);
+		const player = boot(file);
+		play(player, file);
+		const changed = play(player, file);
+		expect(changed.filter(([addr]) => addr === 0x4010)).toEqual([[0x4010, 0x0a]]);
+		expect(changed.some(([addr]) => addr === 0x4012 || addr === 0x4013 || addr === 0x4015)).toBe(
+			false
+		);
+		expect(play(player, file).some(([addr]) => addr === 0x4010)).toBe(false);
+	});
+
 	it('switches sample banks when the DPCM data leaves the first bank', () => {
 		const frames: NsfFrame[] = [];
 		for (let index = 0; index < 40; index++) {
