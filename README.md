@@ -11,7 +11,7 @@
 A modern web-based chiptune tracker for composing on retro sound chips. A project can hold several songs, and each song uses its own chip.
 
 - **AY-3-8910 / YM2149F** - ZX Spectrum, MSX, Atari ST, and other 8-bit machines
-- **2A03 / 2A07** - NES / Famicom (experimental). Each song is NTSC, PAL, or Dendy
+- **2A03 / 2A07** - NES / Famicom. Each song is NTSC, PAL, or Dendy
 
 User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 

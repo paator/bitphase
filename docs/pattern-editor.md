@@ -47,7 +47,7 @@ Empty cells use dots (`---`, `..`, `.`, `....`) instead of blank space. That mak
 
 ### NES (2A03 / 2A07)
 
-NES support is still **experimental**. Channels are **Pulse 1**, **Pulse 2**, **Triangle**, **Noise**, and **DPCM**. The song system (NTSC, PAL, or Dendy), interrupt rate, and A4 tuning live in the song fields.
+Channels are **Pulse 1**, **Pulse 2**, **Triangle**, **Noise**, and **DPCM**. The song system (NTSC, PAL, or Dendy), interrupt rate, and A4 tuning live in the song fields.
 
 Each channel is:
 

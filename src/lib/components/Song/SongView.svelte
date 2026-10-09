@@ -629,12 +629,6 @@
 													<span
 														class="block text-xs font-medium text-[var(--color-app-text-primary)]">
 														{option.label}
-														{#if option.workInProgress}
-															<span
-																class="ml-1 font-normal text-[var(--color-app-text-tertiary)]">
-																(WIP)
-															</span>
-														{/if}
 													</span>
 													<span
 														class="mt-0.5 block text-[10px] text-[var(--color-app-text-tertiary)]">

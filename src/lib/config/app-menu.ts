@@ -11,7 +11,6 @@ export type NewSongOption = {
 	label: string;
 	action: string;
 	examples: string;
-	workInProgress?: boolean;
 };
 
 export const newSongOptions: NewSongOption[] = [
@@ -23,13 +22,12 @@ export const newSongOptions: NewSongOption[] = [
 	{
 		label: '2A03 / 2A07',
 		action: 'new-song-nes',
-		examples: 'NES, Famicom',
-		workInProgress: true
+		examples: 'NES, Famicom'
 	}
 ];
 
 export const newSongMenuItems: MenuItem[] = newSongOptions.map((option) => ({
-	label: option.workInProgress ? `${option.label} (work in progress)` : option.label,
+	label: option.label,
 	type: 'normal',
 	action: option.action
 }));

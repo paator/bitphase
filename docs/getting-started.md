@@ -93,7 +93,7 @@ Regardless whether you built your own instance or you went to bitphase.app, you 
 1. Open **File → New → Project**. That clears the workspace to an empty project (no songs yet).
 2. Add a song by choosing a chip from the empty-state buttons, or use **File → New → Song**:
     - **AY-3-8910 / YM2149F** - recommended starting point
-    - **NES (2A03 / 2A07)** - WIP, still in development
+    - **NES (2A03 / 2A07)** - NES, Famicom
 3. You will now see a blank song with an empty pattern, ready for notes, instruments, and effects.
 
 You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import a module with **File → Import Module** (`.vt2`, `.pt3`, `.taym`, `.psg`, `.ftm`, `.0cc`, `.dnm`).
