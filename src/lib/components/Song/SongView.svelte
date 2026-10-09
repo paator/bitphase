@@ -242,6 +242,18 @@
 			activeChipProcessor?.chip
 		)
 	);
+	const previewChannelLabels = $derived.by(() => {
+		const chip = previewChip;
+		const activeChip = activeChipProcessor?.chip;
+		if (!chip || !activeChip || chip.type !== activeChip.type) return undefined;
+		const labels = projectStore.songs[activeEditorIndex]?.getEffectiveChannelLabels();
+		return labels && labels.length > 0 ? labels : undefined;
+	});
+	const previewChannelIndex = $derived.by(() => {
+		const labels = previewChannelLabels;
+		if (!labels || selectedChannelIndex < 0) return 0;
+		return Math.min(selectedChannelIndex, labels.length - 1);
+	});
 	const previewInstrumentId = $derived.by(() => {
 		const chipType = previewChip?.type;
 		if (!chipType) return '';
@@ -837,7 +849,9 @@
 								<PreviewRow
 									chip={previewChip}
 									instrumentId={previewInstrumentId}
-									tuningTable={previewTuningTable} />
+									tuningTable={previewTuningTable}
+									channelIndex={previewChannelIndex}
+									channelLabels={previewChannelLabels} />
 							</div>
 						{/key}
 					{/if}

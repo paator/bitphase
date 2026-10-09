@@ -4,6 +4,8 @@ import {
 	clampVolumeInput,
 	filterVolumeInput,
 	notesForProcessor,
+	placePreviewNotes,
+	previewChannelForNote,
 	parseClampedHex,
 	parseTableChar,
 	previewMacrosReleaseOnKeyUp,
@@ -60,6 +62,19 @@ describe('preview-row-utils', () => {
 		).toBeNull();
 	});
 
+	it('places the first note on the pattern channel under the cursor', () => {
+		expect(placePreviewNotes(['C-4'], 5, 3)).toEqual(['OFF', 'OFF', 'OFF', 'C-4', 'OFF']);
+		expect(placePreviewNotes(['C-4', 'D-4', 'E-4'], 5, 3)).toEqual([
+			'E-4',
+			'OFF',
+			'OFF',
+			'C-4',
+			'D-4'
+		]);
+		expect(placePreviewNotes(['C-4', 'OFF', 'D-4'], 3, 1)).toEqual(['D-4', 'C-4', 'OFF']);
+		expect(previewChannelForNote(1, 5, 3)).toBe(4);
+	});
+
 	it('splits notes across processors by channel count', () => {
 		expect(notesForProcessor(['C-4', 'D-4', 'E-4', 'F-4'], 0, 3)).toEqual([
 			'C-4',
@@ -103,5 +118,21 @@ describe('preview-row-utils', () => {
 		expect(pattern.channels).toHaveLength(5);
 		expect(pattern.channels[4].rows[0].note.name).toBe(NoteName.G);
 		expect(pattern.channels[0].rows[0].envelopeShape).toBeUndefined();
+	});
+
+	it('uses the song channel layout when virtual channels add columns', () => {
+		const pattern = buildPreviewPattern({
+			schema: NES_CHIP_SCHEMA,
+			instrumentId: '01',
+			table: '',
+			volume: 'F',
+			noteStrings: placePreviewNotes(['C-4'], 6, 4),
+			channelLabels: ['Pulse 1', 'Pulse 1:2', 'Pulse 2', 'Triangle', 'Noise', 'DPCM']
+		});
+
+		expect(pattern.channels).toHaveLength(6);
+		expect(pattern.channels[4].label).toBe('Noise');
+		expect(pattern.channels[4].rows[0].note.name).toBe(NoteName.C);
+		expect(pattern.channels[0].rows[0].note.name).toBe(NoteName.Off);
 	});
 });

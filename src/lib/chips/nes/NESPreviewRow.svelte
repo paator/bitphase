@@ -7,16 +7,22 @@
 
 	let {
 		chip,
-		instrumentId = '01'
+		instrumentId = '01',
+		channelIndex = 0,
+		channelLabels
 	}: {
 		chip: Chip;
 		instrumentId?: string;
 		tuningTable?: number[];
+		channelIndex?: number;
+		channelLabels?: string[];
 	} = $props();
 
 	const playground = createChipPreviewPlayground({
 		getChip: () => chip,
-		getInstrumentId: () => instrumentId
+		getInstrumentId: () => instrumentId,
+		getPreviewChannelIndex: () => channelIndex,
+		getPreviewChannelLabels: () => channelLabels
 	});
 </script>
 

@@ -19,6 +19,8 @@ import {
 	clampVolumeInput,
 	filterVolumeInput,
 	notesForProcessor,
+	placePreviewNotes,
+	previewChannelForNote,
 	previewMacrosReleaseOnKeyUp,
 	previewReleaseTailMs,
 	sanitizeTableInput
@@ -29,6 +31,8 @@ const ROW_INDEX = 0;
 export type ChipPreviewPlaygroundOptions = {
 	getChip: () => Chip;
 	getInstrumentId: () => string;
+	getPreviewChannelIndex?: () => number;
+	getPreviewChannelLabels?: () => string[] | undefined;
 	decoratePreviewPattern?: (pattern: Pattern) => void;
 	onMidiNote?: (midiNote: number, velocity: number) => boolean;
 };
@@ -57,7 +61,13 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 	let savedStereoLayout: string | undefined;
 
 	function channelCount() {
+		const labels = options.getPreviewChannelLabels?.();
+		if (labels && labels.length > 0) return labels.length;
 		return options.getChip().schema.channelLabels?.length ?? 3;
+	}
+
+	function previewStartChannel() {
+		return previewChannelForNote(0, channelCount(), options.getPreviewChannelIndex?.() ?? 0);
 	}
 
 	function currentPreviewProcessors() {
@@ -148,7 +158,9 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 		const count = Math.max(1, channelCount());
 		const processor = currentPreviewProcessors()[Math.floor(slot / count)];
 		if (!processor) return;
-		(processor as unknown as PreviewNoteSupport).releasePreviewNote(slot % count);
+		(processor as unknown as PreviewNoteSupport).releasePreviewNote(
+			previewChannelForNote(slot % count, count, previewStartChannel())
+		);
 	}
 
 	function dropActiveKey(key: string): void {
@@ -186,7 +198,7 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 			: `Play preview (${playbackShortcutDisplay})`
 	);
 	const noteTitle = $derived(
-		`Click to focus, then use keyboard. Polyphony: ${maxPoly()} notes (${channelCount()} per chip). Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${playbackShortcutDisplay} = toggle play.`
+		`Click to focus, then use keyboard. Polyphony: ${maxPoly()} notes (${channelCount()} per chip), starting on the pattern channel under the cursor. Piano: Z–P, Q–I; A = OFF; letters = note with current octave. ${playbackShortcutDisplay} = toggle play.`
 	);
 
 	$effect(() => {
@@ -243,17 +255,18 @@ export function createChipPreviewPlayground(options: ChipPreviewPlaygroundOption
 				)
 			: undefined;
 		processors.forEach((proc, processorIndex) => {
-			const channelNotes = notesForProcessor(
-				effectiveNoteStrings,
-				processorIndex,
-				channelCount()
+			const channelNotes = placePreviewNotes(
+				notesForProcessor(effectiveNoteStrings, processorIndex, channelCount()),
+				channelCount(),
+				previewStartChannel()
 			);
 			const pattern = buildPreviewPattern({
 				schema: chip.schema,
 				instrumentId,
 				table,
 				volume,
-				noteStrings: channelNotes
+				noteStrings: channelNotes,
+				channelLabels: options.getPreviewChannelLabels?.()
 			});
 			options.decoratePreviewPattern?.(pattern);
 			proc.playPreviewRow(pattern, ROW_INDEX, currentInstrument);

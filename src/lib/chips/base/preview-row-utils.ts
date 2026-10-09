@@ -89,14 +89,45 @@ export function notesForProcessor(
 	return Array.from({ length: channelCount }, (_, i) => noteStrings[start + i] ?? 'OFF');
 }
 
+export function previewChannelForNote(
+	noteIndex: number,
+	channelCount: number,
+	startChannel: number
+): number {
+	const count = Math.max(1, channelCount);
+	const start = normalizePreviewChannel(startChannel, count);
+	const index = Number.isFinite(noteIndex) ? Math.max(0, Math.trunc(noteIndex)) : 0;
+	return (start + index) % count;
+}
+
+export function placePreviewNotes(
+	noteStrings: string[],
+	channelCount: number,
+	startChannel: number
+): string[] {
+	const count = Math.max(1, channelCount);
+	const placed = Array.from({ length: count }, () => 'OFF');
+	const limit = Math.min(noteStrings.length, count);
+	for (let i = 0; i < limit; i++) {
+		placed[previewChannelForNote(i, count, startChannel)] = noteStrings[i] || 'OFF';
+	}
+	return placed;
+}
+
+function normalizePreviewChannel(channel: number, count: number): number {
+	if (!Number.isFinite(channel)) return 0;
+	return ((Math.trunc(channel) % count) + count) % count;
+}
+
 export function buildPreviewPattern(options: {
 	schema: ChipSchema;
 	instrumentId: string;
 	table: string;
 	volume: string;
 	noteStrings: string[];
+	channelLabels?: string[];
 }): Pattern {
-	const pattern = new PatternModel(0, 1, options.schema) as Pattern;
+	const pattern = new PatternModel(0, 1, options.schema, options.channelLabels) as Pattern;
 	const instNum = instrumentIdToNumber(options.instrumentId || '01') || 1;
 	const vol = previewVolumeValue(options.volume);
 	const tbl = parseTableChar(options.table);

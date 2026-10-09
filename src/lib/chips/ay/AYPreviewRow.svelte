@@ -18,11 +18,15 @@
 	let {
 		chip,
 		instrumentId = '01',
-		tuningTable = []
+		tuningTable = [],
+		channelIndex = 0,
+		channelLabels
 	}: {
 		chip: Chip;
 		instrumentId?: string;
 		tuningTable?: number[];
+		channelIndex?: number;
+		channelLabels?: string[];
 	} = $props();
 
 	let envelopePeriod = $state(0);
@@ -69,6 +73,8 @@
 	const playground = createChipPreviewPlayground({
 		getChip: () => chip,
 		getInstrumentId: () => instrumentId,
+		getPreviewChannelIndex: () => channelIndex,
+		getPreviewChannelLabels: () => channelLabels,
 		decoratePreviewPattern,
 		onMidiNote: handleMidiNote
 	});
