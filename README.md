@@ -188,6 +188,10 @@ bitphase/
     └── psg/
 ```
 
+## AI assistance disclaimer
+
+I (Pator) use AI tools as a coding assistant on Bitphase. I design the features, review the changes, and understand the code that ships. This project is not vibe-coded.
+
 ## License
 
 Bitphase is [MIT licensed](LICENSE). Third-party software distributed with the app is listed in [`public/THIRD_PARTY_NOTICES.txt`](public/THIRD_PARTY_NOTICES.txt). The running app links to that file from About.
