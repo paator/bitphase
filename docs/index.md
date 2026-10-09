@@ -19,6 +19,8 @@ Open the tracker at [bitphase.app](https://bitphase.app/) or build the app yours
 - [Effects](/effects) - pattern effect reference
 - [Pattern editor](/pattern-editor) - columns, editing, selection, and AY helpers
 - [Order list](/order-list) - arrange patterns, loop marker, clone and make unique
-- [Import & export](/import-export) - open projects, import modules, WAV / PSG / SNDH
+- [Instruments](/instruments) - NES APU macros and DPCM samples
+- [Import & export](/import-export) - open projects, import modules, WAV / PSG / TAYM / SNDH / VGM / NSF
+- [Settings](/settings) - NES song system, interrupt rate, and tuning
 
-More sections (instruments, settings) are stubs for now and will grow over time.
+AY instrument detail, appearance, keybindings, MIDI, and preview are still stubs.

@@ -9,7 +9,7 @@ Bitphase can be accessed via [bitphase.app](https://bitphase.app/), which always
 - **Node.js** (v18 or higher; v20 recommended)
 - **pnpm** (v10.11.0 or higher)
 - **Emscripten SDK** - required for building WebAssembly modules (AY and NES)
-- **Git submodules** - the Ayumi emulator lives in `external/ayumi`
+- **Git submodules** - the Ayumi emulator lives in `external/ayumi`. NES APU sources ship in `external/nsfplug`
 
 ### Installing Emscripten
 
@@ -62,6 +62,8 @@ Bitphase can be accessed via [bitphase.app](https://bitphase.app/), which always
 - `pnpm test` - run tests in watch mode
 - `pnpm test:run` - run tests once
 - `pnpm btp-to-wav` - export a `.btp` project to WAV from the command line
+- `pnpm btp-to-psg` - export a `.btp` project to PSG from the command line
+- `pnpm btp-to-taym` - export a `.btp` project to TAYM from the command line
 
 ## Open the tracker
 
@@ -94,7 +96,7 @@ Regardless whether you built your own instance or you went to bitphase.app, you 
     - **NES (2A03 / 2A07)** - WIP, still in development
 3. You will now see a blank song with an empty pattern, ready for notes, instruments, and effects.
 
-You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import Vortex/ProTracker modules (`.vt2` / `.pt3`) with **File → Import Module**.
+You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import a module with **File → Import Module** (`.vt2`, `.pt3`, `.taym`, `.psg`, `.ftm`, `.0cc`, `.dnm`).
 
 ## Songs and chips
 

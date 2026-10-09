@@ -47,7 +47,7 @@ Empty cells use dots (`---`, `..`, `.`, `....`) instead of blank space. That mak
 
 ### NES (2A03 / 2A07)
 
-NES support is still **experimental**. Channels are **Pulse 1**, **Pulse 2**, **Triangle**, **Noise**, and **DPCM**.
+NES support is still **experimental**. Channels are **Pulse 1**, **Pulse 2**, **Triangle**, **Noise**, and **DPCM**. The song system (NTSC, PAL, or Dendy), interrupt rate, and A4 tuning live in the song fields.
 
 Each channel is:
 
@@ -104,8 +104,8 @@ Press it again to widen - no need to drag a huge rectangle by hand.
 | Paste       | `Mod+V`                | Paste starting at the cursor                                                         |
 | Magic paste | `Mod+Shift+V`          | Paste, but empty clipboard cells (`---`, `.`, `....`, ...) leave existing data alone |
 | Clear       | `Delete` / `Backspace` | Reset selected cells                                                                 |
-| Insert row  | `Mod+I`                | Insert an empty row at the cursor; rows below shift down (last row drops off)       |
-| Remove row  | `Mod+R`                | Delete the cursor row; rows below shift up (empty row padded at the end)            |
+| Insert row  | `Mod+I`                | Insert an empty row at the cursor; rows below shift down (last row drops off)        |
+| Remove row  | `Mod+R`                | Delete the cursor row; rows below shift up (empty row padded at the end)             |
 
 ::: tip Magic paste
 Use magic paste when you want to layer data - for example paste some notes over other notes without wiping the data where the clipboard had empty cells.
@@ -123,14 +123,14 @@ In AY, paste can also convert between a **note** and the **Env** period when tho
 
 ## Editing tools
 
-| Action                     | Default                   |
-| -------------------------- | ------------------------- |
-| Increment / decrement      | `=` / `-`                 |
-| Transpose octave up / down | `Shift++` / `Shift+-`     |
-| Swap channel left / right  | `Mod+Alt+←` / `Mod+Alt+→` |
-| Insert / remove pattern row | `Mod+I` / `Mod+R`        |
-| Apply script...            | `Mod+Shift+S`             |
-| Undo / redo                | `Mod+Z` / `Mod+Y`         |
+| Action                      | Default                   |
+| --------------------------- | ------------------------- |
+| Increment / decrement       | `=` / `-`                 |
+| Transpose octave up / down  | `Shift++` / `Shift+-`     |
+| Swap channel left / right   | `Mod+Alt+←` / `Mod+Alt+→` |
+| Insert / remove pattern row | `Mod+I` / `Mod+R`         |
+| Apply script...             | `Mod+Shift+S`             |
+| Undo / redo                 | `Mod+Z` / `Mod+Y`         |
 
 **Increment / decrement** is selection-aware: if any notes are selected, only notes move; otherwise numeric fields change. For effects, Bitphase adjusts the parameter (or the table id when the effect uses `T`), not the effect letter or delay.
 

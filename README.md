@@ -11,7 +11,7 @@
 A modern web-based chiptune tracker for composing on retro sound chips. A project can hold several songs, and each song uses its own chip.
 
 - **AY-3-8910 / YM2149F** - ZX Spectrum, MSX, Atari ST, and other 8-bit machines
-- **2A03 / 2A07** - NES / Famicom
+- **2A03 / 2A07** - NES / Famicom (experimental). Each song is NTSC, PAL, or Dendy
 
 User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
@@ -45,8 +45,8 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
 - Open and save Bitphase projects (`.btp`)
 - Import ProTracker 3 (`.pt3`), Vortex Tracker 2 (`.vt2`), TAYM (`.taym`), and PSG (`.psg`)
-- Import FamiTracker (`.ftm`) and 0CC-FamiTracker (`.0cc`) as a 2A03 song, and Dn-FamiTracker (`.dnm`) when the module is NES plus Sunsoft 5B
-- Export WAV for any project, PSG / TAYM / SNDH for AY songs, and VGM for AY and NES (at most two of each)
+- Import FamiTracker (`.ftm`) and 0CC-FamiTracker (`.0cc`) as a 2A03 song, and Dn-FamiTracker (`.dnm`) when the module is NES or NES plus Sunsoft 5B. A Sunsoft 5B module also adds an AY song. Other expansion chips are left out of `.ftm` / `.0cc` imports and rejected for `.dnm`
+- Export WAV for any project, PSG / TAYM / SNDH for AY songs, VGM for AY and NES (at most two of each), and NSF when the project has at most one AY song and one NES song
 - AY timer effects are rendered in WAV and written into TAYM and VGM. PSG and SNDH stay one register frame per interrupt
 - Several AY songs export as a ZIP of PSG or TAYM files
 - Command-line export: `pnpm btp-to-wav`, `pnpm btp-to-psg`, `pnpm btp-to-taym`
