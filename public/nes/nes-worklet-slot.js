@@ -3,11 +3,16 @@ import NesAudioDriver from './nes-audio-driver.js';
 import NesApuEngine, { createNesApuEngine } from './nes-apu-engine.js';
 import NesChipRegisterState from './nes-chip-register-state.js';
 import NesVirtualChannelMixer from './nes-virtual-channel-mixer.js';
-import { NesWaveformCapture, noiseChannelLevelFromEmulator, noiseScopeSampleFromChannel } from './nes-waveform-capture.js';
+import {
+	NesWaveformCapture,
+	noiseChannelLevelFromEmulator,
+	noiseScopeSampleFromChannel
+} from './nes-waveform-capture.js';
 import { isNesHardwareEnvelopeReg } from './nes-instrument-utils.js';
 import TrackerPatternProcessor from '../tracker/tracker-pattern-processor.js';
 import { TrackerWorkletSlot } from '../tracker/tracker-worklet-slot.js';
 import { NES_CHANNEL_COUNT } from './nes-constants.js';
+import { nesDpcmSampleRateHz, nesNoiseRepeatHz } from './nes-playback-hz.js';
 
 export class NesWorkletSlot extends TrackerWorkletSlot {
 	constructor(port, chipIndex, sharedTimeline) {
@@ -279,10 +284,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	}
 
 	_clearHardwareWaveformChannel(hardwareChannelIndex) {
-		if (
-			hardwareChannelIndex < 0 ||
-			hardwareChannelIndex >= this.channelWaveformBuf.length
-		) {
+		if (hardwareChannelIndex < 0 || hardwareChannelIndex >= this.channelWaveformBuf.length) {
 			return;
 		}
 		this.channelWaveformBuf[hardwareChannelIndex].fill(0);
@@ -347,8 +349,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 
 	_isLogicalChannelAudible(channelIndex) {
 		return (
-			!this.state.channelMuted[channelIndex] &&
-			this.state.channelSoundEnabled[channelIndex]
+			!this.state.channelMuted[channelIndex] && this.state.channelSoundEnabled[channelIndex]
 		);
 	}
 
@@ -401,7 +402,8 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 			if (hwType === 2) {
 				levels[i] = channel.enabled ? 1 : 0;
 			} else if (hwType === 4) {
-				const raw = channel.dpcmDelta == null ? (hwPeaks[hwType] ?? 0) : (channel.volume ?? 0);
+				const raw =
+					channel.dpcmDelta == null ? (hwPeaks[hwType] ?? 0) : (channel.volume ?? 0);
 				levels[i] = Math.min(1, raw / 127);
 			} else if (isNesHardwareEnvelopeReg(channel?.volumeReg) && canReadOutputs) {
 				levels[i] = Math.min(1, Math.max(0, (hwPeaks[hwType] ?? 0) / 15));
@@ -415,24 +417,31 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 	_collectPlaybackHz() {
 		const toneHz = [];
 		const cpuFrequency = this.state.cpuFrequency;
+		const isPal = this.state.chipVariant === 'PAL';
 		const channelCount = this.registerState.channelCount;
 		for (let i = 0; i < channelCount; i++) {
 			const channel = this.registerState.channels[i];
-			const period = channel?.period ?? 0;
 			const hwType = this.virtualChannelMixer.hasVirtualChannels()
 				? this.virtualChannelMixer.getHardwareChannelIndex(i)
 				: i;
-			if (period <= 0 || !channel?.enabled) {
-				toneHz.push(null);
-			} else if (hwType <= 1) {
-				toneHz.push(cpuFrequency / (16 * period));
-			} else if (hwType === 2) {
-				toneHz.push(cpuFrequency / (32 * period));
-			} else {
-				toneHz.push(null);
-			}
+			toneHz.push(this._channelPlaybackHz(channel, hwType, cpuFrequency, isPal));
 		}
 		return { toneHz };
+	}
+
+	_channelPlaybackHz(channel, hwType, cpuFrequency, isPal) {
+		if (!channel?.enabled) return null;
+		if (hwType === 3) {
+			return nesNoiseRepeatHz(cpuFrequency, channel.noisePeriod, isPal);
+		}
+		if (hwType === 4) {
+			return nesDpcmSampleRateHz(cpuFrequency, channel.dpcmPitch, isPal);
+		}
+		const period = channel.period ?? 0;
+		if (period <= 0) return null;
+		if (hwType <= 1) return cpuFrequency / (16 * period);
+		if (hwType === 2) return cpuFrequency / (32 * period);
+		return null;
 	}
 
 	_captureHardwareWaveformSample(channelIndex, channel, emulatorOutputs, cpuFrequency) {

@@ -38,7 +38,7 @@ export const NES_PLAYBACK_DEBUG: ChipPlaybackDebugSpec = {
 	metrics: [
 		{
 			key: 'tone',
-			label: 'Tone',
+			label: 'Freq',
 			icon: 'tone',
 			accentClass: 'text-[var(--color-pattern-note)]',
 			readHz: (state, channelIndex) => state?.toneHz[channelIndex] ?? null,
