@@ -45,7 +45,7 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
 - Open and save Bitphase projects (`.btp`)
 - Import ProTracker 3 (`.pt3`), Vortex Tracker 2 (`.vt2`), TAYM (`.taym`), and PSG (`.psg`)
-- Import FamiTracker (`.ftm`) and 0CC-FamiTracker (`.0cc`) as a 2A03 song, and Dn-FamiTracker (`.dnm`) when the module is NES or NES plus Sunsoft 5B. A Sunsoft 5B module also adds an AY song. Other expansion chips are left out of `.ftm` / `.0cc` imports and rejected for `.dnm`
+- Import FamiTracker (`.ftm`) and 0CC-FamiTracker (`.0cc`) as a 2A03 song, and Dn-FamiTracker (`.dnm`) when the module is NES or NES plus Sunsoft 5B. A Sunsoft 5B module also adds an AY song.
 - Export WAV for any project, PSG / TAYM / SNDH for AY songs, VGM for AY and NES (at most two of each), and NSF when the project has at most one AY song and one NES song
 - AY timer effects are rendered in WAV and written into TAYM and VGM. PSG and SNDH stay one register frame per interrupt
 - Several AY songs export as a ZIP of PSG or TAYM files
