@@ -490,4 +490,28 @@ describe('NesApuEngine', () => {
 			{ addr: 0x4011, val: 0x22 }
 		]);
 	});
+
+	it('rewrites $4010 when the DPCM rate changes without retriggering', () => {
+		const wasmModule = createMockWasmModule();
+		const engine = createTestEngine(wasmModule);
+		const registerState = new NesChipRegisterState();
+		const channel = registerState.channels[4];
+		channel.enabled = true;
+		channel.dpcmPitch = 15;
+		channel.dpcmLoop = true;
+		channel.dpcmBytes = [0xaa];
+		engine.applyRegisterState(registerState);
+
+		wasmModule.dmcWrites.length = 0;
+		channel.retrigger = false;
+		channel.dpcmPitch = 0x0a;
+		channel.dpcmPitchWrite = true;
+		engine.applyRegisterState(registerState);
+
+		expect(wasmModule.dmcWrites.filter((write) => write.addr === 0x4010)).toEqual([
+			{ addr: 0x4010, val: 0x4a }
+		]);
+		expect(wasmModule.dmcWrites.some((write) => write.addr === 0x4015)).toBe(false);
+		expect(channel.dpcmPitchWrite).toBe(false);
+	});
 });

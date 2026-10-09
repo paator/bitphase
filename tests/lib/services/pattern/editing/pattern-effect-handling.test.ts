@@ -270,5 +270,11 @@ describe('PatternEffectHandling', () => {
 			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 6, parameter: 0x02 });
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E602');
 		});
+
+		it('E7XY DPCM frequency parses and formats as an E subcommand', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E70A');
+			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 7, parameter: 0x0a });
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E70A');
+		});
 	});
 });

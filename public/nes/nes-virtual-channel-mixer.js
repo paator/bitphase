@@ -21,6 +21,7 @@ function copyNesChannelFields(src, dst) {
 	dst.dpcmDelta = src.dpcmDelta;
 	dst.dpcmDeltaHold = src.dpcmDeltaHold;
 	dst.dpcmDeltaWrite = src.dpcmDeltaWrite === true;
+	dst.dpcmPitchWrite = src.dpcmPitchWrite === true;
 	dst.dpcmLengthReg = src.dpcmLengthReg;
 	dst.dpcmBytes = src.dpcmBytes;
 }

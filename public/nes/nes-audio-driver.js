@@ -44,6 +44,7 @@ import {
 } from './nes-delta-counter.js';
 import { applyNesLengthCounter, processNesLengthCounterEffect } from './nes-length-counter.js';
 import { applyNesEnvelopeMode, processNesEnvelopeModeEffect } from './nes-envelope-mode.js';
+import { processNesDpcmPitchEffect } from './nes-dpcm-pitch.js';
 
 const NES_NOISE_PERIOD_COUNT = 16;
 
@@ -105,6 +106,7 @@ class NesAudioDriver {
 			}
 			processNesLengthCounterEffect(state, channelIndex, row, hardwareType);
 			processNesEnvelopeModeEffect(state, channelIndex, row, hardwareType);
+			processNesDpcmPitchEffect(state, channelIndex, row, hardwareType);
 		}
 	}
 
@@ -270,18 +272,23 @@ class NesAudioDriver {
 		const assignment = resolveNesDpcmAssignment(instrument, noteIndex);
 		const keyOn = state.channelKeyOn[channelIndex];
 		if (!assignment) {
+			if (state.channelDpcmPitchWrite) state.channelDpcmPitchWrite[channelIndex] = false;
 			this._silenceChannel(registerState, channelIndex);
 			state.channelKeyOn[channelIndex] = false;
 			return;
 		}
 		channel.enabled = true;
 		channel.volume = assignment.delta ?? 0;
-		channel.dpcmPitch = assignment.pitch;
+		channel.dpcmPitch = state.channelDpcmPitchActive?.[channelIndex]
+			? state.channelDpcmPitch[channelIndex] & 15
+			: assignment.pitch;
 		channel.dpcmLoop = assignment.loop;
 		channel.dpcmDelta = assignment.delta;
 		channel.dpcmLengthReg = assignment.lengthReg;
 		channel.dpcmBytes = assignment.data;
 		channel.retrigger = Boolean(keyOn);
+		channel.dpcmPitchWrite = state.channelDpcmPitchWrite?.[channelIndex] === true;
+		if (state.channelDpcmPitchWrite) state.channelDpcmPitchWrite[channelIndex] = false;
 		state.channelKeyOn[channelIndex] = false;
 	}
 
@@ -334,6 +341,7 @@ class NesAudioDriver {
 			const hwType = this._getHardwareChannelType(channelIndex);
 
 			if (isMuted || !isSoundEnabled) {
+				if (state.channelDpcmPitchWrite) state.channelDpcmPitchWrite[channelIndex] = false;
 				this._silenceChannel(registerState, channelIndex);
 				continue;
 			}

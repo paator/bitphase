@@ -20,6 +20,7 @@ function createDefaultChannel() {
 		dpcmLoop: false,
 		dpcmDelta: null,
 		dpcmDeltaWrite: false,
+		dpcmPitchWrite: false,
 		dpcmLengthReg: 0,
 		dpcmBytes: null
 	};

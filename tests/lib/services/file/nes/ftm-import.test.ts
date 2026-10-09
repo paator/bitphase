@@ -648,6 +648,24 @@ describe('dnm import', () => {
 		expect(() => importFtmBuffer(dnmBytes(1).buffer)).toThrow(/NES and NES \+ 5B/);
 	});
 
+	it('imports vanilla Wxx and 0CC Wxx as E7XY', () => {
+		const vanilla = importFtmBuffer(tinySong([patternCell(0, 0, 0, 26, 0x1a)], 1, 4).buffer);
+		expect(vanilla.project.songs[0]!.patterns[0]!.channels[4]!.rows[0]!.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 7,
+			parameter: 0x0a
+		});
+		const zeroCc = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 29, 0x03)], 1, 4, block('GROOVES', 1, [0])).buffer
+		);
+		expect(zeroCc.project.songs[0]!.patterns[0]!.channels[4]!.rows[0]!.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 7,
+			parameter: 0x03
+		});
+		expect(zeroCc.warnings.some((warning) => warning.includes('W'))).toBe(false);
+	});
+
 	it('imports Zxx as E4XY on the DPCM channel', () => {
 		const { project, warnings } = importFtmBuffer(
 			tinySong([patternCell(0, 0, 0, 15, 0xff)], 1, 4).buffer

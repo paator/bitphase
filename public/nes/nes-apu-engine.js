@@ -503,7 +503,14 @@ class NesApuEngine {
 
 	_writeDpcm(channel, retrigger) {
 		if (!channel?.enabled) return;
-		if (!retrigger) return;
+		if (!retrigger) {
+			if (!channel.dpcmPitchWrite) return;
+			channel.dpcmPitchWrite = false;
+			const loopBit = channel.dpcmLoop ? 0x40 : 0;
+			this._writeDmc(0x4010, loopBit | (channel.dpcmPitch & 15));
+			return;
+		}
+		channel.dpcmPitchWrite = false;
 		const lengthReg = this._loadDpcmSample(channel.dpcmBytes) || channel.dpcmLengthReg & 0xff;
 		const pitch = channel.dpcmPitch & 15;
 		const loopBit = channel.dpcmLoop ? 0x40 : 0;

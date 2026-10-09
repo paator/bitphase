@@ -67,6 +67,12 @@ describe('effect status descriptions', () => {
 		expect(
 			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 6, tableIndex: 1 })
 		).toBeNull();
+		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 7 })).toBe(
+			'E7XY: DPCM Frequency (XY: 00-0F)'
+		);
+		expect(
+			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 7, tableIndex: 1 })
+		).toBeNull();
 		expect(
 			describePatternEffect(
 				{ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 },

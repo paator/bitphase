@@ -1550,6 +1550,18 @@ function mapEffect(
 				return null;
 			}
 			return new Effect(EffectType.ChipSpecific, 4, byte & 0x7f);
+		case 26:
+			if (!zeroCc && !ayChannel && channel === 4) {
+				return new Effect(EffectType.ChipSpecific, 7, byte & 0x0f);
+			}
+			skippedEffects.add(zeroCc ? 'H' : 'W');
+			return null;
+		case 29:
+			if (!ayChannel && channel === 4) {
+				return new Effect(EffectType.ChipSpecific, 7, byte & 0x0f);
+			}
+			skippedEffects.add(zeroCc ? 'W' : 'J');
+			return null;
 		case 18:
 			if (ayChannel || (channel > 1 && channel !== 3)) {
 				skippedEffects.add('V');

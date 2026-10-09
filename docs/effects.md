@@ -248,3 +248,13 @@ Sets bits 4 and 5 of the pulse or noise volume register (`$4000`, `$4004`, `$400
 | **Format**    | `E6XY`                                                          |
 | **Parameter** | `00` envelope, `01` length, `02` looping, `03` constant         |
 | **Example**   | `E600` decay with the length counter; `E603` constant volume    |
+
+### E7 - DPCM frequency
+
+Sets the DPCM sample rate (`$4010` bits 0–3) on the DPCM channel. `00` is the slowest rate and `0F` is the fastest. On a note it replaces that sample's instrument pitch. On a later row it changes the rate of the sample that is already playing. The next note uses the instrument pitch again unless it has its own `E7`. Other channels ignore it.
+
+|               |                                              |
+| ------------- | -------------------------------------------- |
+| **Format**    | `E7XY`                                       |
+| **Parameter** | `XY` - rate index, `00`-`0F`                 |
+| **Example**   | `E70F` fastest; `E700` slowest               |
