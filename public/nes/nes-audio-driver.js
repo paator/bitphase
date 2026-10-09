@@ -45,6 +45,7 @@ import {
 import { applyNesLengthCounter, processNesLengthCounterEffect } from './nes-length-counter.js';
 import { applyNesEnvelopeMode, processNesEnvelopeModeEffect } from './nes-envelope-mode.js';
 import { processNesDpcmPitchEffect } from './nes-dpcm-pitch.js';
+import { applyNesLinearCounter, processNesLinearCounterEffect } from './nes-linear-counter.js';
 
 const NES_NOISE_PERIOD_COUNT = 16;
 
@@ -107,6 +108,7 @@ class NesAudioDriver {
 			processNesLengthCounterEffect(state, channelIndex, row, hardwareType);
 			processNesEnvelopeModeEffect(state, channelIndex, row, hardwareType);
 			processNesDpcmPitchEffect(state, channelIndex, row, hardwareType);
+			processNesLinearCounterEffect(state, channelIndex, row, hardwareType);
 		}
 	}
 
@@ -327,6 +329,7 @@ class NesAudioDriver {
 		}
 		this._syncLengthCounter(state, registerState, false);
 		this._syncEnvelopeMode(state, registerState);
+		this._syncLinearCounter(state, registerState, false);
 	}
 
 	processInstruments(state, registerState) {
@@ -408,6 +411,27 @@ class NesAudioDriver {
 		this._syncDpcmDeltaCounter(state, registerState);
 		this._syncLengthCounter(state, registerState, true);
 		this._syncEnvelopeMode(state, registerState);
+		this._syncLinearCounter(state, registerState, true);
+	}
+
+	_syncLinearCounter(state, registerState, consumeReload) {
+		const active = state.channelLinearCounterActive;
+		const reload = state.channelLinearCounterReload;
+		if (!active || !reload) return;
+		const channelCount = registerState.channelCount ?? active.length;
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			const reloadNow = consumeReload && reload[channelIndex] === true;
+			if (consumeReload) reload[channelIndex] = false;
+			if (!active[channelIndex]) continue;
+			const channel = registerState.channels[channelIndex];
+			if (!channel?.enabled) continue;
+			applyNesLinearCounter(
+				channel,
+				this._getHardwareChannelType(channelIndex),
+				state.channelLinearCounter[channelIndex] ?? 0xff
+			);
+			if (reloadNow) channel.lengthReload = true;
+		}
 	}
 
 	_syncEnvelopeMode(state, registerState) {

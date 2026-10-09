@@ -258,3 +258,13 @@ Sets the DPCM sample rate (`$4010` bits 0–3) on the DPCM channel. `00` is the 
 | **Format**    | `E7XY`                                       |
 | **Parameter** | `XY` - rate index, `00`-`0F`                 |
 | **Example**   | `E70F` fastest; `E700` slowest               |
+
+### E8 - Linear counter
+
+Writes the triangle linear-counter register (`$4008`). The value stays until the next `E8`, including across new notes. Other channels ignore it. `E5` still loads the length counter. `E8` decides whether the linear counter runs.
+
+|               |                                                        |
+| ------------- | ------------------------------------------------------ |
+| **Format**    | `E8XY`                                                 |
+| **Parameter** | `XY` - `$4008`. `00`-`7F` loads and runs, `80`-`FF` halts |
+| **Example**   | `E840` runs for 64 clocks; `E8FF` holds the triangle on |

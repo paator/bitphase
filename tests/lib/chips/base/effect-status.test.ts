@@ -73,6 +73,12 @@ describe('effect status descriptions', () => {
 		expect(
 			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 7, tableIndex: 1 })
 		).toBeNull();
+		expect(describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 8 })).toBe(
+			'E8XY: Linear Counter (XY: $4008)'
+		);
+		expect(
+			describeNesEffect({ effect: 'E'.charCodeAt(0), delay: 8, tableIndex: 1 })
+		).toBeNull();
 		expect(
 			describePatternEffect(
 				{ effect: 'V'.charCodeAt(0), delay: 1, parameter: 0x44 },

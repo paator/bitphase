@@ -858,6 +858,41 @@
 					</div>
 				</div>
 			</div>
+
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+				<div class="mb-2 flex items-center gap-2">
+					<code
+						class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+						E8
+					</code>
+					<h3 class="font-bold text-[var(--color-app-text-primary)]">Linear Counter</h3>
+				</div>
+				<p class="mb-3 text-[var(--color-app-text-secondary)]">
+					Writes the triangle linear counter. 00-7F loads the counter and lets it run. 80-FF
+					halts it, and the low 7 bits stay the reload value. The value stays until the next E8.
+				</p>
+				<div class="mb-2 space-y-1">
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+								>8</span
+							><span style="color: {COLOR.parameter}">X</span><span
+								style="color: {COLOR.parameter}">Y</span>
+						</code>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-FF</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E840</code>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E8FF</code>
+					</div>
+				</div>
+			</div>
 		</div>
 	{/snippet}
 

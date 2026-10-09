@@ -276,5 +276,11 @@ describe('PatternEffectHandling', () => {
 			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 7, parameter: 0x0a });
 			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E70A');
 		});
+
+		it('E8XY linear counter parses and formats as an E subcommand', () => {
+			const parsed = PatternEffectHandling.parseEffectFromString('E8FF');
+			expect(parsed).toMatchObject({ effect: 'E'.charCodeAt(0), delay: 8, parameter: 0xff });
+			expect(PatternEffectHandling.formatEffectAsString(parsed!)).toBe('E8FF');
+		});
 	});
 });

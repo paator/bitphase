@@ -201,7 +201,8 @@ function tinySong(
 	rows: number[][],
 	length = rows.length,
 	channel = 0,
-	extraBlocks: number[] = []
+	extraBlocks: number[] = [],
+	fileHeader = 'FamiTracker Module'
 ): Uint8Array {
 	const params = [
 		0,
@@ -219,7 +220,7 @@ function tinySong(
 	const frames = [...u32(1), ...u32(6), ...u32(150), ...u32(length), 0, 0, 0, 0, 0];
 	const patterns = [...u32(0), ...u32(channel), ...u32(0), ...u32(rows.length), ...rows.flat()];
 	return Uint8Array.from([
-		...ascii('FamiTracker Module'),
+		...ascii(fileHeader),
 		...u32(0x0440),
 		...block('PARAMS', 6, params),
 		...block('INFO', 1, info),
@@ -638,6 +639,39 @@ describe('dnm import', () => {
 		expect(warnings.some((warning) => warning.includes('skipped'))).toBe(false);
 	});
 
+	it('imports 0CC effects from a Dn module that has none of the 0CC blocks', () => {
+		const header = 'Dn-FamiTracker Module';
+		const length = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 5, 0x1f)], 1, 0, [], header).buffer
+		);
+		expect(length.project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!.volume).toBe(0);
+		expect(length.project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 5,
+			parameter: 0x1f
+		});
+
+		const envelope = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 5, 0xe1)], 1, 0, [], header).buffer
+		);
+		expect(envelope.project.songs[0]!.patterns[0]!.channels[0]!.rows[0]!.effects[0]).toMatchObject(
+			{
+				effect: EffectType.ChipSpecific,
+				delay: 6,
+				parameter: 2
+			}
+		);
+
+		const linear = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 23, 0xc0)], 1, 2, [], header).buffer
+		);
+		expect(linear.project.songs[0]!.patterns[0]!.channels[2]!.rows[0]!.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 8,
+			parameter: 0x40
+		});
+	});
+
 	it('imports a plain NES Dn-FamiTracker module', () => {
 		const { project } = importFtmBuffer(dnmBytes(0).buffer, 'fallback');
 		expect(project.songs).toHaveLength(1);
@@ -720,5 +754,26 @@ describe('dnm import', () => {
 			parameter: 2
 		});
 		expect(warnings.some((warning) => warning.includes('EE'))).toBe(false);
+	});
+
+	it('imports 0CC triangle S80-SFF as E8XY', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 23, 0xc0)], 1, 2, block('GROOVES', 1, [0])).buffer
+		);
+		const row = project.songs[0]!.patterns[0]!.channels[2]!.rows[0]!;
+		expect(row.effects[0]).toMatchObject({
+			effect: EffectType.ChipSpecific,
+			delay: 8,
+			parameter: 0x40
+		});
+		expect(warnings.some((warning) => /\bS\b/.test(warning))).toBe(false);
+	});
+
+	it('skips vanilla Sxx above 0F', () => {
+		const { project, warnings } = importFtmBuffer(
+			tinySong([patternCell(0, 0, 0, 23, 0xc0)], 1, 2).buffer
+		);
+		expect(project.songs[0]!.patterns[0]!.channels[2]!.rows[0]!.effects[0]).toBeNull();
+		expect(warnings.some((warning) => warning.includes('S'))).toBe(true);
 	});
 });

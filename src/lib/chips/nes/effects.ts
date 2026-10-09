@@ -7,6 +7,7 @@ export const NES_DELTA_COUNTER_SUBCOMMAND = 4;
 export const NES_LENGTH_COUNTER_SUBCOMMAND = 5;
 export const NES_ENVELOPE_MODE_SUBCOMMAND = 6;
 export const NES_DPCM_PITCH_SUBCOMMAND = 7;
+export const NES_LINEAR_COUNTER_SUBCOMMAND = 8;
 
 export function isNesPulseWidthCycleEffect(effect: { effect: number; delay: number }): boolean {
 	return effect.effect === 'E'.charCodeAt(0) && effect.delay === NES_PULSE_WIDTH_CYCLE_SUBCOMMAND;
@@ -106,6 +107,18 @@ export function isNesDpcmPitchEffect(effect: {
 	);
 }
 
+export function isNesLinearCounterEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): boolean {
+	return (
+		effect.effect === 'E'.charCodeAt(0) &&
+		effect.delay === NES_LINEAR_COUNTER_SUBCOMMAND &&
+		(effect.tableIndex === undefined || effect.tableIndex < 0)
+	);
+}
+
 const NES_PULSE_WIDTH_HINT: EffectStatusHint = {
 	format: 'E1XY',
 	name: 'Pulse Width',
@@ -161,6 +174,11 @@ const NES_DPCM_PITCH_HINT: EffectStatusHint = {
 	name: 'DPCM Frequency',
 	params: 'XY: 00-0F'
 };
+const NES_LINEAR_COUNTER_HINT: EffectStatusHint = {
+	format: 'E8XY',
+	name: 'Linear Counter',
+	params: 'XY: $4008'
+};
 
 const NES_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	NES_PULSE_WIDTH_HINT,
@@ -173,7 +191,8 @@ const NES_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	NES_DELTA_COUNTER_TABLE_HINT,
 	NES_LENGTH_COUNTER_HINT,
 	NES_ENVELOPE_MODE_HINT,
-	NES_DPCM_PITCH_HINT
+	NES_DPCM_PITCH_HINT,
+	NES_LINEAR_COUNTER_HINT
 ];
 
 export function describeNesEffect(effect: {
@@ -204,6 +223,9 @@ export function describeNesEffect(effect: {
 	}
 	if (isNesDpcmPitchEffect(effect)) {
 		return formatEffectStatusHint(NES_DPCM_PITCH_HINT);
+	}
+	if (isNesLinearCounterEffect(effect)) {
+		return formatEffectStatusHint(NES_LINEAR_COUNTER_HINT);
 	}
 	return null;
 }

@@ -377,7 +377,7 @@ export function importFtmBuffer(buffer: ArrayBuffer, fallbackName = ''): FtmImpo
 		note('Bitphase keeps one order list, taken from the first song');
 	}
 	const skippedEffects = new Set<string>();
-	const zeroCc = blocks.some((block) => ZERO_CC_BLOCKS.has(block.name));
+	const zeroCc = dnModule || blocks.some((block) => ZERO_CC_BLOCKS.has(block.name));
 	const arpTables = buildArpTables(instruments, sequences, s5bSequences, note);
 	const projectInstruments = instruments.map((instrument) =>
 		toInstrument(instrument, sequences, s5bSequences, samples, note)
@@ -1118,7 +1118,8 @@ function updateEffectCarry(
 	channel: number,
 	ayChannel: boolean,
 	params: FtmParams,
-	skippedEffects: Set<string>
+	skippedEffects: Set<string>,
+	zeroCc = false
 ): void {
 	const scratch = emptyRow(ayChannel ? AY_CHIP_SCHEMA.fields : NES_CHIP_SCHEMA.fields, 1);
 	scratch.note = row.note;
@@ -1135,7 +1136,8 @@ function updateEffectCarry(
 			scratch,
 			skippedEffects,
 			ayChannel,
-			params.vibratoNew
+			params.vibratoNew,
+			zeroCc
 		);
 		if (mapped) {
 			rememberImportedEffect(carry, mapped);
@@ -1156,11 +1158,12 @@ function sustainImportedEffects(
 	params: FtmParams,
 	channelIndex: number,
 	ayChannel: boolean,
-	skippedEffects: Set<string>
+	skippedEffects: Set<string>,
+	zeroCc = false
 ): void {
 	const pitched = row.note.name >= NoteName.C && row.note.name <= NoteName.B;
 	const gateWasOpen = carry.gate;
-	updateEffectCarry(carry, cell, row, channelIndex, ayChannel, params, skippedEffects);
+	updateEffectCarry(carry, cell, row, channelIndex, ayChannel, params, skippedEffects, zeroCc);
 	if (!pitched) {
 		if (row.note.name === NoteName.Off) carry.gate = false;
 		return;
@@ -1269,7 +1272,8 @@ function toSong(
 					params,
 					channel,
 					false,
-					skippedEffects
+					skippedEffects,
+					zeroCc
 				);
 				patternChannel.rows[rowIndex] = row;
 			}
@@ -1341,7 +1345,8 @@ function toAySong(
 					params,
 					channel,
 					true,
-					skippedEffects
+					skippedEffects,
+					zeroCc
 				);
 				patternChannel.rows[rowIndex] = row;
 			}
@@ -1538,6 +1543,9 @@ function mapEffect(
 			if (byte === 0) {
 				row.note = new Note(NoteName.Off, 0);
 				return null;
+			}
+			if (!ayChannel && zeroCc && channel === 2 && byte >= 0x80) {
+				return new Effect(EffectType.ChipSpecific, 8, byte - 0x80);
 			}
 			if (byte > 0x0f) {
 				skippedEffects.add('S');
