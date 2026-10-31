@@ -221,11 +221,35 @@ describe('SAA tone playback', () => {
 			}
 		}
 		expect(left / 2000).toBeGreaterThan(0.05);
-		expect(peak).toBeGreaterThan(0.3);
-		expect(peak).toBeLessThan(0.5);
+		expect(peak).toBeGreaterThan(0.15);
+		expect(peak).toBeLessThan(0.2);
 		expect(scopePeak).toBeGreaterThan(0.95);
 		expect(right).toBe(0);
 		expect(channel / 2000).toBeGreaterThan(0.02);
 		expect(other).toBe(0);
+	});
+
+	it('keeps six full channels inside the mix', async () => {
+		const wasm = readFileSync('public/saa/saasound.wasm');
+		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
+		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
+		const registers = new SaaRegisterState(6);
+		for (let channel = 0; channel < 6; channel++) {
+			registers.channels[channel] = {
+				tone: true,
+				left: 15,
+				right: 15,
+				octave: 3,
+				freq: 227
+			};
+		}
+		engine.apply(registers);
+		let peak = 0;
+		for (let i = 0; i < 4000; i++) {
+			const sample = engine.generate();
+			peak = Math.max(peak, Math.abs(sample.left), Math.abs(sample.right));
+		}
+		expect(peak).toBeGreaterThan(0.9);
+		expect(peak).toBeLessThanOrEqual(1);
 	});
 });

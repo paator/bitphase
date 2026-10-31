@@ -1,7 +1,7 @@
 export const SAA_CHANNEL_COUNT = 6;
 export const SAA_SAM_CLOCK = 8_000_000;
 export const SAA_LEVEL_MAX = 15;
-export const SAA_OUTPUT_GAIN = 3;
+export const SAA_OUTPUT_GAIN = 1;
 export const SAA_FULL_SIDE_PEAK = (SAA_LEVEL_MAX * 2 * 16 * 11.35) / 32768;
 export const SAA_SCOPE_SCALE = 1 / SAA_FULL_SIDE_PEAK;
 
