@@ -17,8 +17,18 @@ function silenceChannel(registerState, channelIndex) {
 	const channel = registerState.channels[channelIndex];
 	if (!channel) return;
 	channel.tone = false;
+	channel.noise = false;
 	channel.left = 0;
 	channel.right = 0;
+}
+
+function applyNoiseClock(state, key, raw) {
+	if (raw === -1) {
+		state[key] = 0;
+		return;
+	}
+	if (typeof raw !== 'number' || raw === 0) return;
+	state[key] = raw & 3;
 }
 
 function applyPatternSide(state, channelIndex, side, value) {
@@ -52,7 +62,9 @@ function packedTone(state, channelIndex) {
 }
 
 class SaaAudioDriver {
-	processPatternRow(state, pattern, rowIndex, _registerState) {
+	processPatternRow(state, pattern, rowIndex, patternRow) {
+		applyNoiseClock(state, 'noiseClock0', patternRow?.noise0);
+		applyNoiseClock(state, 'noiseClock1', patternRow?.noise1);
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const row = pattern.channels[channelIndex]?.rows?.[rowIndex];
 			if (!row || state.channelMuted?.[channelIndex]) continue;
@@ -74,6 +86,8 @@ class SaaAudioDriver {
 	}
 
 	processInstruments(state, registerState) {
+		registerState.noise0 = (state.noiseClock0 ?? 0) & 3;
+		registerState.noise1 = (state.noiseClock1 ?? 0) & 3;
 		const channelCount = registerState.channelCount;
 		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
 			const channel = registerState.channels[channelIndex];
@@ -106,19 +120,25 @@ class SaaAudioDriver {
 			if (!tone) {
 				silenceChannel(registerState, channelIndex);
 			} else {
-				channel.tone = true;
-				channel.left = combineSaaLevel(
-					state.channelPatternLeft[channelIndex],
-					row.left ?? SAA_LEVEL_MAX,
-					slide
-				);
-				channel.right = combineSaaLevel(
-					state.channelPatternRight[channelIndex],
-					row.right ?? SAA_LEVEL_MAX,
-					slide
-				);
 				channel.octave = tone.octave;
 				channel.freq = tone.freq;
+				channel.tone = row.tone !== false;
+				channel.noise = row.noise === true;
+				if (!channel.tone && !channel.noise) {
+					channel.left = 0;
+					channel.right = 0;
+				} else {
+					channel.left = combineSaaLevel(
+						state.channelPatternLeft[channelIndex],
+						row.left ?? SAA_LEVEL_MAX,
+						slide
+					);
+					channel.right = combineSaaLevel(
+						state.channelPatternRight[channelIndex],
+						row.right ?? SAA_LEVEL_MAX,
+						slide
+					);
+				}
 			}
 			state.instrumentPositions[channelIndex] =
 				(state.instrumentPositions[channelIndex] | 0) + 1;

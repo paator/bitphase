@@ -227,7 +227,9 @@ const SAA_VOLUME_FIELDS = [
 		min: AY_AMPLITUDE_SLIDE_DOWN,
 		max: AY_AMPLITUDE_SLIDE_UP,
 		defaultValue: AY_AMPLITUDE_SLIDE_OFF
-	}
+	},
+	{ id: 'tone', kind: 'boolean', defaultValue: true },
+	{ id: 'noise', kind: 'boolean', defaultValue: false }
 ];
 
 const NES_APU_FIELDS = [

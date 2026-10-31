@@ -44,6 +44,8 @@ describe('migrateLegacyInstrument', () => {
 		expect(migrated.macros?.left?.values).toEqual([4, 8]);
 		expect(migrated.macros?.right?.values).toEqual([2, 1]);
 		expect(migrated.macros?.amplitudeSlide?.values).toEqual([0, 1]);
+		expect(migrated.macros?.tone?.values).toEqual([true]);
+		expect(migrated.macros?.noise?.values).toEqual([false]);
 		expect(migrated.macros?.volume).toBeUndefined();
 	});
 });

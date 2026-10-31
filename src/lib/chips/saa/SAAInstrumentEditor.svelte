@@ -2,6 +2,8 @@
 	import type { Instrument } from '../../models/song';
 	import IconCarbonVolumeUp from '~icons/carbon/volume-up';
 	import IconCarbonArrowsVertical from '~icons/carbon/arrows-vertical';
+	import IconCarbonMusic from '~icons/carbon/music';
+	import IconCarbonWaveform from '~icons/carbon/waveform';
 	import InstrumentEditorIdentity from '../../components/Instruments/InstrumentEditorIdentity.svelte';
 	import InstrumentMacrosEditor from '../../components/Instruments/InstrumentMacrosEditor.svelte';
 	import { SAA_VOLUME_MACRO_FIELDS } from './volume-macros';
@@ -21,7 +23,9 @@
 	const icons = {
 		left: IconCarbonVolumeUp,
 		right: IconCarbonVolumeUp,
-		amplitudeSlide: IconCarbonArrowsVertical
+		amplitudeSlide: IconCarbonArrowsVertical,
+		tone: IconCarbonMusic,
+		noise: IconCarbonWaveform
 	};
 </script>
 

@@ -10,6 +10,7 @@ import {
 	SAA_REG_NOISE_MIXER,
 	SAA_REG_TONE_MIXER
 } from './saa-constants.js';
+import { saaNoiseClockByte } from './saa-levels.js';
 
 function bindExport(wasmModule, name) {
 	const fn = wasmModule[name] ?? wasmModule[`_${name}`];
@@ -79,22 +80,28 @@ class SaaSoundEngine {
 	apply(registerState) {
 		const octaves = [0, 0, 0, 0, 0, 0];
 		let toneMask = 0;
+		let noiseMask = 0;
 		const count = Math.min(SAA_CHANNEL_COUNT, registerState.channelCount);
 		for (let channel = 0; channel < count; channel++) {
 			const source = registerState.channels[channel];
-			const left = source?.tone ? source.left & 15 : 0;
-			const right = source?.tone ? source.right & 15 : 0;
+			const audible = Boolean(source?.tone || source?.noise);
+			const left = audible ? source.left & 15 : 0;
+			const right = audible ? source.right & 15 : 0;
 			this.write(channel, (right << 4) | left);
 			this.write(8 + channel, source?.freq ?? 0);
 			octaves[channel] = (source?.octave ?? 0) & 7;
-			if (source?.tone && (left > 0 || right > 0)) {
-				toneMask |= 1 << channel;
-			}
+			if (source?.tone) toneMask |= 1 << channel;
+			if (source?.noise) noiseMask |= 1 << channel;
 		}
 		this.write(16, octaves[0] | (octaves[1] << 4));
 		this.write(17, octaves[2] | (octaves[3] << 4));
 		this.write(18, octaves[4] | (octaves[5] << 4));
 		this.write(SAA_REG_TONE_MIXER, toneMask);
+		this.write(SAA_REG_NOISE_MIXER, noiseMask);
+		this.write(
+			SAA_REG_NOISE_CLOCK,
+			saaNoiseClockByte(registerState.noise0 ?? 0, registerState.noise1 ?? 0)
+		);
 		this.write(SAA_REG_ENABLE, SAA_ENABLE_OUTPUT);
 	}
 

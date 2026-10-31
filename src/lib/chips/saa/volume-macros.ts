@@ -53,5 +53,25 @@ export const SAA_VOLUME_MACRO_FIELDS: InstrumentMacroField[] = [
 			row.amplitudeSliding = value !== SAA_AMPLITUDE_SLIDE_OFF;
 			row.amplitudeSlideUp = value === SAA_AMPLITUDE_SLIDE_UP;
 		}
+	},
+	{
+		id: 'tone',
+		label: 'Tone',
+		title: 'Square wave',
+		kind: 'boolean',
+		accent: 'tone',
+		group: 'Waveform',
+		shareSequence: true,
+		defaultValue: true
+	},
+	{
+		id: 'noise',
+		label: 'Noise',
+		title: 'Noise',
+		kind: 'boolean',
+		accent: 'noise',
+		group: 'Waveform',
+		shareSequence: true,
+		defaultValue: false
 	}
 ];

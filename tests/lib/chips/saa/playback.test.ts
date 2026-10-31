@@ -7,7 +7,7 @@ import SaaState from '../../../../public/saa/saa-state.js';
 import TrackerPatternProcessor from '../../../../public/tracker/tracker-pattern-processor.js';
 import { createSaaSoundEngine } from '../../../../public/saa/saa-engine.js';
 import { saaWasmImports } from '../../../../public/saa/saa-wasm-imports.js';
-import { saaPeriodFromCode, saaPitchCode } from '../../../../public/saa/saa-levels.js';
+import { saaNoiseClockByte, saaPeriodFromCode, saaPitchCode } from '../../../../public/saa/saa-levels.js';
 import EffectAlgorithms from '../../../../public/tracker/effect-algorithms.js';
 
 const toneCodes = resolveSaaTuningTable(SAA_SAM_CLOCK, 440);
@@ -251,5 +251,60 @@ describe('SAA tone playback', () => {
 		}
 		expect(peak).toBeGreaterThan(0.9);
 		expect(peak).toBeLessThanOrEqual(1);
+	});
+
+	it('enables noise from the instrument and keeps the square off when tone is off', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.instruments[0].macros.tone = { values: [false], loop: 0 };
+		state.instruments[0].macros.noise = { values: [true], loop: 0 };
+		const registers = new SaaRegisterState(1);
+		driver.processInstruments(state, registers);
+		expect(registers.channels[0].tone).toBe(false);
+		expect(registers.channels[0].noise).toBe(true);
+		expect(registers.channels[0].left).toBe(15);
+	});
+
+	it('stores each noise clock and leaves a blank column unchanged', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		const registers = new SaaRegisterState(6);
+		driver.processPatternRow(state, { channels: [] }, 0, { noise0: -1, noise1: 3 });
+		driver.processInstruments(state, registers);
+		expect(registers.noise0).toBe(0);
+		expect(registers.noise1).toBe(3);
+		expect(saaNoiseClockByte(registers.noise0, registers.noise1)).toBe(0x30);
+		driver.processPatternRow(state, { channels: [] }, 0, { noise0: 0, noise1: 0 });
+		driver.processInstruments(state, registers);
+		expect(registers.noise0).toBe(0);
+		expect(registers.noise1).toBe(3);
+		driver.processPatternRow(state, { channels: [] }, 0, { noise0: 2 });
+		driver.processInstruments(state, registers);
+		expect(registers.noise0).toBe(2);
+		expect(registers.noise1).toBe(3);
+	});
+
+	it('renders noise on the addressed side when the square is off', async () => {
+		const wasm = readFileSync('public/saa/saasound.wasm');
+		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
+		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
+		const registers = new SaaRegisterState(6);
+		registers.channels[0] = { tone: false, noise: true, left: 15, right: 0, octave: 3, freq: 227 };
+		registers.noise0 = 0;
+		engine.apply(registers);
+		let left = 0;
+		let right = 0;
+		let other = 0;
+		for (let i = 0; i < 2000; i++) {
+			const sample = engine.generate();
+			left += Math.abs(sample.left);
+			right += Math.abs(sample.right);
+			for (let index = 1; index < sample.channels.length; index++) {
+				other += Math.abs(sample.channels[index]);
+			}
+		}
+		expect(left / 2000).toBeGreaterThan(0.02);
+		expect(right).toBe(0);
+		expect(other).toBe(0);
 	});
 });

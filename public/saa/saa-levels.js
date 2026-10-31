@@ -25,6 +25,10 @@ export function saaPitchCode(period, offset) {
 	return SAA_TONE_CODE_MAX - value;
 }
 
+export function saaNoiseClockByte(noise0, noise1) {
+	return ((noise1 & 3) << 4) | (noise0 & 3);
+}
+
 export function saaToneFrequency(clockHz, octave, freqByte) {
 	const divisor = 511 - (freqByte & 0xff);
 	if (divisor <= 0 || !(clockHz > 0)) return 0;

@@ -3,6 +3,7 @@ import { SAA_CHANNEL_COUNT } from './saa-constants.js';
 function createDefaultChannel() {
 	return {
 		tone: false,
+		noise: false,
 		left: 0,
 		right: 0,
 		octave: 0,
@@ -14,12 +15,16 @@ class SaaRegisterState {
 	constructor(channelCount = SAA_CHANNEL_COUNT) {
 		this.channelCount = channelCount;
 		this.channels = Array.from({ length: channelCount }, () => createDefaultChannel());
+		this.noise0 = 0;
+		this.noise1 = 0;
 	}
 
 	reset() {
 		for (let i = 0; i < this.channelCount; i++) {
 			this.channels[i] = createDefaultChannel();
 		}
+		this.noise0 = 0;
+		this.noise1 = 0;
 	}
 
 	resize(newChannelCount) {

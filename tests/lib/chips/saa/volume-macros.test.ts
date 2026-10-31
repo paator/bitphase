@@ -12,8 +12,12 @@ describe('SAA volume macro', () => {
 		expect(SAA_VOLUME_MACRO_FIELDS.map((field) => field.group)).toEqual([
 			'Volume',
 			'Volume',
-			'Volume'
+			'Volume',
+			'Waveform',
+			'Waveform'
 		]);
+		expect(macros.tone.values).toEqual([true]);
+		expect(macros.noise.values).toEqual([false]);
 	});
 
 	it('scales each side by the pattern level after the slide', () => {

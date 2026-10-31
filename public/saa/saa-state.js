@@ -32,6 +32,8 @@ class SaaState extends TrackerState {
 		this.instruments = [];
 		this.instrumentIdToIndex = new Map();
 		initChipChannelArrays(this, SAA_CHANNEL_COUNT, SAA_CHANNEL_ARRAY_SPECS);
+		this.noiseClock0 = 0;
+		this.noiseClock1 = 0;
 	}
 
 	setWasmModule(wasmModule, chipPtr, wasmBuffer) {
@@ -57,6 +59,8 @@ class SaaState extends TrackerState {
 	reset(opts = {}) {
 		super.reset(opts);
 		resetChipChannelArrays(this, SAA_CHANNEL_ARRAY_SPECS);
+		this.noiseClock0 = 0;
+		this.noiseClock1 = 0;
 	}
 }
 

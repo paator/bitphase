@@ -67,6 +67,7 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		const channel = this.registerState.channels[channelIndex];
 		if (!channel) return;
 		channel.tone = false;
+		channel.noise = false;
 		channel.left = 0;
 		channel.right = 0;
 	}
@@ -199,7 +200,7 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		const levels = [];
 		for (let channel = 0; channel < this.registerState.channelCount; channel++) {
 			const source = this.registerState.channels[channel];
-			if (!source?.tone || this.state.channelMuted[channel]) {
+			if (!(source?.tone || source?.noise) || this.state.channelMuted[channel]) {
 				levels.push(0);
 				continue;
 			}
@@ -212,7 +213,7 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		const frequencies = [];
 		for (let channel = 0; channel < this.registerState.channelCount; channel++) {
 			const source = this.registerState.channels[channel];
-			if (!source?.tone) {
+			if (!(source?.tone || source?.noise)) {
 				frequencies.push(null);
 				continue;
 			}
