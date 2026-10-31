@@ -7,7 +7,7 @@ import SaaState from '../../../../public/saa/saa-state.js';
 import TrackerPatternProcessor from '../../../../public/tracker/tracker-pattern-processor.js';
 import { createSaaSoundEngine } from '../../../../public/saa/saa-engine.js';
 import { saaWasmImports } from '../../../../public/saa/saa-wasm-imports.js';
-import { saaNoiseClockByte, saaPeriodFromCode, saaPitchCode } from '../../../../public/saa/saa-levels.js';
+import { saaEnvelopeControlByte, saaNoiseClockByte, saaPeriodFromCode, saaPitchCode } from '../../../../public/saa/saa-levels.js';
 import EffectAlgorithms from '../../../../public/tracker/effect-algorithms.js';
 
 const toneCodes = resolveSaaTuningTable(SAA_SAM_CLOCK, 440);
@@ -68,6 +68,87 @@ describe('SAA tone playback', () => {
 		driver.processPatternRow(state, pattern, 0, new SaaRegisterState(1));
 		expect(state.channelPatternLeft[0]).toBe(15);
 		expect(state.channelPatternRight[0]).toBe(0);
+	});
+
+	it('adds the tone offset to the period and accumulates it when asked', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelToneAccumulator = [0];
+		state.instruments[0].macros.toneAdd = { values: [16], loop: 0 };
+		state.instruments[0].macros.toneAccumulation = { values: [true], loop: 0 };
+		const registers = new SaaRegisterState(1);
+		const period = saaPeriodFromCode(toneCodes[45]);
+		driver.processInstruments(state, registers);
+		expect(toneCode(registers.channels[0])).toBe(saaPitchCode(period, 16));
+		expect(state.channelToneAccumulator[0]).toBe(16);
+		driver.processInstruments(state, registers);
+		expect(toneCode(registers.channels[0])).toBe(saaPitchCode(period, 32));
+	});
+
+	it('adds the noise offset to the N column while noise is on', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.noiseClock0 = 0;
+		state.channelNoiseAccumulator = [0];
+		state.instruments[0].macros.noise = { values: [true], loop: 0 };
+		state.instruments[0].macros.noiseAdd = { values: [1], loop: 0 };
+		state.instruments[0].macros.noiseAccumulation = { values: [true], loop: 0 };
+		const registers = new SaaRegisterState(1);
+		driver.processInstruments(state, registers);
+		expect(registers.noise0).toBe(1);
+		expect(state.channelNoiseAccumulator[0]).toBe(1);
+		driver.processInstruments(state, registers);
+		expect(registers.noise0).toBe(2);
+	});
+
+	it('keeps an envelope mode, swaps sides, and locks noise', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		state.channelStereoInvert = [false];
+		state.envelopeCommand0 = null;
+		state.envelopeRetrigger0 = false;
+		state.noiseLock0 = false;
+		state.noiseClock0 = 1;
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		driver.processPatternRow(
+			state,
+			{
+				channels: [
+					{
+						rows: [
+							{
+								note: { name: 0, octave: 0 },
+								effects: [
+									{ effect: 'E'.charCodeAt(0), delay: 1, parameter: 1 },
+									{ effect: 'E'.charCodeAt(0), delay: 2, parameter: 1 }
+								]
+							}
+						]
+					}
+				]
+			},
+			0,
+			{ env0: 1 }
+		);
+		const registers = new SaaRegisterState(6);
+		driver.processInstruments(state, registers);
+		expect(state.envelopeCommand0).toBe(0x96);
+		expect(registers.envelope0).toBe(0x96);
+		expect(registers.channels[0].left).toBe(2);
+		expect(registers.channels[0].right).toBe(15);
+		expect(registers.noise0).toBe(3);
+	});
+
+	it('publishes channel A noise clock while the noise mixer is off', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.noiseClock0 = 0;
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		state.instruments[0].macros.noiseAdd = { values: [2], loop: 0 };
+		const registers = new SaaRegisterState(1);
+		driver.processInstruments(state, registers);
+		expect(registers.noise0).toBe(2);
 	});
 
 	it('lowers pitch for a positive slide and raises it for a negative one', () => {
@@ -282,6 +363,66 @@ describe('SAA tone playback', () => {
 		driver.processInstruments(state, registers);
 		expect(registers.noise0).toBe(2);
 		expect(registers.noise1).toBe(3);
+	});
+
+	it('restarts the envelope shape on C and leaves a blank cell unchanged', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelCurrentNotes = [45, 45, 45, 45, 45, 45];
+		state.channelSoundEnabled = [true, true, true, true, true, true];
+		state.channelPatternLeft = [15, 15, 15, 15, 15, 15];
+		state.channelPatternRight = [15, 15, 15, 15, 15, 15];
+		state.channelAmplitudeSliding = [0, 0, 0, 0, 0, 0];
+		state.channelInstruments = [0, 0, 0, 0, 0, 0];
+		state.instrumentPositions = [0, 0, 0, 0, 0, 0];
+		state.envelopeCommand0 = null;
+		const pattern = {
+			channels: Array.from({ length: 6 }, () => ({
+				rows: [{ note: { name: 0, octave: 0 }, instrument: 0 }]
+			}))
+		};
+		const registers = new SaaRegisterState(6);
+		driver.processPatternRow(state, pattern, 0, { env0: 3 });
+		driver.processInstruments(state, registers);
+		expect(state.envelopeCommand0).toBe(0x9a);
+		expect(registers.envelopeRetrigger0).toBe(true);
+		expect(registers.envelope0).toBe(0x9a);
+		driver.processPatternRow(state, pattern, 0, { env0: 0 });
+		driver.processInstruments(state, registers);
+		expect(state.envelopeCommand0).toBe(0x9a);
+		expect(registers.envelopeRetrigger0).toBe(false);
+		expect(registers.envelope0).toBe(0x9a);
+	});
+
+	it('silences channel C when the enabled envelope shape is off', async () => {
+		const wasm = readFileSync('public/saa/saasound.wasm');
+		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
+		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
+		const registers = new SaaRegisterState(6);
+		registers.channels[2] = { tone: true, noise: false, left: 15, right: 0, octave: 4, freq: 200 };
+		registers.envelope0 = saaEnvelopeControlByte({
+			shape: 0,
+			enabled: true,
+			follow: true,
+			coarse: false,
+			mirror: false
+		});
+		engine.apply(registers);
+		let level = 0;
+		for (let i = 0; i < 500; i++) level += Math.abs(engine.generate().left);
+		expect(level).toBe(0);
+		registers.envelope0 = saaEnvelopeControlByte({
+			shape: 1,
+			enabled: true,
+			follow: true,
+			coarse: false,
+			mirror: false
+		});
+		registers.envelopeRetrigger0 = true;
+		engine.apply(registers);
+		level = 0;
+		for (let i = 0; i < 500; i++) level += Math.abs(engine.generate().left);
+		expect(level).toBeGreaterThan(1);
 	});
 
 	it('renders noise on the addressed side when the square is off', async () => {

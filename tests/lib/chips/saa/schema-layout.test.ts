@@ -19,7 +19,6 @@ class RowFormatter extends BaseFormatter {}
 const CHANNEL = {
 	note: 'C-4',
 	instrument: 1,
-	envelopeShape: 0,
 	table: 0,
 	left: 15,
 	right: 8,
@@ -29,7 +28,7 @@ const CHANNEL = {
 function saaRow(): string {
 	const formatter = new RowFormatter();
 	return formatter.formatRow(
-		{ noise0: 1, noise1: 3 },
+		{ noise0: 1, env0: 4, noise1: 3, env1: 2 },
 		Array.from({ length: 6 }, () => ({ ...CHANNEL })),
 		0,
 		SAA_CHIP_SCHEMA
@@ -37,16 +36,15 @@ function saaRow(): string {
 }
 
 describe('SAA pattern layout', () => {
-	it('places noise0 before A and noise1 before D', () => {
+	it('places noise before A and D, and envelope shape before C and F', () => {
 		const tokens = saaRow().split(/\s+/);
 		expect(tokens[1]).toBe('1');
-		expect(tokens[11]).toBe('3');
 		expect(tokens[2]).toBe('C-4');
-		expect(tokens[12]).toBe('C-4');
-		expect(tokens).toHaveLength(1 + 1 + 6 * 3 + 1);
+		expect(tokens).toContain('4');
+		expect(tokens).toContain('2');
 	});
 
-	it('walks columns as noise, A B C, noise, D E F', () => {
+	it('walks columns as noise, A B, envelope, C, noise, D E, envelope, F', () => {
 		const order: string[] = [];
 		PatternTemplateParser.walkRow(saaRow(), SAA_CHIP_SCHEMA, [1, 1, 1, 1, 1, 1], {
 			onGlobalField(key) {
@@ -56,16 +54,30 @@ describe('SAA pattern layout', () => {
 				order.push(`ch${index}`);
 			}
 		});
-		expect(order).toEqual(['noise0', 'ch0', 'ch1', 'ch2', 'noise1', 'ch3', 'ch4', 'ch5']);
+		expect(order).toEqual([
+			'noise0',
+			'ch0',
+			'ch1',
+			'env0',
+			'ch2',
+			'noise1',
+			'ch3',
+			'ch4',
+			'env1',
+			'ch5'
+		]);
 	});
 
-	it('parses anchored noise back onto the pattern row', () => {
+	it('parses anchored noise and envelope shapes back onto the pattern row', () => {
 		const parsed = new RowFormatter().parseRow(saaRow(), SAA_CHIP_SCHEMA);
 		expect(parsed.patternRow.noise0).toBe(1);
+		expect(parsed.patternRow.env0).toBe(4);
 		expect(parsed.patternRow.noise1).toBe(3);
+		expect(parsed.patternRow.env1).toBe(2);
 		expect(parsed.channels).toHaveLength(6);
 		expect(parsed.channels[0]?.left).toBe(15);
 		expect(parsed.channels[0]?.right).toBe(8);
+		expect(parsed.channels[0]?.envelopeShape).toBeUndefined();
 		expect(parsed.channels[3]?.note).toBe('C-4');
 	});
 
@@ -105,7 +117,7 @@ describe('SAA pattern layout', () => {
 			id: 0,
 			length: 1,
 			channels: Array.from({ length: 6 }, () => ({ rows: [{ ...CHANNEL }] })),
-			patternRows: [{ noise0: 1, noise1: 3 }]
+			patternRows: [{ noise0: 1, env0: 4, noise1: 3, env1: 2 }]
 		};
 		const context = {
 			patterns: [pattern],

@@ -4,6 +4,7 @@ import { SAAFormatter } from './formatter';
 import { SAAChipRenderer } from './renderer';
 import { SAA_CHIP_SCHEMA } from './schema';
 import { SAA_AUDIO_SLOT_KIND } from './audio-slot-kind';
+import { describeSaaEffect, listSaaEffectStatusHints } from './effects';
 import type { Chip } from '../types';
 
 export const SAA_CHIP: Chip = {
@@ -15,7 +16,9 @@ export const SAA_CHIP: Chip = {
 	schema: SAA_CHIP_SCHEMA,
 	createConverter: () => new SAAConverter(),
 	createFormatter: () => new SAAFormatter(),
-	createRenderer: () => new SAAChipRenderer()
+	createRenderer: () => new SAAChipRenderer(),
+	describeEffect: describeSaaEffect,
+	listEffectStatusHints: listSaaEffectStatusHints
 };
 
 export const CHIP = SAA_CHIP;

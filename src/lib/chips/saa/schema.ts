@@ -1,4 +1,5 @@
 import type { ChipSchema } from '../base/schema';
+import { saaStickyChannelEffectGroup } from './effects';
 
 export const SAA_SAM_CLOCK = 8_000_000;
 export const SAA_CMS_CLOCK = 7_159_090;
@@ -42,8 +43,9 @@ const SAA_DEFAULT_TUNING_TABLE = resolveSaaTuningTable(SAA_SAM_CLOCK, 440);
 export const SAA_CHIP_SCHEMA: ChipSchema = {
 	chipType: 'saa',
 	defaultTuningTable: SAA_DEFAULT_TUNING_TABLE,
+	stickyChannelEffectGroup: saaStickyChannelEffectGroup,
 	channelLabels: ['A', 'B', 'C', 'D', 'E', 'F'],
-	template: '{note} {instrument}{envelopeShape}{table}{left}{right} {effect}',
+	template: '{note} {instrument}{table}{left}{right} {effect}',
 	fields: {
 		note: {
 			key: 'note',
@@ -61,15 +63,6 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			color: 'patternInstrument',
 			selectable: 'character',
 			allowZeroValue: false,
-			usedForBacktracking: true,
-			backtrackWhen: 'nonZero'
-		},
-		envelopeShape: {
-			key: 'envelopeShape',
-			type: 'hex',
-			length: 1,
-			color: 'patternEnvelope',
-			selectable: 'character',
 			usedForBacktracking: true,
 			backtrackWhen: 'nonZero'
 		},
@@ -130,15 +123,39 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			allowZeroValue: true,
 			usedForBacktracking: true,
 			backtrackWhen: 'any'
+		},
+		env0: {
+			key: 'env0',
+			type: 'hex',
+			length: 1,
+			color: 'patternEnvelope',
+			selectable: 'character',
+			allowZeroValue: true,
+			usedForBacktracking: true,
+			backtrackWhen: 'any'
+		},
+		env1: {
+			key: 'env1',
+			type: 'hex',
+			length: 1,
+			color: 'patternEnvelope',
+			selectable: 'character',
+			allowZeroValue: true,
+			usedForBacktracking: true,
+			backtrackWhen: 'any'
 		}
 	},
 	globalAnchors: [
 		{ field: 'noise0', beforeChannel: 0 },
-		{ field: 'noise1', beforeChannel: 3 }
+		{ field: 'env0', beforeChannel: 2 },
+		{ field: 'noise1', beforeChannel: 3 },
+		{ field: 'env1', beforeChannel: 5 }
 	],
 	globalColumnLabels: {
 		noise0: 'N',
-		noise1: 'N'
+		noise1: 'N',
+		env0: 'E',
+		env1: 'E'
 	},
 	settings: [
 		{

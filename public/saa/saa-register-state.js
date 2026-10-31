@@ -17,6 +17,10 @@ class SaaRegisterState {
 		this.channels = Array.from({ length: channelCount }, () => createDefaultChannel());
 		this.noise0 = 0;
 		this.noise1 = 0;
+		this.envelope0 = 0;
+		this.envelope1 = 0;
+		this.envelopeRetrigger0 = false;
+		this.envelopeRetrigger1 = false;
 	}
 
 	reset() {
@@ -25,6 +29,10 @@ class SaaRegisterState {
 		}
 		this.noise0 = 0;
 		this.noise1 = 0;
+		this.envelope0 = 0;
+		this.envelope1 = 0;
+		this.envelopeRetrigger0 = false;
+		this.envelopeRetrigger1 = false;
 	}
 
 	resize(newChannelCount) {

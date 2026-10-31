@@ -29,6 +29,15 @@ export function saaNoiseClockByte(noise0, noise1) {
 	return ((noise1 & 3) << 4) | (noise0 & 3);
 }
 
+export function saaEnvelopeControlByte({ shape, enabled, follow, coarse, mirror }) {
+	if (!enabled) return 0;
+	let byte = (shape & 7) << 1;
+	if (mirror) byte |= 0x01;
+	if (coarse) byte |= 0x10;
+	if (!follow) byte |= 0x20;
+	return byte | 0x80;
+}
+
 export function saaToneFrequency(clockHz, octave, freqByte) {
 	const divisor = 511 - (freqByte & 0xff);
 	if (divisor <= 0 || !(clockHz > 0)) return 0;

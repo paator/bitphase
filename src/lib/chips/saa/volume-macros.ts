@@ -65,12 +65,56 @@ export const SAA_VOLUME_MACRO_FIELDS: InstrumentMacroField[] = [
 		defaultValue: true
 	},
 	{
+		id: 'toneAdd',
+		label: 'Offset',
+		title: 'Tone offset. Added to the period, so positive values lower the pitch.',
+		kind: 'integer',
+		accent: 'tone',
+		group: 'Tone parameters',
+		shareSequence: true,
+		min: -2048,
+		max: 2047,
+		defaultValue: 0
+	},
+	{
+		id: 'toneAccumulation',
+		label: 'Accumulation',
+		title: 'Add this step to the running tone offset.',
+		kind: 'boolean',
+		accent: 'tone',
+		group: 'Tone parameters',
+		shareSequence: true,
+		defaultValue: false
+	},
+	{
 		id: 'noise',
 		label: 'Noise',
 		title: 'Noise',
 		kind: 'boolean',
 		accent: 'noise',
 		group: 'Waveform',
+		shareSequence: true,
+		defaultValue: false
+	},
+	{
+		id: 'noiseAdd',
+		label: 'Offset',
+		title: 'Noise offset. Added to the N column while noise is on. Wraps through 0-3.',
+		kind: 'integer',
+		accent: 'noise',
+		group: 'Noise parameters',
+		shareSequence: true,
+		min: -3,
+		max: 3,
+		defaultValue: 0
+	},
+	{
+		id: 'noiseAccumulation',
+		label: 'Accumulation',
+		title: 'Add this step to the running noise offset.',
+		kind: 'boolean',
+		accent: 'noise',
+		group: 'Noise parameters',
 		shareSequence: true,
 		defaultValue: false
 	}

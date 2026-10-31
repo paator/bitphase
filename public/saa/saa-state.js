@@ -17,6 +17,9 @@ const SAA_CHANNEL_ARRAY_SPECS = [
 	['channelPatternLeft', SAA_LEVEL_MAX],
 	['channelPatternRight', SAA_LEVEL_MAX],
 	['channelAmplitudeSliding', 0],
+	['channelToneAccumulator', 0],
+	['channelNoiseAccumulator', 0],
+	['channelStereoInvert', false],
 	['channelMuted', false],
 	['channelSoundEnabled', false],
 	['channelKeyOn', false]
@@ -34,6 +37,12 @@ class SaaState extends TrackerState {
 		initChipChannelArrays(this, SAA_CHANNEL_COUNT, SAA_CHANNEL_ARRAY_SPECS);
 		this.noiseClock0 = 0;
 		this.noiseClock1 = 0;
+		this.envelopeRetrigger0 = false;
+		this.envelopeRetrigger1 = false;
+		this.envelopeCommand0 = null;
+		this.envelopeCommand1 = null;
+		this.noiseLock0 = false;
+		this.noiseLock1 = false;
 	}
 
 	setWasmModule(wasmModule, chipPtr, wasmBuffer) {
@@ -61,6 +70,12 @@ class SaaState extends TrackerState {
 		resetChipChannelArrays(this, SAA_CHANNEL_ARRAY_SPECS);
 		this.noiseClock0 = 0;
 		this.noiseClock1 = 0;
+		this.envelopeRetrigger0 = false;
+		this.envelopeRetrigger1 = false;
+		this.envelopeCommand0 = null;
+		this.envelopeCommand1 = null;
+		this.noiseLock0 = false;
+		this.noiseLock1 = false;
 	}
 }
 

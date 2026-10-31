@@ -3,6 +3,7 @@ import { loadVT2File, loadPT3File } from '../modules/vt-converter';
 import { isTaymBuffer, loadTaymFile } from '../taym/taym-import';
 import { isPsgBuffer, loadPsgFile } from '../ay/psg-import';
 import { isFtmBuffer, loadFtmFile } from '../nes/ftm-import';
+import { isEtrackerBuffer, loadEtrackerFile } from '../saa/etracker-import';
 import { Project, Table, normalizeInitialSpeed, normalizeTempo } from '../../../models/project';
 import {
 	Song,
@@ -539,7 +540,7 @@ export class FileImportService {
 		try {
 			const input = document.createElement('input');
 			input.type = 'file';
-			input.accept = '.pt3,.vt2,.taym,.psg,.ftm,.0cc,.dnm';
+			input.accept = '.pt3,.vt2,.taym,.psg,.ftm,.0cc,.dnm,.cop,.etc,.saa,.sng,.m';
 			input.style.display = 'none';
 
 			document.body.appendChild(input);
@@ -569,12 +570,15 @@ export class FileImportService {
 						const isTaym = isTaymBuffer(buffer);
 						const isPsg = isPsgBuffer(buffer);
 						const isFtm = isFtmBuffer(buffer);
-						if (!isPT3 && !isVT2 && !isTaym && !isPsg && !isFtm) {
+						const isEtracker = isEtrackerBuffer(buffer);
+						if (!isPT3 && !isVT2 && !isTaym && !isPsg && !isFtm && !isEtracker) {
 							throw new Error(
-								'Unknown format. Expected PT3, VT2, TAYM, PSG, FTM, 0CC or DNM module (.pt3, .vt2, .taym, .psg, .ftm, .0cc, .dnm).'
+								'Unknown format. Expected PT3, VT2, TAYM, PSG, FTM, 0CC, DNM or E-Tracker module (.pt3, .vt2, .taym, .psg, .ftm, .0cc, .dnm, .cop, .etc, .saa, .sng, .m).'
 							);
 						}
-						const project = isFtm
+						const project = isEtracker
+							? await loadEtrackerFile(file)
+							: isFtm
 							? await loadFtmFile(file)
 							: isTaym
 								? await loadTaymFile(file)

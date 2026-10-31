@@ -14,8 +14,16 @@ describe('SAA volume macro', () => {
 			'Volume',
 			'Volume',
 			'Waveform',
-			'Waveform'
+			'Tone parameters',
+			'Tone parameters',
+			'Waveform',
+			'Noise parameters',
+			'Noise parameters'
 		]);
+		expect(macros.toneAdd.values).toEqual([0]);
+		expect(macros.toneAccumulation.values).toEqual([false]);
+		expect(macros.noiseAdd.values).toEqual([0]);
+		expect(macros.noiseAccumulation.values).toEqual([false]);
 		expect(macros.tone.values).toEqual([true]);
 		expect(macros.noise.values).toEqual([false]);
 	});

@@ -34,7 +34,9 @@ export class SAAConverter implements PatternConverter {
 			const patternRow = saaPattern.patternRows[rowIndex];
 			generic.patternRows.push({
 				noise0: toNumber(patternRow.noise0),
-				noise1: toNumber(patternRow.noise1)
+				noise1: toNumber(patternRow.noise1),
+				env0: toNumber(patternRow.env0),
+				env1: toNumber(patternRow.env1)
 			});
 
 			for (let channelIndex = 0; channelIndex < saaPattern.channels.length; channelIndex++) {
@@ -44,7 +46,6 @@ export class SAAConverter implements PatternConverter {
 				const genericRow: GenericRow = {
 					note: formatNoteFromEnum(saaRow.note.name, saaRow.note.octave),
 					instrument: toNumber(saaRow.instrument),
-					envelopeShape: toNumber(saaRow.envelopeShape),
 					table: toNumber(saaRow.table),
 					left: toNumber(saaRow.left),
 					right: toNumber(saaRow.right)
@@ -75,6 +76,8 @@ export class SAAConverter implements PatternConverter {
 			if (patternRow && genericPatternRow) {
 				patternRow.noise0 = toNumber(genericPatternRow.noise0);
 				patternRow.noise1 = toNumber(genericPatternRow.noise1);
+				patternRow.env0 = toNumber(genericPatternRow.env0);
+				patternRow.env1 = toNumber(genericPatternRow.env1);
 			}
 
 			for (let channelIndex = 0; channelIndex < generic.channels.length; channelIndex++) {
@@ -89,7 +92,6 @@ export class SAAConverter implements PatternConverter {
 				}
 
 				saaRow.instrument = toNumber(genericRow.instrument);
-				saaRow.envelopeShape = toNumber(genericRow.envelopeShape);
 				saaRow.table = toNumber(genericRow.table);
 				saaRow.left = toNumber(genericRow.left);
 				saaRow.right = toNumber(genericRow.right);

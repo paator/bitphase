@@ -45,14 +45,28 @@ class SaaSoundEngine {
 		this.channelSamples = new Float32Array(SAA_CHANNEL_COUNT);
 		this.shadow = new Int16Array(32);
 		this.shadow.fill(-1);
+		this.clockRate = 0;
+		this.sampleRate = 0;
+		this.fixedEnvelopePhase0 = 0;
+		this.fixedEnvelopePhase1 = 0;
+		this.envelopeExternal0 = false;
+		this.envelopeExternal1 = false;
+		const writeAddress = wasmModule.SAASNDWriteAddress ?? wasmModule._SAASNDWriteAddress;
+		this.writeAddress = typeof writeAddress === 'function' ? writeAddress : null;
 	}
 
 	setClockRate(clockRate) {
-		if (clockRate > 0) this.setClock(this.chipPtr, clockRate >>> 0);
+		if (clockRate > 0) {
+			this.clockRate = clockRate;
+			this.setClock(this.chipPtr, clockRate >>> 0);
+		}
 	}
 
 	setSampleRate(sampleRate) {
-		if (sampleRate > 0) this.setRate(this.chipPtr, sampleRate >>> 0);
+		if (sampleRate > 0) {
+			this.sampleRate = sampleRate;
+			this.setRate(this.chipPtr, sampleRate >>> 0);
+		}
 	}
 
 	write(register, value) {
@@ -61,6 +75,22 @@ class SaaSoundEngine {
 		if (this.shadow[reg] === byte) return;
 		this.shadow[reg] = byte;
 		this.writeAddressData(this.chipPtr, reg, byte);
+	}
+
+	forceWrite(register, value) {
+		const reg = register & 31;
+		const byte = value & 255;
+		this.shadow[reg] = byte;
+		this.writeAddressData(this.chipPtr, reg, byte);
+	}
+
+	writeEnvelope(register, byte, retrigger) {
+		if (retrigger && byte & 0x80) {
+			this.forceWrite(register, byte & 0x7f);
+			this.forceWrite(register, byte);
+			return;
+		}
+		this.write(register, byte);
 	}
 
 	reset() {
@@ -75,6 +105,10 @@ class SaaSoundEngine {
 			this.write(channel, 0);
 		}
 		this.write(SAA_REG_ENABLE, SAA_ENABLE_OUTPUT);
+		this.envelopeExternal0 = false;
+		this.envelopeExternal1 = false;
+		this.fixedEnvelopePhase0 = 0;
+		this.fixedEnvelopePhase1 = 0;
 	}
 
 	apply(registerState) {
@@ -102,10 +136,33 @@ class SaaSoundEngine {
 			SAA_REG_NOISE_CLOCK,
 			saaNoiseClockByte(registerState.noise0 ?? 0, registerState.noise1 ?? 0)
 		);
+		const envelope0 = registerState.envelope0 ?? 0;
+		const envelope1 = registerState.envelope1 ?? 0;
+		this.envelopeExternal0 = (envelope0 & 0x20) !== 0;
+		this.envelopeExternal1 = (envelope1 & 0x20) !== 0;
+		this.writeEnvelope(SAA_REG_ENVELOPE_0, envelope0, registerState.envelopeRetrigger0);
+		this.writeEnvelope(SAA_REG_ENVELOPE_1, envelope1, registerState.envelopeRetrigger1);
+		registerState.envelopeRetrigger0 = false;
+		registerState.envelopeRetrigger1 = false;
 		this.write(SAA_REG_ENABLE, SAA_ENABLE_OUTPUT);
 	}
 
+	advanceFixedEnvelope(phaseKey, register) {
+		if (!this.writeAddress || !(this.clockRate > 0) || !(this.sampleRate > 0)) return;
+		this[phaseKey] += this.clockRate / 512 / this.sampleRate;
+		let pulses = 0;
+		while (this[phaseKey] >= 1 && pulses < 8) {
+			this[phaseKey] -= 1;
+			pulses++;
+		}
+		for (let pulse = 0; pulse < pulses; pulse++) {
+			this.writeAddress(this.chipPtr, register);
+		}
+	}
+
 	generate() {
+		if (this.envelopeExternal0) this.advanceFixedEnvelope('fixedEnvelopePhase0', SAA_REG_ENVELOPE_0);
+		if (this.envelopeExternal1) this.advanceFixedEnvelope('fixedEnvelopePhase1', SAA_REG_ENVELOPE_1);
 		this.generateManySeparate(this.chipPtr, this.pointerTable, 1);
 		const memory = this.wasmModule.memory.buffer;
 		let left = 0;

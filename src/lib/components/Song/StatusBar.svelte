@@ -126,8 +126,16 @@
 			return 'Envelope Shape: Set envelope generator shape. Hex: (1-F).';
 		}
 
+		if (selectedFieldKey === 'env0' || selectedFieldKey === 'env1') {
+			return 'Envelope mode for channels A-C or D-F. Hex 0-C. 0 is off. A blank cell leaves the current mode.';
+		}
+
 		if (selectedFieldKey === 'noiseValue') {
 			return 'Noise: Set noise generator value. Hex: (00-1F).';
+		}
+
+		if (selectedFieldKey === 'noise0' || selectedFieldKey === 'noise1') {
+			return 'Noise clock for A-C or D-F: 0 high, 1 mid, 2 low, 3 locked to A or D. Blank keeps the current clock.';
 		}
 
 		if (fieldType === 'hex') {

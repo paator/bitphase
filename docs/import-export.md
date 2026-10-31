@@ -17,15 +17,16 @@ Save always downloads a file named from the project title (browsers do not overw
 
 **File → Import Module** opens a picker for:
 
-| Format  | What it is                        |
-| ------- | --------------------------------- |
-| `.pt3`  | ProTracker 3.4 AY modules         |
-| `.vt2`  | Vortex Tracker 2 AY modules       |
-| `.taym` | Register-level timer-trick tracks |
-| `.psg`  | AY register dumps                 |
-| `.ftm`  | FamiTracker modules               |
-| `.0cc`  | 0CC-FamiTracker modules           |
-| `.dnm`  | Dn-FamiTracker modules            |
+| Format                               | What it is                        |
+| ------------------------------------ | --------------------------------- |
+| `.pt3`                               | ProTracker 3.4 AY modules         |
+| `.vt2`                               | Vortex Tracker 2 AY modules       |
+| `.taym`                              | Register-level timer-trick tracks |
+| `.psg`                               | AY register dumps                 |
+| `.ftm`                               | FamiTracker modules               |
+| `.0cc`                               | 0CC-FamiTracker modules           |
+| `.dnm`                               | Dn-FamiTracker modules            |
+| `.cop`, `.etc`, `.saa`, `.sng`, `.m` | E-Tracker SAA1099 modules         |
 
 `.pt3` and `.vt2` bring in classic AY tracker songs.
 

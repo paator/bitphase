@@ -4,6 +4,8 @@
 	import IconCarbonArrowsVertical from '~icons/carbon/arrows-vertical';
 	import IconCarbonMusic from '~icons/carbon/music';
 	import IconCarbonWaveform from '~icons/carbon/waveform';
+	import IconCarbonChartWinLoss from '~icons/carbon/chart-win-loss';
+	import IconCarbonRenew from '~icons/carbon/renew';
 	import InstrumentEditorIdentity from '../../components/Instruments/InstrumentEditorIdentity.svelte';
 	import InstrumentMacrosEditor from '../../components/Instruments/InstrumentMacrosEditor.svelte';
 	import { SAA_VOLUME_MACRO_FIELDS } from './volume-macros';
@@ -25,7 +27,11 @@
 		right: IconCarbonVolumeUp,
 		amplitudeSlide: IconCarbonArrowsVertical,
 		tone: IconCarbonMusic,
-		noise: IconCarbonWaveform
+		toneAdd: IconCarbonChartWinLoss,
+		toneAccumulation: IconCarbonRenew,
+		noise: IconCarbonWaveform,
+		noiseAdd: IconCarbonWaveform,
+		noiseAccumulation: IconCarbonRenew
 	};
 </script>
 

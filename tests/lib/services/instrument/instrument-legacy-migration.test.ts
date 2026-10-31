@@ -45,7 +45,12 @@ describe('migrateLegacyInstrument', () => {
 		expect(migrated.macros?.right?.values).toEqual([2, 1]);
 		expect(migrated.macros?.amplitudeSlide?.values).toEqual([0, 1]);
 		expect(migrated.macros?.tone?.values).toEqual([true]);
+		expect(migrated.macros?.toneAdd?.values).toEqual([0]);
+		expect(migrated.macros?.toneAccumulation?.values).toEqual([false]);
 		expect(migrated.macros?.noise?.values).toEqual([false]);
+		expect(migrated.macros?.noiseAdd?.values).toEqual([0]);
+		expect(migrated.macros?.noiseAccumulation?.values).toEqual([false]);
+		expect(migrated.macros?.envelope).toBeUndefined();
 		expect(migrated.macros?.volume).toBeUndefined();
 	});
 });
