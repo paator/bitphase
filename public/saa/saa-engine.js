@@ -118,9 +118,8 @@ class SaaSoundEngine {
 		const count = Math.min(SAA_CHANNEL_COUNT, registerState.channelCount);
 		for (let channel = 0; channel < count; channel++) {
 			const source = registerState.channels[channel];
-			const audible = Boolean(source?.tone || source?.noise);
-			const left = audible ? source.left & 15 : 0;
-			const right = audible ? source.right & 15 : 0;
+			const left = source ? source.left & 15 : 0;
+			const right = source ? source.right & 15 : 0;
 			this.write(channel, (right << 4) | left);
 			this.write(8 + channel, source?.freq ?? 0);
 			octaves[channel] = (source?.octave ?? 0) & 7;

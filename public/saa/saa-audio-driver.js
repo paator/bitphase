@@ -224,28 +224,23 @@ class SaaAudioDriver {
 				channel.tone = row.tone !== false;
 				channel.noise = row.noise === true;
 				applyInstrumentNoise(registerState, state, channelIndex, row);
-				if (!channel.tone && !channel.noise) {
-					channel.left = 0;
-					channel.right = 0;
-				} else {
-					let left = combineSaaLevel(
-						state.channelPatternLeft[channelIndex],
-						row.left ?? SAA_LEVEL_MAX,
-						slide
-					);
-					let right = combineSaaLevel(
-						state.channelPatternRight[channelIndex],
-						row.right ?? SAA_LEVEL_MAX,
-						slide
-					);
-					if (state.channelStereoInvert?.[channelIndex]) {
-						const swapped = left;
-						left = right;
-						right = swapped;
-					}
-					channel.left = left;
-					channel.right = right;
+				let left = combineSaaLevel(
+					state.channelPatternLeft[channelIndex],
+					row.left ?? SAA_LEVEL_MAX,
+					slide
+				);
+				let right = combineSaaLevel(
+					state.channelPatternRight[channelIndex],
+					row.right ?? SAA_LEVEL_MAX,
+					slide
+				);
+				if (state.channelStereoInvert?.[channelIndex]) {
+					const swapped = left;
+					left = right;
+					right = swapped;
 				}
+				channel.left = left;
+				channel.right = right;
 				writeEnvelope(state, registerState, channelIndex);
 			}
 			state.instrumentPositions[channelIndex] =

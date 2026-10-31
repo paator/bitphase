@@ -310,6 +310,23 @@ describe('SAA tone playback', () => {
 		expect(other).toBe(0);
 	});
 
+	it('plays an envelope on channel C with the square and noise off', async () => {
+		const wasm = readFileSync('public/saa/saasound.wasm');
+		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
+		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
+		const registers = new SaaRegisterState(6);
+		registers.channels[1] = { tone: false, noise: false, left: 0, right: 0, octave: 5, freq: 255 };
+		registers.channels[2] = { tone: false, noise: false, left: 15, right: 15, octave: 0, freq: 0 };
+		registers.envelope0 = 0x96;
+		engine.apply(registers);
+		let energy = 0;
+		for (let i = 0; i < 4000; i++) {
+			const sample = engine.generate();
+			energy += Math.abs(sample.left) + Math.abs(sample.right);
+		}
+		expect(energy).toBeGreaterThan(0);
+	});
+
 	it('keeps six full channels inside the mix', async () => {
 		const wasm = readFileSync('public/saa/saasound.wasm');
 		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
@@ -332,6 +349,30 @@ describe('SAA tone playback', () => {
 		}
 		expect(peak).toBeGreaterThan(0.9);
 		expect(peak).toBeLessThanOrEqual(1);
+	});
+
+	it('keeps the level when tone and noise are off so the envelope can sound', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelMuted = [false, false, false];
+		state.channelSoundEnabled = [true, true, true];
+		state.channelPatternLeft = [15, 15, 15];
+		state.channelPatternRight = [15, 15, 15];
+		state.channelAmplitudeSliding = [0, 0, 0];
+		state.channelInstruments = [0, 0, 0];
+		state.instrumentPositions = [0, 0, 0];
+		state.channelCurrentNotes = [45, 45, 45];
+		state.instruments[0].macros.tone = { values: [false], loop: 0 };
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		state.envelopeCommand0 = 0x96;
+		const registers = new SaaRegisterState(6);
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(false);
+		expect(registers.channels[2].noise).toBe(false);
+		expect(registers.channels[2].left).toBe(15);
+		expect(registers.channels[2].right).toBe(4);
+		expect(registers.envelope0).toBe(0x96);
 	});
 
 	it('enables noise from the instrument and keeps the square off when tone is off', () => {
