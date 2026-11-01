@@ -31,6 +31,7 @@ const AY_CHANNEL_ARRAY_SPECS = [
 	['channelTimerPwmSweepShapeOverride', null],
 	['channelTimerPwmSweepStartPhaseOverride', -1],
 	['channelEnvelopeEnabled', false],
+	['channelSourceMask', null],
 	['channelMuted', false],
 	['channelSoundEnabled', false],
 	['channelTimerEffectReset', false],

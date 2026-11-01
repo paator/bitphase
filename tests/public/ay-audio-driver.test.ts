@@ -742,6 +742,110 @@ describe('AYAudioDriver', () => {
 			expect(registerState.channels[2].volume).toBe(0);
 		});
 
+		it('E607 matches the waveform mask and E608 follows the instrument', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setTuningTable([600]);
+			state.setInstruments(
+				legacyInstruments([
+					{
+						id: '01',
+						rows: [{ tone: true, volume: 15, noise: false, envelope: true }],
+						loop: 0
+					}
+				])
+			);
+			state.channelInstruments = [0, -1, -1];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelEnvelopeEnabled = [true, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.channelToneAccumulator = [0, 0, 0];
+			state.channelNoiseAccumulator = [0, 0, 0];
+			state.channelEnvelopeAccumulator = [0, 0, 0];
+			state.channelTimerPwmSweep = [-1, -1, -1];
+			state.channelTimerEffectReset = [false, false, false];
+			state.envelopeOnOffCounter = 0;
+			state.envelopeEffectTable = -1;
+			const registers = () => ({
+				channels: [0, 1, 2].map(() => ({
+					tone: 600,
+					volume: 15,
+					mixer: { tone: true, noise: false, envelope: true }
+				})),
+				noise: 0,
+				envelopePeriod: 0,
+				envelopeShape: 0,
+				forceEnvelopeShapeWrite: false
+			});
+			const row = (parameter: number) => ({
+				note: { name: 0, octave: 0 },
+				effects: [{ effect: 'E'.charCodeAt(0), delay: 6, parameter }]
+			});
+			const pattern = (parameter: number) => ({
+				channels: [0, 1, 2].map(() => ({ rows: [row(parameter)] }))
+			});
+			const masked = registers();
+			driver.processPatternRow(state, pattern(7), 0, { noiseValue: -1 }, masked);
+			expect(state.channelSourceMask[0]).toBe(7);
+			driver.processInstruments(state, masked);
+			expect(masked.channels[0].mixer.tone).toBe(true);
+			expect(masked.channels[0].mixer.noise).toBe(true);
+			expect(masked.channels[0].mixer.envelope).toBe(true);
+			expect(masked.channels[0].volume & 16).toBe(16);
+
+			state.instrumentPositions = [0, 0, 0];
+			const held = registers();
+			driver.processInstruments(state, held);
+			expect(held.channels[0].mixer.tone).toBe(true);
+			expect(held.channels[0].mixer.noise).toBe(true);
+			expect(held.channels[0].mixer.envelope).toBe(true);
+
+			state.channelEnvelopeEnabled[0] = false;
+			state.instrumentPositions = [0, 0, 0];
+			const shapeOff = registers();
+			driver.processInstruments(state, shapeOff);
+			expect(shapeOff.channels[0].mixer.tone).toBe(true);
+			expect(shapeOff.channels[0].mixer.noise).toBe(true);
+			expect(shapeOff.channels[0].mixer.envelope).toBe(false);
+			expect(shapeOff.channels[0].volume & 16).toBe(0);
+			expect(shapeOff.channels[0].volume & 15).toBeGreaterThan(0);
+			state.channelEnvelopeEnabled[0] = true;
+
+			state.instrumentPositions = [0, 0, 0];
+			const envelopeOnly = registers();
+			driver.processPatternRow(state, pattern(4), 0, { noiseValue: -1 }, envelopeOnly);
+			driver.processInstruments(state, envelopeOnly);
+			expect(envelopeOnly.channels[0].mixer.tone).toBe(false);
+			expect(envelopeOnly.channels[0].mixer.noise).toBe(false);
+			expect(envelopeOnly.channels[0].mixer.envelope).toBe(true);
+			expect(envelopeOnly.channels[0].volume & 16).toBe(16);
+
+			state.instrumentPositions = [0, 0, 0];
+			const silent = registers();
+			driver.processPatternRow(state, pattern(0), 0, { noiseValue: -1 }, silent);
+			driver.processInstruments(state, silent);
+			expect(silent.channels[0].mixer.tone).toBe(false);
+			expect(silent.channels[0].mixer.noise).toBe(false);
+			expect(silent.channels[0].mixer.envelope).toBe(false);
+			expect(silent.channels[0].volume & 16).toBe(0);
+
+			state.instrumentPositions = [0, 0, 0];
+			const restored = registers();
+			driver.processPatternRow(state, pattern(8), 0, { noiseValue: -1 }, restored);
+			expect(state.channelSourceMask[0]).toBeNull();
+			driver.processInstruments(state, restored);
+			expect(restored.channels[0].mixer.tone).toBe(true);
+			expect(restored.channels[0].mixer.envelope).toBe(true);
+			expect(restored.channels[0].volume & 16).toBe(16);
+		});
+
 		it('preserves channelEnvelopeEnabled through mute and restores envelope mixer on unmute', () => {
 			const driver = new AYAudioDriver();
 			const state = new AyumiState();

@@ -20,6 +20,7 @@ const SAA_CHANNEL_ARRAY_SPECS = [
 	['channelToneAccumulator', 0],
 	['channelNoiseAccumulator', 0],
 	['channelStereoInvert', false],
+	['channelSourceMask', null],
 	['channelMuted', false],
 	['channelSoundEnabled', false],
 	['channelKeyOn', false]

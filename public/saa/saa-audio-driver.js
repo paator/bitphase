@@ -15,6 +15,8 @@ const NOTE_RELEASE = 14;
 const CHIP_EFFECT = 'E'.charCodeAt(0);
 const STEREO_INVERT_SUBCOMMAND = 1;
 const NOISE_LOCK_SUBCOMMAND = 2;
+const MIXER_SUBCOMMAND = 6;
+const MIXER_FOLLOW_INSTRUMENT = 4;
 const ENVELOPE_CHANNEL_0 = 2;
 const ENVELOPE_CHANNEL_1 = 5;
 const ENVELOPE_BYTES = [
@@ -71,6 +73,19 @@ function writeEnvelope(state, registerState, channelIndex) {
 	else registerState.envelope1 = byte;
 }
 
+function storeSourceMask(state, channelIndex, parameter) {
+	if (!state.channelSourceMask) return;
+	const value = parameter | 0;
+	state.channelSourceMask[channelIndex] = value >= MIXER_FOLLOW_INSTRUMENT ? null : value & 3;
+}
+
+function applySourceMask(channel, state, channelIndex) {
+	const mask = state.channelSourceMask?.[channelIndex];
+	if (mask === null || mask === undefined || mask >= MIXER_FOLLOW_INSTRUMENT) return;
+	channel.tone = (mask & 1) !== 0;
+	channel.noise = (mask & 2) !== 0;
+}
+
 function processSaaEffects(state, channelIndex, row) {
 	const effects = row?.effects;
 	if (!effects) return;
@@ -84,6 +99,8 @@ function processSaaEffects(state, channelIndex, row) {
 		} else if (effect.delay === NOISE_LOCK_SUBCOMMAND) {
 			if (channelIndex < 3) state.noiseLock0 = (parameter & 1) !== 0;
 			else state.noiseLock1 = (parameter & 1) !== 0;
+		} else if (effect.delay === MIXER_SUBCOMMAND) {
+			storeSourceMask(state, channelIndex, parameter);
 		}
 	}
 }
@@ -223,6 +240,7 @@ class SaaAudioDriver {
 				channel.freq = tone.freq;
 				channel.tone = row.tone !== false;
 				channel.noise = row.noise === true;
+				applySourceMask(channel, state, channelIndex);
 				applyInstrumentNoise(registerState, state, channelIndex, row);
 				let left = combineSaaLevel(
 					state.channelPatternLeft[channelIndex],

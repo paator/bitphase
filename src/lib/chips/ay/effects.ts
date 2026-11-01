@@ -1,3 +1,4 @@
+import type { StickyEffectCommand } from '../base/schema';
 import { formatEffectStatusHint, type EffectStatusHint } from '../base/effect-status';
 
 export const AY_TIMER_PWM_MIN_SUBCOMMAND = 1;
@@ -6,6 +7,7 @@ export const AY_TIMER_PWM_SWEEP_SUBCOMMAND = 3;
 export const AY_TIMER_PWM_SHAPE_SUBCOMMAND = 4;
 export const AY_TIMER_PWM_START_SUBCOMMAND = 5;
 export const AY_AUTO_ENVELOPE_SUBCOMMAND = 0xa;
+export const AY_MIXER_SUBCOMMAND = 6;
 
 export const AY_TIMER_PWM_SWEEP_SHAPE_BY_INDEX = [
 	'triangle',
@@ -110,6 +112,11 @@ const AY_AUTO_ENVELOPE_HINT: EffectStatusHint = {
 	name: 'Auto-Envelope',
 	params: 'X: num; Y: den'
 };
+const AY_MIXER_HINT: EffectStatusHint = {
+	format: 'E6XY',
+	name: 'Waveform',
+	params: 'XY: 1=tone, 2=noise, 4=env, 08=inst'
+};
 
 const AY_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	AY_PWM_MIN_HINT,
@@ -122,7 +129,8 @@ const AY_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	AY_PWM_SHAPE_TABLE_HINT,
 	AY_PWM_START_HINT,
 	AY_PWM_START_TABLE_HINT,
-	AY_AUTO_ENVELOPE_HINT
+	AY_AUTO_ENVELOPE_HINT,
+	AY_MIXER_HINT
 ];
 
 export function describeAyEffect(effect: {
@@ -149,6 +157,9 @@ export function describeAyEffect(effect: {
 	if (isAyAutoEnvelopeEffect(effect)) {
 		return formatEffectStatusHint(AY_AUTO_ENVELOPE_HINT);
 	}
+	if (isAyMixerEffect(effect)) {
+		return formatEffectStatusHint(AY_MIXER_HINT);
+	}
 	return null;
 }
 
@@ -158,6 +169,15 @@ export function listAyEffectStatusHints(): EffectStatusHint[] {
 
 export function isAyAutoEnvelopeEffect(effect: { effect: number; delay: number }): boolean {
 	return effect.effect === 'E'.charCodeAt(0) && effect.delay === AY_AUTO_ENVELOPE_SUBCOMMAND;
+}
+
+export function isAyMixerEffect(effect: { effect: number; delay: number }): boolean {
+	return effect.effect === 'E'.charCodeAt(0) && effect.delay === AY_MIXER_SUBCOMMAND;
+}
+
+export function ayStickyChannelEffectGroup(effect: StickyEffectCommand): string | null {
+	if (isAyMixerEffect(effect)) return 'ay-mixer';
+	return null;
 }
 
 export function mapHexParameterToTimerPwmPercent(parameter: number): number {

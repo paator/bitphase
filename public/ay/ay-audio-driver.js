@@ -72,6 +72,10 @@ import {
 	disableTimerEffect
 } from './ay-timer-effect-constants.js';
 
+const CHIP_EFFECT = 'E'.charCodeAt(0);
+const MIXER_SUBCOMMAND = 6;
+const MIXER_FOLLOW_INSTRUMENT = 8;
+
 class AYAudioDriver {
 	constructor(channelCount = 3) {
 		this.channelMixerState = [];
@@ -192,6 +196,41 @@ class AYAudioDriver {
 		}
 	}
 
+	_storeSourceMask(state, channelIndex, row) {
+		const effects = row?.effects;
+		if (!effects || !state.channelSourceMask) return;
+		for (const effect of effects) {
+			if (!effect || effect.effect !== CHIP_EFFECT || effect.delay !== MIXER_SUBCOMMAND)
+				continue;
+			const value = effect.parameter | 0;
+			state.channelSourceMask[channelIndex] =
+				value >= MIXER_FOLLOW_INSTRUMENT ? null : value & 7;
+		}
+	}
+
+	_applySourceMask(state, registerState, channelIndex) {
+		const mask = state.channelSourceMask?.[channelIndex];
+		if (mask === null || mask === undefined || mask >= MIXER_FOLLOW_INSTRUMENT) return;
+		const tone = (mask & 1) !== 0;
+		const noise = (mask & 2) !== 0;
+		const envelope =
+			(mask & 4) !== 0 &&
+			!!state.channelEnvelopeEnabled?.[channelIndex] &&
+			!this.envelopeOffPhase(state);
+		const channel = registerState.channels[channelIndex];
+		channel.mixer.tone = tone;
+		channel.mixer.noise = noise;
+		channel.mixer.envelope = envelope;
+		const mixer = this.channelMixerState[channelIndex];
+		if (mixer) {
+			mixer.tone = tone;
+			mixer.noise = noise;
+			mixer.envelope = envelope;
+		}
+		if (envelope) channel.volume |= 16;
+		else channel.volume &= 15;
+	}
+
 	processPatternRow(state, pattern, rowIndex, patternRow, registerState) {
 		if (
 			patternRow.noiseValue === null ||
@@ -213,6 +252,7 @@ class AYAudioDriver {
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const channel = pattern.channels[channelIndex];
 			const row = channel.rows[rowIndex];
+			this._storeSourceMask(state, channelIndex, row);
 			const isMuted = state.channelMuted[channelIndex];
 
 			if (isMuted) {
@@ -1139,6 +1179,7 @@ class AYAudioDriver {
 				}
 
 				registerState.channels[channelIndex].volume = finalVolume;
+				this._applySourceMask(state, registerState, channelIndex);
 
 				const sidBaseVolume = getAySidBaseVolume(finalVolume);
 				const timerEffectReset = state.channelTimerEffectReset?.[channelIndex] ?? false;

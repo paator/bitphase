@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { describeSaaEffect, saaStickyChannelEffectGroup } from '@/lib/chips/saa/effects';
 import { SAA_SAM_CLOCK, resolveSaaTuningTable, saaToneFrequency } from '@/lib/chips/saa/schema';
 import SaaAudioDriver from '../../../../public/saa/saa-audio-driver.js';
 import SaaRegisterState from '../../../../public/saa/saa-register-state.js';
@@ -7,7 +8,12 @@ import SaaState from '../../../../public/saa/saa-state.js';
 import TrackerPatternProcessor from '../../../../public/tracker/tracker-pattern-processor.js';
 import { createSaaSoundEngine } from '../../../../public/saa/saa-engine.js';
 import { saaWasmImports } from '../../../../public/saa/saa-wasm-imports.js';
-import { saaEnvelopeControlByte, saaNoiseClockByte, saaPeriodFromCode, saaPitchCode } from '../../../../public/saa/saa-levels.js';
+import {
+	saaEnvelopeControlByte,
+	saaNoiseClockByte,
+	saaPeriodFromCode,
+	saaPitchCode
+} from '../../../../public/saa/saa-levels.js';
 import EffectAlgorithms from '../../../../public/tracker/effect-algorithms.js';
 
 const toneCodes = resolveSaaTuningTable(SAA_SAM_CLOCK, 440);
@@ -161,11 +167,7 @@ describe('SAA tone playback', () => {
 		up.channelToneSliding = [-16];
 		const upRegisters = new SaaRegisterState(1);
 		driver.processInstruments(up, upRegisters);
-		const baseHz = saaToneFrequency(
-			SAA_SAM_CLOCK,
-			toneCodes[45] >> 8,
-			toneCodes[45] & 0xff
-		);
+		const baseHz = saaToneFrequency(SAA_SAM_CLOCK, toneCodes[45] >> 8, toneCodes[45] & 0xff);
 		const downChannel = downRegisters.channels[0];
 		const upChannel = upRegisters.channels[0];
 		const downHz = saaToneFrequency(SAA_SAM_CLOCK, downChannel.octave, downChannel.freq);
@@ -321,8 +323,22 @@ describe('SAA tone playback', () => {
 		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
 		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
 		const registers = new SaaRegisterState(6);
-		registers.channels[1] = { tone: false, noise: false, left: 0, right: 0, octave: 5, freq: 255 };
-		registers.channels[2] = { tone: false, noise: false, left: 15, right: 15, octave: 0, freq: 0 };
+		registers.channels[1] = {
+			tone: false,
+			noise: false,
+			left: 0,
+			right: 0,
+			octave: 5,
+			freq: 255
+		};
+		registers.channels[2] = {
+			tone: false,
+			noise: false,
+			left: 15,
+			right: 15,
+			octave: 0,
+			freq: 0
+		};
 		registers.envelope0 = 0x96;
 		engine.apply(registers);
 		let energy = 0;
@@ -379,6 +395,76 @@ describe('SAA tone playback', () => {
 		expect(registers.channels[2].left).toBe(15);
 		expect(registers.channels[2].right).toBe(4);
 		expect(registers.envelope0).toBe(0x96);
+	});
+
+	it('E600 turns the square off and E604 follows the instrument again', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelMuted = [false, false, false];
+		state.channelSoundEnabled = [true, true, true];
+		state.channelPatternLeft = [15, 15, 15];
+		state.channelPatternRight = [15, 15, 15];
+		state.channelAmplitudeSliding = [0, 0, 0];
+		state.channelInstruments = [0, 0, 0];
+		state.instrumentPositions = [0, 0, 0];
+		state.channelCurrentNotes = [45, 45, 45];
+		state.channelSourceMask = [null, null, null];
+		state.instruments[0].macros.tone = { values: [true], loop: 0 };
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		const mixer = (parameter: number) => ({
+			channels: [0, 1, 2].map(() => ({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						instrument: 0,
+						effects: [{ effect: 'E'.charCodeAt(0), delay: 6, parameter }]
+					}
+				]
+			}))
+		});
+		driver.processPatternRow(state, mixer(0), 0, { env0: 1 });
+		expect(state.channelSourceMask[2]).toBe(0);
+		const registers = new SaaRegisterState(6);
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(false);
+		expect(registers.channels[2].noise).toBe(false);
+		expect(registers.channels[2].left).toBe(15);
+		expect(registers.envelope0).toBe(0x96);
+
+		state.instrumentPositions = [0, 0, 0];
+		driver.processPatternRow(state, mixer(1), 0, {});
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(registers.channels[2].noise).toBe(false);
+
+		state.instrumentPositions = [0, 0, 0];
+		driver.processPatternRow(state, mixer(3), 0, {});
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(registers.channels[2].noise).toBe(true);
+
+		state.instrumentPositions = [0, 0, 0];
+		const noteOn = {
+			channels: [0, 1, 2].map(() => ({
+				rows: [{ note: { name: 11, octave: 4 }, instrument: 0, effects: [null] }]
+			}))
+		};
+		driver.processPatternRow(state, noteOn, 0, {});
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(registers.channels[2].noise).toBe(true);
+
+		state.instrumentPositions = [0, 0, 0];
+		driver.processPatternRow(state, mixer(4), 0, {});
+		expect(state.channelSourceMask[2]).toBeNull();
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(registers.channels[2].noise).toBe(false);
+		expect(describeSaaEffect({ effect: 'E'.charCodeAt(0), delay: 6 })).toContain('1=tone');
+		expect(
+			saaStickyChannelEffectGroup({ effect: 'E'.charCodeAt(0), delay: 6, parameter: 3 })
+		).toBe('saa-mixer');
 	});
 
 	it('enables noise from the instrument and keeps the square off when tone is off', () => {
@@ -446,7 +532,14 @@ describe('SAA tone playback', () => {
 		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
 		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
 		const registers = new SaaRegisterState(6);
-		registers.channels[2] = { tone: true, noise: false, left: 15, right: 0, octave: 4, freq: 200 };
+		registers.channels[2] = {
+			tone: true,
+			noise: false,
+			left: 15,
+			right: 0,
+			octave: 4,
+			freq: 200
+		};
 		registers.envelope0 = saaEnvelopeControlByte({
 			shape: 0,
 			enabled: true,
@@ -477,7 +570,14 @@ describe('SAA tone playback', () => {
 		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
 		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
 		const registers = new SaaRegisterState(6);
-		registers.channels[0] = { tone: false, noise: true, left: 15, right: 0, octave: 3, freq: 227 };
+		registers.channels[0] = {
+			tone: false,
+			noise: true,
+			left: 15,
+			right: 0,
+			octave: 3,
+			freq: 227
+		};
 		registers.noise0 = 0;
 		engine.apply(registers);
 		let left = 0;

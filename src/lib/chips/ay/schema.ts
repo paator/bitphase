@@ -1,6 +1,7 @@
 import type { ChipSchema } from '../base/schema';
 import { PT3TuneTables, generate12TETTuningTable } from '../../models/pt3/tuning-tables';
 import { readAyEnvelopeSticky } from './playback-carry';
+import { ayStickyChannelEffectGroup } from './effects';
 
 export const ATARI_ST_CHIP_FREQUENCY = 2_000_000;
 export const SUNSOFT_5B_CHIP_FREQUENCY = 894_886;
@@ -10,6 +11,7 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 	defaultTuningTable: PT3TuneTables[2],
 	defaultChipVariant: 'AY',
 	readGlobalStickyRow: readAyEnvelopeSticky,
+	stickyChannelEffectGroup: ayStickyChannelEffectGroup,
 	globalTemplate: '{envelopeValue} {envelopeEffect} {noiseValue}',
 	globalFields: {
 		envelopeValue: {
