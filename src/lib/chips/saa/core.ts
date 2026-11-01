@@ -16,7 +16,7 @@ export const SAA_CHIP: Chip = {
 	schema: SAA_CHIP_SCHEMA,
 	createConverter: () => new SAAConverter(),
 	createFormatter: () => new SAAFormatter(),
-	createRenderer: () => new SAAChipRenderer(),
+	createRenderer: (loader, binding) => new SAAChipRenderer(loader, binding),
 	describeEffect: describeSaaEffect,
 	listEffectStatusHints: listSaaEffectStatusHints
 };

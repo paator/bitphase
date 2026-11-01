@@ -43,6 +43,7 @@ class SaaSoundEngine {
 			pointers.setUint32(channel * 4, this.channelPtrs[channel], true);
 		}
 		this.channelSamples = new Float32Array(SAA_CHANNEL_COUNT);
+		this.exportChannels = new Float32Array(SAA_CHANNEL_COUNT);
 		this.shadow = new Int16Array(32);
 		this.shadow.fill(-1);
 		this.clockRate = 0;
@@ -51,6 +52,8 @@ class SaaSoundEngine {
 		this.fixedEnvelopePhase1 = 0;
 		this.envelopeExternal0 = false;
 		this.envelopeExternal1 = false;
+		this.free = bindExport(wasmModule, 'free');
+		this.deleteChip = bindExport(wasmModule, 'deleteSAASND');
 		const writeAddress = wasmModule.SAASNDWriteAddress ?? wasmModule._SAASNDWriteAddress;
 		this.writeAddress = typeof writeAddress === 'function' ? writeAddress : null;
 	}
@@ -173,12 +176,26 @@ class SaaSoundEngine {
 			left += channelLeft * SAA_OUTPUT_GAIN;
 			right += channelRight * SAA_OUTPUT_GAIN;
 			this.channelSamples[channel] = (channelLeft + channelRight) * SAA_SCOPE_SCALE;
+			this.exportChannels[channel] = (channelLeft + channelRight) * SAA_OUTPUT_GAIN;
 		}
 		return {
 			left,
 			right,
-			channels: this.channelSamples
+			channels: this.channelSamples,
+			exportChannels: this.exportChannels
 		};
+	}
+
+	dispose() {
+		if (!this.chipPtr) return;
+		for (const ptr of this.channelPtrs) {
+			if (ptr) this.free(ptr);
+		}
+		if (this.pointerTable) this.free(this.pointerTable);
+		this.deleteChip(this.chipPtr);
+		this.channelPtrs = [];
+		this.pointerTable = 0;
+		this.chipPtr = 0;
 	}
 }
 

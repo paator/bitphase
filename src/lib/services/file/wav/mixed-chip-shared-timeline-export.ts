@@ -9,10 +9,13 @@ import type {
 } from '../../../chips/base/renderer';
 import { AYUMI_AUDIO_SLOT_KIND } from '../../../chips/ay/audio-slot-kind';
 import { NES_AUDIO_SLOT_KIND } from '../../../chips/nes/audio-slot-kind';
+import { SAA_AUDIO_SLOT_KIND } from '../../../chips/saa/audio-slot-kind';
 import { AYChipRenderer } from '../../../chips/ay/renderer';
 import { NESChipRenderer } from '../../../chips/nes/renderer';
+import { SAAChipRenderer } from '../../../chips/saa/renderer';
 import { createAySharedTimelineExportLane } from '../../../chips/ay/shared-timeline-export-lane';
 import { createNesSharedTimelineExportLane } from '../../../chips/nes/shared-timeline-export-lane';
+import { createSaaSharedTimelineExportLane } from '../../../chips/saa/shared-timeline-export-lane';
 import {
 	renderOfflineSharedTimeline,
 	type OfflineSharedTimeline
@@ -84,6 +87,19 @@ async function createLaneForSlot(
 			audioSlotKind: chip.audioSlotKind
 		}) as NESChipRenderer;
 		return createNesSharedTimelineExportLane(
+			renderer,
+			project,
+			slot.songIndex,
+			session,
+			onProgress
+		);
+	}
+	if (slot.audioSlotKind === SAA_AUDIO_SLOT_KIND) {
+		const renderer = chip.createRenderer(resourceLoader, {
+			chipType: chip.type,
+			audioSlotKind: chip.audioSlotKind
+		}) as SAAChipRenderer;
+		return createSaaSharedTimelineExportLane(
 			renderer,
 			project,
 			slot.songIndex,

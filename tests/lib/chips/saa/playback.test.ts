@@ -288,6 +288,8 @@ describe('SAA tone playback', () => {
 		let other = 0;
 		let peak = 0;
 		let scopePeak = 0;
+		let exported = 0;
+		let exportedOther = 0;
 		for (let i = 0; i < 2000; i++) {
 			const sample = engine.generate();
 			const level = Math.abs(sample.left);
@@ -297,8 +299,10 @@ describe('SAA tone playback', () => {
 			if (scope > scopePeak) scopePeak = scope;
 			right += Math.abs(sample.right);
 			channel += scope;
+			exported += Math.abs(sample.exportChannels[0]);
 			for (let index = 1; index < sample.channels.length; index++) {
 				other += Math.abs(sample.channels[index]);
+				exportedOther += Math.abs(sample.exportChannels[index]);
 			}
 		}
 		expect(left / 2000).toBeGreaterThan(0.05);
@@ -308,6 +312,8 @@ describe('SAA tone playback', () => {
 		expect(right).toBe(0);
 		expect(channel / 2000).toBeGreaterThan(0.02);
 		expect(other).toBe(0);
+		expect(exported / 2000).toBeGreaterThan(0.05);
+		expect(exportedOther).toBe(0);
 	});
 
 	it('plays an envelope on channel C with the square and noise off', async () => {

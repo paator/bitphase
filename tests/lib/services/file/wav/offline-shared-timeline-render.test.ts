@@ -56,5 +56,6 @@ describe('offline shared timeline render', () => {
 		expect(buffers[0]![0]!.length).toBe(buffers[1]![0]!.length);
 		expect(buffers[0]![1]!.length).toBe(buffers[1]![1]!.length);
 		expect(buffers[0]![0]!.length).toBeGreaterThan(0);
+		expect(buffers[0]![0]!.length).toBeLessThan(20_000);
 	});
 });

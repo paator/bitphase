@@ -74,15 +74,13 @@ export async function renderOfflineSharedTimeline({
 		if (timeline.tickAccumulator >= 1.0) {
 			if (timeline.songEnded) break;
 			const finishingSong = timeline.isSongEndFrame();
-			const playSlots = sortPlaySlotsForQuantum(lanes);
-			const leaderLen = leaderPatternLengthFromSlots(lanes);
-			runSharedTimelineQuantum(playSlots, lanes, timeline, leaderLen);
-
 			const isLastPattern =
 				timeline.currentPatternOrderIndex >= timeline.patternOrder.length - 1;
-			const leaderRowCount = leaderPatternLengthFromSlots(lanes);
-			const isLastRow = timeline.currentRow >= leaderRowCount - 1;
+			const leaderLen = leaderPatternLengthFromSlots(lanes);
+			const isLastRow = timeline.currentRow >= leaderLen - 1;
 			const isLastTick = timeline.isLastFrameOfRow();
+			const playSlots = sortPlaySlotsForQuantum(lanes);
+			runSharedTimelineQuantum(playSlots, lanes, timeline, leaderLen);
 
 			if (!finishingSong && !timeline.songEnded && isLastPattern && isLastRow && isLastTick) {
 				completedLoops++;
