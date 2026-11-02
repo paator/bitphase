@@ -9,6 +9,7 @@ import {
 	type SharedTimelineExportSlot
 } from '../base/renderer';
 import { NES_AUDIO_SLOT_KIND } from './audio-slot-kind';
+import { renderRowProgress, renderSampleLimit } from '../../services/file/wav/render-sample-limit';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
 import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
@@ -239,7 +240,12 @@ export class NESChipRenderer implements ChipRenderer {
 			? Array.from({ length: 5 }, () => [])
 			: null;
 		let totalSamples = 0;
-		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
+		const maxSamples = renderSampleLimit(
+			SAMPLE_RATE,
+			totalRows,
+			loopCount,
+			lane.state.timeline.intFrequency
+		);
 		let completedLoops = 0;
 		let lastProgressUpdate = 0;
 		const progressUpdateInterval = SAMPLE_RATE * 0.1;
@@ -255,9 +261,8 @@ export class NESChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const renderProgress = (totalSamples / maxSamples) * 50;
-				const progress = 50 + renderProgress;
 				const currentRow = this.calculateCurrentRow(lane.state, song);
+				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
 				onProgress?.(progress, `Rendering... ${currentRow}/${totalRows} rows`);
 				lastProgressUpdate = totalSamples;
 				lastProgressTime = now;
@@ -347,7 +352,12 @@ export class NESChipRenderer implements ChipRenderer {
 			? contexts.map(() => Array.from({ length: 5 }, () => []))
 			: null;
 		let totalSamples = 0;
-		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
+		const maxSamples = renderSampleLimit(
+			SAMPLE_RATE,
+			totalRows,
+			loopCount,
+			contexts[0]!.state.timeline.intFrequency
+		);
 		let completedLoops = 0;
 		let lastProgressUpdate = 0;
 		const progressUpdateInterval = SAMPLE_RATE * 0.1;
@@ -362,9 +372,8 @@ export class NESChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const renderProgress = (totalSamples / maxSamples) * 50;
-				const progress = 50 + renderProgress;
 				const currentRow = this.calculateCurrentRow(leader.state, leaderSong);
+				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
 				onProgress?.(progress, `Rendering... ${currentRow}/${totalRows} rows`);
 				lastProgressUpdate = totalSamples;
 				lastProgressTime = now;

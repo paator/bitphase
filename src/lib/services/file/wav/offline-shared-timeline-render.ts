@@ -4,6 +4,7 @@ import {
 	runSharedTimelineQuantum,
 	sortPlaySlotsForQuantum
 } from '../../../../../public/tracker/shared-playback-orchestrator.js';
+import { renderRowProgress, renderSampleLimit } from './render-sample-limit';
 
 export type OfflineSharedTimeline = {
 	tickAccumulator: number;
@@ -45,7 +46,7 @@ export async function renderOfflineSharedTimeline({
 		: null;
 
 	let totalSamples = 0;
-	const maxSamples = sampleRate * 300 * Math.max(1, loopCount);
+	const maxSamples = renderSampleLimit(sampleRate, totalRows, loopCount, timeline.intFrequency);
 	let completedLoops = 0;
 	let lastProgressUpdate = 0;
 	const progressUpdateInterval = sampleRate * 0.1;
@@ -60,9 +61,8 @@ export async function renderOfflineSharedTimeline({
 				now - lastProgressTime >= minProgressUpdateMs) &&
 			totalSamples > 0
 		) {
-			const renderProgress = (totalSamples / maxSamples) * 50;
-			const progress = 50 + renderProgress;
 			const currentRow = calculateCurrentRow ? calculateCurrentRow() : 0;
+			const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
 			onProgress(progress, `Rendering... ${currentRow}/${totalRows} rows`);
 			lastProgressUpdate = totalSamples;
 			lastProgressTime = now;

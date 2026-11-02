@@ -58,4 +58,38 @@ describe('offline shared timeline render', () => {
 		expect(buffers[0]![0]!.length).toBeGreaterThan(0);
 		expect(buffers[0]![0]!.length).toBeLessThan(20_000);
 	});
+
+	it('renders past five minutes when the song is longer than the old sample cap', async () => {
+		const timeline = new SongTimeline();
+		timeline.setPatternOrder([0]);
+		timeline.setIntFrequency(1, 1);
+		timeline.tickAccumulator = 1;
+		timeline.currentSpeed = 1;
+		const rows = 400;
+
+		const lane = {
+			songIndex: 0,
+			audioSlotKind: 'ayumi',
+			separateChannels: false,
+			getLeaderPatternRowCount() {
+				return rows;
+			},
+			runSharedPlaybackQuantum() {},
+			onPatternOrderAdvanced() {},
+			captureSample() {
+				return { left: 0, right: 0 };
+			},
+			release() {}
+		};
+
+		const buffers = await renderOfflineSharedTimeline({
+			lanes: [lane],
+			timeline,
+			sampleRate: 1,
+			loopCount: 1,
+			totalRows: rows
+		});
+
+		expect(buffers[0]![0]!.length).toBeGreaterThan(300);
+	});
 });

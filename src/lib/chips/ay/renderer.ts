@@ -9,6 +9,7 @@ import {
 	type SharedTimelineExportSlot
 } from '../base/renderer';
 import { AYUMI_AUDIO_SLOT_KIND } from './audio-slot-kind';
+import { renderRowProgress, renderSampleLimit } from '../../services/file/wav/render-sample-limit';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
@@ -267,7 +268,12 @@ export class AYChipRenderer implements ChipRenderer {
 			? Array.from({ length: TONE_CHANNELS }, () => [])
 			: [];
 		let totalSamples = 0;
-		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
+		const maxSamples = renderSampleLimit(
+			SAMPLE_RATE,
+			totalRows,
+			loopCount,
+			state.timeline.intFrequency
+		);
 		let completedLoops = 0;
 
 		let lastProgressUpdate = 0;
@@ -284,9 +290,8 @@ export class AYChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const renderProgress = (totalSamples / maxSamples) * 50;
-				const progress = 50 + renderProgress;
 				const currentRow = this.calculateCurrentRow(state, song);
+				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
 				const message = `Rendering... ${currentRow}/${totalRows} rows`;
 				onProgress?.(progress, message);
 				lastProgressUpdate = totalSamples;
@@ -415,7 +420,12 @@ export class AYChipRenderer implements ChipRenderer {
 			: null;
 
 		let totalSamples = 0;
-		const maxSamples = SAMPLE_RATE * 300 * Math.max(1, loopCount);
+		const maxSamples = renderSampleLimit(
+			SAMPLE_RATE,
+			totalRows,
+			loopCount,
+			contexts[0]!.state.timeline.intFrequency
+		);
 		let completedLoops = 0;
 		let lastProgressUpdate = 0;
 		const progressUpdateInterval = SAMPLE_RATE * 0.1;
@@ -431,9 +441,8 @@ export class AYChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const renderProgress = (totalSamples / maxSamples) * 50;
-				const progress = 50 + renderProgress;
 				const currentRow = this.calculateCurrentRow(leader.state, leaderSong);
+				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
 				const message = `Rendering... ${currentRow}/${totalRows} rows`;
 				onProgress?.(progress, message);
 				lastProgressUpdate = totalSamples;
