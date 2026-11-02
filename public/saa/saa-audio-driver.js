@@ -41,17 +41,15 @@ function applyNoiseClock(state, key, raw) {
 	state[key] = raw & 3;
 }
 
-function applyEnvelopeMode(state, byteKey, retriggerKey, raw) {
+function applyEnvelopeMode(state, byteKey, raw) {
 	if (raw === -1) {
 		state[byteKey] = ENVELOPE_BYTES[0];
-		state[retriggerKey] = true;
 		return;
 	}
 	if (typeof raw !== 'number' || raw === 0) return;
 	const index = raw & 15;
 	if (index >= ENVELOPE_BYTES.length) return;
 	state[byteKey] = ENVELOPE_BYTES[index];
-	state[retriggerKey] = true;
 }
 
 function envelopeCommandByte(state, channelIndex) {
@@ -65,9 +63,11 @@ function clearEnvelope(state, registerState, channelIndex) {
 	writeEnvelope(state, registerState, channelIndex);
 }
 
-function writeEnvelope(state, registerState, channelIndex) {
+function writeEnvelope(state, registerState, channelIndex, shape) {
 	if (channelIndex !== ENVELOPE_CHANNEL_0 && channelIndex !== ENVELOPE_CHANNEL_1) return;
-	const commanded = envelopeCommandByte(state, channelIndex);
+	const index = shape | 0;
+	const override = index > 0 && index < ENVELOPE_BYTES.length ? ENVELOPE_BYTES[index] : null;
+	const commanded = override != null ? override : envelopeCommandByte(state, channelIndex);
 	const byte = commanded == null ? 0 : commanded & 0xff;
 	if (channelIndex === ENVELOPE_CHANNEL_0) registerState.envelope0 = byte;
 	else registerState.envelope1 = byte;
@@ -165,8 +165,8 @@ class SaaAudioDriver {
 	processPatternRow(state, pattern, rowIndex, patternRow) {
 		applyNoiseClock(state, 'noiseClock0', patternRow?.noise0);
 		applyNoiseClock(state, 'noiseClock1', patternRow?.noise1);
-		applyEnvelopeMode(state, 'envelopeCommand0', 'envelopeRetrigger0', patternRow?.env0);
-		applyEnvelopeMode(state, 'envelopeCommand1', 'envelopeRetrigger1', patternRow?.env1);
+		applyEnvelopeMode(state, 'envelopeCommand0', patternRow?.env0);
+		applyEnvelopeMode(state, 'envelopeCommand1', patternRow?.env1);
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const row = pattern.channels[channelIndex]?.rows?.[rowIndex];
 			if (!row) continue;
@@ -186,8 +186,6 @@ class SaaAudioDriver {
 			if (row.note && row.note.name !== 0) {
 				state.channelAmplitudeSliding[channelIndex] = 0;
 				resetInstrumentAccumulators(state, channelIndex);
-				if (channelIndex === ENVELOPE_CHANNEL_0) state.envelopeRetrigger0 = true;
-				if (channelIndex === ENVELOPE_CHANNEL_1) state.envelopeRetrigger1 = true;
 			}
 			const assigned = assignPatternRowInstrument(state, channelIndex, row);
 			if (assigned.changed) resetInstrumentAccumulators(state, channelIndex);
@@ -222,6 +220,10 @@ class SaaAudioDriver {
 					state.instrumentPositions[channelIndex] | 0,
 					channelInstrumentReleaseTick(state, channelIndex)
 				) ?? {};
+			if (row.retriggerEnvelope) {
+				if (channelIndex === ENVELOPE_CHANNEL_0) registerState.envelopeRetrigger0 = true;
+				else if (channelIndex === ENVELOPE_CHANNEL_1) registerState.envelopeRetrigger1 = true;
+			}
 			if (row.amplitudeSliding) {
 				const slide = state.channelAmplitudeSliding[channelIndex] | 0;
 				if (row.amplitudeSlideUp) {
@@ -234,7 +236,7 @@ class SaaAudioDriver {
 			const tone = packedTone(state, channelIndex, sampleToneOffset(state, channelIndex, row));
 			if (!tone) {
 				silenceChannel(registerState, channelIndex);
-				clearEnvelope(state, registerState, channelIndex);
+				writeEnvelope(state, registerState, channelIndex, row.envelopeShape);
 			} else {
 				channel.octave = tone.octave;
 				channel.freq = tone.freq;
@@ -259,7 +261,7 @@ class SaaAudioDriver {
 				}
 				channel.left = left;
 				channel.right = right;
-				writeEnvelope(state, registerState, channelIndex);
+				writeEnvelope(state, registerState, channelIndex, row.envelopeShape);
 			}
 			state.instrumentPositions[channelIndex] =
 				(state.instrumentPositions[channelIndex] | 0) + 1;

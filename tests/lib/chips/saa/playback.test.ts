@@ -479,6 +479,51 @@ describe('SAA tone playback', () => {
 		expect(registers.channels[0].left).toBe(15);
 	});
 
+	it('restarts the envelope immediately when the instrument step retriggers', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelMuted = [false, false, false];
+		state.channelSoundEnabled = [true, true, true];
+		state.channelPatternLeft = [15, 15, 15];
+		state.channelPatternRight = [15, 15, 15];
+		state.channelAmplitudeSliding = [0, 0, 0];
+		state.channelInstruments = [0, 0, 0];
+		state.instrumentPositions = [0, 0, 0];
+		state.channelCurrentNotes = [45, 45, 45];
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		state.instruments[0].macros.retriggerEnvelope = { values: [true], loop: 0 };
+		state.envelopeCommand0 = 0x9a;
+		const registers = new SaaRegisterState(6);
+		driver.processInstruments(state, registers);
+		expect(registers.envelopeRetrigger0).toBe(true);
+		expect(registers.envelopeRetrigger1).toBe(false);
+		expect(registers.envelope0).toBe(0x9a);
+	});
+
+	it('plays the instrument envelope shape and uses the E column when the step is 0', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelMuted = [false, false, false];
+		state.channelSoundEnabled = [true, true, true];
+		state.channelPatternLeft = [15, 15, 15];
+		state.channelPatternRight = [15, 15, 15];
+		state.channelAmplitudeSliding = [0, 0, 0];
+		state.channelInstruments = [0, 0, 0];
+		state.instrumentPositions = [0, 0, 0];
+		state.channelCurrentNotes = [45, 45, 45];
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		state.instruments[0].macros.envelopeShape = { values: [3], loop: 0 };
+		state.envelopeCommand0 = 0x96;
+		const registers = new SaaRegisterState(6);
+		driver.processInstruments(state, registers);
+		expect(registers.envelope0).toBe(0x9a);
+		expect(registers.envelopeRetrigger0).toBe(false);
+		state.instrumentPositions = [0, 0, 0];
+		state.instruments[0].macros.envelopeShape = { values: [0], loop: 0 };
+		driver.processInstruments(state, registers);
+		expect(registers.envelope0).toBe(0x96);
+	});
+
 	it('stores each noise clock and leaves a blank column unchanged', () => {
 		const driver = new SaaAudioDriver();
 		const state = playbackState(45);
@@ -498,7 +543,7 @@ describe('SAA tone playback', () => {
 		expect(registers.noise1).toBe(3);
 	});
 
-	it('restarts the envelope shape on C and leaves a blank cell unchanged', () => {
+	it('writes the envelope shape on C without restarting it, and leaves a blank cell unchanged', () => {
 		const driver = new SaaAudioDriver();
 		const state = playbackState(45);
 		state.channelCurrentNotes = [45, 45, 45, 45, 45, 45];
@@ -518,7 +563,7 @@ describe('SAA tone playback', () => {
 		driver.processPatternRow(state, pattern, 0, { env0: 3 });
 		driver.processInstruments(state, registers);
 		expect(state.envelopeCommand0).toBe(0x9a);
-		expect(registers.envelopeRetrigger0).toBe(true);
+		expect(registers.envelopeRetrigger0).toBe(false);
 		expect(registers.envelope0).toBe(0x9a);
 		driver.processPatternRow(state, pattern, 0, { env0: 0 });
 		driver.processInstruments(state, registers);

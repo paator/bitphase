@@ -117,5 +117,27 @@ export const SAA_VOLUME_MACRO_FIELDS: InstrumentMacroField[] = [
 		group: 'Noise parameters',
 		shareSequence: true,
 		defaultValue: false
+	},
+	{
+		id: 'envelopeShape',
+		label: 'Shape',
+		title: 'Envelope shape. 0 uses the E column. 1-C are the same shapes as the E column.',
+		kind: 'integer',
+		accent: 'envelope',
+		group: 'Envelope',
+		shareSequence: true,
+		min: 0,
+		max: 12,
+		defaultValue: 0
+	},
+	{
+		id: 'retriggerEnvelope',
+		label: 'Retrigger',
+		title: 'Restart the envelope immediately when this step is played',
+		kind: 'boolean',
+		accent: 'envelope',
+		group: 'Envelope retrigger',
+		shareSequence: true,
+		defaultValue: false
 	}
 ];
