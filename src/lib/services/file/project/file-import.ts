@@ -492,6 +492,7 @@ function reconstructInstrumentRow(data: any, chipType?: string): InstrumentRow {
 				amplitudeSlideUp: rowData.amplitudeSlideUp ?? false,
 				toneAccumulation: rowData.toneAccumulation ?? false,
 				noiseAccumulation: rowData.noiseAccumulation ?? false,
+				envelopeShape: rowData.envelopeShape ?? 0,
 				retriggerEnvelope: rowData.retriggerEnvelope ?? false
 			});
 	}

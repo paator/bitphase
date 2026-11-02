@@ -103,6 +103,7 @@ const AY_MIXER_FIELDS = [
 	{ id: 'tone', kind: 'boolean', defaultValue: true },
 	{ id: 'noise', kind: 'boolean', defaultValue: false },
 	{ id: 'envelope', kind: 'boolean', defaultValue: false },
+	{ id: 'envelopeShape', kind: 'integer', min: 0, max: 15, defaultValue: 0 },
 	{ id: 'retriggerEnvelope', kind: 'boolean', defaultValue: false },
 	{ id: 'toneAdd', kind: 'integer', min: -4096, max: 4095, defaultValue: 0 },
 	{ id: 'toneAccumulation', kind: 'boolean', defaultValue: false },

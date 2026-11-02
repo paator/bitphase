@@ -490,9 +490,9 @@ class AYAudioDriver {
 		}
 
 		const shapeSet = isPatternEnvelopeShapeSet(row.envelopeShape);
-		if (state.channelPatternEnvelopeShapes) {
-			state.channelPatternEnvelopeShapes[channelIndex] =
-				typeof row.envelopeShape === 'number' ? row.envelopeShape : 0;
+		const rawShape = typeof row.envelopeShape === 'number' ? row.envelopeShape : 0;
+		if (state.channelPatternEnvelopeShapes && rawShape !== 0) {
+			state.channelPatternEnvelopeShapes[channelIndex] = rawShape;
 		}
 		const syncbuzzerOwnsEnvelopeShape = this.isSyncbuzzerEnvelopeShapeSource(
 			state,
@@ -911,8 +911,46 @@ class AYAudioDriver {
 		}
 	}
 
+	instrumentEnvelopeShape(state, channelIndex) {
+		if (state.channelMuted?.[channelIndex]) return null;
+		const { instrument } = getChannelInstrument(state, channelIndex);
+		if (!instrument || instrumentHasSample(instrument)) return null;
+		const row = sampleAyMixerRow(
+			instrument,
+			state.instrumentPositions[channelIndex],
+			channelInstrumentReleaseTick(state, channelIndex)
+		);
+		if (!row) return null;
+		return row.envelopeShape | 0;
+	}
+
+	applyInstrumentEnvelopeShape(state, registerState, channelIndex, shape) {
+		const columnShape = state.channelPatternEnvelopeShapes?.[channelIndex] | 0;
+		const resolved = shape > 0 ? shape | 0 : columnShape;
+		if (resolved <= 0) return;
+		if (resolved >= 15) {
+			state.channelEnvelopeEnabled[channelIndex] = false;
+			this.channelMixerState[channelIndex].envelope = false;
+			registerState.channels[channelIndex].mixer.envelope = false;
+			return;
+		}
+		if (this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)) return;
+		registerState.envelopeShape = resolved & 0xf;
+		state.channelEnvelopeEnabled[channelIndex] = true;
+	}
+
+	applyInstrumentEnvelopeShapes(state, registerState) {
+		const count = state.channelInstruments?.length ?? 0;
+		for (let channelIndex = 0; channelIndex < count; channelIndex++) {
+			const shape = this.instrumentEnvelopeShape(state, channelIndex);
+			if (shape == null) continue;
+			this.applyInstrumentEnvelopeShape(state, registerState, channelIndex, shape);
+		}
+	}
+
 	processInstruments(state, registerState) {
 		state.envelopeAddValue = 0;
+		this.applyInstrumentEnvelopeShapes(state, registerState);
 		if (state.autoEnvelopeActive) {
 			this.processAutoEnvelope(state, registerState);
 		}
@@ -1335,6 +1373,14 @@ class AYAudioDriver {
 	}
 
 	resolveChannelEnvelopeShapeForAutoEnvelope(state, channelIndex, registerState) {
+		const instrumentShape = this.instrumentEnvelopeShape(state, channelIndex);
+		if (
+			instrumentShape != null &&
+			isPatternEnvelopeShapeSet(instrumentShape) &&
+			!this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)
+		) {
+			return instrumentShape & 0xf;
+		}
 		const patternShape = state.channelPatternEnvelopeShapes?.[channelIndex];
 		if (isPatternEnvelopeShapeSet(patternShape)) {
 			return patternShape & 0xf;

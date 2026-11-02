@@ -64,6 +64,7 @@
 		tone: IconCarbonMusic,
 		noise: IconCarbonWaveform,
 		envelope: IconCarbonActivity,
+		envelopeShape: IconCarbonActivity,
 		retriggerEnvelope: IconCarbonRepeat,
 		toneAdd: IconCarbonChartWinLoss,
 		toneAccumulation: IconCarbonRenew,

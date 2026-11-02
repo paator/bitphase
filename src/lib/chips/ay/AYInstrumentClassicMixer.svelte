@@ -50,6 +50,7 @@
 		tone: boolean;
 		noise: boolean;
 		envelope: boolean;
+		envelopeShape: number;
 		retriggerEnvelope: boolean;
 		toneAdd: number;
 		noiseAdd: number;
@@ -88,6 +89,7 @@
 		{ key: 'toneAdd', min: -4096, max: 4095 },
 		{ key: 'noiseAdd', min: -31, max: 31 },
 		{ key: 'envelopeAdd', min: -255, max: 255 },
+		{ key: 'envelopeShape', min: 0, max: 15 },
 		{ key: 'volume', min: 0, max: 15 }
 	] as const;
 
@@ -308,6 +310,14 @@
 						</div>
 					</th>
 					<th
+						class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-8 px-0.5 text-[0.65rem]'}
+						title="Envelope shape. 0 uses the shape column. 1-F match the shape column.">
+						<div class="flex items-center justify-center gap-0.5">
+							<IconCarbonActivity class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+							<span>S</span>
+						</div>
+					</th>
+					<th
 						class="w-8 min-w-8 {isExpanded ? 'px-1' : 'px-0.5 text-[0.65rem]'}"
 						title="Retrigger envelope when this row is played (only when envelope is on)">
 						<div class="flex items-center justify-center">
@@ -456,6 +466,17 @@
 								booleanDrag.dragOver((value) =>
 									updateBooleanRow(index, 'envelope', value)
 								)} />
+						<td class={isExpanded ? 'w-12 min-w-12 px-1.5' : 'w-8 px-0.5'}>
+							<CommitNumericInput
+								value={row.envelopeShape}
+								{asHex}
+								min={0}
+								max={15}
+								maxDigits={1}
+								class={compactTableInputClass({ selected, isExpanded })}
+								onkeydown={(e) => handleNumericKeyDown(index, e)}
+								onValueChange={(v) => updateRow(index, 'envelopeShape', v)} />
+						</td>
 						<BooleanPaintableCell
 							active={row.retriggerEnvelope}
 							{selected}

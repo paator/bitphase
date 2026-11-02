@@ -279,6 +279,7 @@ describe('groupInstrumentMacroFields', () => {
 			['Tone parameters', ['toneAdd', 'toneAccumulation']],
 			['Noise parameters', ['noiseAdd', 'noiseAccumulation']],
 			['Envelope parameters', ['envelopeAdd', 'envelopeAccumulation']],
+			['Envelope', ['envelopeShape']],
 			['Envelope retrigger', ['retriggerEnvelope']]
 		]);
 		expect(

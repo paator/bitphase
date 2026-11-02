@@ -1240,6 +1240,142 @@ describe('AYAudioDriver', () => {
 			expect(registerState.channels[0].mixer.envelope).toBe(true);
 			expect(registerState.envelopeShape).toBe(12);
 		});
+
+		it('plays the instrument envelope shape and uses the shape column when the step is 0', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setInstruments([
+				{
+					id: '01',
+					macros: {
+						tone: { values: [true], loop: 0 },
+						noise: { values: [false], loop: 0 },
+						envelope: { values: [true], loop: 0 },
+						volume: { values: [15], loop: 0 },
+						amplitudeSlide: { values: [0], loop: 0 },
+						envelopeShape: { values: [4], loop: 0 }
+					}
+				}
+			]);
+			state.setTuningTable([500]);
+			state.channelInstruments = [0, -1, -1];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelEnvelopeEnabled = [false, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.envelopeOnOffCounter = 0;
+			state.envelopeEffectTable = -1;
+			state.channelCurrentNotes = [0, 0, 0];
+			state.channelToneAccumulator = [0, 0, 0];
+			state.channelNoiseAccumulator = [0, 0, 0];
+			state.channelEnvelopeAccumulator = [0, 0, 0];
+			state.channelTimerPwmSweep = [-1, -1, -1];
+			state.channelTimerEffectReset = [false, false, false];
+			const registerState = createRegisterState();
+			registerState.channels[0].tone = 500;
+
+			driver._processEnvelope(
+				state,
+				0,
+				{ envelopeShape: 12 },
+				{ envelopeValue: null },
+				registerState
+			);
+			driver.processInstruments(state, registerState);
+			expect(registerState.envelopeShape).toBe(4);
+			expect(state.channelEnvelopeEnabled[0]).toBe(true);
+			expect(registerState.channels[0].mixer.envelope).toBe(true);
+			expect(registerState.forceEnvelopeShapeWrite).toBe(true);
+
+			registerState.forceEnvelopeShapeWrite = false;
+			driver.processInstruments(state, registerState);
+			expect(registerState.envelopeShape).toBe(4);
+			expect(registerState.forceEnvelopeShapeWrite).toBe(false);
+
+			state.instruments[0].macros.envelopeShape = { values: [0], loop: 0 };
+			driver._processEnvelope(
+				state,
+				0,
+				{ envelopeShape: 9 },
+				{ envelopeValue: null },
+				registerState
+			);
+			driver.processInstruments(state, registerState);
+			expect(registerState.envelopeShape).toBe(9);
+			expect(state.channelEnvelopeEnabled[0]).toBe(true);
+
+			state.instruments[0].macros.envelopeShape = { values: [15], loop: 0 };
+			registerState.forceEnvelopeShapeWrite = false;
+			driver.processInstruments(state, registerState);
+			expect(state.channelEnvelopeEnabled[0]).toBe(false);
+			expect(registerState.channels[0].mixer.envelope).toBe(false);
+			expect(registerState.envelopeShape).toBe(9);
+			expect(registerState.forceEnvelopeShapeWrite).toBe(false);
+		});
+
+		it('alternates the shape column with the instrument shape', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setInstruments([
+				{
+					id: '01',
+					macros: {
+						tone: { values: [true], loop: 0 },
+						noise: { values: [false], loop: 0 },
+						envelope: { values: [true], loop: 0 },
+						volume: { values: [15], loop: 0 },
+						amplitudeSlide: { values: [0], loop: 0 },
+						envelopeShape: { values: [0, 5], loop: 0 }
+					}
+				}
+			]);
+			state.setTuningTable([500]);
+			state.channelInstruments = [0, -1, -1];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelEnvelopeEnabled = [true, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.envelopeOnOffCounter = 0;
+			state.envelopeEffectTable = -1;
+			state.channelCurrentNotes = [0, 0, 0];
+			state.channelToneAccumulator = [0, 0, 0];
+			state.channelNoiseAccumulator = [0, 0, 0];
+			state.channelEnvelopeAccumulator = [0, 0, 0];
+			state.channelTimerPwmSweep = [-1, -1, -1];
+			state.channelTimerEffectReset = [false, false, false];
+			state.channelPatternEnvelopeShapes = [4, 0, 0];
+			const registerState = createRegisterState();
+			registerState.channels[0].tone = 500;
+			registerState.envelopeShape = 4;
+
+			const shapes = [];
+			for (let step = 0; step < 4; step++) {
+				registerState.forceEnvelopeShapeWrite = false;
+				driver.processInstruments(state, registerState);
+				shapes.push(registerState.envelopeShape);
+				expect(registerState.forceEnvelopeShapeWrite).toBe(false);
+			}
+			expect(shapes).toEqual([4, 5, 4, 5]);
+
+			driver._processEnvelope(
+				state,
+				0,
+				{ envelopeShape: 0 },
+				{ envelopeValue: null },
+				registerState
+			);
+			expect(state.channelPatternEnvelopeShapes[0]).toBe(4);
+		});
 	});
 
 	describe('syncbuzzer envelope shape ownership', () => {

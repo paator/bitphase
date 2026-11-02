@@ -142,6 +142,18 @@ export const AY_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		defaultValue: false
 	},
 	{
+		id: 'envelopeShape',
+		label: 'Shape',
+		title: 'Envelope shape. 0 uses the shape column. 1-F are the same shapes as the shape column.',
+		kind: 'integer',
+		accent: 'envelope',
+		group: 'Envelope',
+		shareSequence: true,
+		min: 0,
+		max: 15,
+		defaultValue: 0
+	},
+	{
 		id: 'retriggerEnvelope',
 		label: 'Retrigger',
 		title: 'Retrigger envelope when this step is played',
