@@ -7,6 +7,7 @@ import {
 import { renderRowProgress, renderSampleLimit } from './render-sample-limit';
 
 export type OfflineSharedTimeline = {
+	intFrequency: number;
 	tickAccumulator: number;
 	tickStep: number;
 	currentTick: number;

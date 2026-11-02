@@ -25,6 +25,7 @@ type NesSlotLane = {
 	state: {
 		currentPattern: Pattern | null;
 		timeline: {
+			intFrequency: number;
 			tickAccumulator: number;
 			tickStep: number;
 			currentTick: number;
