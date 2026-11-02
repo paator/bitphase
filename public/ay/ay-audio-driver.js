@@ -491,8 +491,11 @@ class AYAudioDriver {
 
 		const shapeSet = isPatternEnvelopeShapeSet(row.envelopeShape);
 		const rawShape = typeof row.envelopeShape === 'number' ? row.envelopeShape : 0;
-		if (state.channelPatternEnvelopeShapes && rawShape !== 0) {
+		if (state.channelPatternEnvelopeShapes) {
 			state.channelPatternEnvelopeShapes[channelIndex] = rawShape;
+		}
+		if (rawShape !== 0 && state.channelEnvelopeColumnShape) {
+			state.channelEnvelopeColumnShape[channelIndex] = rawShape;
 		}
 		const syncbuzzerOwnsEnvelopeShape = this.isSyncbuzzerEnvelopeShapeSource(
 			state,
@@ -925,17 +928,33 @@ class AYAudioDriver {
 	}
 
 	applyInstrumentEnvelopeShape(state, registerState, channelIndex, shape) {
-		const columnShape = state.channelPatternEnvelopeShapes?.[channelIndex] | 0;
-		const resolved = shape > 0 ? shape | 0 : columnShape;
-		if (resolved <= 0) return;
-		if (resolved >= 15) {
+		if (shape <= 0) {
+			if (!state.channelEnvelopeShapeOverride?.[channelIndex]) return;
+			state.channelEnvelopeShapeOverride[channelIndex] = false;
+			this.writeEnvelopeShape(
+				state,
+				registerState,
+				channelIndex,
+				state.channelEnvelopeColumnShape?.[channelIndex] | 0
+			);
+			return;
+		}
+		if (state.channelEnvelopeShapeOverride) {
+			state.channelEnvelopeShapeOverride[channelIndex] = true;
+		}
+		this.writeEnvelopeShape(state, registerState, channelIndex, shape | 0);
+	}
+
+	writeEnvelopeShape(state, registerState, channelIndex, shape) {
+		if (shape <= 0) return;
+		if (shape >= 15) {
 			state.channelEnvelopeEnabled[channelIndex] = false;
 			this.channelMixerState[channelIndex].envelope = false;
 			registerState.channels[channelIndex].mixer.envelope = false;
 			return;
 		}
 		if (this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)) return;
-		registerState.envelopeShape = resolved & 0xf;
+		registerState.envelopeShape = shape & 0xf;
 		state.channelEnvelopeEnabled[channelIndex] = true;
 	}
 

@@ -1357,6 +1357,13 @@ describe('AYAudioDriver', () => {
 			const registerState = createRegisterState();
 			registerState.channels[0].tone = 500;
 			registerState.envelopeShape = 4;
+			driver._processEnvelope(
+				state,
+				0,
+				{ envelopeShape: 4 },
+				{ envelopeValue: null },
+				registerState
+			);
 
 			const shapes = [];
 			for (let step = 0; step < 4; step++) {
@@ -1374,7 +1381,11 @@ describe('AYAudioDriver', () => {
 				{ envelopeValue: null },
 				registerState
 			);
-			expect(state.channelPatternEnvelopeShapes[0]).toBe(4);
+			expect(state.channelPatternEnvelopeShapes[0]).toBe(0);
+			expect(state.channelEnvelopeColumnShape[0]).toBe(4);
+			registerState.forceEnvelopeShapeWrite = false;
+			driver.processInstruments(state, registerState);
+			expect(registerState.envelopeShape).toBe(4);
 		});
 	});
 

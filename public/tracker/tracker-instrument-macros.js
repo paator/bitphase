@@ -85,7 +85,12 @@ function decodeTimerWaveformPayload(encoded, fallback) {
 		if (Array.isArray(parsed) && parsed.length > 0) {
 			return { steps: parsed, loop: 0 };
 		}
-		if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+		if (
+			parsed &&
+			typeof parsed === 'object' &&
+			Array.isArray(parsed.steps) &&
+			parsed.steps.length > 0
+		) {
 			const length = parsed.steps.length;
 			const loop = Math.max(0, Math.min(parsed.loop | 0, length - 1));
 			return { steps: parsed.steps, loop };
@@ -111,7 +116,13 @@ const AY_MIXER_FIELDS = [
 	{ id: 'noiseAccumulation', kind: 'boolean', defaultValue: false },
 	{ id: 'envelopeAdd', kind: 'integer', min: -255, max: 255, defaultValue: 0 },
 	{ id: 'envelopeAccumulation', kind: 'boolean', defaultValue: false },
-	{ id: 'amplitudeSlide', kind: 'enum', min: AY_AMPLITUDE_SLIDE_DOWN, max: AY_AMPLITUDE_SLIDE_UP, defaultValue: AY_AMPLITUDE_SLIDE_OFF }
+	{
+		id: 'amplitudeSlide',
+		kind: 'enum',
+		min: AY_AMPLITUDE_SLIDE_DOWN,
+		max: AY_AMPLITUDE_SLIDE_UP,
+		defaultValue: AY_AMPLITUDE_SLIDE_OFF
+	}
 ];
 
 const AY_TIMER_FIELDS = [

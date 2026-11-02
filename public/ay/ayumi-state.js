@@ -37,7 +37,9 @@ const AY_CHANNEL_ARRAY_SPECS = [
 	['channelTimerEffectReset', false],
 	['channelSamplePositions', 0],
 	['channelSamplePhase', 0],
-	['channelPatternEnvelopeShapes', 0]
+	['channelPatternEnvelopeShapes', 0],
+	['channelEnvelopeColumnShape', 0],
+	['channelEnvelopeShapeOverride', false]
 ];
 
 class AyumiState extends TrackerState {
