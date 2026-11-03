@@ -24,7 +24,11 @@
 		type VisibleRowsCache
 	} from '../../services/pattern/pattern-visible-rows';
 	import { PatternEditingService } from '../../services/pattern/pattern-editing';
-	import { PreviewService } from '../../services/audio/preview-service';
+	import {
+		fieldEditPreviews,
+		previewChannelForFieldEdit,
+		PreviewService
+	} from '../../services/audio/preview-service';
 	import { PlaybackOrderIndexGate } from '../../services/audio/playback-order-index-gate';
 	import { PlaybackSeekScheduler } from '../../services/audio/playback-seek-scheduler';
 	import {
@@ -1742,14 +1746,10 @@
 			moveColumn(1);
 		}
 
-		const shouldPreviewField =
-			fieldInfoBeforeEdit &&
-			(fieldInfoBeforeEdit.channelIndex >= 0 ||
-				fieldInfoBeforeEdit.fieldKey === 'envelopeValue');
-		const previewChannel =
-			fieldInfoBeforeEdit?.fieldKey === 'envelopeValue'
-				? 0
-				: (fieldInfoBeforeEdit?.channelIndex ?? -1);
+		const shouldPreviewField = fieldEditPreviews(schema, fieldInfoBeforeEdit);
+		const previewChannel = fieldInfoBeforeEdit
+			? previewChannelForFieldEdit(fieldInfoBeforeEdit)
+			: -1;
 		if (
 			previewKey !== undefined &&
 			editingResult.shouldPreview !== false &&
@@ -3015,13 +3015,11 @@
 			recordPatternEdit(pattern, finalPattern);
 			updatePatternInArray(finalPattern);
 
-			const previewChannel =
-				fieldInfo.fieldKey === 'envelopeValue' ? 0 : fieldInfo.channelIndex;
+			const previewChannel = previewChannelForFieldEdit(fieldInfo);
 			const shouldPreview =
 				keyForPreview === undefined &&
 				!playbackStore.isPlaying &&
-				previewChannel >= 0 &&
-				(fieldInfo.channelIndex >= 0 || fieldInfo.fieldKey === 'envelopeValue');
+				fieldEditPreviews(schema, fieldInfo);
 			if (shouldPreview && chipProcessor && 'playPreviewRow' in chipProcessor) {
 				const previewChipIndex = getChipIndex();
 				if (previewChipIndex >= 0) {

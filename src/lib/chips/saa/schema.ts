@@ -112,7 +112,8 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any'
+			backtrackWhen: 'any',
+			previewOnEdit: true
 		},
 		noise1: {
 			key: 'noise1',
@@ -122,7 +123,8 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any'
+			backtrackWhen: 'any',
+			previewOnEdit: true
 		},
 		env0: {
 			key: 'env0',
@@ -132,7 +134,8 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any'
+			backtrackWhen: 'any',
+			previewOnEdit: true
 		},
 		env1: {
 			key: 'env1',
@@ -142,7 +145,8 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any'
+			backtrackWhen: 'any',
+			previewOnEdit: true
 		}
 	},
 	globalAnchors: [

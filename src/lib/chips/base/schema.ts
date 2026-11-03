@@ -13,6 +13,7 @@ export interface ChipField {
 	allowZeroValue?: boolean;
 	usedForBacktracking?: boolean;
 	backtrackWhen?: BacktrackWhen;
+	previewOnEdit?: boolean;
 }
 
 export type SettingType = 'text' | 'number' | 'select' | 'toggle';

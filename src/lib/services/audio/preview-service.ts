@@ -10,6 +10,19 @@ export interface PreviewFromContextOptions {
 	isGlobalField?: boolean;
 }
 
+export function fieldEditPreviews(
+	schema: ChipSchema,
+	field: { fieldKey: string; channelIndex: number } | null | undefined
+): boolean {
+	if (!field) return false;
+	if (field.channelIndex >= 0) return true;
+	return schema.globalFields?.[field.fieldKey]?.previewOnEdit === true;
+}
+
+export function previewChannelForFieldEdit(field: { channelIndex: number }): number {
+	return field.channelIndex >= 0 ? field.channelIndex : 0;
+}
+
 export class PreviewService {
 	playFromContext(
 		processor: PreviewNoteSupport,

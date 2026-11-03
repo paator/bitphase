@@ -352,7 +352,20 @@ export class TrackerWorkletSlot extends WorkletSlotBase {
 				notes.push(`${instrumentId}:${note.name}.${note.octave}`);
 			}
 		}
-		return `${singleChannel ? `ch${channelIndex}` : 'all'}:${notes.join('|')}`;
+		const globals = this._previewGlobalIdentity(pattern, rowIndex);
+		return `${singleChannel ? `ch${channelIndex}` : 'all'}:${notes.join('|')}|${globals}`;
+	}
+
+	_previewGlobalIdentity(pattern, rowIndex) {
+		const row = pattern?.patternRows?.[rowIndex];
+		if (!row || typeof row !== 'object') return '';
+		const parts = [];
+		for (const key of Object.keys(row).sort()) {
+			const value = row[key];
+			if (typeof value === 'function') continue;
+			parts.push(`${key}=${value}`);
+		}
+		return parts.join(',');
 	}
 
 	_syncPreviewTable(channelIndex, row) {

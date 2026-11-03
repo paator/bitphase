@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PreviewService } from '../../../../src/lib/services/audio/preview-service';
+import {
+	fieldEditPreviews,
+	PreviewService
+} from '../../../../src/lib/services/audio/preview-service';
+import { SAA_CHIP_SCHEMA } from '../../../../src/lib/chips/saa/schema';
 import { Pattern as PatternModel, Note, NoteName } from '../../../../src/lib/models/song';
 import type { Pattern } from '../../../../src/lib/models/song';
 import type { PreviewNoteSupport } from '../../../../src/lib/chips/base/processor';
@@ -56,6 +60,21 @@ describe('PreviewService', () => {
 		expect(previewPattern.channels[1].rows[0].note.name).toBe(NoteName.E);
 		expect(previewPattern.channels[0].rows[0].note.name).toBe(NoteName.None);
 		expect(previewPattern.channels[2].rows[0].note.name).toBe(NoteName.None);
+	});
+
+	it('previews SAA noise and envelope columns and AY envelope, and skips other global columns', () => {
+		expect(fieldEditPreviews(schema, { fieldKey: 'envelopeValue', channelIndex: -1 })).toBe(true);
+		expect(fieldEditPreviews(schema, { fieldKey: 'noiseValue', channelIndex: -1 })).toBe(false);
+		expect(fieldEditPreviews(schema, { fieldKey: 'note', channelIndex: 1 })).toBe(true);
+		expect(fieldEditPreviews(SAA_CHIP_SCHEMA, { fieldKey: 'noise0', channelIndex: -1 })).toBe(
+			true
+		);
+		expect(fieldEditPreviews(SAA_CHIP_SCHEMA, { fieldKey: 'noise1', channelIndex: -1 })).toBe(
+			true
+		);
+		expect(fieldEditPreviews(SAA_CHIP_SCHEMA, { fieldKey: 'env0', channelIndex: -1 })).toBe(true);
+		expect(fieldEditPreviews(SAA_CHIP_SCHEMA, { fieldKey: 'env1', channelIndex: -1 })).toBe(true);
+		expect(fieldEditPreviews(SAA_CHIP_SCHEMA, null)).toBe(false);
 	});
 
 	it('previews the full row for global fields even when previewFullRow is disabled', () => {

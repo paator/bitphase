@@ -21,9 +21,16 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			color: 'patternEnvelope',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'nonZero'
+			backtrackWhen: 'nonZero',
+			previewOnEdit: true
 		},
-		envelopeEffect: { key: 'envelopeEffect', type: 'hex', length: 4, color: 'patternEffect' },
+		envelopeEffect: {
+			key: 'envelopeEffect',
+			type: 'hex',
+			length: 4,
+			color: 'patternEffect',
+			previewOnEdit: true
+		},
 		noiseValue: {
 			key: 'noiseValue',
 			type: 'hex',
@@ -31,7 +38,8 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			color: 'patternNoise',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any'
+			backtrackWhen: 'any',
+			previewOnEdit: true
 		}
 	},
 	channelLabels: ['A', 'B', 'C'],
