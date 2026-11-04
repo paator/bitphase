@@ -62,9 +62,12 @@ describe('PreviewService', () => {
 		expect(previewPattern.channels[2].rows[0].note.name).toBe(NoteName.None);
 	});
 
-	it('previews SAA noise and envelope columns and AY envelope, and skips other global columns', () => {
+	it('previews SAA noise and envelope columns and AY global columns', () => {
 		expect(fieldEditPreviews(schema, { fieldKey: 'envelopeValue', channelIndex: -1 })).toBe(true);
-		expect(fieldEditPreviews(schema, { fieldKey: 'noiseValue', channelIndex: -1 })).toBe(false);
+		expect(fieldEditPreviews(schema, { fieldKey: 'envelopeEffect', channelIndex: -1 })).toBe(
+			true
+		);
+		expect(fieldEditPreviews(schema, { fieldKey: 'noiseValue', channelIndex: -1 })).toBe(true);
 		expect(fieldEditPreviews(schema, { fieldKey: 'note', channelIndex: 1 })).toBe(true);
 		expect(fieldEditPreviews(SAA_CHIP_SCHEMA, { fieldKey: 'noise0', channelIndex: -1 })).toBe(
 			true

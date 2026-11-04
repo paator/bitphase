@@ -7,6 +7,11 @@ import SaaRegisterState from '../../../../public/saa/saa-register-state.js';
 import SaaState from '../../../../public/saa/saa-state.js';
 import TrackerPatternProcessor from '../../../../public/tracker/tracker-pattern-processor.js';
 import { createSaaSoundEngine } from '../../../../public/saa/saa-engine.js';
+import {
+	SAA_CHANNEL_COUNT,
+	SAA_FULL_SIDE_PEAK,
+	SAA_OUTPUT_GAIN
+} from '../../../../public/saa/saa-constants.js';
 import { saaWasmImports } from '../../../../public/saa/saa-wasm-imports.js';
 import {
 	saaEnvelopeControlByte,
@@ -307,9 +312,10 @@ describe('SAA tone playback', () => {
 				exportedOther += Math.abs(sample.exportChannels[index]);
 			}
 		}
+		const sidePeak = SAA_FULL_SIDE_PEAK * SAA_OUTPUT_GAIN;
 		expect(left / 2000).toBeGreaterThan(0.05);
-		expect(peak).toBeGreaterThan(0.15);
-		expect(peak).toBeLessThan(0.2);
+		expect(peak).toBeGreaterThan(sidePeak * 0.9);
+		expect(peak).toBeLessThan(sidePeak * 1.05);
 		expect(scopePeak).toBeGreaterThan(0.95);
 		expect(right).toBe(0);
 		expect(channel / 2000).toBeGreaterThan(0.02);
@@ -349,7 +355,7 @@ describe('SAA tone playback', () => {
 		expect(energy).toBeGreaterThan(0);
 	});
 
-	it('keeps six full channels inside the mix', async () => {
+	it('scales six full channels by the output gain', async () => {
 		const wasm = readFileSync('public/saa/saasound.wasm');
 		const { instance } = await WebAssembly.instantiate(wasm, saaWasmImports());
 		const engine = createSaaSoundEngine(instance.exports, SAA_SAM_CLOCK, 44100);
@@ -369,8 +375,9 @@ describe('SAA tone playback', () => {
 			const sample = engine.generate();
 			peak = Math.max(peak, Math.abs(sample.left), Math.abs(sample.right));
 		}
-		expect(peak).toBeGreaterThan(0.9);
-		expect(peak).toBeLessThanOrEqual(1);
+		const fullChipPeak = SAA_CHANNEL_COUNT * SAA_FULL_SIDE_PEAK * SAA_OUTPUT_GAIN;
+		expect(peak).toBeGreaterThan(fullChipPeak * 0.9);
+		expect(peak).toBeLessThanOrEqual(fullChipPeak * 1.02);
 	});
 
 	it('keeps the level when tone and noise are off so the envelope can sound', () => {
