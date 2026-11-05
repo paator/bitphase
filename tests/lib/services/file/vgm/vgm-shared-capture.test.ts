@@ -41,10 +41,7 @@ describe('vgm-shared-capture validation', () => {
 			name: 'test',
 			patternOrder: [0],
 			loopPointId: 0,
-			songs: [
-				songStub({ interruptFrequency: 50 }),
-				songStub({ interruptFrequency: 60 })
-			],
+			songs: [songStub({ interruptFrequency: 50 }), songStub({ interruptFrequency: 60 })],
 			instruments: [],
 			tables: []
 		} as unknown as Project;
@@ -59,16 +56,31 @@ describe('vgm-shared-capture validation', () => {
 			name: 'test',
 			patternOrder: [0],
 			loopPointId: 0,
-			songs: [
-				songStub({ chipFrequency: 1773400 }),
-				songStub({ chipFrequency: 2000000 })
-			],
+			songs: [songStub({ chipFrequency: 1773400 }), songStub({ chipFrequency: 2000000 })],
 			instruments: [],
 			tables: []
 		} as unknown as Project;
 
 		await expect(captureVgmProject(project, [0, 1], [])).rejects.toThrow(
 			/matching chip frequencies/
+		);
+	});
+
+	it('rejects dual SAA with mismatched clocks', async () => {
+		const project = {
+			name: 'test',
+			patternOrder: [0],
+			loopPointId: 0,
+			songs: [
+				songStub({ chipType: 'saa', chipFrequency: 8_000_000 }),
+				songStub({ chipType: 'saa', chipFrequency: 7_159_090 })
+			],
+			instruments: [],
+			tables: []
+		} as unknown as Project;
+
+		await expect(captureVgmProject(project, [], [], undefined, [0, 1])).rejects.toThrow(
+			/dual SAA/
 		);
 	});
 });

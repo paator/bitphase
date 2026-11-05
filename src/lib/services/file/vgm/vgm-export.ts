@@ -20,7 +20,8 @@ import {
 	type AyTimerRuntime
 } from './vgm-ay-timers';
 import { expandAyFrameSampleWrites } from './vgm-ay-samples';
-import { captureVgmProject } from './vgm-shared-capture';
+import { appendSaaRegisterDiffs, SAA_VGM_REGISTER_COUNT, type SaaCaptureResult } from './vgm-saa';
+import { captureVgmProject, type VgmProjectCapture } from './vgm-shared-capture';
 
 const MAX_SAME_CHIP = 2;
 
@@ -40,6 +41,13 @@ type StreamEvent =
 			registers: number[];
 			dpcm: NesDpcmCapture | null;
 			lengthReloads: number[];
+	  }
+	| {
+			sample: number;
+			kind: 'saa';
+			chip: 0 | 1;
+			registers: number[];
+			envelopeRetrigger: [boolean, boolean];
 	  };
 
 function getSongIndicesByChip(project: Project, chipType: string): number[] {
@@ -58,8 +66,10 @@ function getSongIndicesByChip(project: Project, chipType: string): number[] {
 	return indices;
 }
 
-function systemNameForProject(ayCount: number, nesCount: number): string {
-	if (ayCount > 0 && nesCount > 0) return 'Multi-chip';
+function systemNameForProject(ayCount: number, nesCount: number, saaCount: number): string {
+	const kinds = [ayCount > 0, nesCount > 0, saaCount > 0].filter(Boolean).length;
+	if (kinds > 1) return 'Multi-chip';
+	if (saaCount > 0) return 'SAA1099';
 	if (nesCount > 0) return 'NES';
 	return 'AY-3-8910';
 }
@@ -119,12 +129,13 @@ function emitStreamEvents(
 	fromSample: number,
 	toSample: number,
 	ayPrev: number[][],
-	nesPrev: number[][]
+	nesPrev: number[][],
+	saaPrev: number[][]
 ): void {
 	events.sort((a, b) => {
 		if (a.sample !== b.sample) return a.sample - b.sample;
 		const rank = (event: StreamEvent) => {
-			if (event.kind === 'ay-base' || event.kind === 'nes') return 0;
+			if (event.kind === 'ay-base' || event.kind === 'nes' || event.kind === 'saa') return 0;
 			return 1;
 		};
 		return rank(a) - rank(b);
@@ -148,6 +159,14 @@ function emitStreamEvents(
 			);
 		} else if (event.kind === 'ay-timer') {
 			applyAyTimedWrite(commands, ayPrev[event.chip]!, event.write, event.chip);
+		} else if (event.kind === 'saa') {
+			appendSaaRegisterDiffs(
+				commands,
+				saaPrev[event.chip]!,
+				event.registers,
+				event.chip,
+				event.envelopeRetrigger
+			);
 		} else {
 			const previous = nesPrev[event.chip]!;
 			if (event.dpcm?.retrigger) {
@@ -181,6 +200,7 @@ function collectFrameEvents(
 	frameEnd: number,
 	ayCaptures: SongCaptureResult[],
 	nesCaptures: NesCaptureResult[],
+	saaCaptures: SaaCaptureResult[],
 	ayTimerRuntimes: AyTimerRuntime[]
 ): StreamEvent[] {
 	const events: StreamEvent[] = [];
@@ -242,7 +262,104 @@ function collectFrameEvents(
 		});
 	}
 
+	for (let chip = 0; chip < saaCaptures.length; chip++) {
+		const frame = saaCaptures[chip]!.frames[frameIndex];
+		if (!frame) continue;
+		events.push({
+			sample: frameStart,
+			kind: 'saa',
+			chip: chip === 0 ? 0 : 1,
+			registers: frame.registers,
+			envelopeRetrigger: frame.envelopeRetrigger
+		});
+	}
+
 	return events;
+}
+
+export function encodeCapturedVgm(
+	project: Project,
+	captured: VgmProjectCapture,
+	ayIndices: number[]
+): ArrayBuffer {
+	const ayCaptures = captured.ayCaptures;
+	const nesCaptures = captured.nesCaptures;
+	const saaCaptures = captured.saaCaptures;
+	const interruptFrequency = captured.interruptFrequency;
+	const waitSamples = samplesPerInterrupt(interruptFrequency);
+	const frameCount = Math.max(
+		0,
+		...ayCaptures.map((capture) => capture.frames.length),
+		...nesCaptures.map((capture) => capture.frames.length),
+		...saaCaptures.map((capture) => capture.frames.length)
+	);
+	const patternOrder = project.patternOrder || [0];
+	const loopFrameIndex = captured.songEnded
+		? null
+		: findLoopFrameIndex(captured.orderIndices, project.loopPointId, patternOrder.length);
+
+	const commands: number[] = [];
+	const ayPrev = ayCaptures.map(() => new Array(14).fill(-1));
+	const nesPrev = nesCaptures.map(() => new Array(0x16).fill(-1));
+	const saaPrev = saaCaptures.map(() => new Array(SAA_VGM_REGISTER_COUNT).fill(-1));
+	const ayTimerRuntimes = ayCaptures.map(() => createAyTimerRuntime());
+	let totalSamples = 0;
+	let loopDataOffset: number | undefined;
+	let samplesBeforeLoop = 0;
+
+	for (let frame = 0; frame < frameCount; frame++) {
+		if (loopFrameIndex === frame) {
+			loopDataOffset = VGM_HEADER_SIZE + commands.length;
+			samplesBeforeLoop = totalSamples;
+		}
+		const frameStart = totalSamples;
+		const frameEnd = totalSamples + waitSamples;
+		const events = collectFrameEvents(
+			frame,
+			frameStart,
+			frameEnd,
+			ayCaptures,
+			nesCaptures,
+			saaCaptures,
+			ayTimerRuntimes
+		);
+		emitStreamEvents(commands, events, frameStart, frameEnd, ayPrev, nesPrev, saaPrev);
+		totalSamples = frameEnd;
+	}
+
+	const loopSamples = loopDataOffset != null ? totalSamples - samplesBeforeLoop : undefined;
+	const firstAySong = ayIndices.length > 0 ? project.songs[ayIndices[0]!] : null;
+	const ayType = firstAySong
+		? resolveVgmAyType(
+				firstAySong.chipVariant,
+				Boolean((firstAySong as { stMixing?: boolean }).stMixing)
+			)
+		: undefined;
+
+	return encodeVgm({
+		ayClock: ayCaptures[0]?.chipFrequency,
+		ayDual: ayCaptures.length > 1,
+		ayType,
+		nesClock: nesCaptures[0]?.chipFrequency,
+		nesDual: nesCaptures.length > 1,
+		saaClock: saaCaptures[0]?.chipFrequency,
+		saaDual: saaCaptures.length > 1,
+		totalSamples,
+		loopDataOffset,
+		loopSamples: loopSamples != null && loopSamples > 0 ? loopSamples : undefined,
+		rateHz: interruptFrequency,
+		commands: Uint8Array.from(commands),
+		gd3: {
+			trackName: project.name || 'Untitled',
+			author: project.author || '',
+			systemName: systemNameForProject(
+				ayCaptures.length,
+				nesCaptures.length,
+				saaCaptures.length
+			),
+			converter: 'bitphase'
+		}
+	});
 }
 
 export async function exportToVGM(
@@ -256,13 +373,15 @@ export async function exportToVGM(
 
 		const ayIndices = getSongIndicesByChip(project, 'ay').slice(0, MAX_SAME_CHIP);
 		const nesIndices = getSongIndicesByChip(project, 'nes').slice(0, MAX_SAME_CHIP);
+		const saaIndices = getSongIndicesByChip(project, 'saa').slice(0, MAX_SAME_CHIP);
 
-		if (ayIndices.length === 0 && nesIndices.length === 0) {
-			throw new Error('No AY or NES songs to export');
+		if (ayIndices.length === 0 && nesIndices.length === 0 && saaIndices.length === 0) {
+			throw new Error('No AY, NES, or SAA songs to export');
 		}
 		if (
 			getSongIndicesByChip(project, 'ay').length > MAX_SAME_CHIP ||
-			getSongIndicesByChip(project, 'nes').length > MAX_SAME_CHIP
+			getSongIndicesByChip(project, 'nes').length > MAX_SAME_CHIP ||
+			getSongIndicesByChip(project, 'saa').length > MAX_SAME_CHIP
 		) {
 			throw new Error('VGM supports at most 2 chips of the same type');
 		}
@@ -271,83 +390,19 @@ export async function exportToVGM(
 			throw new Error('Export cancelled');
 		}
 
-		const captured = await captureVgmProject(project, ayIndices, nesIndices, {
-			onProgress,
-			abortSignal
-		});
-		const ayCaptures = captured.ayCaptures;
-		const nesCaptures = captured.nesCaptures;
+		const captured = await captureVgmProject(
+			project,
+			ayIndices,
+			nesIndices,
+			{
+				onProgress,
+				abortSignal
+			},
+			saaIndices
+		);
 
 		onProgress?.(85, 'Encoding VGM...');
-
-		const interruptFrequency = captured.interruptFrequency;
-		const waitSamples = samplesPerInterrupt(interruptFrequency);
-		const frameCount = Math.max(
-			0,
-			...ayCaptures.map((c) => c.frames.length),
-			...nesCaptures.map((c) => c.frames.length)
-		);
-		const patternOrder = project.patternOrder || [0];
-		const loopFrameIndex = captured.songEnded
-			? null
-			: findLoopFrameIndex(captured.orderIndices, project.loopPointId, patternOrder.length);
-
-		const commands: number[] = [];
-		const ayPrev = ayCaptures.map(() => new Array(14).fill(-1));
-		const nesPrev = nesCaptures.map(() => new Array(0x16).fill(-1));
-		const ayTimerRuntimes = ayCaptures.map(() => createAyTimerRuntime());
-		let totalSamples = 0;
-		let loopDataOffset: number | undefined;
-		let samplesBeforeLoop = 0;
-
-		for (let frame = 0; frame < frameCount; frame++) {
-			if (loopFrameIndex === frame) {
-				loopDataOffset = VGM_HEADER_SIZE + commands.length;
-				samplesBeforeLoop = totalSamples;
-			}
-			const frameStart = totalSamples;
-			const frameEnd = totalSamples + waitSamples;
-			const events = collectFrameEvents(
-				frame,
-				frameStart,
-				frameEnd,
-				ayCaptures,
-				nesCaptures,
-				ayTimerRuntimes
-			);
-			emitStreamEvents(commands, events, frameStart, frameEnd, ayPrev, nesPrev);
-			totalSamples = frameEnd;
-		}
-
-		const loopSamples =
-			loopDataOffset != null ? totalSamples - samplesBeforeLoop : undefined;
-
-		const firstAySong = ayIndices.length > 0 ? project.songs[ayIndices[0]!] : null;
-		const ayType = firstAySong
-			? resolveVgmAyType(
-					firstAySong.chipVariant,
-					Boolean((firstAySong as { stMixing?: boolean }).stMixing)
-				)
-			: undefined;
-
-		const buffer = encodeVgm({
-			ayClock: ayCaptures[0]?.chipFrequency,
-			ayDual: ayCaptures.length > 1,
-			ayType,
-			nesClock: nesCaptures[0]?.chipFrequency,
-			nesDual: nesCaptures.length > 1,
-			totalSamples,
-			loopDataOffset,
-			loopSamples: loopSamples != null && loopSamples > 0 ? loopSamples : undefined,
-			rateHz: interruptFrequency,
-			commands: Uint8Array.from(commands),
-			gd3: {
-				trackName: project.name || 'Untitled',
-				author: project.author || '',
-				systemName: systemNameForProject(ayCaptures.length, nesCaptures.length),
-				converter: 'bitphase'
-			}
-		});
+		const buffer = encodeCapturedVgm(project, captured, ayIndices);
 
 		if (abortSignal?.aborted) {
 			throw new Error('Export cancelled');

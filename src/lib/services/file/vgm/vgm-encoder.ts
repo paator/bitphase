@@ -3,6 +3,7 @@ export const VGM_HEADER_SIZE = 0x100;
 export const VGM_DUAL_CHIP_CLOCK_BIT = 0x40000000;
 export const VGM_CMD_AY8910 = 0xa0;
 export const VGM_CMD_NES_APU = 0xb4;
+export const VGM_CMD_SAA1099 = 0xbd;
 export const VGM_CMD_WAIT = 0x61;
 export const VGM_CMD_WAIT_735 = 0x62;
 export const VGM_CMD_WAIT_882 = 0x63;
@@ -27,6 +28,8 @@ export type EncodeVgmOptions = {
 	ayType?: number;
 	nesClock?: number;
 	nesDual?: boolean;
+	saaClock?: number;
+	saaDual?: boolean;
 	totalSamples: number;
 	loopSamples?: number;
 	loopDataOffset?: number;
@@ -117,6 +120,16 @@ export function appendNesWrite(
 ): void {
 	const addr = (addressOffset & 0x7f) | (chipIndex === 1 ? 0x80 : 0);
 	commands.push(VGM_CMD_NES_APU, addr, value & 0xff);
+}
+
+export function appendSaaWrite(
+	commands: number[],
+	register: number,
+	value: number,
+	chipIndex: 0 | 1 = 0
+): void {
+	const addr = (register & 0x1f) | (chipIndex === 1 ? 0x80 : 0);
+	commands.push(VGM_CMD_SAA1099, addr, value & 0xff);
 }
 
 export function appendRegisterDiffs(
@@ -247,9 +260,7 @@ export function encodeVgm(options: EncodeVgmOptions): ArrayBuffer {
 
 	const dataStart = VGM_HEADER_SIZE;
 	const gd3OffsetAbsolute = gd3 ? dataStart + endWithTerminator.length : 0;
-	const eofAbsolute = gd3
-		? gd3OffsetAbsolute + gd3.length
-		: dataStart + endWithTerminator.length;
+	const eofAbsolute = gd3 ? gd3OffsetAbsolute + gd3.length : dataStart + endWithTerminator.length;
 
 	const buffer = new ArrayBuffer(eofAbsolute);
 	const view = new DataView(buffer);
@@ -291,6 +302,14 @@ export function encodeVgm(options: EncodeVgmOptions): ArrayBuffer {
 			clock |= VGM_DUAL_CHIP_CLOCK_BIT;
 		}
 		writeU32LE(view, 0x84, clock);
+	}
+
+	if (options.saaClock && options.saaClock > 0) {
+		let clock = options.saaClock >>> 0;
+		if (options.saaDual) {
+			clock |= VGM_DUAL_CHIP_CLOCK_BIT;
+		}
+		writeU32LE(view, 0xc8, clock);
 	}
 
 	bytes.set(endWithTerminator, dataStart);

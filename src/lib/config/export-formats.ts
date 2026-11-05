@@ -29,7 +29,9 @@ const EXPORT_FORMATS: ExportFormat[] = [
 		isAvailable: (c) => {
 			const ay = c['ay'] ?? 0;
 			const nes = c['nes'] ?? 0;
-			return ay <= 2 && nes <= 2 && ay + nes >= 1;
+			const saa = c['saa'] ?? 0;
+			const counts = [ay, nes, saa];
+			return counts.every((count) => count <= 2) && counts.some((count) => count > 0);
 		}
 	},
 	{

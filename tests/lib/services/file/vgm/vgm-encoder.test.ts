@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { Project } from '@/lib/models/project';
+import type { SongCaptureFrame } from '@/lib/services/file/ay/ay-export-utils';
+import { encodeCapturedVgm } from '@/lib/services/file/vgm/vgm-export';
+import type { VgmProjectCapture } from '@/lib/services/file/vgm/vgm-shared-capture';
 import {
 	appendAyWrite,
 	appendNesDpcmTrigger,
 	appendNesRegisterDiffs,
 	appendNesWrite,
+	appendSaaWrite,
 	appendWait,
 	buildGd3Tag,
 	encodeVgm,
@@ -14,6 +19,7 @@ import {
 	VGM_CMD_AY8910,
 	VGM_CMD_END,
 	VGM_CMD_NES_APU,
+	VGM_CMD_SAA1099,
 	VGM_CMD_WAIT_882,
 	VGM_DUAL_CHIP_CLOCK_BIT,
 	VGM_HEADER_SIZE,
@@ -52,6 +58,24 @@ describe('vgm-encoder', () => {
 		expect(bytes[VGM_HEADER_SIZE]).toBe(VGM_CMD_WAIT_882);
 		expect(bytes[VGM_HEADER_SIZE + 1]).toBe(VGM_CMD_END);
 		expect(view.getUint32(0x14, true)).toBeGreaterThan(0);
+	});
+
+	it('writes the SAA1099 clock at 0xC8 and uses address bit 7 for the second chip', () => {
+		const commands: number[] = [];
+		appendSaaWrite(commands, 0x1c, 0x01, 0);
+		appendSaaWrite(commands, 0x1c, 0x01, 1);
+		expect(commands).toEqual([VGM_CMD_SAA1099, 0x1c, 0x01, VGM_CMD_SAA1099, 0x9c, 0x01]);
+
+		const buffer = encodeVgm({
+			saaClock: 8_000_000,
+			saaDual: true,
+			totalSamples: 882,
+			rateHz: 50,
+			commands: Uint8Array.from(commands)
+		});
+		const view = new DataView(buffer);
+		expect(view.getUint32(0xc8, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(8_000_000);
+		expect(view.getUint32(0xc8, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
 	});
 
 	it('uses address bit 7 for second AY/NES chip', () => {
@@ -300,7 +324,18 @@ describe('appendNesDpcmTrigger', () => {
 		appendNesDpcmTrigger(commands, previous, next, 0, new Uint8Array([0xaa]));
 
 		expect(commands.slice(0, 12)).toEqual([
-			0x67, 0x66, 0xc2, 3, 0, 0, 0, 0x00, 0xc0, 0xaa, VGM_CMD_NES_APU, 0x10
+			0x67,
+			0x66,
+			0xc2,
+			3,
+			0,
+			0,
+			0,
+			0x00,
+			0xc0,
+			0xaa,
+			VGM_CMD_NES_APU,
+			0x10
 		]);
 		expect(commands).toContain(0x0f);
 		const statusWrites = [];
@@ -310,5 +345,94 @@ describe('appendNesDpcmTrigger', () => {
 			}
 		}
 		expect(statusWrites).toEqual([0x0f, 0x1f]);
+	});
+
+	it('writes two AY, two NES, and two SAA into one file', () => {
+		const idle = { enabled: false };
+		const ayFrame = (value: number) =>
+			({
+				registers: [value, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+				sid: [idle, idle, idle],
+				syncbuzzer: [idle, idle, idle],
+				fm: [idle, idle, idle],
+				envFm: [idle, idle, idle],
+				sample: [idle, idle, idle]
+			}) as SongCaptureFrame;
+		const saaFrame = (value: number) => ({
+			registers: Array.from({ length: 32 }, (_, index) => (index === 0 ? value : 0)),
+			envelopeRetrigger: [false, false] as [boolean, boolean]
+		});
+		const captured: VgmProjectCapture = {
+			ayCaptures: [0, 1].map((index) => ({
+				frames: [ayFrame(index + 1)],
+				orderIndices: [0],
+				instruments: [],
+				chipFrequency: 1_773_400,
+				interruptFrequency: 50,
+				isYm: false
+			})),
+			nesCaptures: [0, 1].map((index) => ({
+				frames: [
+					Array.from({ length: 0x16 }, (_, register) => (register === 0 ? index + 1 : 0))
+				],
+				dpcmFrames: [null],
+				lengthReloads: [[]],
+				orderIndices: [0],
+				chipFrequency: 1_789_773,
+				interruptFrequency: 50,
+				songEnded: false
+			})),
+			saaCaptures: [0, 1].map((index) => ({
+				frames: [saaFrame(0x10 + index)],
+				orderIndices: [0],
+				chipFrequency: 8_000_000,
+				interruptFrequency: 50
+			})),
+			interruptFrequency: 50,
+			orderIndices: [0],
+			songEnded: true
+		};
+		const bytes = new Uint8Array(encodeCapturedVgm(new Project('Mix'), captured, [0, 1]));
+		const view = new DataView(bytes.buffer);
+		expect(view.getUint32(0x74, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(1_773_400);
+		expect(view.getUint32(0x74, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
+		expect(view.getUint32(0x84, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(1_789_773);
+		expect(view.getUint32(0x84, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
+		expect(view.getUint32(0xc8, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(8_000_000);
+		expect(view.getUint32(0xc8, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
+
+		const writes: Array<[number, number]> = [];
+		for (let index = VGM_HEADER_SIZE; index < bytes.length; ) {
+			const command = bytes[index];
+			if (command === VGM_CMD_END) break;
+			if (
+				command === VGM_CMD_AY8910 ||
+				command === VGM_CMD_NES_APU ||
+				command === VGM_CMD_SAA1099
+			) {
+				writes.push([command, bytes[index + 1] ?? 0]);
+				index += 3;
+				continue;
+			}
+			if (command === 0x61) {
+				index += 3;
+				continue;
+			}
+			if (command === 0x62 || command === 0x63) {
+				index += 1;
+				continue;
+			}
+			throw new Error(`unexpected command ${command?.toString(16)}`);
+		}
+		expect(writes).toEqual(
+			expect.arrayContaining([
+				[VGM_CMD_AY8910, 0x00],
+				[VGM_CMD_AY8910, 0x80],
+				[VGM_CMD_NES_APU, 0x00],
+				[VGM_CMD_NES_APU, 0x80],
+				[VGM_CMD_SAA1099, 0x00],
+				[VGM_CMD_SAA1099, 0x80]
+			])
+		);
 	});
 });

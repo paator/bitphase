@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildChipConfiguration, buildExportMenuItems } from '../../../src/lib/config/export-formats';
+import {
+	buildChipConfiguration,
+	buildExportMenuItems
+} from '../../../src/lib/config/export-formats';
 
 describe('export formats', () => {
 	it('shows PSG and SNDH for single AY', () => {
@@ -34,16 +37,18 @@ describe('export formats', () => {
 		const single = buildExportMenuItems(buildChipConfiguration(['nes']));
 		expect(single.map((item) => item.label)).toContain('NSF');
 		expect(single.find((item) => item.label === 'NSF')?.action).toBe('export-nsf');
-		expect(buildExportMenuItems(buildChipConfiguration(['ay'])).map((i) => i.label)).toContain('NSF');
-		expect(buildExportMenuItems(buildChipConfiguration(['ay', 'nes'])).map((i) => i.label)).toContain(
+		expect(buildExportMenuItems(buildChipConfiguration(['ay'])).map((i) => i.label)).toContain(
 			'NSF'
 		);
-		expect(buildExportMenuItems(buildChipConfiguration(['nes', 'nes'])).map((i) => i.label)).not.toContain(
-			'NSF'
-		);
-		expect(buildExportMenuItems(buildChipConfiguration(['ay', 'ay'])).map((i) => i.label)).not.toContain(
-			'NSF'
-		);
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['ay', 'nes'])).map((i) => i.label)
+		).toContain('NSF');
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['nes', 'nes'])).map((i) => i.label)
+		).not.toContain('NSF');
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['ay', 'ay'])).map((i) => i.label)
+		).not.toContain('NSF');
 	});
 
 	it('shows VGM for NES and mixed chips within dual limits', () => {
@@ -62,5 +67,27 @@ describe('export formats', () => {
 		expect(
 			buildExportMenuItems(buildChipConfiguration(['nes', 'nes', 'nes'])).map((i) => i.label)
 		).not.toContain('VGM');
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['saa', 'saa', 'saa'])).map((i) => i.label)
+		).not.toContain('VGM');
+	});
+
+	it('shows VGM for any mix with at most two of each chip', () => {
+		expect(buildExportMenuItems(buildChipConfiguration(['saa'])).map((i) => i.label)).toContain(
+			'VGM'
+		);
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['saa', 'ay', 'ay'])).map((i) => i.label)
+		).toContain('VGM');
+		expect(
+			buildExportMenuItems(buildChipConfiguration(['nes', 'nes', 'saa', 'saa', 'ay'])).map(
+				(i) => i.label
+			)
+		).toContain('VGM');
+		expect(
+			buildExportMenuItems(
+				buildChipConfiguration(['ay', 'ay', 'nes', 'nes', 'saa', 'saa'])
+			).map((i) => i.label)
+		).toContain('VGM');
 	});
 });
