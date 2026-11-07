@@ -30,6 +30,10 @@
 	import PlaybackToneDebug from './PlaybackToneDebug.svelte';
 	import ChannelOscilloscopes from './ChannelOscilloscopes.svelte';
 	import { PatternService } from '../../services/pattern/pattern-service';
+	import type {
+		PatternEditorDirection,
+		PatternEditorLanding
+	} from '../../services/pattern/pattern-navigation';
 	import { settingsStore } from '../../stores/settings.svelte';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { projectStore } from '../../stores/project.svelte';
@@ -177,6 +181,48 @@
 			.map((type) => byType.get(type))
 			.filter((chip) => chip != null);
 	});
+
+	function wrappedEditorIndex(direction: PatternEditorDirection): number {
+		if (direction === 'next') {
+			for (let index = 0; index < patternEditors.length; index++) {
+				if (patternEditors[index]) return index;
+			}
+			return -1;
+		}
+		for (let index = patternEditors.length - 1; index >= 0; index--) {
+			if (patternEditors[index]) return index;
+		}
+		return -1;
+	}
+
+	function focusAdjacentEditor(
+		fromIndex: number,
+		direction: PatternEditorDirection,
+		landing: PatternEditorLanding,
+		wrap = false
+	): boolean {
+		const step = direction === 'next' ? 1 : -1;
+		let targetIndex = fromIndex + step;
+		while (
+			targetIndex >= 0 &&
+			targetIndex < patternEditors.length &&
+			!patternEditors[targetIndex]
+		) {
+			targetIndex += step;
+		}
+		if (!patternEditors[targetIndex] && wrap) {
+			targetIndex = wrappedEditorIndex(direction);
+			if (targetIndex === fromIndex) return false;
+		}
+		const target = patternEditors[targetIndex];
+		if (!target) return false;
+		target.placeCursor(landing);
+		activeEditorIndex = targetIndex;
+		patternEditor = target;
+		target.focusCanvas();
+		target.scrollCursorIntoView();
+		return true;
+	}
 
 	function getHardwareChannelLabels(chipIndex: number): string[] {
 		return chipProcessors[chipIndex]?.chip.schema.channelLabels ?? ['A', 'B', 'C'];
@@ -576,7 +622,9 @@
 
 <div bind:this={songViewContainer} class="relative flex h-full flex-col overflow-hidden">
 	<div class="flex flex-1 overflow-hidden">
-		<div class="relative flex min-w-0 flex-1 flex-nowrap overflow-x-auto overflow-y-hidden">
+		<div
+			class="relative flex min-w-0 flex-1 flex-nowrap overflow-x-auto overflow-y-hidden"
+			data-song-pattern-scroll>
 			<div
 				class="sticky left-0 z-20 h-full shrink-0 bg-[var(--color-app-surface-secondary)] transition-all duration-300 {blurredContentClass}">
 				<Card
@@ -759,6 +807,13 @@
 													activeEditorIndex = i;
 													patternEditor = patternEditors[i];
 												}}
+												onLeaveEditor={(direction, landing, wrap) =>
+													focusAdjacentEditor(
+														i,
+														direction,
+														landing,
+														wrap
+													)}
 												canFocusOnHover={() =>
 													!patternEditors.some(
 														(e) =>

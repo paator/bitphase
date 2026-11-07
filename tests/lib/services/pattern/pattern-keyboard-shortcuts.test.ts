@@ -139,4 +139,116 @@ describe('PatternKeyboardShortcutsService selection navigation', () => {
 		expect(ctx.onInsertPatternRow).not.toHaveBeenCalled();
 		expect(ctx.onRemovePatternRow).not.toHaveBeenCalled();
 	});
+
+	it('moves within the pattern when page down still has rows left', () => {
+		const onLeaveEditor = vi.fn(() => true);
+		const ctx = createContext({ onLeaveEditor });
+
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('PageDown'), ctx);
+
+		expect(onLeaveEditor).not.toHaveBeenCalled();
+		expect(ctx.onMoveRow).toHaveBeenCalledWith(16);
+	});
+
+	it('stays on this chip when page down cannot move further', () => {
+		const onLeaveEditor = vi.fn(() => true);
+		const ctx = createContext({ selectedRow: 63, onLeaveEditor });
+
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('PageDown'), ctx);
+
+		expect(onLeaveEditor).not.toHaveBeenCalled();
+		expect(ctx.onMoveRow).toHaveBeenCalledWith(16);
+	});
+
+	it('stays on this chip when arrow up cannot move further', () => {
+		const onLeaveEditor = vi.fn(() => true);
+		const ctx = createContext({ selectedRow: 0, onLeaveEditor });
+
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('ArrowUp'), ctx);
+
+		expect(onLeaveEditor).not.toHaveBeenCalled();
+		expect(ctx.onMoveRow).toHaveBeenCalledWith(-1);
+	});
+
+	it('leaves the chip when channel cycle wraps and another chip can take it', () => {
+		const onLeaveEditor = vi.fn(() => true);
+		const pattern = new Pattern(0, 16);
+		const ctx = createContext({
+			pattern,
+			selectedRow: 0,
+			selectedColumn: 0,
+			onLeaveEditor,
+			navigationContext: {
+				patterns: [pattern],
+				patternOrder: [0],
+				currentPattern: pattern,
+				converter: {
+					toGeneric: () => ({
+						id: 0,
+						length: 16,
+						channels: [{ rows: Array.from({ length: 16 }, () => ({})) }],
+						patternRows: Array.from({ length: 16 }, () => ({}))
+					})
+				} as never,
+				formatter: {
+					formatRow: () => '',
+					parseRow: () => ({ patternRow: {}, channels: [] }),
+					getColorForField: () => '#000'
+				} as never,
+				schema: {
+					chipType: 'test',
+					template: '',
+					fields: {},
+					globalFields: {}
+				},
+				getCellPositions: () => []
+			}
+		});
+
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('`'), ctx);
+
+		expect(onLeaveEditor).toHaveBeenCalledWith('next', 'first-column', true);
+		expect(ctx.onSetSelectedColumn).not.toHaveBeenCalled();
+	});
+
+	it('wraps inside the only chip when channel cycle cannot leave', () => {
+		const onLeaveEditor = vi.fn(() => false);
+		const pattern = new Pattern(0, 16);
+		const ctx = createContext({
+			pattern,
+			selectedRow: 0,
+			selectedColumn: 0,
+			onLeaveEditor,
+			navigationContext: {
+				patterns: [pattern],
+				patternOrder: [0],
+				currentPattern: pattern,
+				converter: {
+					toGeneric: () => ({
+						id: 0,
+						length: 16,
+						channels: [{ rows: Array.from({ length: 16 }, () => ({})) }],
+						patternRows: Array.from({ length: 16 }, () => ({}))
+					})
+				} as never,
+				formatter: {
+					formatRow: () => '',
+					parseRow: () => ({ patternRow: {}, channels: [] }),
+					getColorForField: () => '#000'
+				} as never,
+				schema: {
+					chipType: 'test',
+					template: '',
+					fields: {},
+					globalFields: {}
+				},
+				getCellPositions: () => []
+			}
+		});
+
+		PatternKeyboardShortcutsService.handleKeyDown(keyEvent('`'), ctx);
+
+		expect(onLeaveEditor).toHaveBeenCalledWith('next', 'first-column', true);
+		expect(ctx.onSetSelectedColumn).toHaveBeenCalledWith(0);
+	});
 });

@@ -83,6 +83,8 @@ Step `1` feels like a classic tracker. Higher steps (for example `2` or `4`) are
 
 If you move past the top or bottom of the pattern, Bitphase will jump into the previous or next order entry when one exists - so you can keep editing through the song without hunting in the order list every time.
 
+Move past the left or right edge and the cursor continues on the previous or next chip, on the same row. `` ` `` walks channels across chips, and after the last channel of the last chip it wraps to the first channel of the first chip. Up, down, page up, and page down stay on the current chip.
+
 Faded **ghost rows** from neighboring patterns may appear at the edges. They are only for context; you edit the solid rows of the current pattern.
 
 ## Selection and clipboard

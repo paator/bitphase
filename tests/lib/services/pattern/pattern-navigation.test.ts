@@ -224,6 +224,47 @@ describe('PatternNavigationService', () => {
 		});
 	});
 
+	describe('columnOverflow', () => {
+		it('reports the next editor when moving past the last column', () => {
+			const patterns = [new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH)];
+			const patternOrder = [DEFAULT_PATTERN_ID];
+			const context = createMockContext(patterns, patternOrder);
+			const state: NavigationState = {
+				selectedRow: 0,
+				currentPatternOrderIndex: 0,
+				selectedColumn: 2
+			};
+
+			expect(PatternNavigationService.columnOverflow(state, context, 1)).toBe('next');
+		});
+
+		it('reports the previous editor when moving before the first column', () => {
+			const patterns = [new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH)];
+			const patternOrder = [DEFAULT_PATTERN_ID];
+			const context = createMockContext(patterns, patternOrder);
+			const state: NavigationState = {
+				selectedRow: 0,
+				currentPatternOrderIndex: 0,
+				selectedColumn: 0
+			};
+
+			expect(PatternNavigationService.columnOverflow(state, context, -1)).toBe('previous');
+		});
+
+		it('reports no overflow while the column stays in the row', () => {
+			const patterns = [new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH)];
+			const patternOrder = [DEFAULT_PATTERN_ID];
+			const context = createMockContext(patterns, patternOrder);
+			const state: NavigationState = {
+				selectedRow: 0,
+				currentPatternOrderIndex: 0,
+				selectedColumn: 1
+			};
+
+			expect(PatternNavigationService.columnOverflow(state, context, 1)).toBeNull();
+		});
+	});
+
 	describe('moveColumnByDelta', () => {
 		it('should increment column by positive delta', () => {
 			const patterns = [new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH)];
@@ -283,6 +324,28 @@ describe('PatternNavigationService', () => {
 			const result = PatternNavigationService.moveColumnByDelta(state, context, 5);
 
 			expect(result.selectedColumn).toBe(2);
+		});
+	});
+
+	describe('moveToNextChannel', () => {
+		it('wraps when the editor has a single channel slot', () => {
+			const schema = {
+				...createMockChip().schema,
+				channelLabels: ['A']
+			};
+			const pattern = new Pattern(DEFAULT_PATTERN_ID, DEFAULT_PATTERN_LENGTH, schema);
+			const context = createMockContext([pattern], [DEFAULT_PATTERN_ID]);
+			context.schema = schema;
+			const state: NavigationState = {
+				selectedRow: 0,
+				currentPatternOrderIndex: 0,
+				selectedColumn: 0
+			};
+
+			const result = PatternNavigationService.moveToNextChannel(state, context);
+
+			expect(result.wrapped).toBe(true);
+			expect(result.selectedColumn).toBe(0);
 		});
 	});
 

@@ -17,7 +17,11 @@
 	import { playbackStore } from '../../stores/playback.svelte';
 	import { getFormatter, getConverter } from '../../chips/registry';
 	import { PatternService } from '../../services/pattern/pattern-service';
-	import { PatternNavigationService } from '../../services/pattern/pattern-navigation';
+	import {
+		PatternNavigationService,
+		type PatternEditorDirection,
+		type PatternEditorLanding
+	} from '../../services/pattern/pattern-navigation';
 	import {
 		PatternVisibleRowsService,
 		type VisibleRow,
@@ -131,6 +135,7 @@
 		isActive = false,
 		isPlaybackMaster = false,
 		onfocus,
+		onLeaveEditor,
 		canFocusOnHover = () => false,
 		onaction,
 		initAllChips,
@@ -147,6 +152,11 @@
 		isActive?: boolean;
 		isPlaybackMaster?: boolean;
 		onfocus?: () => void;
+		onLeaveEditor?: (
+			direction: PatternEditorDirection,
+			landing: PatternEditorLanding,
+			wrap?: boolean
+		) => boolean;
 		canFocusOnHover?: () => boolean;
 		onaction?: (data: { action: string }) => void;
 		initAllChips?: () => void;
@@ -600,6 +610,61 @@
 
 	export function focusCanvas(): void {
 		canvas?.focus();
+	}
+
+	export function placeCursor(landing: PatternEditorLanding): void {
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		mouseDownCell = null;
+		pressOnInactiveEditor = false;
+		const pattern = currentPattern || ensurePatternExists();
+		if (!pattern) return;
+		const state = {
+			selectedRow,
+			currentPatternOrderIndex,
+			selectedColumn
+		};
+		const context = buildNavigationContext(pattern);
+		if (landing === 'first-column') {
+			selectedColumn = 0;
+			return;
+		}
+		if (landing === 'last-column') {
+			selectedColumn = PatternNavigationService.moveToRowEnd(state, context).selectedColumn;
+			return;
+		}
+		selectedColumn = PatternNavigationService.moveToPreviousChannel(
+			{ ...state, selectedColumn: 0 },
+			context
+		).selectedColumn;
+	}
+
+	export function scrollCursorIntoView(): void {
+		if (!canvas) return;
+		const scroller = canvas.closest('[data-song-pattern-scroll]');
+		const pattern = currentPattern;
+		if (!(scroller instanceof HTMLElement) || !pattern) {
+			canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+			return;
+		}
+		const rowString = getPatternRowData(pattern, selectedRow);
+		const cells = getCellPositions(rowString, selectedRow);
+		const cell = cells[selectedColumn];
+		if (!cell) {
+			canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+			return;
+		}
+		const canvasRect = canvas.getBoundingClientRect();
+		const scrollerRect = scroller.getBoundingClientRect();
+		const cellLeft = canvasRect.left + cell.x;
+		const cellRight = cellLeft + cell.width;
+		if (cellLeft < scrollerRect.left) {
+			scroller.scrollLeft -= scrollerRect.left - cellLeft;
+		} else if (cellRight > scrollerRect.right) {
+			scroller.scrollLeft += cellRight - scrollerRect.right;
+		}
 	}
 
 	export function getCanvas(): HTMLCanvasElement | undefined {
@@ -1340,9 +1405,7 @@
 					isSelected:
 						isActive &&
 						isCurrentPattern &&
-						(cursorOverride
-							? row.rowIndex === cursorOverride.row
-							: row.isSelected),
+						(cursorOverride ? row.rowIndex === cursorOverride.row : row.isSelected),
 					rowIndex: row.rowIndex,
 					selectedColumn: cursorOverride?.column ?? selectedColumn,
 					segments,
@@ -1497,6 +1560,32 @@
 		};
 	});
 
+	function buildNavigationContext(pattern: Pattern) {
+		return {
+			patterns,
+			patternOrder,
+			currentPattern: pattern,
+			converter,
+			formatter,
+			schema,
+			getCellPositions
+		};
+	}
+
+	function tryLeaveEditor(
+		direction: PatternEditorDirection,
+		landing: PatternEditorLanding,
+		wrap = false
+	): boolean {
+		if (!onLeaveEditor?.(direction, landing, wrap)) return false;
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		scheduleDraw();
+		return true;
+	}
+
 	function moveRow(delta: number) {
 		if (playbackStore.isPlaying) return;
 
@@ -1546,23 +1635,19 @@
 		const pattern = currentPattern || ensurePatternExists();
 		if (!pattern) return;
 
-		const navigationState = PatternNavigationService.moveColumnByDelta(
-			{
-				selectedRow,
-				currentPatternOrderIndex,
-				selectedColumn
-			},
-			{
-				patterns,
-				patternOrder,
-				currentPattern: pattern,
-				converter,
-				formatter,
-				schema,
-				getCellPositions
-			},
-			delta
-		);
+		const state = {
+			selectedRow,
+			currentPatternOrderIndex,
+			selectedColumn
+		};
+		const context = buildNavigationContext(pattern);
+		const overflow = PatternNavigationService.columnOverflow(state, context, delta);
+		if (overflow) {
+			const landing = overflow === 'next' ? 'first-column' : 'last-column';
+			if (tryLeaveEditor(overflow, landing)) return;
+		}
+
+		const navigationState = PatternNavigationService.moveColumnByDelta(state, context, delta);
 
 		selectedColumn = navigationState.selectedColumn;
 	}
@@ -1622,6 +1707,7 @@
 			},
 			onMoveRow: moveRow,
 			onMoveColumn: moveColumn,
+			onLeaveEditor: tryLeaveEditor,
 			onSetSelectedRow: setSelectedRow,
 			onSetSelectedColumn: (column: number) => {
 				selectedColumn = column;
