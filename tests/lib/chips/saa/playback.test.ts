@@ -648,3 +648,107 @@ describe('SAA tone playback', () => {
 		expect(other).toBe(0);
 	});
 });
+
+describe('SAA auto-envelope', () => {
+	const toneTable = toneCodes.map((code) => saaPeriodFromCode(code));
+
+	function groupState() {
+		const state = playbackState(20);
+		state.channelMuted = Array(6).fill(false);
+		state.channelSoundEnabled = Array(6).fill(true);
+		state.channelPatternLeft = Array(6).fill(15);
+		state.channelPatternRight = Array(6).fill(15);
+		state.channelAmplitudeSliding = Array(6).fill(0);
+		state.channelInstruments = Array(6).fill(0);
+		state.instrumentPositions = Array(6).fill(0);
+		state.channelBaseNotes = [12, 20, 40, 8, 16, 48];
+		state.channelCurrentNotes = state.channelBaseNotes.slice();
+		state.currentTuningTable = toneTable;
+		state.instruments[0].macros.tone = { values: [true], loop: 0 };
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		return state;
+	}
+
+	function autoEnvelopePattern(channelCount: number, channelIndex: number, parameter: number) {
+		return {
+			channels: Array.from({ length: channelCount }, (_, index) => ({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						instrument: 0,
+						effects:
+							index === channelIndex
+								? [{ effect: 'E'.charCodeAt(0), delay: 0x0a, parameter }]
+								: [null]
+					}
+				]
+			}))
+		};
+	}
+
+	it('writes the ratio onto the clock channel from whichever channel holds EA', () => {
+		const driver = new SaaAudioDriver();
+		const state = groupState();
+		const registers = new SaaRegisterState(6);
+
+		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0x11), 0, { env0: 4 });
+		driver.processInstruments(state, registers);
+
+		const clock = saaPitchCode(toneTable[40], 0);
+		expect(toneCode(registers.channels[1])).toBe(clock);
+		expect(registers.channels[1].tone).toBe(false);
+		expect(registers.channels[1].noise).toBe(false);
+		expect(toneCode(registers.channels[2])).toBe(toneCodes[40]);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(state.autoEnvelopeSource[0]).toBe(2);
+
+		state.instrumentPositions = Array(6).fill(0);
+		driver.processPatternRow(state, autoEnvelopePattern(6, 0, 0x32), 0, { env0: 4 });
+		driver.processInstruments(state, registers);
+		expect(toneCode(registers.channels[1])).toBe(
+			saaPitchCode(Math.round((toneTable[12] * 3) / 2), 0)
+		);
+		expect(state.autoEnvelopeSource[0]).toBe(0);
+	});
+
+	it('clocks the second group from its own EA and leaves the first clock alone', () => {
+		const driver = new SaaAudioDriver();
+		const state = groupState();
+		const registers = new SaaRegisterState(6);
+
+		driver.processPatternRow(state, autoEnvelopePattern(6, 5, 0x11), 0, { env1: 6 });
+		driver.processInstruments(state, registers);
+
+		expect(toneCode(registers.channels[4])).toBe(saaPitchCode(toneTable[48], 0));
+		expect(registers.channels[4].tone).toBe(false);
+		expect(toneCode(registers.channels[1])).toBe(toneCodes[20]);
+		expect(registers.channels[1].tone).toBe(true);
+	});
+
+	it('EA00 stops replacing the clock channel', () => {
+		const driver = new SaaAudioDriver();
+		const state = groupState();
+		const registers = new SaaRegisterState(6);
+
+		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0x11), 0, { env0: 4 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0), 0, { env0: 4 });
+		driver.processInstruments(state, registers);
+
+		expect(state.autoEnvelopeActive[0]).toBe(false);
+		expect(toneCode(registers.channels[1])).toBe(toneCodes[20]);
+		expect(registers.channels[1].tone).toBe(true);
+	});
+
+	it('names EAXY in the status hint and clears the ratio on reset', () => {
+		expect(describeSaaEffect({ effect: 'E'.charCodeAt(0), delay: 0x0a })).toContain('X:Y');
+		const state = new SaaState();
+		state.autoEnvelopeActive = [true, false];
+		state.autoEnvelopeNumerator = [3, 0];
+		state.autoEnvelopeDenominator = [2, 0];
+		state.autoEnvelopeSource = [2, -1];
+		state.reset();
+		expect(state.autoEnvelopeActive).toEqual([false, false]);
+		expect(state.autoEnvelopeSource).toEqual([-1, -1]);
+	});
+});

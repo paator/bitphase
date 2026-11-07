@@ -3,6 +3,7 @@ import type { ChipSchema } from '../../../../src/lib/chips/base/schema';
 import type { Pattern } from '../../../../src/lib/models/song';
 import { AY_CHIP_SCHEMA } from '../../../../src/lib/chips/ay/schema';
 import { NES_CHIP_SCHEMA } from '../../../../src/lib/chips/nes/schema';
+import { SAA_CHIP_SCHEMA } from '../../../../src/lib/chips/saa/schema';
 import { collectPlaybackCarry } from '../../../../src/lib/services/audio/play-from-position';
 
 const schema: ChipSchema = {
@@ -396,5 +397,95 @@ describe('collectPlaybackCarry', () => {
 				}
 			]
 		});
+	});
+});
+
+const CHIP_EFFECT = 'E'.charCodeAt(0);
+
+function saaPattern(id: number, length: number): Pattern {
+	return {
+		id,
+		length,
+		channels: Array.from({ length: 6 }, (_, index) => ({
+			label: 'ABCDEF'[index] ?? 'A',
+			effectColumnCount: 1,
+			rows: Array.from({ length }, () => ({
+				note: { name: 0, octave: 0 },
+				effects: [null]
+			}))
+		})),
+		patternRows: Array.from({ length }, () => ({
+			noise0: 0,
+			noise1: 0,
+			env0: 0,
+			env1: 0
+		}))
+	} as Pattern;
+}
+
+function saaEffect(channel: number, pattern: Pattern, row: number, parameter: number): void {
+	pattern.channels[channel]!.rows[row]!.effects = [
+		{ effect: CHIP_EFFECT, delay: 0x0a, parameter }
+	];
+}
+
+describe('SAA playback carry', () => {
+	it('carries the last noise and envelope columns across blank cells', () => {
+		const first = saaPattern(0, 2);
+		(first.patternRows[0] as Record<string, unknown>).noise0 = 2;
+		(first.patternRows[0] as Record<string, unknown>).env0 = 4;
+		(first.patternRows[0] as Record<string, unknown>).noise1 = 1;
+		(first.patternRows[0] as Record<string, unknown>).env1 = 6;
+		const second = saaPattern(1, 1);
+
+		expect(
+			collectPlaybackCarry([0, 1], (id) => (id === 0 ? first : second), 1, 0, SAA_CHIP_SCHEMA)
+				?.globalFields
+		).toEqual({
+			noise0: 2,
+			env0: 4,
+			noise1: 1,
+			env1: 6
+		});
+	});
+
+	it('lets an explicit column off replace the earlier value', () => {
+		const pattern = saaPattern(0, 3);
+		(pattern.patternRows[0] as Record<string, unknown>).env0 = 4;
+		(pattern.patternRows[1] as Record<string, unknown>).env0 = -1;
+
+		expect(
+			collectPlaybackCarry([0], () => pattern, 0, 2, SAA_CHIP_SCHEMA)?.globalFields
+		).toEqual({
+			env0: -1
+		});
+	});
+
+	it('carries the newest auto-envelope in each channel group', () => {
+		const pattern = saaPattern(0, 3);
+		saaEffect(2, pattern, 0, 0x32);
+		saaEffect(5, pattern, 0, 0x21);
+		saaEffect(0, pattern, 1, 0x11);
+
+		const carry = collectPlaybackCarry([0], () => pattern, 0, 2, SAA_CHIP_SCHEMA);
+		expect(carry?.channelStickyEffects?.[0]).toEqual([
+			{ effect: CHIP_EFFECT, delay: 0x0a, parameter: 0x11 }
+		]);
+		expect(carry?.channelStickyEffects?.[2]).toEqual([]);
+		expect(carry?.channelStickyEffects?.[5]).toEqual([
+			{ effect: CHIP_EFFECT, delay: 0x0a, parameter: 0x21 }
+		]);
+	});
+
+	it('carries an auto-envelope off so an earlier ratio does not return', () => {
+		const pattern = saaPattern(0, 3);
+		saaEffect(2, pattern, 0, 0x32);
+		saaEffect(0, pattern, 1, 0x00);
+
+		const carry = collectPlaybackCarry([0], () => pattern, 0, 2, SAA_CHIP_SCHEMA);
+		expect(carry?.channelStickyEffects?.[0]).toEqual([
+			{ effect: CHIP_EFFECT, delay: 0x0a, parameter: 0 }
+		]);
+		expect(carry?.channelStickyEffects?.[2]).toEqual([]);
 	});
 });

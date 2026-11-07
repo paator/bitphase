@@ -91,7 +91,8 @@ export interface ChipSchema {
 		context: Record<string, unknown>
 	) => ChipSettingSideEffect[];
 	normalizeSettings?: (record: Record<string, unknown>) => Record<string, unknown>;
-	stickyChannelEffectGroup?: (effect: StickyEffectCommand) => string | null;
+	stickyChannelEffectGroup?: (effect: StickyEffectCommand, channelIndex: number) => string | null;
+	stickyChannelEffectIsShared?: (group: string) => boolean;
 	readGlobalStickyRow?: (
 		patternRow: Record<string, unknown>,
 		channelRows: Array<Record<string, unknown> | undefined>

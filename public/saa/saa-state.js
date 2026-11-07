@@ -44,6 +44,10 @@ class SaaState extends TrackerState {
 		this.envelopeCommand1 = null;
 		this.noiseLock0 = false;
 		this.noiseLock1 = false;
+		this.autoEnvelopeActive = [false, false];
+		this.autoEnvelopeNumerator = [0, 0];
+		this.autoEnvelopeDenominator = [0, 0];
+		this.autoEnvelopeSource = [-1, -1];
 	}
 
 	setWasmModule(wasmModule, chipPtr, wasmBuffer) {
@@ -77,6 +81,10 @@ class SaaState extends TrackerState {
 		this.envelopeCommand1 = null;
 		this.noiseLock0 = false;
 		this.noiseLock1 = false;
+		this.autoEnvelopeActive = [false, false];
+		this.autoEnvelopeNumerator = [0, 0];
+		this.autoEnvelopeDenominator = [0, 0];
+		this.autoEnvelopeSource = [-1, -1];
 	}
 }
 

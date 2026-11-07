@@ -5,6 +5,9 @@ import { Effect, EffectType, Note, NoteName, Pattern } from '@/lib/models/song';
 import { AYConverter } from '@/lib/chips/ay/adapter';
 import { AYFormatter } from '@/lib/chips/ay/formatter';
 import { AY_CHIP_SCHEMA } from '@/lib/chips/ay/schema';
+import { SAAConverter } from '@/lib/chips/saa/adapter';
+import { SAAFormatter } from '@/lib/chips/saa/formatter';
+import { SAA_CHIP_SCHEMA } from '@/lib/chips/saa/schema';
 import { NESConverter } from '@/lib/chips/nes/adapter';
 import { NESFormatter } from '@/lib/chips/nes/formatter';
 import { NES_CHIP_SCHEMA } from '@/lib/chips/nes/schema';
@@ -298,6 +301,52 @@ describe('ClipboardService cross-chip paste', () => {
 		expect(updated.channels[0].rows[0].table).toBe(4);
 		expect(updated.channels[0].rows[0].volume).toBe(0xe);
 		expect(updated.channels[0].rows[0].envelopeShape).toBe(0);
+	});
+
+	it('pastes an SAA envelope onto the destination group instead of the source column', async () => {
+		const converter = new SAAConverter();
+		const formatter = new SAAFormatter();
+		const source = new Pattern(0, 1, SAA_CHIP_SCHEMA);
+		source.channels[4].rows[0].note = new Note(NoteName.G, 8);
+		source.channels[5].rows[0].note = new Note(NoteName.G, 5);
+		source.patternRows[0].env0 = 9;
+		source.patternRows[0].env1 = 3;
+
+		const sourceRow = formatPatternRow(source, converter, formatter, SAA_CHIP_SCHEMA);
+		const sourceCells = fieldCellsForRow(sourceRow, SAA_CHIP_SCHEMA, source);
+		const noteColumns = sourceCells.flatMap((cell, index) =>
+			cell.fieldKey === 'note' ? [index] : []
+		);
+		ClipboardService.copySelection(
+			createClipboardContext(source, converter, formatter, SAA_CHIP_SCHEMA, noteColumns[4], {
+				minCol: noteColumns[4],
+				maxCol: sourceCells.length - 1
+			})
+		);
+
+		const target = new Pattern(1, 1, SAA_CHIP_SCHEMA);
+		const targetRow = formatPatternRow(target, converter, formatter, SAA_CHIP_SCHEMA);
+		const targetNotes = fieldCellsForRow(targetRow, SAA_CHIP_SCHEMA, target).flatMap(
+			(cell, index) => (cell.fieldKey === 'note' ? [index] : [])
+		);
+
+		let updated = target;
+		await ClipboardService.pasteSelection(
+			createClipboardContext(target, converter, formatter, SAA_CHIP_SCHEMA, targetNotes[0]),
+			(next) => {
+				updated = next;
+			}
+		);
+
+		expect(updated.channels[0].rows[0].note).toEqual(
+			expect.objectContaining({ name: NoteName.G, octave: 8 })
+		);
+		expect(updated.channels[1].rows[0].note).toEqual(
+			expect.objectContaining({ name: NoteName.G, octave: 5 })
+		);
+		expect(updated.channels[4].rows[0].note.name).toBe(NoteName.None);
+		expect(updated.patternRows[0].env0).toBe(3);
+		expect(updated.patternRows[0].env1).toBe(0);
 	});
 });
 

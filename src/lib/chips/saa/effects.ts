@@ -4,6 +4,7 @@ import { formatEffectStatusHint, type EffectStatusHint } from '../base/effect-st
 export const SAA_STEREO_INVERT_SUBCOMMAND = 1;
 export const SAA_NOISE_LOCK_SUBCOMMAND = 2;
 export const SAA_MIXER_SUBCOMMAND = 6;
+export const SAA_AUTO_ENVELOPE_SUBCOMMAND = 0x0a;
 
 const CHIP_EFFECT = 'E'.charCodeAt(0);
 
@@ -23,11 +24,25 @@ export function isSaaMixerEffect(effect: { effect: number; delay: number }): boo
 	return isSaaSubcommand(effect, SAA_MIXER_SUBCOMMAND);
 }
 
-export function saaStickyChannelEffectGroup(effect: StickyEffectCommand): string | null {
+export function isSaaAutoEnvelopeEffect(effect: { effect: number; delay: number }): boolean {
+	return isSaaSubcommand(effect, SAA_AUTO_ENVELOPE_SUBCOMMAND);
+}
+
+export function saaStickyChannelEffectGroup(
+	effect: StickyEffectCommand,
+	channelIndex = 0
+): string | null {
 	if (isSaaStereoInvertEffect(effect)) return 'saa-invert';
 	if (isSaaNoiseLockEffect(effect)) return 'saa-noise-lock';
 	if (isSaaMixerEffect(effect)) return 'saa-mixer';
+	if (isSaaAutoEnvelopeEffect(effect)) {
+		return channelIndex < 3 ? 'saa-auto-envelope-0' : 'saa-auto-envelope-1';
+	}
 	return null;
+}
+
+export function saaStickyChannelEffectIsShared(group: string): boolean {
+	return group.startsWith('saa-auto-envelope-');
 }
 
 const SAA_STEREO_INVERT_HINT: EffectStatusHint = {
@@ -45,17 +60,24 @@ const SAA_MIXER_HINT: EffectStatusHint = {
 	name: 'Waveform',
 	params: 'XY: 1=tone, 2=noise, 04=inst'
 };
+const SAA_AUTO_ENVELOPE_HINT: EffectStatusHint = {
+	format: 'EAXY',
+	name: 'Auto-Envelope',
+	params: 'X:Y writes the clock channel'
+};
 
 const SAA_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	SAA_STEREO_INVERT_HINT,
 	SAA_NOISE_LOCK_HINT,
-	SAA_MIXER_HINT
+	SAA_MIXER_HINT,
+	SAA_AUTO_ENVELOPE_HINT
 ];
 
 export function describeSaaEffect(effect: { effect: number; delay: number }): string | null {
 	if (isSaaStereoInvertEffect(effect)) return formatEffectStatusHint(SAA_STEREO_INVERT_HINT);
 	if (isSaaNoiseLockEffect(effect)) return formatEffectStatusHint(SAA_NOISE_LOCK_HINT);
 	if (isSaaMixerEffect(effect)) return formatEffectStatusHint(SAA_MIXER_HINT);
+	if (isSaaAutoEnvelopeEffect(effect)) return formatEffectStatusHint(SAA_AUTO_ENVELOPE_HINT);
 	return null;
 }
 

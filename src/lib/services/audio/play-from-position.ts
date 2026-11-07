@@ -85,22 +85,27 @@ function readEffectCommand(slot: unknown): PlaybackEffectCommand | null {
 	return command;
 }
 
-function stickyChannelGroup(command: StickyEffectCommand, schema: ChipSchema): string | null {
+function stickyChannelGroup(
+	command: StickyEffectCommand,
+	schema: ChipSchema,
+	channelIndex: number
+): string | null {
 	if (command.effect === DETUNE_EFFECT_TYPE) return 'detune';
 	if (command.effect === VOLUME_SLIDE_EFFECT) return 'volume-slide';
-	return schema.stickyChannelEffectGroup?.(command) ?? null;
+	return schema.stickyChannelEffectGroup?.(command, channelIndex) ?? null;
 }
 
 function readStickyGroupsOnRow(
 	effects: unknown,
-	schema: ChipSchema
+	schema: ChipSchema,
+	channelIndex: number
 ): Map<string, PlaybackEffectCommand> {
 	const found = new Map<string, PlaybackEffectCommand>();
 	if (!Array.isArray(effects)) return found;
 	for (const slot of effects) {
 		const command = readEffectCommand(slot);
 		if (!command) continue;
-		const group = stickyChannelGroup(command, schema);
+		const group = stickyChannelGroup(command, schema, channelIndex);
 		if (!group) continue;
 		found.set(group, command);
 	}
@@ -150,6 +155,10 @@ export function collectPlaybackCarry(
 	let speedTablePosition: number | undefined;
 	const channelStickyFound = Array.from({ length: channelCount }, () => new Set<string>());
 	const channelSticky: PlaybackEffectCommand[][] = Array.from({ length: channelCount }, () => []);
+	const sharedSticky = new Map<
+		string,
+		{ channel: number; command: PlaybackEffectCommand; rowKey: string }
+	>();
 	const globalStickyGroups = new Set<string>();
 	const globalSticky: PlaybackEffectCommand[] = [];
 	let globalStickyFieldKey: string | undefined;
@@ -222,14 +231,25 @@ export function collectPlaybackCarry(
 				}
 				const foundGroups = channelStickyFound[ch];
 				if (!foundGroups) continue;
-				const stickyOnRow = readStickyGroupsOnRow(row.effects, schema);
+				const stickyOnRow = readStickyGroupsOnRow(row.effects, schema, ch);
+				const rowKey = `${orderIndex}:${rowIndex}`;
 				for (const [group, command] of stickyOnRow) {
+					if (schema.stickyChannelEffectIsShared?.(group)) {
+						const existing = sharedSticky.get(group);
+						if (!existing || (existing.rowKey === rowKey && ch > existing.channel)) {
+							sharedSticky.set(group, { channel: ch, command, rowKey });
+						}
+						continue;
+					}
 					if (foundGroups.has(group)) continue;
 					foundGroups.add(group);
 					channelSticky[ch]?.push(command);
 				}
 			}
 		}
+	}
+	for (const { channel, command } of sharedSticky.values()) {
+		channelSticky[channel]?.push(command);
 	}
 	globalSticky.reverse();
 

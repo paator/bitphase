@@ -8,7 +8,7 @@ import {
 import EffectAlgorithms from '../tracker/effect-algorithms.js';
 import { sampleSaaVolumeRow } from '../tracker/tracker-instrument-macros.js';
 import { SAA_LEVEL_MAX } from './saa-constants.js';
-import { combineSaaLevel, saaPitchCode } from './saa-levels.js';
+import { combineSaaLevel, SAA_TONE_CODE_MAX, saaPitchCode } from './saa-levels.js';
 
 const NOTE_OFF = 1;
 const NOTE_RELEASE = 14;
@@ -16,7 +16,9 @@ const CHIP_EFFECT = 'E'.charCodeAt(0);
 const STEREO_INVERT_SUBCOMMAND = 1;
 const NOISE_LOCK_SUBCOMMAND = 2;
 const MIXER_SUBCOMMAND = 6;
+const AUTO_ENVELOPE_SUBCOMMAND = 0x0a;
 const MIXER_FOLLOW_INSTRUMENT = 4;
+const ENVELOPE_CLOCK_CHANNELS = [1, 4];
 const ENVELOPE_CHANNEL_0 = 2;
 const ENVELOPE_CHANNEL_1 = 5;
 const ENVELOPE_BYTES = [
@@ -101,7 +103,78 @@ function processSaaEffects(state, channelIndex, row) {
 			else state.noiseLock1 = (parameter & 1) !== 0;
 		} else if (effect.delay === MIXER_SUBCOMMAND) {
 			storeSourceMask(state, channelIndex, parameter);
+		} else if (effect.delay === AUTO_ENVELOPE_SUBCOMMAND) {
+			storeAutoEnvelope(state, channelIndex, parameter);
 		}
+	}
+}
+
+function ensureAutoEnvelope(state) {
+	if (state.autoEnvelopeActive) return;
+	state.autoEnvelopeActive = [false, false];
+	state.autoEnvelopeNumerator = [0, 0];
+	state.autoEnvelopeDenominator = [0, 0];
+	state.autoEnvelopeSource = [-1, -1];
+}
+
+function storeAutoEnvelope(state, channelIndex, parameter) {
+	ensureAutoEnvelope(state);
+	const group = channelIndex < 3 ? 0 : 1;
+	const numerator = (parameter >> 4) & 0xf;
+	const denominator = parameter & 0xf;
+	if (numerator > 0 && denominator > 0) {
+		state.autoEnvelopeActive[group] = true;
+		state.autoEnvelopeNumerator[group] = numerator;
+		state.autoEnvelopeDenominator[group] = denominator;
+		state.autoEnvelopeSource[group] = channelIndex;
+		return;
+	}
+	state.autoEnvelopeActive[group] = false;
+	state.autoEnvelopeNumerator[group] = 0;
+	state.autoEnvelopeDenominator[group] = 0;
+	state.autoEnvelopeSource[group] = -1;
+}
+
+function envelopeClockSteps(byte) {
+	if (typeof byte !== 'number' || (byte & 0x80) === 0) return 0;
+	const shape = (byte >> 1) & 7;
+	if (shape !== 3 && shape !== 5 && shape !== 7) return 0;
+	const stepsPerPhase = (byte & 0x10) !== 0 ? 8 : 16;
+	return (shape === 5 ? 2 : 1) * stepsPerPhase;
+}
+
+function sourceTonePeriod(state, channelIndex) {
+	if (!state.channelSoundEnabled?.[channelIndex]) return 0;
+	const table = state.currentTuningTable;
+	const note = state.channelBaseNotes?.[channelIndex];
+	const index = typeof note === 'number' ? note : state.channelCurrentNotes?.[channelIndex];
+	if (!table || typeof index !== 'number' || index < 0 || index >= table.length) return 0;
+	let period = (table[index] | 0) + pitchOffset(state, channelIndex);
+	if (period < 0) period = 0;
+	if (period > SAA_TONE_CODE_MAX) period = SAA_TONE_CODE_MAX;
+	return period;
+}
+
+function applyAutoEnvelope(state, registerState) {
+	if (!state.autoEnvelopeActive) return;
+	for (let group = 0; group < 2; group++) {
+		if (!state.autoEnvelopeActive[group]) continue;
+		const channel = registerState.channels[ENVELOPE_CLOCK_CHANNELS[group]];
+		if (!channel) continue;
+		const steps = envelopeClockSteps(
+			group === 0 ? registerState.envelope0 : registerState.envelope1
+		);
+		if (!steps) continue;
+		const period = sourceTonePeriod(state, state.autoEnvelopeSource[group]);
+		if (period <= 0) continue;
+		const scaled = Math.round(
+			(period * state.autoEnvelopeNumerator[group]) / state.autoEnvelopeDenominator[group]
+		);
+		const code = saaPitchCode(scaled, 0);
+		channel.octave = (code >> 8) & 7;
+		channel.freq = code & 0xff;
+		channel.tone = false;
+		channel.noise = false;
 	}
 }
 
@@ -222,18 +295,29 @@ class SaaAudioDriver {
 				) ?? {};
 			if (row.retriggerEnvelope) {
 				if (channelIndex === ENVELOPE_CHANNEL_0) registerState.envelopeRetrigger0 = true;
-				else if (channelIndex === ENVELOPE_CHANNEL_1) registerState.envelopeRetrigger1 = true;
+				else if (channelIndex === ENVELOPE_CHANNEL_1)
+					registerState.envelopeRetrigger1 = true;
 			}
 			if (row.amplitudeSliding) {
 				const slide = state.channelAmplitudeSliding[channelIndex] | 0;
 				if (row.amplitudeSlideUp) {
-					state.channelAmplitudeSliding[channelIndex] = Math.min(SAA_LEVEL_MAX, slide + 1);
+					state.channelAmplitudeSliding[channelIndex] = Math.min(
+						SAA_LEVEL_MAX,
+						slide + 1
+					);
 				} else {
-					state.channelAmplitudeSliding[channelIndex] = Math.max(-SAA_LEVEL_MAX, slide - 1);
+					state.channelAmplitudeSliding[channelIndex] = Math.max(
+						-SAA_LEVEL_MAX,
+						slide - 1
+					);
 				}
 			}
 			const slide = state.channelAmplitudeSliding[channelIndex] | 0;
-			const tone = packedTone(state, channelIndex, sampleToneOffset(state, channelIndex, row));
+			const tone = packedTone(
+				state,
+				channelIndex,
+				sampleToneOffset(state, channelIndex, row)
+			);
 			if (!tone) {
 				silenceChannel(registerState, channelIndex);
 				writeEnvelope(state, registerState, channelIndex, row.envelopeShape);
@@ -269,6 +353,7 @@ class SaaAudioDriver {
 		if (state.noiseLock0) registerState.noise0 = 3;
 		if (state.noiseLock1) registerState.noise1 = 3;
 		processChannelOnOffCounters(state, channelCount);
+		applyAutoEnvelope(state, registerState);
 	}
 
 	applyVolumeSlide(state, channelIndex, param) {

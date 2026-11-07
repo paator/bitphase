@@ -1,5 +1,5 @@
 import type { ChipSchema } from '../base/schema';
-import { saaStickyChannelEffectGroup } from './effects';
+import { saaStickyChannelEffectGroup, saaStickyChannelEffectIsShared } from './effects';
 
 export const SAA_SAM_CLOCK = 8_000_000;
 export const SAA_CMS_CLOCK = 7_159_090;
@@ -44,6 +44,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 	chipType: 'saa',
 	defaultTuningTable: SAA_DEFAULT_TUNING_TABLE,
 	stickyChannelEffectGroup: saaStickyChannelEffectGroup,
+	stickyChannelEffectIsShared: saaStickyChannelEffectIsShared,
 	channelLabels: ['A', 'B', 'C', 'D', 'E', 'F'],
 	template: '{note} {instrument}{table}{left}{right} {effect}',
 	fields: {
@@ -112,7 +113,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any',
+			backtrackWhen: 'nonZero',
 			previewOnEdit: true
 		},
 		noise1: {
@@ -123,7 +124,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any',
+			backtrackWhen: 'nonZero',
 			previewOnEdit: true
 		},
 		env0: {
@@ -134,7 +135,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any',
+			backtrackWhen: 'nonZero',
 			previewOnEdit: true
 		},
 		env1: {
@@ -145,7 +146,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'any',
+			backtrackWhen: 'nonZero',
 			previewOnEdit: true
 		}
 	},

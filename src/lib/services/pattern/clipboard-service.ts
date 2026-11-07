@@ -28,7 +28,8 @@ import {
 	clipboardNoteEnvelopeConversionTarget,
 	minClipboardChannelIndex,
 	resolveClipboardDestChannelIndex,
-	resolveClipboardDestFieldKey
+	resolveClipboardDestFieldKey,
+	resolveClipboardDestGlobalFieldKey
 } from './clipboard-field-mapping';
 
 export interface ClipboardContext {
@@ -87,7 +88,11 @@ export class ClipboardService {
 				const field = this.getFieldDef(schema, cell.fieldKey);
 				if (!field) continue;
 
-				const value = PatternValueUpdates.getValueFromGeneric(genericPattern, row, fieldInfo);
+				const value = PatternValueUpdates.getValueFromGeneric(
+					genericPattern,
+					row,
+					fieldInfo
+				);
 
 				cells.push({
 					row: row - minRow,
@@ -152,7 +157,12 @@ export class ClipboardService {
 
 		const bounds = hasSelection
 			? getSelectionBounds()
-			: { minRow: selectedRow, maxRow: selectedRow, minCol: selectedColumn, maxCol: selectedColumn };
+			: {
+					minRow: selectedRow,
+					maxRow: selectedRow,
+					minCol: selectedColumn,
+					maxCol: selectedColumn
+				};
 		if (!bounds) return;
 
 		const { minRow, maxRow, minCol, maxCol } = bounds;
@@ -180,7 +190,11 @@ export class ClipboardService {
 				const field = this.getFieldDef(schema, cell.fieldKey);
 				if (!field) continue;
 
-				const value = PatternValueUpdates.getValueFromGeneric(genericPattern, row, fieldInfo);
+				const value = PatternValueUpdates.getValueFromGeneric(
+					genericPattern,
+					row,
+					fieldInfo
+				);
 				clipboardCells.push({
 					row: row - minRow,
 					column: col - minCol,
@@ -198,7 +212,14 @@ export class ClipboardService {
 
 		if (deletionOps.length > 0) {
 			for (const { row, fieldInfo, field } of deletionOps) {
-				this.applyDeleteToGeneric(genericPattern, row, fieldInfo, field, schema, context.tuningTable);
+				this.applyDeleteToGeneric(
+					genericPattern,
+					row,
+					fieldInfo,
+					field,
+					schema,
+					context.tuningTable
+				);
 			}
 			onPatternUpdate(converter.fromGeneric(genericPattern));
 		}
@@ -216,7 +237,11 @@ export class ClipboardService {
 			const rowString = this.formatGenericRow(genericPattern, row, formatter, schema);
 			const cellPositions = getCellPositions(rowString, row);
 
-			for (let col = bounds.minCol; col <= bounds.maxCol && col < cellPositions.length; col++) {
+			for (
+				let col = bounds.minCol;
+				col <= bounds.maxCol && col < cellPositions.length;
+				col++
+			) {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
@@ -226,7 +251,14 @@ export class ClipboardService {
 				const field = this.getFieldDef(schema, cell.fieldKey);
 				if (!field) continue;
 
-				this.applyDeleteToGeneric(genericPattern, row, fieldInfo, field, schema, context.tuningTable);
+				this.applyDeleteToGeneric(
+					genericPattern,
+					row,
+					fieldInfo,
+					field,
+					schema,
+					context.tuningTable
+				);
 				hasChanges = true;
 			}
 		}
@@ -291,7 +323,9 @@ export class ClipboardService {
 		fieldKey: string
 	): { type: string; length: number; allowZeroValue?: boolean } | null {
 		const field = resolveSchemaField(schema, fieldKey);
-		return field ? { type: field.type, length: field.length, allowZeroValue: field.allowZeroValue } : null;
+		return field
+			? { type: field.type, length: field.length, allowZeroValue: field.allowZeroValue }
+			: null;
 	}
 
 	private static applyDeleteToGeneric(
@@ -322,11 +356,12 @@ export class ClipboardService {
 	private static getPasteValue(
 		clipCell: ClipboardCell,
 		targetFieldKey: string,
+		schema: ChipSchema,
 		tuningTable: number[] | undefined,
 		getOctave: (() => number) | undefined,
 		allowNoteEnvelopeConversion: boolean
 	): string | number | null | Record<string, unknown> {
-		if (clipboardFieldsAreCompatible(clipCell.fieldKey, targetFieldKey)) {
+		if (clipboardFieldsAreCompatible(clipCell.fieldKey, targetFieldKey, schema)) {
 			return clipCell.value as string | number | null | Record<string, unknown>;
 		}
 		if (!allowNoteEnvelopeConversion) return null;
@@ -392,9 +427,12 @@ export class ClipboardService {
 			originChannelIndex,
 			minSourceChannelIndex
 		);
-		const destFieldKey = resolveClipboardDestFieldKey(
-			clipCell.fieldKey,
+		const destFieldKey = resolveClipboardDestGlobalFieldKey(
+			resolveClipboardDestFieldKey(clipCell.fieldKey, originFieldKey, sourceFieldKeys),
+			context.schema,
 			originFieldKey,
+			originChannelIndex,
+			minSourceChannelIndex,
 			sourceFieldKeys
 		);
 		const matchedCol = this.findFieldColumnInScope(
@@ -410,11 +448,7 @@ export class ClipboardService {
 		const conversionTarget = clipboardNoteEnvelopeConversionTarget(clipCell.fieldKey);
 		if (!conversionTarget) return null;
 		const conversionChannel =
-			conversionTarget === 'note'
-				? originChannelIndex >= 0
-					? originChannelIndex
-					: 0
-				: -1;
+			conversionTarget === 'note' ? (originChannelIndex >= 0 ? originChannelIndex : 0) : -1;
 		return this.findFieldColumnInScope(
 			conversionTarget,
 			conversionChannel,
@@ -526,11 +560,15 @@ export class ClipboardService {
 			const pasteValue = this.getPasteValue(
 				clipCell,
 				cell.fieldKey,
+				context.schema,
 				context.tuningTable,
 				context.getOctave,
 				allowNoteEnvelopeConversion
 			);
-			if (pasteValue === null && !clipboardFieldsAreCompatible(clipCell.fieldKey, cell.fieldKey)) {
+			if (
+				pasteValue === null &&
+				!clipboardFieldsAreCompatible(clipCell.fieldKey, cell.fieldKey, context.schema)
+			) {
 				continue;
 			}
 
