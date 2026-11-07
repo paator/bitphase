@@ -60,24 +60,51 @@ const SAA_MIXER_HINT: EffectStatusHint = {
 	name: 'Waveform',
 	params: 'XY: 1=tone, 2=noise, 04=inst'
 };
+const SAA_MIXER_TABLE_HINT: EffectStatusHint = {
+	format: 'E6TY',
+	name: 'Waveform',
+	params: 'Y: table'
+};
 const SAA_AUTO_ENVELOPE_HINT: EffectStatusHint = {
 	format: 'EAXY',
 	name: 'Auto-Envelope',
 	params: 'X:Y writes the clock channel'
+};
+const SAA_AUTO_ENVELOPE_TABLE_HINT: EffectStatusHint = {
+	format: 'EATY',
+	name: 'Auto-Envelope',
+	params: 'Y: table'
 };
 
 const SAA_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	SAA_STEREO_INVERT_HINT,
 	SAA_NOISE_LOCK_HINT,
 	SAA_MIXER_HINT,
-	SAA_AUTO_ENVELOPE_HINT
+	SAA_MIXER_TABLE_HINT,
+	SAA_AUTO_ENVELOPE_HINT,
+	SAA_AUTO_ENVELOPE_TABLE_HINT
 ];
 
-export function describeSaaEffect(effect: { effect: number; delay: number }): string | null {
+function usesTable(effect: { tableIndex?: number }): boolean {
+	return effect.tableIndex !== undefined && effect.tableIndex >= 0;
+}
+
+export function describeSaaEffect(effect: {
+	effect: number;
+	delay: number;
+	tableIndex?: number;
+}): string | null {
+	const table = usesTable(effect);
 	if (isSaaStereoInvertEffect(effect)) return formatEffectStatusHint(SAA_STEREO_INVERT_HINT);
 	if (isSaaNoiseLockEffect(effect)) return formatEffectStatusHint(SAA_NOISE_LOCK_HINT);
-	if (isSaaMixerEffect(effect)) return formatEffectStatusHint(SAA_MIXER_HINT);
-	if (isSaaAutoEnvelopeEffect(effect)) return formatEffectStatusHint(SAA_AUTO_ENVELOPE_HINT);
+	if (isSaaMixerEffect(effect)) {
+		return formatEffectStatusHint(table ? SAA_MIXER_TABLE_HINT : SAA_MIXER_HINT);
+	}
+	if (isSaaAutoEnvelopeEffect(effect)) {
+		return formatEffectStatusHint(
+			table ? SAA_AUTO_ENVELOPE_TABLE_HINT : SAA_AUTO_ENVELOPE_HINT
+		);
+	}
 	return null;
 }
 

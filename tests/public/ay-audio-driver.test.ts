@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { describeAyEffect } from '@/lib/chips/ay/effects';
 import { legacyInstruments } from '../helpers/instrument-fixtures.ts';
 import AYAudioDriver from '../../public/ay/ay-audio-driver.js';
 import AyumiState from '../../public/ay/ayumi-state.js';
@@ -844,6 +845,117 @@ describe('AYAudioDriver', () => {
 			expect(restored.channels[0].mixer.tone).toBe(true);
 			expect(restored.channels[0].mixer.envelope).toBe(true);
 			expect(restored.channels[0].volume & 16).toBe(16);
+		});
+
+		it('steps E6TX each tick and lets a literal E6 replace the table', () => {
+			const driver = new AYAudioDriver();
+			const state = new AyumiState();
+			state.setTuningTable([600]);
+			state.setTables([{ id: 1, rows: [1, 8, 2], loop: 0 }]);
+			state.setInstruments(
+				legacyInstruments([
+					{
+						id: '01',
+						rows: [{ tone: true, volume: 15, noise: false, envelope: true }],
+						loop: 0
+					}
+				])
+			);
+			state.channelInstruments = [0, -1, -1];
+			state.channelOnOffCounter = [0, 0, 0];
+			state.channelMuted = [false, false, false];
+			state.channelSoundEnabled = [true, false, false];
+			state.channelEnvelopeEnabled = [true, false, false];
+			state.channelPatternVolumes = [15, 15, 15];
+			state.channelInstrumentVolumes = [15, 0, 0];
+			state.channelAmplitudeSliding = [0, 0, 0];
+			state.channelCurrentNotes = [0, 0, 0];
+			state.instrumentPositions = [0, 0, 0];
+			state.channelTimerPositions = [0, 0, 0];
+			state.channelToneAccumulator = [0, 0, 0];
+			state.channelNoiseAccumulator = [0, 0, 0];
+			state.channelEnvelopeAccumulator = [0, 0, 0];
+			state.channelTimerPwmSweep = [-1, -1, -1];
+			state.channelTimerEffectReset = [false, false, false];
+			state.envelopeOnOffCounter = 0;
+			state.envelopeEffectTable = -1;
+			const registers = () => ({
+				channels: [0, 1, 2].map(() => ({
+					tone: 600,
+					volume: 15,
+					mixer: { tone: true, noise: false, envelope: true }
+				})),
+				noise: 0,
+				envelopePeriod: 0,
+				envelopeShape: 0,
+				forceEnvelopeShapeWrite: false
+			});
+			const pattern = {
+				channels: [0, 1, 2].map((index) => ({
+					rows: [
+						{
+							note: { name: 0, octave: 0 },
+							effects:
+								index === 0
+									? [
+											{
+												effect: 'E'.charCodeAt(0),
+												delay: 6,
+												parameter: 0,
+												tableIndex: 1
+											}
+										]
+									: [null]
+						}
+					]
+				}))
+			};
+			const first = registers();
+			driver.processPatternRow(state, pattern, 0, { noiseValue: -1 }, first);
+			expect(state.channelSourceMask[0]).toBe(1);
+			expect(state.channelMixerTableIndex[0]).toBe(1);
+			driver.processInstruments(state, first);
+			expect(first.channels[0].mixer.tone).toBe(true);
+			expect(first.channels[0].mixer.noise).toBe(false);
+			expect(first.channels[0].mixer.envelope).toBe(false);
+			expect(state.channelSourceMask[0]).toBeNull();
+
+			state.instrumentPositions = [0, 0, 0];
+			const second = registers();
+			driver.processInstruments(state, second);
+			expect(second.channels[0].mixer.tone).toBe(true);
+			expect(second.channels[0].mixer.envelope).toBe(true);
+			expect(state.channelSourceMask[0]).toBe(2);
+
+			state.instrumentPositions = [0, 0, 0];
+			const third = registers();
+			driver.processInstruments(state, third);
+			expect(third.channels[0].mixer.tone).toBe(false);
+			expect(third.channels[0].mixer.noise).toBe(true);
+			expect(state.channelSourceMask[0]).toBe(1);
+
+			const literal = {
+				channels: [0, 1, 2].map((index) => ({
+					rows: [
+						{
+							note: { name: 0, octave: 0 },
+							effects:
+								index === 0
+									? [{ effect: 'E'.charCodeAt(0), delay: 6, parameter: 7 }]
+									: [null]
+						}
+					]
+				}))
+			};
+			driver.processPatternRow(state, literal, 0, { noiseValue: -1 }, registers());
+			expect(state.channelMixerTableIndex[0]).toBe(-1);
+			expect(state.channelSourceMask[0]).toBe(7);
+			state.instrumentPositions = [0, 0, 0];
+			driver.processInstruments(state, registers());
+			expect(state.channelSourceMask[0]).toBe(7);
+			expect(describeAyEffect({ effect: 'E'.charCodeAt(0), delay: 6, tableIndex: 1 })).toBe(
+				'E6TY: Waveform (Y: table)'
+			);
 		});
 
 		it('preserves channelEnvelopeEnabled through mute and restores envelope mixer on unmute', () => {

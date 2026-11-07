@@ -9,6 +9,11 @@ import EffectAlgorithms from '../tracker/effect-algorithms.js';
 import { sampleSaaVolumeRow } from '../tracker/tracker-instrument-macros.js';
 import { SAA_LEVEL_MAX } from './saa-constants.js';
 import { combineSaaLevel, SAA_TONE_CODE_MAX, saaPitchCode } from './saa-levels.js';
+import {
+	advanceSaaEffectTables,
+	applySaaAutoEnvelopeCommand,
+	applySaaMixerCommand
+} from './saa-effect-tables.js';
 
 const NOTE_OFF = 1;
 const NOTE_RELEASE = 14;
@@ -102,9 +107,13 @@ function processSaaEffects(state, channelIndex, row) {
 			if (channelIndex < 3) state.noiseLock0 = (parameter & 1) !== 0;
 			else state.noiseLock1 = (parameter & 1) !== 0;
 		} else if (effect.delay === MIXER_SUBCOMMAND) {
-			storeSourceMask(state, channelIndex, parameter);
+			applySaaMixerCommand(state, channelIndex, effect, (value) =>
+				storeSourceMask(state, channelIndex, value)
+			);
 		} else if (effect.delay === AUTO_ENVELOPE_SUBCOMMAND) {
-			storeAutoEnvelope(state, channelIndex, parameter);
+			applySaaAutoEnvelopeCommand(state, channelIndex, effect, (source, value) =>
+				storeAutoEnvelope(state, source, value)
+			);
 		}
 	}
 }
@@ -354,6 +363,11 @@ class SaaAudioDriver {
 		if (state.noiseLock1) registerState.noise1 = 3;
 		processChannelOnOffCounters(state, channelCount);
 		applyAutoEnvelope(state, registerState);
+		advanceSaaEffectTables(
+			state,
+			(channelIndex, value) => storeSourceMask(state, channelIndex, value),
+			(channelIndex, value) => storeAutoEnvelope(state, channelIndex, value)
+		);
 	}
 
 	applyVolumeSlide(state, channelIndex, param) {

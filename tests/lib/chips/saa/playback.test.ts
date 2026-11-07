@@ -474,6 +474,84 @@ describe('SAA tone playback', () => {
 		).toBe('saa-mixer');
 	});
 
+	it('steps E6TX each tick and lets a literal E6 replace the table', () => {
+		const driver = new SaaAudioDriver();
+		const state = playbackState(45);
+		state.channelMuted = [false, false, false];
+		state.channelSoundEnabled = [true, true, true];
+		state.channelPatternLeft = [15, 15, 15];
+		state.channelPatternRight = [15, 15, 15];
+		state.channelAmplitudeSliding = [0, 0, 0];
+		state.channelInstruments = [0, 0, 0];
+		state.instrumentPositions = [0, 0, 0];
+		state.channelCurrentNotes = [45, 45, 45];
+		state.channelSourceMask = [null, null, null];
+		state.getTable = (id: number) => (id === 1 ? { rows: [1, 4, 2], loop: 0 } : undefined);
+		state.instruments[0].macros.tone = { values: [true], loop: 0 };
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		const pattern = {
+			channels: [0, 1, 2].map((index) => ({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						instrument: 0,
+						effects:
+							index === 2
+								? [
+										{
+											effect: 'E'.charCodeAt(0),
+											delay: 6,
+											parameter: 0,
+											tableIndex: 1
+										}
+									]
+								: [null]
+					}
+				]
+			}))
+		};
+		driver.processPatternRow(state, pattern, 0, {});
+		expect(state.channelSourceMask[2]).toBe(1);
+		expect(state.channelMixerTableIndex[2]).toBe(1);
+		const registers = new SaaRegisterState(6);
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(registers.channels[2].noise).toBe(false);
+		expect(state.channelSourceMask[2]).toBeNull();
+		state.instrumentPositions = [0, 0, 0];
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(true);
+		expect(registers.channels[2].noise).toBe(false);
+		expect(state.channelSourceMask[2]).toBe(2);
+		state.instrumentPositions = [0, 0, 0];
+		driver.processInstruments(state, registers);
+		expect(registers.channels[2].tone).toBe(false);
+		expect(registers.channels[2].noise).toBe(true);
+		expect(state.channelSourceMask[2]).toBe(1);
+
+		const literal = {
+			channels: [0, 1, 2].map(() => ({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						instrument: 0,
+						effects: [{ effect: 'E'.charCodeAt(0), delay: 6, parameter: 1 }]
+					}
+				]
+			}))
+		};
+		driver.processPatternRow(state, literal, 0, {});
+		expect(state.channelMixerTableIndex[2]).toBe(-1);
+		expect(state.channelSourceMask[2]).toBe(1);
+		state.instrumentPositions = [0, 0, 0];
+		driver.processInstruments(state, registers);
+		expect(state.channelSourceMask[2]).toBe(1);
+		expect(describeSaaEffect({ effect: 'E'.charCodeAt(0), delay: 6, tableIndex: 1 })).toBe(
+			'E6TY: Waveform (Y: table)'
+		);
+	});
+
 	it('enables noise from the instrument and keeps the square off when tone is off', () => {
 		const driver = new SaaAudioDriver();
 		const state = playbackState(45);
@@ -742,13 +820,88 @@ describe('SAA auto-envelope', () => {
 
 	it('names EAXY in the status hint and clears the ratio on reset', () => {
 		expect(describeSaaEffect({ effect: 'E'.charCodeAt(0), delay: 0x0a })).toContain('X:Y');
+		expect(describeSaaEffect({ effect: 'E'.charCodeAt(0), delay: 0x0a, tableIndex: 1 })).toBe(
+			'EATY: Auto-Envelope (Y: table)'
+		);
 		const state = new SaaState();
 		state.autoEnvelopeActive = [true, false];
 		state.autoEnvelopeNumerator = [3, 0];
 		state.autoEnvelopeDenominator = [2, 0];
 		state.autoEnvelopeSource = [2, -1];
+		state.autoEnvelopeTableIndex = [1, -1];
+		state.channelMixerTableIndex[0] = 2;
 		state.reset();
 		expect(state.autoEnvelopeActive).toEqual([false, false]);
 		expect(state.autoEnvelopeSource).toEqual([-1, -1]);
+		expect(state.autoEnvelopeTableIndex).toEqual([-1, -1]);
+		expect(state.channelMixerTableIndex[0]).toBe(-1);
+	});
+
+	it('steps EATX per group and keeps the source across an off row', () => {
+		const driver = new SaaAudioDriver();
+		const state = groupState();
+		state.getTable = (id: number) => {
+			if (id === 1) return { rows: [0x32, 0x00, 0x11], loop: 0 };
+			if (id === 2) return { rows: [0x21, 0x12], loop: 0 };
+			return undefined;
+		};
+		const registers = new SaaRegisterState(6);
+		const tablePattern = (channelIndex: number, tableIndex: number) => ({
+			channels: Array.from({ length: 6 }, (_, index) => ({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						instrument: 0,
+						effects:
+							index === channelIndex
+								? [
+										{
+											effect: 'E'.charCodeAt(0),
+											delay: 0x0a,
+											parameter: 0,
+											tableIndex
+										}
+									]
+								: [null]
+					}
+				]
+			}))
+		});
+
+		driver.processPatternRow(state, tablePattern(2, 1), 0, { env0: 4 });
+		expect(state.autoEnvelopeNumerator[0]).toBe(3);
+		expect(state.autoEnvelopeDenominator[0]).toBe(2);
+		expect(state.autoEnvelopeSource[0]).toBe(2);
+		driver.processInstruments(state, registers);
+		expect(toneCode(registers.channels[1])).toBe(
+			saaPitchCode(Math.round((toneTable[40] * 3) / 2), 0)
+		);
+		expect(state.autoEnvelopeActive[0]).toBe(false);
+		expect(state.autoEnvelopeTableSource[0]).toBe(2);
+
+		state.instrumentPositions = Array(6).fill(0);
+		driver.processInstruments(state, registers);
+		expect(toneCode(registers.channels[1])).toBe(toneCodes[20]);
+		expect(registers.channels[1].tone).toBe(true);
+		expect(state.autoEnvelopeActive[0]).toBe(true);
+		expect(state.autoEnvelopeNumerator[0]).toBe(1);
+		expect(state.autoEnvelopeDenominator[0]).toBe(1);
+		expect(state.autoEnvelopeSource[0]).toBe(2);
+
+		driver.processPatternRow(state, tablePattern(5, 2), 0, { env1: 6 });
+		expect(state.autoEnvelopeTableIndex[0]).toBe(1);
+		expect(state.autoEnvelopeNumerator[1]).toBe(2);
+		expect(state.autoEnvelopeSource[1]).toBe(5);
+
+		driver.processPatternRow(state, autoEnvelopePattern(6, 0, 0x21), 0, { env0: 4 });
+		expect(state.autoEnvelopeTableIndex[0]).toBe(-1);
+		expect(state.autoEnvelopeTableIndex[1]).toBe(2);
+		expect(state.autoEnvelopeNumerator[0]).toBe(2);
+		expect(state.autoEnvelopeSource[0]).toBe(0);
+		state.instrumentPositions = Array(6).fill(0);
+		driver.processInstruments(state, registers);
+		expect(state.autoEnvelopeNumerator[0]).toBe(2);
+		expect(state.autoEnvelopeNumerator[1]).toBe(1);
+		expect(state.autoEnvelopeDenominator[1]).toBe(2);
 	});
 });

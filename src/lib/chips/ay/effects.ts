@@ -112,10 +112,20 @@ const AY_AUTO_ENVELOPE_HINT: EffectStatusHint = {
 	name: 'Auto-Envelope',
 	params: 'X: num; Y: den'
 };
+const AY_AUTO_ENVELOPE_TABLE_HINT: EffectStatusHint = {
+	format: 'EATY',
+	name: 'Auto-Envelope',
+	params: 'Y: table'
+};
 const AY_MIXER_HINT: EffectStatusHint = {
 	format: 'E6XY',
 	name: 'Waveform',
 	params: 'XY: 1=tone, 2=noise, 4=env, 08=inst'
+};
+const AY_MIXER_TABLE_HINT: EffectStatusHint = {
+	format: 'E6TY',
+	name: 'Waveform',
+	params: 'Y: table'
 };
 
 const AY_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
@@ -130,7 +140,9 @@ const AY_EFFECT_STATUS_HINTS: EffectStatusHint[] = [
 	AY_PWM_START_HINT,
 	AY_PWM_START_TABLE_HINT,
 	AY_AUTO_ENVELOPE_HINT,
-	AY_MIXER_HINT
+	AY_AUTO_ENVELOPE_TABLE_HINT,
+	AY_MIXER_HINT,
+	AY_MIXER_TABLE_HINT
 ];
 
 export function describeAyEffect(effect: {
@@ -155,10 +167,10 @@ export function describeAyEffect(effect: {
 		return formatEffectStatusHint(table ? AY_PWM_START_TABLE_HINT : AY_PWM_START_HINT);
 	}
 	if (isAyAutoEnvelopeEffect(effect)) {
-		return formatEffectStatusHint(AY_AUTO_ENVELOPE_HINT);
+		return formatEffectStatusHint(table ? AY_AUTO_ENVELOPE_TABLE_HINT : AY_AUTO_ENVELOPE_HINT);
 	}
 	if (isAyMixerEffect(effect)) {
-		return formatEffectStatusHint(AY_MIXER_HINT);
+		return formatEffectStatusHint(table ? AY_MIXER_TABLE_HINT : AY_MIXER_HINT);
 	}
 	return null;
 }

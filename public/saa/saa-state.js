@@ -6,6 +6,7 @@ import {
 	resizeChipChannelArrays
 } from '../tracker/tracker-chip-state.js';
 import { SAA_CHANNEL_COUNT, SAA_LEVEL_MAX, SAA_SAM_CLOCK } from './saa-constants.js';
+import { clearSaaEffectTables } from './saa-effect-tables.js';
 
 const SAA_CHANNEL_ARRAY_SPECS = [
 	['channelInstruments', -1],
@@ -21,6 +22,8 @@ const SAA_CHANNEL_ARRAY_SPECS = [
 	['channelNoiseAccumulator', 0],
 	['channelStereoInvert', false],
 	['channelSourceMask', null],
+	['channelMixerTableIndex', -1],
+	['channelMixerTablePosition', 0],
 	['channelMuted', false],
 	['channelSoundEnabled', false],
 	['channelKeyOn', false]
@@ -48,6 +51,9 @@ class SaaState extends TrackerState {
 		this.autoEnvelopeNumerator = [0, 0];
 		this.autoEnvelopeDenominator = [0, 0];
 		this.autoEnvelopeSource = [-1, -1];
+		this.autoEnvelopeTableIndex = [-1, -1];
+		this.autoEnvelopeTablePosition = [0, 0];
+		this.autoEnvelopeTableSource = [-1, -1];
 	}
 
 	setWasmModule(wasmModule, chipPtr, wasmBuffer) {
@@ -85,6 +91,10 @@ class SaaState extends TrackerState {
 		this.autoEnvelopeNumerator = [0, 0];
 		this.autoEnvelopeDenominator = [0, 0];
 		this.autoEnvelopeSource = [-1, -1];
+		this.autoEnvelopeTableIndex = [-1, -1];
+		this.autoEnvelopeTablePosition = [0, 0];
+		this.autoEnvelopeTableSource = [-1, -1];
+		clearSaaEffectTables(this);
 	}
 }
 

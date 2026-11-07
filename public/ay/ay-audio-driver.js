@@ -71,6 +71,13 @@ import {
 	disableAllChannelTimerEffects,
 	disableTimerEffect
 } from './ay-timer-effect-constants.js';
+import {
+	advanceAyAutoEnvelopeTable,
+	advanceAyMixerTables,
+	applyAyMixerCommand,
+	clearAyAutoEnvelopeTable,
+	startAyAutoEnvelopeTable
+} from './ay-effect-tables.js';
 
 const CHIP_EFFECT = 'E'.charCodeAt(0);
 const MIXER_SUBCOMMAND = 6;
@@ -202,9 +209,7 @@ class AYAudioDriver {
 		for (const effect of effects) {
 			if (!effect || effect.effect !== CHIP_EFFECT || effect.delay !== MIXER_SUBCOMMAND)
 				continue;
-			const value = effect.parameter | 0;
-			state.channelSourceMask[channelIndex] =
-				value >= MIXER_FOLLOW_INSTRUMENT ? null : value & 7;
+			applyAyMixerCommand(state, channelIndex, effect, MIXER_FOLLOW_INSTRUMENT);
 		}
 	}
 
@@ -567,6 +572,7 @@ class AYAudioDriver {
 		state.envelopeOnOffActive = false;
 		state.envelopeEffectTable = -1;
 		state.autoEnvelopeActive = false;
+		clearAyAutoEnvelopeTable(state);
 	}
 
 	_processEnvelopeEffects(state, channelIndex, row, patternRow) {
@@ -578,11 +584,16 @@ class AYAudioDriver {
 			effect.tableIndex !== undefined &&
 			effect.tableIndex !== null &&
 			effect.tableIndex >= 0;
+		const autoEnvelope = isAyAutoEnvelopeEffect(effect);
 
-		if (hasTableIndex) {
+		if (autoEnvelope && hasTableIndex) {
+			state.envelopeEffectTable = -1;
+			startAyAutoEnvelopeTable(state, effect);
+		} else if (hasTableIndex) {
 			this._initEnvelopeEffectTable(state, effect);
 		} else {
 			state.envelopeEffectTable = -1;
+			if (autoEnvelope) clearAyAutoEnvelopeTable(state);
 		}
 
 		const resets = EffectAlgorithms.getEffectActivationResets(effect.effect);
@@ -617,7 +628,7 @@ class AYAudioDriver {
 				this._initEnvelopeDetune(state, effect, hasTableIndex);
 				break;
 			case EffectAlgorithms.AUTO_ENVELOPE:
-				if (isAyAutoEnvelopeEffect(effect)) {
+				if (autoEnvelope && !hasTableIndex) {
 					this._initAutoEnvelope(state, effect);
 				}
 				break;
@@ -1331,6 +1342,8 @@ class AYAudioDriver {
 
 		this.updateEnvelopeWithSlide(state, registerState);
 		advanceAyTimerPwmTables(state);
+		advanceAyMixerTables(state, MIXER_FOLLOW_INSTRUMENT);
+		advanceAyAutoEnvelopeTable(state);
 	}
 
 	getEffectiveTone(state, channelIndex) {

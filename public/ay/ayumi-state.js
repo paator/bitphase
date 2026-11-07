@@ -32,6 +32,8 @@ const AY_CHANNEL_ARRAY_SPECS = [
 	['channelTimerPwmSweepStartPhaseOverride', -1],
 	['channelEnvelopeEnabled', false],
 	['channelSourceMask', null],
+	['channelMixerTableIndex', -1],
+	['channelMixerTablePosition', 0],
 	['channelMuted', false],
 	['channelSoundEnabled', false],
 	['channelTimerEffectReset', false],
@@ -101,6 +103,8 @@ class AyumiState extends TrackerState {
 		this.autoEnvelopeActive = false;
 		this.autoEnvelopeNumerator = 0;
 		this.autoEnvelopeDenominator = 0;
+		this.autoEnvelopeTableIndex = -1;
+		this.autoEnvelopeTablePosition = 0;
 		this.envelopeDetune = 0;
 	}
 
@@ -183,6 +187,8 @@ class AyumiState extends TrackerState {
 		this.autoEnvelopeActive = false;
 		this.autoEnvelopeNumerator = 0;
 		this.autoEnvelopeDenominator = 0;
+		this.autoEnvelopeTableIndex = -1;
+		this.autoEnvelopeTablePosition = 0;
 		this.envelopeDetune = 0;
 	}
 }

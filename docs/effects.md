@@ -24,7 +24,7 @@ Rapidly alternates between the current note and two additional notes.
 | **Steps length** | `X` - ticks between arpeggio steps (`0`-`F`)                             |
 | **Parameter**    | `Y` / `Z` - semitone offsets (`0`-`F`)                                   |
 | **With table**   | `AXTY` - `Y` is table id (`0`-`9`, `A`-`Z`); offsets come from the table |
-| **Stop**         | `A000` (or any `Ax00`) stops a running arpeggio                         |
+| **Stop**         | `A000` (or any `Ax00`) stops a running arpeggio                          |
 | **Example**      | `A137` - steps length 1, offsets +3 and +7 (minor chord)                 |
 
 ### V - Vibrato
@@ -123,12 +123,13 @@ On top of that, there are special effects only targeted towards envelopes:
 
 Automatically calculates the envelope period from channel notes using a ratio. When active, set the envelope shape in the channel column - the envelope value is computed from the playing note. Enter in the envelope effect column only.
 
-|               |                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------- |
-| **Format**    | `EAXY`                                                                                 |
-| **Parameter** | `X` numerator (`1`-`F`), `Y` denominator (`1`-`F`) → ratio `X:Y`                       |
-| **Example**   | `EA32` - ratio 3:2                                                                     |
-| **Shapes**    | Works with repeating shapes `8`, `A`, `C`, `E`. Divisor 16 for `8`/`C`, 32 for `A`/`E` |
+|                |                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------- |
+| **Format**     | `EAXY` or `EATX`                                                                        |
+| **Parameter**  | `X` numerator (`1`-`F`), `Y` denominator (`1`-`F`) → ratio `X:Y`                        |
+| **With table** | `EATX` - ratio from table `X` each tick. `00` turns auto-envelope off until a later row |
+| **Example**    | `EA32` - ratio 3:2; `EAT1` table 1                                                      |
+| **Shapes**     | Works with repeating shapes `8`, `A`, `C`, `E`. Divisor 16 for `8`/`C`, 32 for `A`/`E`  |
 
 Persists across rows until another envelope effect replaces it or a new envelope shape is written. Follows note changes in real time.
 
@@ -136,12 +137,12 @@ Persists across rows until another envelope effect replaces it or a new envelope
 
 Sets the PWM sweep minimum duty for SID / syncbuzzer / FM timer effects that use exactly two waveform steps (for example `15 0`). Hex `00`-`FF` maps to `0`-`100`%. While sweep is `0`, min is unused; max sets the static pulse width.
 
-|               |                                              |
-| ------------- | -------------------------------------------- |
-| **Format**    | `E1XY` or `E1TX`                             |
-| **Parameter** | `XY` - duty percent mapped from `00`-`FF`    |
-| **With table** | `E1TX` - min duty from table `X` each tick  |
-| **Example**   | `E180` - about 50% min; `E1T1` - table 1     |
+|                |                                            |
+| -------------- | ------------------------------------------ |
+| **Format**     | `E1XY` or `E1TX`                           |
+| **Parameter**  | `XY` - duty percent mapped from `00`-`FF`  |
+| **With table** | `E1TX` - min duty from table `X` each tick |
+| **Example**    | `E180` - about 50% min; `E1T1` - table 1   |
 
 Persists until a new note, note off, or a new `E1`.
 
@@ -149,45 +150,102 @@ Persists until a new note, note off, or a new `E1`.
 
 Sets the PWM maximum duty (static pulse width when sweep is `0`). Same eligibility and mapping as `E1`.
 
-|               |                                              |
-| ------------- | -------------------------------------------- |
-| **Format**    | `E2XY` or `E2TX`                             |
-| **Parameter** | `XY` - duty percent mapped from `00`-`FF`    |
-| **With table** | `E2TX` - max duty from table `X` each tick  |
-| **Example**   | `E29E` - about 62% max; `E2T1` - table 1     |
+|                |                                            |
+| -------------- | ------------------------------------------ |
+| **Format**     | `E2XY` or `E2TX`                           |
+| **Parameter**  | `XY` - duty percent mapped from `00`-`FF`  |
+| **With table** | `E2TX` - max duty from table `X` each tick |
+| **Example**    | `E29E` - about 62% max; `E2T1` - table 1   |
 
 ### E3 - Timer PWM sweep
 
 Sets PWM sweep speed between min and max. Same eligibility and mapping as `E1`. `E300` disables sweep so max acts as static pulse width.
 
-|               |                                              |
-| ------------- | -------------------------------------------- |
-| **Format**    | `E3XY` or `E3TX`                             |
-| **Parameter** | `XY` - sweep speed mapped from `00`-`FF`     |
+|                |                                               |
+| -------------- | --------------------------------------------- |
+| **Format**     | `E3XY` or `E3TX`                              |
+| **Parameter**  | `XY` - sweep speed mapped from `00`-`FF`      |
 | **With table** | `E3TX` - sweep speed from table `X` each tick |
-| **Example**   | `E310` - slow sweep; `E3T1` - table 1        |
+| **Example**    | `E310` - slow sweep; `E3T1` - table 1         |
 
 ### E4 - Timer PWM sweep shape
 
 Selects the PWM sweep automation curve. Same eligibility as `E1`.
 
-|               |                                                                 |
-| ------------- | --------------------------------------------------------------- |
-| **Format**    | `E4XY` or `E4TX`                                                    |
-| **Parameter** | `XY` - shape index: `00` triangle, `01` sine, `02` saw up, `03` saw down, `04` square (wraps) |
-| **With table** | `E4TX` - shape index from table `X` each tick                      |
-| **Example**   | `E401` - sine; `E4T1` - table 1                                     |
+|                |                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| **Format**     | `E4XY` or `E4TX`                                                                              |
+| **Parameter**  | `XY` - shape index: `00` triangle, `01` sine, `02` saw up, `03` saw down, `04` square (wraps) |
+| **With table** | `E4TX` - shape index from table `X` each tick                                                 |
+| **Example**    | `E401` - sine; `E4T1` - table 1                                                               |
 
 ### E5 - Timer PWM sweep start
 
 Sets the start position on the PWM sweep automation curve (`0`-`1000`, shown as `0%`-`100%` in the editor). Hex `00`-`FF` maps onto that range. Same eligibility as `E1`. Also jumps the live sweep to that position.
 
-|               |                                                          |
-| ------------- | -------------------------------------------------------- |
-| **Format**    | `E5XY` or `E5TX`                                             |
-| **Parameter** | `XY` - start phase mapped from `00`-`FF` → `0`-`1000`    |
+|                |                                                                       |
+| -------------- | --------------------------------------------------------------------- |
+| **Format**     | `E5XY` or `E5TX`                                                      |
+| **Parameter**  | `XY` - start phase mapped from `00`-`FF` → `0`-`1000`                 |
 | **With table** | `E5TX` - start phase from table `X` each tick (also jumps live sweep) |
-| **Example**   | `E580` - about halfway (`50%`); `E5T1` - table 1             |
+| **Example**    | `E580` - about halfway (`50%`); `E5T1` - table 1                      |
+
+### E6 - Waveform
+
+Forces this channel's tone, noise, and envelope outputs. Stays until the next `E6`. `08` and above follow the instrument again.
+
+|                |                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------- |
+| **Format**     | `E6XY` or `E6TX`                                                                        |
+| **Parameter**  | `XY` bits: `1` tone, `2` noise, `4` envelope. Combine them. `08` follows the instrument |
+| **With table** | `E6TX` - mixer bits from table `X` each tick                                            |
+| **Example**    | `E601` tone; `E603` tone and noise; `E607` all three; `E608` instrument; `E6T1` table 1 |
+
+## SAA1099
+
+Chip commands are entered in the channel effect column. `E1`, `E2`, and `E6` stay until the next command of the same kind. `EA` stays until a newer `EA` in the same channel group. `E6` and `EA` can step a table (`E6TX`, `EATX`). The table value replaces `XY` on each tick, starting with the first row. A later command of the same kind replaces the running table.
+
+### E1 - Stereo invert
+
+Swaps this channel's left and right levels.
+
+|               |                   |
+| ------------- | ----------------- |
+| **Format**    | `E1XY`            |
+| **Parameter** | `00` off, `01` on |
+| **Example**   | `E101`            |
+
+### E2 - Noise lock
+
+Locks the noise clock of this channel's group to the same setting as noise column `3`. A command on A, B, or C locks the first group. A command on D, E, or F locks the second.
+
+|               |                     |
+| ------------- | ------------------- |
+| **Format**    | `E2XY`              |
+| **Parameter** | `00` off, `01` lock |
+| **Example**   | `E201`              |
+
+### E6 - Waveform
+
+Forces this channel's tone and noise instead of the instrument. `04` and above follow the instrument again.
+
+|                |                                                                           |
+| -------------- | ------------------------------------------------------------------------- |
+| **Format**     | `E6XY` or `E6TX`                                                          |
+| **Parameter**  | `XY` bits: `1` tone, `2` noise. Combine them. `04` follows the instrument |
+| **With table** | `E6TX` - mixer bits from table `X` each tick                              |
+| **Example**    | `E601` tone; `E602` noise; `E603` both; `E604` instrument; `E6T1` table 1 |
+
+### EA - Auto-envelope
+
+Uses this channel's note as the envelope clock for its group. A–C clock channel B. D–F clock channel E. Both halves of the ratio must be `1`-`F`. A zero half turns auto-envelope off for that group. The clock channel is rewritten to `source period * X / Y`, and its tone and noise are silenced while a clocked envelope shape is running.
+
+|                |                                                    |
+| -------------- | -------------------------------------------------- |
+| **Format**     | `EAXY` or `EATX`                                   |
+| **Parameter**  | `X` numerator (`1`-`F`), `Y` denominator (`1`-`F`) |
+| **With table** | `EATX` - ratio from table `X` each tick            |
+| **Example**    | `EA32` - ratio 3:2; `EA00` off; `EAT1` table 1     |
 
 ## 2A03 / 2A07 (NES)
 
@@ -220,11 +278,11 @@ Same format as `E2`, sweeping down (`E3XY` / `E3TX`). A new note clears it the s
 
 Writes the DPCM delta counter (`$4011`) on the DPCM channel. Values above the center pull the triangle, noise, and DPCM mix down. The level stays through a new note until the next `E4`. A DPCM note cut writes it back to `00`. It does not restart a playing sample. Other channels ignore it.
 
-|               |                                              |
-| ------------- | -------------------------------------------- |
-| **Format**    | `E4XY` or `E4TX`                             |
-| **Parameter** | `XY` - delta counter, `00`-`7F`              |
-| **Table**     | `TX` - level from table `X` each tick        |
+|               |                                                                 |
+| ------------- | --------------------------------------------------------------- |
+| **Format**    | `E4XY` or `E4TX`                                                |
+| **Parameter** | `XY` - delta counter, `00`-`7F`                                 |
+| **Table**     | `TX` - level from table `X` each tick                           |
 | **Example**   | `E400` restores the mix; `E47F` attenuates it; `E4T1` - table 1 |
 
 ### E5 - Length counter
@@ -233,38 +291,38 @@ Loads the hardware length counter on pulse, triangle, and noise, and lets it run
 
 Length-counter clocks are 120 Hz on 2A03. `E501` lasts a little over two seconds. `E503` is two clocks.
 
-|               |                                                        |
-| ------------- | ------------------------------------------------------ |
-| **Format**    | `E5XY`                                                 |
-| **Parameter** | `XY` - length index, `00`-`1F`                         |
-| **Example**   | `E501` long; `E503` very short; `E51F` 30 clocks       |
+|               |                                                  |
+| ------------- | ------------------------------------------------ |
+| **Format**    | `E5XY`                                           |
+| **Parameter** | `XY` - length index, `00`-`1F`                   |
+| **Example**   | `E501` long; `E503` very short; `E51F` 30 clocks |
 
 ### E6 - Envelope mode
 
 Sets bits 4 and 5 of the pulse or noise volume register (`$4000`, `$4004`, `$400C`). The mode stays until the next `E6`. Triangle and DPCM ignore it. In modes `00` and `02` the volume nibble is the hardware decay rate. In modes `01` and `03` it is a constant volume.
 
-|               |                                                                 |
-| ------------- | --------------------------------------------------------------- |
-| **Format**    | `E6XY`                                                          |
-| **Parameter** | `00` envelope, `01` length, `02` looping, `03` constant         |
-| **Example**   | `E600` decay with the length counter; `E603` constant volume    |
+|               |                                                              |
+| ------------- | ------------------------------------------------------------ |
+| **Format**    | `E6XY`                                                       |
+| **Parameter** | `00` envelope, `01` length, `02` looping, `03` constant      |
+| **Example**   | `E600` decay with the length counter; `E603` constant volume |
 
 ### E7 - DPCM frequency
 
 Sets the DPCM sample rate (`$4010` bits 0–3) on the DPCM channel. `00` is the slowest rate and `0F` is the fastest. On a note it replaces that sample's instrument pitch. On a later row it changes the rate of the sample that is already playing. The next note uses the instrument pitch again unless it has its own `E7`. Other channels ignore it.
 
-|               |                                              |
-| ------------- | -------------------------------------------- |
-| **Format**    | `E7XY`                                       |
-| **Parameter** | `XY` - rate index, `00`-`0F`                 |
-| **Example**   | `E70F` fastest; `E700` slowest               |
+|               |                                |
+| ------------- | ------------------------------ |
+| **Format**    | `E7XY`                         |
+| **Parameter** | `XY` - rate index, `00`-`0F`   |
+| **Example**   | `E70F` fastest; `E700` slowest |
 
 ### E8 - Linear counter
 
 Writes the triangle linear-counter register (`$4008`). The value stays until the next `E8`, including across new notes. Other channels ignore it. `E5` still loads the length counter. `E8` decides whether the linear counter runs.
 
-|               |                                                        |
-| ------------- | ------------------------------------------------------ |
-| **Format**    | `E8XY`                                                 |
+|               |                                                           |
+| ------------- | --------------------------------------------------------- |
+| **Format**    | `E8XY`                                                    |
 | **Parameter** | `XY` - `$4008`. `00`-`7F` loads and runs, `80`-`FF` halts |
-| **Example**   | `E840` runs for 64 clocks; `E8FF` holds the triangle on |
+| **Example**   | `E840` runs for 64 clocks; `E8FF` holds the triangle on   |

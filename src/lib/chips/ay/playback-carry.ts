@@ -36,6 +36,7 @@ export function ayEnvelopeStickyEffectGroup(effect: StickyEffectCommand): string
 	}
 	if (effect.effect === ON_OFF) return 'envelope-on-off';
 	if (isAyAutoEnvelopeEffect(effect)) {
+		if (effect.tableIndex !== undefined && effect.tableIndex >= 0) return 'envelope-auto';
 		const parameter = effect.parameter ?? 0;
 		const numerator = (parameter >> 4) & 0xf;
 		const denominator = parameter & 0xf;

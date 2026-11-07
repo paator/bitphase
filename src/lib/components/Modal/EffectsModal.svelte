@@ -89,7 +89,8 @@
 		{
 			code: 'P',
 			name: 'Portamento',
-			description: 'Smoothly slides from the previous note to the current note (PXYZ / PXTY).',
+			description:
+				'Smoothly slides from the previous note to the current note (PXYZ / PXTY).',
 			format: 'PXYZ',
 			formatWithTable: 'PXTY',
 			delay: 'X - delay between portamento steps (0-F)',
@@ -163,6 +164,14 @@
 			parameter: 'XY - new speed value (01-FF)',
 			tableDescription: 'speed from table each pattern row',
 			example: 'S.03 - set speed to 3'
+		},
+		{
+			code: 'Q',
+			name: 'Song End',
+			description: 'Stops the song after this row (Q...).',
+			format: 'Q...',
+			parameter: 'ignored',
+			example: 'Q...'
 		}
 	];
 </script>
@@ -171,7 +180,7 @@
 	<h2
 		class="{first
 			? 'mb-3'
-			: 'mb-3 mt-8'} border-b border-[var(--color-app-border)] pb-2 text-lg font-bold text-[var(--color-app-text-primary)]">
+			: 'mt-8 mb-3'} border-b border-[var(--color-app-border)] pb-2 text-lg font-bold text-[var(--color-app-text-primary)]">
 		{title}
 	</h2>
 {/snippet}
@@ -213,7 +222,8 @@
 			</div>
 			{#if effect.formatWithTable}
 				<div>
-					<span class="font-medium text-[var(--color-app-text-primary)]">With table:</span>
+					<span class="font-medium text-[var(--color-app-text-primary)]"
+						>With table:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
 						>{#each getFormatSegments(effect.formatWithTable) as seg}
 							<span style="color: {seg.color}">{seg.char}</span>{/each}</code>
@@ -223,7 +233,8 @@
 			{/if}
 			<div>
 				<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
-				<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">{effect.example}</code>
+				<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+					>{effect.example}</code>
 			</div>
 		</div>
 	</div>
@@ -243,7 +254,8 @@
 						<span style="color: {seg.color}">{seg.char}</span>
 					{/each}
 				</code>, where
-				<code class="rounded bg-[var(--color-app-surface-secondary)] px-1 py-0.5 font-mono">A</code>
+				<code class="rounded bg-[var(--color-app-surface-secondary)] px-1 py-0.5 font-mono"
+					>A</code>
 				indicates the effect type and
 				<code class="rounded bg-[var(--color-app-surface-secondary)] px-1 py-0.5 font-mono"
 					>XYZ</code> are its parameters.
@@ -255,21 +267,22 @@
 						<span style="color: {seg.color}">{seg.char}</span>
 					{/each}
 				</code>
-				(<code class="font-mono">T</code> + table id). For example, rather than manually alternating
+				(<code class="font-mono">T</code> + table id). For example, rather than manually
+				alternating
 				<code class="font-mono">S.03</code>,
 				<code class="font-mono">S.05</code>,
-				<code class="font-mono">S.03</code> to create a groove tempo, you can put the tempo values in
-				table 1 and simply use
-				<code class="font-mono">S.T1</code>.
-				Commands that can run together on the same row can each use their own table
-				(<code class="font-mono">V1T1</code> next to
+				<code class="font-mono">S.03</code> to create a groove tempo, you can put the tempo
+				values in table 1 and simply use
+				<code class="font-mono">S.T1</code>. Commands that can run together on the same row
+				can each use their own table (<code class="font-mono">V1T1</code> next to
 				<code class="font-mono">A0T2</code>).
 			</p>
 			<p>
 				Effect parameters are hexadecimal (0-9, A-F). Table ids in
 				<code class="font-mono">T</code> syntax use 0-9 and A-Z (for example
 				<code class="font-mono">S.TZ</code>). Use
-				<code class="rounded bg-[var(--color-app-surface-secondary)] px-1 py-0.5 font-mono">.</code>
+				<code class="rounded bg-[var(--color-app-surface-secondary)] px-1 py-0.5 font-mono"
+					>.</code>
 				for 0.
 			</p>
 		</div>
@@ -287,8 +300,9 @@
 		<div class="mb-4 text-[var(--color-app-text-secondary)]">
 			<p>
 				Envelope effects use the same codes but are entered in the
-				<span class="font-medium text-[var(--color-app-text-primary)]">envelope effect</span> column.
-				On top of that, there are special effects only targeted towards envelopes:
+				<span class="font-medium text-[var(--color-app-text-primary)]"
+					>envelope effect</span> column. On top of that, there are special effects only targeted
+				towards envelopes:
 			</p>
 		</div>
 
@@ -302,17 +316,25 @@
 				<h3 class="font-bold text-[var(--color-app-text-primary)]">Auto-Envelope</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Automatically calculates the envelope period from channel notes using a ratio. When active,
-				set the envelope shape in the channel column - the envelope value is computed from the
-				playing note. Enter in the envelope effect column only.
+				Automatically calculates the envelope period from channel notes using a ratio. When
+				active, set the envelope shape in the channel column - the envelope value is
+				computed from the playing note. Enter in the envelope effect column only.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">A</span
-						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
-							>Y</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>A</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
+					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>A</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
 					</code>
 				</div>
 				<div>
@@ -321,9 +343,15 @@
 						>X numerator (1-F), Y denominator (1-F) → ratio X:Y</span>
 				</div>
 				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - ratio from table X each tick. 00 turns auto-envelope off until a later
+						row</span>
+				</div>
+				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
 					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
-						>EA32 - ratio 3:2</code>
+						>EA32 - ratio 3:2; EAT1 table</code>
 				</div>
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Shapes:</span>
@@ -333,8 +361,8 @@
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Note:</span>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]"
-						>Persists across rows until another envelope effect replaces it or a new envelope
-						shape is written. Follows note changes in real time.</span>
+						>Persists across rows until another envelope effect replaces it or a new
+						envelope shape is written. Follows note changes in real time.</span>
 				</div>
 			</div>
 		</div>
@@ -349,22 +377,25 @@
 				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Min %</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Sets PWM sweep minimum duty for SID, syncbuzzer, or FM timer effects with exactly two
-				waveform steps (for example 15 0). Hex 00-FF maps to 0-100%. While sweep is 0, min is
-				unused; max sets the static pulse width. Resets on a new note or note off.
+				Sets PWM sweep minimum duty for SID, syncbuzzer, or FM timer effects with exactly
+				two waveform steps (for example 15 0). Hex 00-FF maps to 0-100%. While sweep is 0,
+				min is unused; max sets the static pulse width. Resets on a new note or note off.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">1</span
-						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
-							>Y</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>1</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
 					</code>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">1</span
-						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>1</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
 					</code>
 				</div>
 				<div>
@@ -395,21 +426,24 @@
 				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Max %</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Sets PWM maximum duty (static pulse width when sweep is 0). Same eligibility and mapping as
-				E1.
+				Sets PWM maximum duty (static pulse width when sweep is 0). Same eligibility and
+				mapping as E1.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">2</span
-						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
-							>Y</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>2</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
 					</code>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">2</span
-						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>2</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
 					</code>
 				</div>
 				<div>
@@ -440,21 +474,24 @@
 				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Sweep</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Sets PWM sweep speed between min and max. Same eligibility and mapping as E1. E300 disables
-				sweep so max acts as static pulse width.
+				Sets PWM sweep speed between min and max. Same eligibility and mapping as E1. E300
+				disables sweep so max acts as static pulse width.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">3</span
-						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
-							>Y</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>3</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
 					</code>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">3</span
-						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>3</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
 					</code>
 				</div>
 				<div>
@@ -482,24 +519,29 @@
 					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
 					E4
 				</code>
-				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Sweep Shape</h3>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">
+					Timer PWM Sweep Shape
+				</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Selects the PWM sweep automation curve (triangle, sine, saw up, saw down, square). Same
-				eligibility as E1.
+				Selects the PWM sweep automation curve (triangle, sine, saw up, saw down, square).
+				Same eligibility as E1.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">4</span
-						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
-							>Y</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>4</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
 					</code>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">4</span
-						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>4</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
 					</code>
 				</div>
 				<div>
@@ -527,25 +569,30 @@
 					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
 					E5
 				</code>
-				<h3 class="font-bold text-[var(--color-app-text-primary)]">Timer PWM Sweep Start</h3>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">
+					Timer PWM Sweep Start
+				</h3>
 			</div>
 			<p class="mb-3 text-[var(--color-app-text-secondary)]">
-				Sets the start position on the PWM sweep automation curve (0-1000, shown as 0%-100% in the
-				editor). Hex 00-FF maps onto that range. Also jumps the live sweep to that position. Same
-				eligibility as E1.
+				Sets the start position on the PWM sweep automation curve (0-1000, shown as 0%-100%
+				in the editor). Hex 00-FF maps onto that range. Also jumps the live sweep to that
+				position. Same eligibility as E1.
 			</p>
 			<div class="mb-2 space-y-1">
 				<div>
 					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">5</span
-						><span style="color: {COLOR.parameter}">X</span><span style="color: {COLOR.parameter}"
-							>Y</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>5</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
 					</code>
 					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 					<code class="ml-2 font-mono">
-						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}">5</span
-						><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}">X</span>
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>5</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
 					</code>
 				</div>
 				<div>
@@ -566,6 +613,250 @@
 			</div>
 		</div>
 
+		<div
+			class="mt-4 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+			<div class="mb-2 flex items-center gap-2">
+				<code
+					class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+					E6
+				</code>
+				<h3 class="font-bold text-[var(--color-app-text-primary)]">Waveform</h3>
+			</div>
+			<p class="mb-3 text-[var(--color-app-text-secondary)]">
+				Forces this channel's tone, noise, and envelope outputs. Stays until the next E6. 08
+				and above follow the instrument again.
+			</p>
+			<div class="mb-2 space-y-1">
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>6</span
+						><span style="color: {COLOR.parameter}">X</span><span
+							style="color: {COLOR.parameter}">Y</span>
+					</code>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+					<code class="ml-2 font-mono">
+						<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
+							>6</span
+						><span style="color: {COLOR.table}">T</span><span
+							style="color: {COLOR.table}">X</span>
+					</code>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>XY bits: 1 tone, 2 noise, 4 envelope. Combine them. 08 follows the
+						instrument</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+					<span class="ml-2 text-[var(--color-app-text-secondary)]"
+						>TX - mixer bits from table X each tick</span>
+				</div>
+				<div>
+					<span class="font-medium text-[var(--color-app-text-primary)]">Example:</span>
+					<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+						>E601 tone; E603 tone and noise; E607 all three; E608 instrument; E6T1 table</code>
+				</div>
+			</div>
+		</div>
+
+		{@render effectSection('SAA1099')}
+
+		<div class="mb-4 text-[var(--color-app-text-secondary)]">
+			<p>
+				Chip commands are entered in the channel effect column. E1, E2, and E6 stay until
+				the next command of the same kind. EA stays until a newer EA in the same channel
+				group.
+			</p>
+		</div>
+
+		<div class="space-y-4">
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+				<div class="mb-2 flex items-center gap-2">
+					<code
+						class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+						E1
+					</code>
+					<h3 class="font-bold text-[var(--color-app-text-primary)]">Stereo Invert</h3>
+				</div>
+				<p class="mb-3 text-[var(--color-app-text-secondary)]">
+					Swaps this channel's left and right levels.
+				</p>
+				<div class="mb-2 space-y-1">
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">1</span
+							><span style="color: {COLOR.parameter}">X</span><span
+								style="color: {COLOR.parameter}">Y</span>
+						</code>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]"
+							>00 off, 01 on</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Example:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E101</code>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+				<div class="mb-2 flex items-center gap-2">
+					<code
+						class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+						E2
+					</code>
+					<h3 class="font-bold text-[var(--color-app-text-primary)]">Noise Lock</h3>
+				</div>
+				<p class="mb-3 text-[var(--color-app-text-secondary)]">
+					Locks the noise clock of this channel's group to the same setting as noise
+					column 3. A command on A, B, or C locks the first group. A command on D, E, or F
+					locks the second.
+				</p>
+				<div class="mb-2 space-y-1">
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">2</span
+							><span style="color: {COLOR.parameter}">X</span><span
+								style="color: {COLOR.parameter}">Y</span>
+						</code>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]"
+							>00 off, 01 lock</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Example:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E201</code>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+				<div class="mb-2 flex items-center gap-2">
+					<code
+						class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+						E6
+					</code>
+					<h3 class="font-bold text-[var(--color-app-text-primary)]">Waveform</h3>
+				</div>
+				<p class="mb-3 text-[var(--color-app-text-secondary)]">
+					Forces this channel's tone and noise instead of the instrument. 04 and above
+					follow the instrument again.
+				</p>
+				<div class="mb-2 space-y-1">
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">6</span
+							><span style="color: {COLOR.parameter}">X</span><span
+								style="color: {COLOR.parameter}">Y</span>
+						</code>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">6</span
+							><span style="color: {COLOR.table}">T</span><span
+								style="color: {COLOR.table}">X</span>
+						</code>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]"
+							>XY bits: 1 tone, 2 noise. Combine them. 04 follows the instrument</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]"
+							>TX - mixer bits from table X each tick</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Example:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E601 tone; E602 noise; E603 both; E604 instrument; E6T1 table</code>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface-secondary)] p-4">
+				<div class="mb-2 flex items-center gap-2">
+					<code
+						class="rounded bg-[var(--color-app-surface)] px-2 py-1 font-mono font-bold text-[var(--color-app-text-primary)]">
+						EA
+					</code>
+					<h3 class="font-bold text-[var(--color-app-text-primary)]">Auto-Envelope</h3>
+				</div>
+				<p class="mb-3 text-[var(--color-app-text-secondary)]">
+					Uses this channel's note as the envelope clock for its group. A-C clock channel
+					B. D-F clock channel E. Both halves of the ratio must be 1-F. A zero half turns
+					auto-envelope off for that group. The clock channel is rewritten to source
+					period × X / Y, and its tone and noise are silenced while a clocked envelope
+					shape is running.
+				</p>
+				<div class="mb-2 space-y-1">
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">A</span
+							><span style="color: {COLOR.parameter}">X</span><span
+								style="color: {COLOR.parameter}">Y</span>
+						</code>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
+						<code class="ml-2 font-mono">
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">A</span
+							><span style="color: {COLOR.table}">T</span><span
+								style="color: {COLOR.table}">X</span>
+						</code>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]"
+							>X numerator (1-F), Y denominator (1-F)</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
+						<span class="ml-2 text-[var(--color-app-text-secondary)]"
+							>TX - ratio from table X each tick. 00 in the table turns the group off</span>
+					</div>
+					<div>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Example:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>EA32 - ratio 3:2; EA00 off; EAT1 table</code>
+					</div>
+				</div>
+			</div>
+		</div>
+
 		{@render effectSection('2A03 / 2A07 (NES)')}
 
 		<div class="space-y-4">
@@ -579,31 +870,33 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Pulse Width</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists through note off
-					until a new E1. Use E100 to restore the instrument duty cycle.
+					Sets or automates square pulse width on Pulse 1 and Pulse 2. Persists through
+					note off until a new E1. Use E100 to restore the instrument duty cycle.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>1</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">1</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>1</span
-							><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
-								>X</span>
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">1</span
+							><span style="color: {COLOR.table}">T</span><span
+								style="color: {COLOR.table}">X</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]"
-							>00 restores instrument duty; 01-04 select duty cycles 1-4 (12.5%, 25%, 50%,
-							75%)</span>
+							>00 restores instrument duty; 01-04 select duty cycles 1-4 (12.5%, 25%,
+							50%, 75%)</span>
 					</div>
 					<div>
 						<span class="font-medium text-[var(--color-app-text-primary)]">Table:</span>
@@ -611,10 +904,16 @@
 							>TX - values from table X each tick (0 = instrument duty)</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E100</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E102</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E1T1</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E100</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E102</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E1T1</code>
 					</div>
 				</div>
 			</div>
@@ -629,35 +928,44 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Sweep Up</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Hardware pitch sweep up on Pulse 1 / Pulse 2 (E2XY / E2TX). A new note clears the sweep unless that note has E2 or E3.
+					Hardware pitch sweep up on Pulse 1 / Pulse 2 (E2XY / E2TX). A new note clears
+					the sweep unless that note has E2 or E3.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>2</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">2</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>2</span
-							><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
-								>X</span>
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">2</span
+							><span style="color: {COLOR.table}">T</span><span
+								style="color: {COLOR.table}">X</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]"
 							>X = sweep time (0-7), Y = shift (0-7). Y = 0 disables.</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E247</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E2T1</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E200</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E247</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E2T1</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E200</code>
 					</div>
 				</div>
 			</div>
@@ -672,30 +980,38 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Sweep Down</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Same format as E2, sweeping down (E3XY / E3TX). A new note clears it the same way.
+					Same format as E2, sweeping down (E3XY / E3TX). A new note clears it the same
+					way.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>3</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">3</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>3</span
-							><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
-								>X</span>
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">3</span
+							><span style="color: {COLOR.table}">T</span><span
+								style="color: {COLOR.table}">X</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E317</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E3T1</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E300</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E317</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E3T1</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E300</code>
 					</div>
 				</div>
 			</div>
@@ -710,29 +1026,31 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Delta Counter</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Writes the DPCM delta counter on the DPCM channel. Higher values attenuate triangle,
-					noise, and DPCM. The level stays through a new note until the next E4. A DPCM note cut
-					writes it back to 00. It does not restart a playing sample.
+					Writes the DPCM delta counter on the DPCM channel. Higher values attenuate
+					triangle, noise, and DPCM. The level stays through a new note until the next E4.
+					A DPCM note cut writes it back to 00. It does not restart a playing sample.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>4</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">4</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">or</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>4</span
-							><span style="color: {COLOR.table}">T</span><span style="color: {COLOR.table}"
-								>X</span>
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">4</span
+							><span style="color: {COLOR.table}">T</span><span
+								style="color: {COLOR.table}">X</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-7F</span>
 					</div>
 					<div>
@@ -741,10 +1059,16 @@
 							>TX - level from table X each tick</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E400</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E47F</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E4T1</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E400</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E47F</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E4T1</code>
 					</div>
 				</div>
 			</div>
@@ -759,29 +1083,37 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Length Counter</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Loads the hardware length counter on pulse, triangle, and noise. The note goes silent
-					when the counter expires, and a new note reloads the same length. The index stays until
-					the next E5.
+					Loads the hardware length counter on pulse, triangle, and noise. The note goes
+					silent when the counter expires, and a new note reloads the same length. The
+					index stays until the next E5.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>5</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">5</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-1F</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E501</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E503</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E51F</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E501</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E503</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E51F</code>
 					</div>
 				</div>
 			</div>
@@ -796,29 +1128,37 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Envelope Mode</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Sets the pulse and noise envelope mode. 00 is hardware decay with the length counter,
-					01 is constant volume with the length counter, 02 is a looping decay, and 03 is constant
-					volume. The mode stays until the next E6.
+					Sets the pulse and noise envelope mode. 00 is hardware decay with the length
+					counter, 01 is constant volume with the length counter, 02 is a looping decay,
+					and 03 is constant volume. The mode stays until the next E6.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>6</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">6</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-03</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E600</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E602</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E603</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E600</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E602</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E603</code>
 					</div>
 				</div>
 			</div>
@@ -833,28 +1173,34 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">DPCM Frequency</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Sets the DPCM sample rate. On a note it replaces the instrument pitch. On a later row it
-					changes the rate of the sample already playing. The next note uses the instrument pitch
-					again.
+					Sets the DPCM sample rate. On a note it replaces the instrument pitch. On a
+					later row it changes the rate of the sample already playing. The next note uses
+					the instrument pitch again.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>7</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">7</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-0F</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E700</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E70F</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E700</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E70F</code>
 					</div>
 				</div>
 			</div>
@@ -869,27 +1215,34 @@
 					<h3 class="font-bold text-[var(--color-app-text-primary)]">Linear Counter</h3>
 				</div>
 				<p class="mb-3 text-[var(--color-app-text-secondary)]">
-					Writes the triangle linear counter. 00-7F loads the counter and lets it run. 80-FF
-					halts it, and the low 7 bits stay the reload value. The value stays until the next E8.
+					Writes the triangle linear counter. 00-7F loads the counter and lets it run.
+					80-FF halts it, and the low 7 bits stay the reload value. The value stays until
+					the next E8.
 				</p>
 				<div class="mb-2 space-y-1">
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Format:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Format:</span>
 						<code class="ml-2 font-mono">
-							<span style="color: {COLOR.code}">E</span><span style="color: {COLOR.delay}"
-								>8</span
+							<span style="color: {COLOR.code}">E</span><span
+								style="color: {COLOR.delay}">8</span
 							><span style="color: {COLOR.parameter}">X</span><span
 								style="color: {COLOR.parameter}">Y</span>
 						</code>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Parameter:</span>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Parameter:</span>
 						<span class="ml-2 text-[var(--color-app-text-secondary)]">XY - 00-FF</span>
 					</div>
 					<div>
-						<span class="font-medium text-[var(--color-app-text-primary)]">Examples:</span>
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E840</code>,
-						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]">E8FF</code>
+						<span class="font-medium text-[var(--color-app-text-primary)]"
+							>Examples:</span>
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E840</code
+						>,
+						<code class="ml-2 font-mono text-[var(--color-app-text-secondary)]"
+							>E8FF</code>
 					</div>
 				</div>
 			</div>
