@@ -827,7 +827,12 @@
 												{getSpeedForPlayPattern}
 												{tuningTableVersion}
 												chip={chipProcessor.chip}
-												{chipProcessor} />
+												{chipProcessor}
+												onChannelMutesChanged={() => {
+													patternEditors.forEach((editor) =>
+														editor?.requestRedraw?.()
+													);
+												}} />
 										{/key}
 									</div>
 								</Card>

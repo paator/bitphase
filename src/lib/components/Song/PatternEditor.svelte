@@ -48,6 +48,11 @@
 	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
 	import { Cache } from '../../utils/memoize';
 	import { channelMuteStore } from '../../stores/channel-mute.svelte';
+	import {
+		channelCountForMute,
+		clearedChannelMutes,
+		soloChannelMutes
+	} from '../../services/audio/channel-mute-plan';
 	import { waveformStore } from '../../stores/waveform.svelte';
 	import { PatternFieldDetection } from '../../services/pattern/editing/pattern-field-detection';
 	import {
@@ -144,7 +149,8 @@
 		getSpeedForPlayPattern,
 		chip,
 		chipProcessor,
-		tuningTableVersion = 0
+		tuningTableVersion = 0,
+		onChannelMutesChanged
 	}: {
 		songIndex: number;
 		currentPatternOrderIndex: number;
@@ -166,6 +172,7 @@
 		chip: Chip;
 		chipProcessor: ChipProcessor;
 		tuningTableVersion?: number;
+		onChannelMutesChanged?: () => void;
 	} = $props();
 
 	const patterns = $derived(projectStore.patterns[songIndex] ?? []);
@@ -1237,7 +1244,14 @@
 	});
 
 	function getChipIndex(): number {
-		return services.audioService.chipProcessors.findIndex((p) => p === chipProcessor);
+		const found = services.audioService.chipProcessors.findIndex((p) => p === chipProcessor);
+		if (found >= 0) return found;
+		const count = Math.max(
+			services.audioService.chipProcessors.length,
+			projectStore.songs.length
+		);
+		if (songIndex >= 0 && songIndex < count) return songIndex;
+		return -1;
 	}
 
 	function getChannelMutedState(pattern: Pattern): boolean[] {
@@ -2467,17 +2481,49 @@
 		return fieldInfo.channelIndex;
 	}
 
+	function hardwareLabelsForChip(chipIdx: number): string[] {
+		const processor = services.audioService.chipProcessors[chipIdx];
+		const fromProcessor = processor?.chip.schema.channelLabels;
+		if (fromProcessor && fromProcessor.length > 0) return fromProcessor;
+		const fromSong = projectStore.songs[chipIdx]?.getSchema()?.channelLabels;
+		if (fromSong && fromSong.length > 0) return fromSong;
+		return ['A', 'B', 'C'];
+	}
+
+	function channelCountForChip(chipIdx: number): number {
+		const hwLabels = hardwareLabelsForChip(chipIdx);
+		const patternsForChip = projectStore.patterns[chipIdx] ?? [];
+		return channelCountForMute({
+			hardwareChannelCount: hwLabels.length,
+			virtualChannelMap: projectStore.songs[chipIdx]?.virtualChannelMap,
+			patternChannelCounts: patternsForChip.map((pattern) => pattern.channels.length),
+			existingMuteCount: channelMuteStore.getAllMuteStates().get(chipIdx)?.length ?? 0
+		});
+	}
+
+	function chipCountForMute(): number {
+		return Math.max(services.audioService.chipProcessors.length, projectStore.songs.length);
+	}
+
+	function applyChannelMutePlan(plan: Map<number, boolean[]>): void {
+		channelMuteStore.setAll(plan);
+		const processors = services.audioService.chipProcessors;
+		for (const [chipIdx, mutes] of plan) {
+			const processor = processors[chipIdx];
+			if (!processor) continue;
+			for (let channel = 0; channel < mutes.length; channel++) {
+				processor.updateParameter(`channelMute_${channel}`, mutes[channel]);
+			}
+		}
+		if (onChannelMutesChanged) onChannelMutesChanged();
+		else draw();
+	}
+
 	function isPlayingSolo(): boolean {
 		let unmutedCount = 0;
-		const chipProcessors = services.audioService.chipProcessors;
-		for (let chipIdx = 0; chipIdx < chipProcessors.length; chipIdx++) {
-			const chipSong = projectStore.songs[chipIdx];
-			const chipSchema = chipProcessors[chipIdx].chip.schema;
-			const hwLabels = chipSchema.channelLabels ?? ['A', 'B', 'C'];
-			const totalChannels = getTotalVirtualChannelCount(
-				hwLabels.length,
-				chipSong?.virtualChannelMap ?? {}
-			);
+		const chipCount = chipCountForMute();
+		for (let chipIdx = 0; chipIdx < chipCount; chipIdx++) {
+			const totalChannels = channelCountForChip(chipIdx);
 			for (let ch = 0; ch < totalChannels; ch++) {
 				if (!channelMuteStore.isChannelMuted(chipIdx, ch)) unmutedCount++;
 			}
@@ -2486,40 +2532,29 @@
 	}
 
 	function executePlaySolo(clickedChipIndex: number, soloChannel: number): void {
-		const chipProcessors = services.audioService.chipProcessors;
-		chipProcessors.forEach((processor, chipIdx) => {
-			const chipSong = projectStore.songs[chipIdx];
-			const chipSchema = processor.chip.schema;
-			const hwLabels = chipSchema.channelLabels ?? ['A', 'B', 'C'];
-			const totalChannels = getTotalVirtualChannelCount(
-				hwLabels.length,
-				chipSong?.virtualChannelMap ?? {}
+		if (clickedChipIndex < 0 || soloChannel < 0) return;
+		const plan = new Map<number, boolean[]>();
+		const chipCount = chipCountForMute();
+		for (let chipIdx = 0; chipIdx < chipCount; chipIdx++) {
+			const totalChannels = channelCountForChip(chipIdx);
+			if (totalChannels <= 0) continue;
+			plan.set(
+				chipIdx,
+				soloChannelMutes(totalChannels, soloChannel, chipIdx === clickedChipIndex)
 			);
-			for (let ch = 0; ch < totalChannels; ch++) {
-				const muted = chipIdx === clickedChipIndex ? ch !== soloChannel : true;
-				channelMuteStore.setChannelMuted(chipIdx, ch, muted);
-				processor.updateParameter(`channelMute_${ch}`, muted);
-			}
-		});
-		draw();
+		}
+		applyChannelMutePlan(plan);
 	}
 
 	function executeUnmuteAll(): void {
-		const chipProcessors = services.audioService.chipProcessors;
-		chipProcessors.forEach((processor, chipIdx) => {
-			const chipSong = projectStore.songs[chipIdx];
-			const chipSchema = processor.chip.schema;
-			const hwLabels = chipSchema.channelLabels ?? ['A', 'B', 'C'];
-			const totalChannels = getTotalVirtualChannelCount(
-				hwLabels.length,
-				chipSong?.virtualChannelMap ?? {}
-			);
-			for (let ch = 0; ch < totalChannels; ch++) {
-				channelMuteStore.setChannelMuted(chipIdx, ch, false);
-				processor.updateParameter(`channelMute_${ch}`, false);
-			}
-		});
-		draw();
+		const plan = new Map<number, boolean[]>();
+		const chipCount = chipCountForMute();
+		for (let chipIdx = 0; chipIdx < chipCount; chipIdx++) {
+			const totalChannels = channelCountForChip(chipIdx);
+			if (totalChannels <= 0) continue;
+			plan.set(chipIdx, clearedChannelMutes(totalChannels));
+		}
+		applyChannelMutePlan(plan);
 	}
 
 	function handleChannelContextMenuAction(data: { action: string }): void {

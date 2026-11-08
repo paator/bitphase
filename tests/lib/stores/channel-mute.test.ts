@@ -51,4 +51,19 @@ describe('ChannelMuteStore', () => {
 		channelMuteStore.setChannelMuted(0, 1, false);
 		expect(channelMuteStore.areChannelsMuted(0, [0, 1])).toBe(false);
 	});
+
+	it('replaces mute state for every chip at once', () => {
+		channelMuteStore.setChannelMuted(0, 0, true);
+		channelMuteStore.setAll([
+			[0, [true, false, true]],
+			[1, [true, true, true]]
+		]);
+
+		expect(channelMuteStore.isChannelMuted(0, 0)).toBe(true);
+		expect(channelMuteStore.isChannelMuted(0, 1)).toBe(false);
+		expect(channelMuteStore.isChannelMuted(0, 2)).toBe(true);
+		expect(channelMuteStore.isChannelMuted(1, 0)).toBe(true);
+		expect(channelMuteStore.isChannelMuted(1, 1)).toBe(true);
+		expect(channelMuteStore.isChannelMuted(1, 2)).toBe(true);
+	});
 });

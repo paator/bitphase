@@ -36,6 +36,14 @@ class ChannelMuteStore {
 		this.muteState = new Map(this.muteState);
 	}
 
+	setAll(mutesByChip: Iterable<readonly [number, readonly boolean[]]>): void {
+		const next = new Map<number, boolean[]>();
+		for (const [chipIndex, mutes] of mutesByChip) {
+			next.set(chipIndex, [...mutes]);
+		}
+		this.muteState = next;
+	}
+
 	areChannelsMuted(chipIndex: number, channelIndices: number[]): boolean {
 		return (
 			channelIndices.length > 0 &&
