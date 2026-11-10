@@ -24,6 +24,7 @@ export interface PianoConflictNote {
 	note: string;
 	instrument: number | null;
 	release: boolean;
+	bounded?: boolean;
 	fields?: PianoNoteFields;
 }
 
@@ -197,6 +198,7 @@ export function replaceChannelConflicts(
 				note: note.note,
 				instrument: note.instrument,
 				release: note.release,
+				...(note.bounded === false ? { bounded: false as const } : {}),
 				...withFields(note.fields)
 			}))
 		);
@@ -258,7 +260,7 @@ export function heldConflictIntents(notes: readonly PianoConflictNote[]): PianoI
 		note: note.note,
 		instrument: note.instrument,
 		release: note.release,
-		bounded: true,
+		bounded: note.bounded !== false,
 		preferred: false,
 		...withFields(note.fields)
 	}));

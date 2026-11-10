@@ -71,10 +71,19 @@ export function previousNoteEvent(
 	return null;
 }
 
-export function clearFollowingGate(rows: GenericRow[], noteKey: string, from: number): boolean {
+export function clearFollowingGate(
+	rows: GenericRow[],
+	noteKey: string,
+	from: number,
+	ownerRow: number | null = null
+): boolean {
 	const event = nextNoteEvent(rows, noteKey, from);
 	const cell = event ? rows[event.row] : undefined;
 	if (!event || !cell || !isGateKind(event.kind)) return false;
+	if (ownerRow !== null) {
+		const previous = previousNoteEvent(rows, noteKey, event.row - 1);
+		if (previous && previous.row < ownerRow) return false;
+	}
 	cell[noteKey] = EMPTY_NOTE;
 	return true;
 }

@@ -1,6 +1,6 @@
 import type { PianoNoteBlock } from './piano-roll-notes';
 
-export const PIANO_ROLL_RESIZE_HANDLE = 8;
+export const PIANO_ROLL_RESIZE_HANDLE = 6;
 
 export interface PianoRollMetrics {
 	rowWidth: number;
@@ -113,10 +113,7 @@ export function hitTestNoteContent(
 		const endX = block.endRow * metrics.rowWidth;
 		const startX = block.startRow * metrics.rowWidth;
 		const width = Math.max(metrics.rowWidth, endX - startX);
-		const handle = Math.min(
-			width / 2,
-			Math.max(PIANO_ROLL_RESIZE_HANDLE, metrics.rowWidth * 0.7)
-		);
+		const handle = Math.min(width / 2, PIANO_ROLL_RESIZE_HANDLE);
 		const slop = Math.min(PIANO_ROLL_RESIZE_HANDLE, metrics.rowWidth / 2);
 		if (row >= block.startRow && row < block.endRow) {
 			if (x >= endX - handle && x < endX) return { type: 'resize', block };

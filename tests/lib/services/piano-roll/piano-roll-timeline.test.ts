@@ -121,6 +121,14 @@ describe('piano roll notes across a pattern boundary', () => {
 		});
 	});
 
+	it('does not erase pitched notes while spilling a tail across a pattern boundary', () => {
+		const first = rows(['---', 'C-4', '---', '---']);
+		const second = rows(['E-4', '---', '---', '---']);
+		const { spans, rowsFor } = twoPatterns(first, second);
+		writeSpilledNoteTail(spans, 'note', 1, 4, false, rowsFor);
+		expect(second.map((row) => row.note)).toEqual(['E-4', 'OFF', '---', '---']);
+	});
+
 	it('collects blocks from the visible spans and stretches open ones across the timeline', () => {
 		const first = rows(['---', 'C-4', '---', '---']);
 		const second = rows(['---', '---', 'OFF', 'E-4']);
@@ -144,6 +152,23 @@ describe('piano roll notes across a pattern boundary', () => {
 		expect(all.gates).toEqual([
 			expect.objectContaining({ row: 6, localRow: 2, orderIndex: 1, kind: 'off' })
 		]);
+	});
+
+	it('keeps pattern-local lengths when open-note continuation is disabled', () => {
+		const first = rows(['---', 'C-4', '---', '---']);
+		const second = rows(['---', '---', 'OFF', 'E-4']);
+		const { spans, rowsFor } = twoPatterns(first, second);
+		const local = collectTimelineBlocks({
+			timeline: spans,
+			noteKey: 'note',
+			rowsForSpan: rowsFor,
+			collect: (patternRows) => collectPianoNotes(patternRows, 'note'),
+			continueOpen: false
+		});
+		expect(local.blocks.find((block) => block.note === 'C-4')).toMatchObject({
+			startRow: 1,
+			endRow: 4
+		});
 	});
 
 	it('removes the gate left in the next pattern when the note moves away', () => {

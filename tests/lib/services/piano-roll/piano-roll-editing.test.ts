@@ -169,6 +169,29 @@ describe('piano roll note editing', () => {
 		expect(removePitchedNotes(single(channel), 0, 'note', [1])).toBe(false);
 	});
 
+	it('does not lengthen the previous same-pitch note when a later note is removed', () => {
+		const channel = rows(['E-4', '---', 'E-4', '---', 'OFF', '---', '---', '---']);
+		expect(collectPianoNotes(channel, 'note').blocks.map((block) => block.endRow)).toEqual([
+			2, 4
+		]);
+		expect(removePitchedNote(single(channel), 0, 'note', 2)).toBe(true);
+		expect(notesOf(channel)).toEqual(['E-4', '---', 'OFF', '---', '---', '---', '---', '---']);
+		expect(collectPianoNotes(channel, 'note').blocks[0]).toMatchObject({
+			startRow: 0,
+			endRow: 2
+		});
+	});
+
+	it('restores an OFF so a neighbour held as conflict cannot lengthen the previous note', () => {
+		const channel = rows(['E-4', '---', 'E-4', '---', 'G-4', '---', 'OFF']);
+		expect(removePitchedNotes(single(channel), 0, 'note', [2])).toBe(true);
+		expect(notesOf(channel)).toEqual(['E-4', '---', 'OFF', '---', 'G-4', '---', 'OFF']);
+		expect(collectPianoNotes(channel, 'note').blocks[0]).toMatchObject({
+			startRow: 0,
+			endRow: 2
+		});
+	});
+
 	it('clears the removed note parameters from a blank schema row', () => {
 		const blank = blankChannelRow(new AYConverter(), AY_CHIP_SCHEMA)!;
 		const channel: GenericRow[] = [

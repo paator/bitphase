@@ -158,6 +158,29 @@ describe('piano roll intent planning', () => {
 		expect(plain).not.toHaveProperty('fields');
 	});
 
+	it('preserves open-note bounds when holding a silenced note', () => {
+		const [held] = replaceChannelConflicts([], 0, 0, [
+			intent(4, 4, 40, { bounded: false, preferred: true })
+		]);
+		expect(held).toMatchObject({ startRow: 4, length: 4, bounded: false });
+		expect(heldConflictIntents([held!])[0]).toMatchObject({ bounded: false, preferred: false });
+		const [gated] = replaceChannelConflicts([], 0, 0, [intent(0, 2, 12, { bounded: true })]);
+		expect(gated).not.toHaveProperty('bounded');
+		expect(heldConflictIntents([gated!])[0]).toMatchObject({ bounded: true });
+	});
+
+	it('holds the lower note at its pattern-local length when a higher note overlaps it', () => {
+		const lower = intent(8, 2, 40, { preferred: true, note: 'E-4' });
+		const higher = intent(9, 4, 52, { preferred: false, note: 'E-5' });
+		const neighbour = intent(4, 4, 40, { preferred: true, note: 'E-4' });
+		const plan = planPianoIntents([neighbour, lower, higher], [neighbour, lower]);
+		expect(plan.silent).toEqual([lower]);
+		expect(plan.silent[0]).toMatchObject({ startRow: 8, length: 2 });
+		expect(plan.remove).toEqual([lower]);
+		expect(plan.add).toEqual([higher]);
+		expect(plan.reshape).toEqual([]);
+	});
+
 	it('mirrors conflicts onto every order slot that reuses the same pattern', () => {
 		const timeline = buildPianoTimeline([0, 0, 1, 0], () => 8);
 		const held: PianoConflictNote = {

@@ -48,6 +48,14 @@ describe('piano roll geometry', () => {
 		expect(yToPitch(-1, metrics)).toBeNull();
 	});
 
+	it('keeps the resize handle near the trailing edge', () => {
+		const wide: PianoRollMetrics = { ...metrics, rowWidth: 40 };
+		const y = pitchToY(10, wide) + 1;
+		const endX = block.endRow * wide.rowWidth;
+		expect(hitTestNoteContent(endX - 4, y, [block], wide)).toMatchObject({ type: 'resize' });
+		expect(hitTestNoteContent(endX - 20, y, [block], wide)).toMatchObject({ type: 'block' });
+	});
+
 	it('resizes the note on the pointed pitch when two notes share a start row', () => {
 		const low: PianoNoteBlock = {
 			startRow: 2,

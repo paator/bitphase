@@ -17,12 +17,13 @@
 		type PianoFieldValue
 	} from '../../services/piano-roll/piano-lane-codec';
 	import {
+		clearFollowingGate,
 		EMPTY_NOTE,
 		gateNote,
 		noteEventKind,
 		notePitchIndex,
 		pitchNoteText,
-		RELEASE_NOTE
+		writeNoteGate
 	} from '../../services/piano-roll/piano-note-events';
 	import {
 		amplitudeFields,
@@ -1208,11 +1209,13 @@
 			timeline,
 			noteKey: key,
 			rowsForSpan,
-			collect: (rows) => collectPianoNotes(rows, key)
+			collect: (rows) => collectPianoNotes(rows, key),
+			continueOpen: false
 		});
-		const columns = timelineColumnCount(timeline);
 		return blocks.map((block) => {
-			const bounded = block.endRow < columns;
+			const home = timelineSpanAt(timeline, block.startRow);
+			const localEnd = home ? block.endRow - home.span.startRow : block.endRow;
+			const bounded = !!home && localEnd < home.span.length;
 			return {
 				startRow: block.startRow,
 				length: blockLength(block),
@@ -1293,27 +1296,22 @@
 		if (!noteKey || !located || !generic || !rows) return;
 		const patternId = located.span.patternId;
 		const { localRow } = located;
-		const resize = (end: number) =>
-			session.mark(
-				patternId,
-				resizePitchedNote(generic, session.channelIndex, noteKey, localRow, end)
-			);
+		const openInPattern = () => {
+			if (clearFollowingGate(rows, noteKey, localRow + 1, localRow)) session.mark(patternId);
+		};
 		if (!note.bounded) {
-			resize(rows.length);
+			openInPattern();
 			return;
 		}
 		const end = localRow + note.length;
 		if (end >= rows.length) {
-			resize(rows.length);
+			openInPattern();
 			sealTail(session, note.startRow, note.length, note.release);
 			return;
 		}
-		resize(end);
-		const gate = rows[end];
-		if (note.release && gate && gate[noteKey] !== RELEASE_NOTE) {
-			gate[noteKey] = RELEASE_NOTE;
-			session.mark(patternId);
-		}
+		clearFollowingGate(rows, noteKey, localRow + 1, localRow);
+		writeNoteGate(rows, noteKey, end, note.release);
+		session.mark(patternId);
 	}
 
 	function eraseIntents(spots: readonly PianoNoteSpot[], cursor: PianoEditCursor): IntentResult {
@@ -1385,13 +1383,32 @@
 			const generic = located ? session.generic(located.span.patternId) : null;
 			return located && generic ? { ...located, generic } : null;
 		};
-		for (const note of [...plan.remove].sort((left, right) => right.startRow - left.startRow)) {
-			const place = target(note);
-			if (!place) continue;
-			clearOpenTail(session, place.span, place.localRow);
+		const removals = groupBy(
+			[...plan.remove].sort((left, right) => right.startRow - left.startRow),
+			(note) => {
+				const place = target(note);
+				return place ? place.span.patternId : -1;
+			},
+			(note) => {
+				const place = target(note);
+				if (!place) return -1;
+				clearOpenTail(session, place.span, place.localRow);
+				return place.localRow;
+			}
+		);
+		for (const [patternId, localRows] of removals) {
+			if (patternId < 0) continue;
+			const generic = session.generic(patternId);
+			if (!generic) continue;
 			session.mark(
-				place.span.patternId,
-				removePitchedNote(place.generic, channelIndex, key, place.localRow, blankRow)
+				patternId,
+				removePitchedNotes(
+					generic,
+					channelIndex,
+					key,
+					localRows.filter((row) => row >= 0),
+					blankRow
+				)
 			);
 		}
 		for (const note of plan.reshape) {
@@ -1761,6 +1778,8 @@
 	}
 
 	function draggedBlockLength(from: NoteSelection): number | null {
+		const intent = allIntents().find((item) => sameNoteSpot(item, from));
+		if (intent) return intent.length;
 		const block = notes.blocks.find(
 			(item) =>
 				item.orderIndex === from.orderIndex &&
@@ -2067,9 +2086,10 @@
 
 	function moveGroupNote(selection: NoteSelection, fallbackLength = 1): MoveGroupNote {
 		const block = findBlock(selection);
+		const intent = allIntents().find((item) => sameNoteSpot(item, selection));
 		return {
 			...selection,
-			length: block ? blockLength(block) : Math.max(1, fallbackLength),
+			length: intent?.length ?? (block ? blockLength(block) : Math.max(1, fallbackLength)),
 			color: block ? resolveNoteColor(block) : null,
 			instrument: block?.instrument ?? null,
 			gestures: block?.gestures ?? [],

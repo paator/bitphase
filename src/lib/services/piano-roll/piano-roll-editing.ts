@@ -1,7 +1,6 @@
 import type { GenericPattern, GenericRow } from '../../models/song/generic';
 import {
 	clearFollowingGate,
-	clearNoteEvents,
 	EMPTY_NOTE,
 	gateNote,
 	isGateKind,
@@ -162,6 +161,13 @@ export function removePitchedNotes(
 		.sort((left, right) => left - right);
 	if (starts.length === 0) return false;
 	const startSet = new Set(starts);
+	const preserveEnds = new Set<number>();
+	for (const start of starts) {
+		const previous = previousNoteEvent(rows, noteKey, start - 1, (row) => startSet.has(row));
+		if (previous?.kind !== 'pitched') continue;
+		const between = nextNoteEvent(rows, noteKey, previous.row + 1, start);
+		if (!between) preserveEnds.add(start);
+	}
 	const gates = new Set<number>();
 	for (const start of starts) {
 		for (let row = start + 1; row < rows.length; row++) {
@@ -194,7 +200,20 @@ export function removePitchedNotes(
 		const cell = rows[gate];
 		if (cell) cell[noteKey] = EMPTY_NOTE;
 	}
+	for (const endRow of preserveEnds) {
+		sealPreviousNoteEnd(rows, noteKey, endRow);
+	}
 	return true;
+}
+
+function sealPreviousNoteEnd(rows: GenericRow[], noteKey: string, endRow: number): void {
+	const cell = rows[endRow];
+	if (!cell || noteEventKind(cell[noteKey]) !== 'empty') return;
+	const previous = previousNoteEvent(rows, noteKey, endRow - 1);
+	if (previous?.kind !== 'pitched') return;
+	const next = nextNoteEvent(rows, noteKey, previous.row + 1);
+	if (next && next.row <= endRow) return;
+	cell[noteKey] = OFF_NOTE;
 }
 
 export function resizePitchedNote(
@@ -240,7 +259,14 @@ function writeBoundedBody(
 	release: boolean
 ): void {
 	const end = startRow + length;
-	clearNoteEvents(rows, noteKey, startRow + 1, end);
+	clearFollowingGate(rows, noteKey, startRow + 1, startRow);
+	for (let row = startRow + 1; row < end && row < rows.length; row++) {
+		const kind = noteEventKind(rows[row]?.[noteKey]);
+		if (kind === 'empty' || kind === 'pitched') continue;
+		const previous = previousNoteEvent(rows, noteKey, row - 1);
+		if (previous?.kind === 'pitched' && previous.row < startRow) continue;
+		rows[row][noteKey] = EMPTY_NOTE;
+	}
 	writeNoteGate(rows, noteKey, end, release);
 }
 

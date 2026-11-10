@@ -185,13 +185,21 @@ export interface CollectTimelineBlocksOptions {
 	noteKey: string;
 	rowsForSpan: SpanRowsReader;
 	collect: (rows: GenericRow[], span: PianoTimelineSpan) => PianoRollNotes;
+	continueOpen?: boolean;
 }
 
 export function collectTimelineBlocks(options: CollectTimelineBlocksOptions): {
 	blocks: PianoTimelineBlock[];
 	gates: PianoTimelineGate[];
 } {
-	const { timeline, spans = timeline, noteKey, rowsForSpan, collect } = options;
+	const {
+		timeline,
+		spans = timeline,
+		noteKey,
+		rowsForSpan,
+		collect,
+		continueOpen = true
+	} = options;
 	const blocks: PianoTimelineBlock[] = [];
 	const gates: PianoTimelineGate[] = [];
 	for (const span of spans) {
@@ -201,7 +209,7 @@ export function collectTimelineBlocks(options: CollectTimelineBlocksOptions): {
 		blocks.push(...shifted.blocks);
 		gates.push(...shifted.gates);
 	}
-	continueOpenNoteBlocks(blocks, timeline, noteKey, rowsForSpan);
+	if (continueOpen) continueOpenNoteBlocks(blocks, timeline, noteKey, rowsForSpan);
 	return { blocks, gates };
 }
 
@@ -244,7 +252,8 @@ export function writeSpilledNoteTail(
 	const gate = gateNote(release);
 	const end = absoluteStart + length;
 	eachTimelineRow(spans, absoluteStart + 1, end, rowsForSpan, (cell, span) => {
-		if (noteEventKind(cell[noteKey]) === 'empty') return;
+		const kind = noteEventKind(cell[noteKey]);
+		if (kind === 'empty' || kind === 'pitched') return;
 		cell[noteKey] = EMPTY_NOTE;
 		changed.add(span.patternId);
 	});
