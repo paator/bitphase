@@ -979,6 +979,17 @@
 		};
 	}
 
+	export function playFromPosition(orderIndex: number, row: number): void {
+		lastPatternOrderIndexFromPlayback = orderIndex;
+		discardPendingPlaybackPosition(orderIndex);
+		playbackSeekScheduler.cancel();
+		if (currentPatternOrderIndex !== orderIndex) currentPatternOrderIndex = orderIndex;
+		selectedRow = Math.max(0, row);
+		if (services.audioService.playing) services.audioService.stop();
+		playbackStore.isPlaying = true;
+		playFromCursor();
+	}
+
 	export function playFromCursor() {
 		if (!chipProcessor || !chipProcessor.isAudioNodeAvailable()) {
 			console.warn('Audio processor not available or not initialized');
@@ -1500,11 +1511,15 @@
 		drawHeaderOverlay();
 	}
 
+	function patternEditorIsShown(): boolean {
+		return !document.hidden && !!containerDiv && containerDiv.getClientRects().length > 0;
+	}
+
 	function scheduleDraw(): void {
-		if (pendingDrawRaf !== null) return;
+		if (pendingDrawRaf !== null || !patternEditorIsShown()) return;
 		pendingDrawRaf = requestAnimationFrame(() => {
 			pendingDrawRaf = null;
-			if (!document.hidden) draw();
+			if (patternEditorIsShown()) draw();
 		});
 	}
 
@@ -3322,7 +3337,7 @@
 			sizeChanged ||
 			channelCountChanged
 		) {
-			if (fontReady && !document.hidden) {
+			if (fontReady && patternEditorIsShown()) {
 				if (
 					(rowChanged || columnChanged) &&
 					!orderChanged &&

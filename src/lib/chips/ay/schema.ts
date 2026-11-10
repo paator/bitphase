@@ -22,7 +22,8 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			allowZeroValue: true,
 			usedForBacktracking: true,
 			backtrackWhen: 'nonZero',
-			previewOnEdit: true
+			previewOnEdit: true,
+			noteEquivalent: true
 		},
 		envelopeEffect: {
 			key: 'envelopeEffect',
@@ -95,7 +96,8 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'nonZero'
+			backtrackWhen: 'nonZero',
+			amplitude: true
 		},
 		effect: {
 			key: 'effect',

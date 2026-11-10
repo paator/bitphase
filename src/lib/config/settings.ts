@@ -85,6 +85,14 @@ export const settingsItems: SettingsItem[] = [
 		category: 'general'
 	},
 	{
+		label: 'Experimental features',
+		description: 'Show unfinished features',
+		type: 'toggle',
+		defaultValue: false,
+		setting: 'experimentalFeatures',
+		category: 'general'
+	},
+	{
 		label: 'Pattern Editor Font Size',
 		description: 'Adjust the font size in the pattern editor',
 		type: 'number',

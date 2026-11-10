@@ -30,6 +30,8 @@ import { SAA_CHIP } from '../../chips/saa';
 import type { Chip } from '../../chips/types';
 import type { MenuActionContext } from './menu-action-context';
 import { projectStore } from '../../stores/project.svelte';
+import { settingsStore } from '../../stores/settings.svelte';
+import { pianoRollConflictStore } from '../../stores/piano-roll-conflicts.svelte';
 import { SongTransposeService } from '../song/song-transpose-service';
 
 async function createNewSongFromMenu(ctx: MenuActionContext, chip: Chip): Promise<void> {
@@ -205,6 +207,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				ctx.container.audioService.stop();
 				await ctx.clearAutobackup();
 				const newProject = await ctx.projectService.resetProject();
+				pianoRollConflictStore.clear();
 				ctx.applyProject(newProject);
 				ctx.resetPatternEditor();
 				return;
@@ -244,6 +247,18 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 
 			if (data.action === 'settings') {
 				await ctx.open(SettingsModal, {});
+				return;
+			}
+
+			if (data.action === 'edit-view-tracker') {
+				editorStateStore.setEditView('tracker');
+				return;
+			}
+
+			if (data.action === 'edit-view-piano-roll') {
+				if (settingsStore.experimentalFeatures) {
+					editorStateStore.setEditView('piano-roll');
+				}
 				return;
 			}
 
@@ -305,6 +320,13 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 			}
 
 			if (data.action === 'save' || data.action === 'save-as') {
+				if (pianoRollConflictStore.hasNotes) {
+					const confirmed = await ctx.open(ConfirmModal, {
+						message:
+							'Some overlapping notes are marked in red. Only the highest note is kept in the song, so the red notes will not be saved. Save anyway?'
+					});
+					if (!confirmed) return;
+				}
 				await ctx.handleFileExport(data.action, ctx.getCurrentProject());
 				return;
 			}
@@ -380,6 +402,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 					ctx.container.audioService.stop();
 					await ctx.projectService.restoreChipProcessorsForSongs(project.songs);
 					ctx.syncChipProcessors();
+					pianoRollConflictStore.clear();
 					ctx.applyProject(project);
 					ctx.resetPatternEditor();
 				}
@@ -392,6 +415,7 @@ export function createMenuActionHandler(ctx: MenuActionContext) {
 				ctx.container.audioService.stop();
 				await ctx.projectService.restoreChipProcessorsForSongs(importedProject.songs);
 				ctx.syncChipProcessors();
+				pianoRollConflictStore.clear();
 				ctx.applyProject(importedProject);
 				ctx.resetPatternEditor();
 			}

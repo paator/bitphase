@@ -16,6 +16,7 @@
 			class?: ClassValue;
 		}[];
 		headerContent?: Snippet;
+		headerClass?: ClassValue;
 	} = $props();
 </script>
 
@@ -23,7 +24,7 @@
 	<h2
 		class="relative z-10 flex items-center justify-between rounded-t-sm border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-2 py-1 font-bold {props.fullHeight
 			? 'flex-shrink-0'
-			: ''}">
+			: ''} {props.headerClass ?? ''}">
 		<div class="flex items-center gap-2">
 			{props.title}
 			{#if props.icon}
@@ -33,7 +34,7 @@
 		<div class="flex items-center gap-2">
 			{#if props.actions}
 				<div class="flex items-center gap-1">
-					{#each props.actions as action}
+					{#each props.actions as action (action.label)}
 						<Button
 							variant="header"
 							onclick={action.onClick}

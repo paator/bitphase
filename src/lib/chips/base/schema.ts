@@ -14,6 +14,8 @@ export interface ChipField {
 	usedForBacktracking?: boolean;
 	backtrackWhen?: BacktrackWhen;
 	previewOnEdit?: boolean;
+	noteEquivalent?: boolean;
+	amplitude?: boolean;
 }
 
 export type SettingType = 'text' | 'number' | 'select' | 'toggle';

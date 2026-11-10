@@ -1,4 +1,5 @@
 import { formatEffectStatusHint, type EffectStatusHint } from '../base/effect-status';
+import type { PianoEffectGesture } from '../base/piano-effect-gesture';
 
 export const NES_PULSE_WIDTH_CYCLE_SUBCOMMAND = 1;
 export const NES_SWEEP_UP_SUBCOMMAND = 2;
@@ -53,6 +54,24 @@ export function isNesSweepDownTableEffect(effect: {
 
 export function isNesSweepEffect(effect: { effect: number; delay: number }): boolean {
 	return isNesSweepUpEffect(effect) || isNesSweepDownEffect(effect);
+}
+
+function nesSweepAmount(effect: { parameter?: number; tableIndex?: number }): number {
+	if (effect.tableIndex !== undefined && effect.tableIndex >= 0) return 0.55;
+	const shift = (effect.parameter ?? 0) & 0xf;
+	if (shift <= 0) return 0.4;
+	return Math.max(0.3, Math.min(1, shift / 8));
+}
+
+export function nesPianoEffectGesture(effect: {
+	effect: number;
+	delay: number;
+	parameter?: number;
+	tableIndex?: number;
+}): PianoEffectGesture | null {
+	if (isNesSweepUpEffect(effect)) return { kind: 'slide-up', amount: nesSweepAmount(effect) };
+	if (isNesSweepDownEffect(effect)) return { kind: 'slide-down', amount: nesSweepAmount(effect) };
+	return null;
 }
 
 export function isNesDeltaCounterEffect(effect: { effect: number; delay: number }): boolean {

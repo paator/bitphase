@@ -6,9 +6,11 @@ import type { ChipRenderer, ChipRendererBinding } from './base/renderer';
 import type { ResourceLoader } from './base/resource-loader';
 import type { Component } from 'svelte';
 import type { ChipPlaybackDebugSpec } from './base/playback-debug';
+import type { PianoEffectGesture } from './base/piano-effect-gesture';
 
 import type { Instrument } from '../models/song';
 import type { GenericPattern } from '../models/song/generic';
+import type { EffectLike } from '../utils/type-guards';
 
 export interface Chip {
 	type: string;
@@ -30,6 +32,7 @@ export interface Chip {
 		parameter?: number;
 		tableIndex?: number;
 	}) => string | null;
+	pianoEffectGesture?: (effect: EffectLike) => PianoEffectGesture | null;
 	listEffectStatusHints?: () => Array<{
 		format: string;
 		name: string;

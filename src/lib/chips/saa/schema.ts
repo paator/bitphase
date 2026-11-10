@@ -84,7 +84,8 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'nonZero'
+			backtrackWhen: 'nonZero',
+			amplitude: true
 		},
 		right: {
 			key: 'right',
@@ -94,7 +95,8 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 			selectable: 'character',
 			allowZeroValue: true,
 			usedForBacktracking: true,
-			backtrackWhen: 'nonZero'
+			backtrackWhen: 'nonZero',
+			amplitude: true
 		},
 		effect: {
 			key: 'effect',

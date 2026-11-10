@@ -37,7 +37,10 @@ export const newSongMenuItems: MenuItem[] = newSongOptions.map((option) => ({
 	action: option.action
 }));
 
-export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
+export function buildMenuItems(
+	chipConfig: ChipConfiguration,
+	experimentalFeatures = false
+): MenuItem[] {
 	return [
 		{
 			label: 'File',
@@ -72,6 +75,20 @@ export function buildMenuItems(chipConfig: ChipConfiguration): MenuItem[] {
 		{
 			label: 'View',
 			items: [
+				{
+					label: 'Tracker',
+					type: 'normal',
+					action: 'edit-view-tracker'
+				},
+				...(experimentalFeatures
+					? [
+							{
+								label: 'Piano roll',
+								type: 'normal' as const,
+								action: 'edit-view-piano-roll'
+							}
+						]
+					: []),
 				{
 					label: 'Appearance',
 					type: 'normal',

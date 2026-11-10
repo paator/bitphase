@@ -224,20 +224,24 @@
 				{/if}
 			</div>
 			<div class="flex items-center gap-1.5" title="Envelope as Note">
-				<label class="flex cursor-pointer items-center gap-1.5">
+				<label for="envelope-as-note" class="cursor-pointer">
 					<IconCarbonMusic
 						class="h-3.5 w-3.5 shrink-0 text-[var(--color-app-text-muted)]" />
-					<Checkbox
-						showStatus={false}
-						bind:checked={editorStateStore.envelopeAsNote}
-						onchange={() => {
-							editorStateStore.setEnvelopeAsNote(!editorStateStore.envelopeAsNote);
-						}}
-						title="Envelope as Note" />
-					<span
-						class="hidden text-xs font-medium text-[var(--color-app-text-tertiary)] min-[1880px]:inline"
-						>Env as Note</span>
 				</label>
+				<Checkbox
+					id="envelope-as-note"
+					showStatus={false}
+					bind:checked={editorStateStore.envelopeAsNote}
+					onchange={(event) => {
+						const target = event.currentTarget;
+						if (!(target instanceof HTMLInputElement)) return;
+						editorStateStore.setEnvelopeAsNote(target.checked);
+					}}
+					title="Envelope as Note" />
+				<label
+					for="envelope-as-note"
+					class="hidden cursor-pointer text-xs font-medium text-[var(--color-app-text-tertiary)] min-[1880px]:inline"
+					>Env as Note</label>
 			</div>
 		{/if}
 		<div

@@ -13,4 +13,15 @@ describe('settings', () => {
 		);
 		expect(settingsItems.some((setting) => setting.setting === 'hexNumerals')).toBe(true);
 	});
+
+	it('keeps experimental features off unless enabled', () => {
+		const item = settingsItems.find((setting) => setting.setting === 'experimentalFeatures');
+		expect(item).toEqual(
+			expect.objectContaining({
+				type: 'toggle',
+				defaultValue: false,
+				category: 'general'
+			})
+		);
+	});
 });

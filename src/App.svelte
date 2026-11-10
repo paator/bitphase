@@ -121,7 +121,10 @@
 		const chipTypes = projectStore.songs
 			.map((s) => s.chipType)
 			.filter((t): t is string => t !== undefined);
-		return buildMenuItems(buildChipConfiguration(chipTypes));
+		return buildMenuItems(
+			buildChipConfiguration(chipTypes),
+			settingsStore.experimentalFeatures
+		);
 	});
 
 	$effect(() => {

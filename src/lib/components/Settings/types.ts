@@ -14,6 +14,7 @@ export interface Settings {
 	showInstrumentPreview: boolean;
 	previewFullRow: boolean;
 	debugMode: boolean;
+	experimentalFeatures: boolean;
 	selectionStyle: 'inverted' | 'filled';
 	emptyNoteAlignment: 'center' | 'baseline';
 	classicInstrumentEditor: boolean;

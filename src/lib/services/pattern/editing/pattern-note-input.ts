@@ -117,6 +117,14 @@ export class PatternNoteInput {
 		return this.applyNoteToField(context, fieldInfo, noteStr);
 	}
 
+	static applyNoteString(
+		context: EditingContext,
+		fieldInfo: FieldInfo,
+		noteStr: string
+	): PatternEditingResult | null {
+		return this.applyNoteToField(context, fieldInfo, noteStr);
+	}
+
 	private static applyNoteToField(
 		context: EditingContext,
 		fieldInfo: FieldInfo,

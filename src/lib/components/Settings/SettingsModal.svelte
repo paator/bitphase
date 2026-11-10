@@ -6,6 +6,7 @@
 		ayYmSettings
 	} from '../../config/settings';
 	import { settingsStore } from '../../stores/settings.svelte';
+	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import type { Settings, SettingsTabState } from './types';
 	import Button from '../Button/Button.svelte';
 	import ConfirmModal from '../Modal/ConfirmModal.svelte';
@@ -42,6 +43,7 @@
 		showInstrumentPreview: settingsStore.showInstrumentPreview,
 		previewFullRow: settingsStore.previewFullRow,
 		debugMode: settingsStore.debugMode,
+		experimentalFeatures: settingsStore.experimentalFeatures,
 		selectionStyle: settingsStore.selectionStyle,
 		emptyNoteAlignment: settingsStore.emptyNoteAlignment,
 		classicInstrumentEditor: settingsStore.classicInstrumentEditor
@@ -93,6 +95,9 @@
 		if (hasTabConflicts) return;
 		for (const item of settingsItems) {
 			settingsStore.set(item.setting, tempSettings[item.setting]);
+		}
+		if (!tempSettings.experimentalFeatures) {
+			editorStateStore.setEditView('tracker');
 		}
 		midiService.setSelectedInputId(
 			tempSettings.midiInputDeviceId || null

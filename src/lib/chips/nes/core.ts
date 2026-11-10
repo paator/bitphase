@@ -6,7 +6,7 @@ import { NES_CHIP_SCHEMA } from './schema';
 import { NES_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { NES_PLAYBACK_DEBUG } from './playback-debug';
 import { copyNesInstrumentFields } from './instrument';
-import { describeNesEffect, listNesEffectStatusHints } from './effects';
+import { describeNesEffect, listNesEffectStatusHints, nesPianoEffectGesture } from './effects';
 import type { Chip } from '../types';
 
 export const NES_CHIP: Chip = {
@@ -24,6 +24,7 @@ export const NES_CHIP: Chip = {
 	playbackDebug: NES_PLAYBACK_DEBUG,
 	copyInstrumentFields: copyNesInstrumentFields,
 	describeEffect: describeNesEffect,
+	pianoEffectGesture: nesPianoEffectGesture,
 	listEffectStatusHints: listNesEffectStatusHints
 };
 

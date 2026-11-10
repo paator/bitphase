@@ -19,6 +19,7 @@ class SettingsStore {
 	showInstrumentPreview = $state(true);
 	previewFullRow = $state(true);
 	debugMode = $state(false);
+	experimentalFeatures = $state(false);
 	selectionStyle = $state<'inverted' | 'filled'>('inverted');
 	emptyNoteAlignment = $state<'center' | 'baseline'>('center');
 	classicInstrumentEditor = $state(false);

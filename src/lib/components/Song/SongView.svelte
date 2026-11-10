@@ -9,6 +9,7 @@
 	import type { AudioService } from '../../services/audio/audio-service';
 	import Card from '../Card/Card.svelte';
 	import PatternEditor from './PatternEditor.svelte';
+	import PianoRollView from './PianoRollView.svelte';
 	import PatternOrder from './PatternOrder.svelte';
 	import { TabView } from '../TabView';
 	import { TablesView } from '../Tables';
@@ -16,6 +17,8 @@
 	import { InstrumentsView } from '../Instruments';
 	import { SelectionPalette } from '../SelectionPalette';
 	import IconCarbonChip from '~icons/carbon/chip';
+	import IconCarbonGrid from '~icons/carbon/grid';
+	import IconCarbonMusic from '~icons/carbon/music';
 	import IconCarbonListBoxes from '~icons/carbon/list-boxes';
 	import IconCarbonDataTable from '~icons/carbon/data-table';
 	import IconCarbonWaveform from '~icons/carbon/waveform';
@@ -68,6 +71,7 @@
 	} = $props();
 
 	let sharedPatternOrderIndex = $state(0);
+	let orderListPick = $state(0);
 	let sharedSelectedRow = $state(0);
 	let songViewContainer: HTMLDivElement;
 	let patternEditors: PatternEditor[] = $state([]);
@@ -152,6 +156,7 @@
 	}
 
 	$effect(() => {
+		if (pianoRollActive) return;
 		const activeEditor = patternEditors[activeEditorIndex];
 		if (activeEditor) {
 			selectedColumn = activeEditor.getSelectedColumn();
@@ -166,10 +171,31 @@
 		}
 	});
 
+	$effect(() => {
+		if (pianoRollActive) return;
+		tick().then(() => {
+			patternEditors.forEach((editor) => editor?.requestRedraw?.());
+		});
+	});
+
+	function togglePlaybackFromPiano(): void {
+		if (playbackStore.isPlaying || services.audioService.playing) {
+			playbackStore.isPlaying = false;
+			services.audioService.stop();
+			return;
+		}
+		playbackStore.isPlaying = true;
+		patternEditors[0]?.togglePlayback?.();
+	}
+
 	let patternLengthValue = $state('');
+	let viewSwitchWidth = $state(0);
 
 	const blurredContentClass = $derived(
 		isRightPanelExpanded ? 'pointer-events-none opacity-50' : ''
+	);
+	const pianoRollActive = $derived(
+		settingsStore.experimentalFeatures && editorStateStore.editView === 'piano-roll'
 	);
 
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
@@ -622,8 +648,9 @@
 
 <div bind:this={songViewContainer} class="relative flex h-full flex-col overflow-hidden">
 	<div class="flex flex-1 overflow-hidden">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 		<div
-			class="relative flex min-w-0 flex-1 flex-nowrap overflow-x-auto overflow-y-hidden"
+			class="relative flex min-h-0 min-w-0 flex-1 flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-none"
 			data-song-pattern-scroll>
 			<div
 				class="sticky left-0 z-20 h-full shrink-0 bg-[var(--color-app-surface-secondary)] transition-all duration-300 {blurredContentClass}">
@@ -640,13 +667,105 @@
 							await tick();
 							patternEditors.forEach((e) => e?.requestRedraw?.());
 						}}
-						onPatternSelect={(index, immediate) =>
-							patternEditors[0]?.markPatternChangeFromUser?.(index, immediate)} />
+						onPatternSelect={(index, immediate) => {
+							orderListPick += 1;
+							patternEditors[0]?.markPatternChangeFromUser?.(index, immediate);
+						}} />
 				</Card>
 			</div>
 			<div
-				class="flex min-h-0 min-w-max flex-1 flex-col overflow-hidden transition-all duration-300 {blurredContentClass}">
-				<div class="flex min-h-0 min-w-0 flex-1 flex-nowrap justify-center px-8">
+				class="relative flex min-h-0 flex-1 flex-col overflow-hidden transition-all duration-300 {pianoRollActive
+					? 'min-w-0'
+					: 'min-w-max'} {blurredContentClass}"
+				style:--view-switch-width="{settingsStore.experimentalFeatures ? viewSwitchWidth + 8 : 0}px">
+				{#if projectStore.songs.length > 0 && settingsStore.experimentalFeatures}
+					<div
+						bind:clientWidth={viewSwitchWidth}
+						class="absolute top-0.5 left-1 z-30 flex items-center gap-1.5">
+						<div
+							class="flex shrink-0 items-center rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-surface)]">
+							<button
+								type="button"
+								class="flex cursor-pointer items-center gap-1 px-2 py-1 text-[11px] whitespace-nowrap {editorStateStore.editView ===
+								'tracker'
+									? 'bg-[var(--color-app-surface-active)] text-[var(--color-app-text-primary)]'
+									: 'text-[var(--color-app-text-secondary)] hover:bg-[var(--color-app-surface-hover)]'}"
+								onclick={() => editorStateStore.setEditView('tracker')}>
+								<IconCarbonGrid class="h-3.5 w-3.5" />
+								Tracker
+							</button>
+							<button
+								type="button"
+								class="flex cursor-pointer items-center gap-1 border-l border-[var(--color-app-border)] px-2 py-1 text-[11px] whitespace-nowrap {editorStateStore.editView ===
+								'piano-roll'
+									? 'bg-[var(--color-app-surface-active)] text-[var(--color-app-text-primary)]'
+									: 'text-[var(--color-app-text-secondary)] hover:bg-[var(--color-app-surface-hover)]'}"
+								onclick={() => editorStateStore.setEditView('piano-roll')}>
+								<IconCarbonMusic class="h-3.5 w-3.5" />
+								Piano roll
+							</button>
+						</div>
+						{#if editorStateStore.editView === 'piano-roll'}
+							<div
+								class="flex items-center rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] {playbackStore.isPlaying
+									? 'opacity-50'
+									: ''}">
+								<Input
+									value={patternLengthValue}
+									id="pattern-length-input-piano"
+									type="number"
+									min="1"
+									max="256"
+									step="1"
+									disabled={playbackStore.isPlaying}
+									class="h-5 w-12 border-0 bg-transparent px-1 py-0 text-center font-mono text-xs leading-none focus:ring-0 disabled:cursor-not-allowed"
+									oninput={(e) => {
+										if (!playbackStore.isPlaying) {
+											patternLengthValue = (e.target as HTMLInputElement).value;
+										}
+									}}
+									onblur={() => {
+										if (!playbackStore.isPlaying) commitPatternLength();
+									}}
+									onkeydown={(e: KeyboardEvent) => {
+										if (playbackStore.isPlaying) {
+											e.preventDefault();
+											return;
+										}
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											commitPatternLength();
+											(e.target as HTMLInputElement)?.blur();
+										}
+									}} />
+								<span class="pr-1 text-[10px] text-[var(--color-app-text-muted)]">rows</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
+				{#if projectStore.songs.length > 0 && pianoRollActive}
+					<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+					<PianoRollView
+						{chipProcessors}
+						{orderListPick}
+						bind:currentPatternOrderIndex={sharedPatternOrderIndex}
+						bind:selectedRow={sharedSelectedRow}
+						onchannelchange={(songIndex, channelIndex, fieldKey) => {
+							activeEditorIndex = songIndex;
+							selectedChannelIndex = channelIndex;
+							selectedFieldKey = fieldKey;
+							patternEditor = patternEditors[songIndex] ?? null;
+						}}
+						ontoggleplayback={togglePlaybackFromPiano}
+						onseekplayback={(orderIndex, row) => {
+							patternEditors[0]?.playFromPosition?.(orderIndex, row);
+						}} />
+					</div>
+				{/if}
+				<div
+					class={pianoRollActive
+						? 'hidden'
+						: 'flex min-h-0 min-w-0 flex-1 flex-nowrap justify-center px-8'}>
 					{#if projectStore.songs.length === 0}
 						<div
 							class="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
@@ -699,6 +818,9 @@
 									title={`${chipProcessor.chip.name} - (${i + 1})`}
 									fullHeight={true}
 									icon={IconCarbonChip}
+									headerClass={i === 0 && settingsStore.experimentalFeatures
+										? 'pl-[var(--view-switch-width)]'
+										: ''}
 									class="flex shrink-0 flex-col p-0">
 									{#snippet headerContent()}
 										<div class="flex items-center gap-1">
@@ -851,6 +973,7 @@
 					onclick={() => (isRightPanelExpanded = false)}
 					aria-label="Collapse panel"></button>
 			{/if}
+		</div>
 		</div>
 		<SelectionPalette chip={previewChip} chips={paletteChips} chipType={instrumentsChipType} />
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
