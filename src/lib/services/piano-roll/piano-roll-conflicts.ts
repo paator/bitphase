@@ -1,4 +1,4 @@
-import { noteSpotKey, sameNoteSpot, type PianoNoteSpot } from './piano-roll-notes';
+import { indexBySpot, noteSpotKey, sameNoteSpot, type PianoNoteSpot } from './piano-roll-notes';
 
 export interface OverlapNote extends PianoNoteSpot {
 	length: number;
@@ -47,15 +47,45 @@ function notesOverlap(
 	return rangesOverlap(note.startRow, note.length, other.startRow, other.length);
 }
 
+function eachOverlap(
+	notes: readonly { startRow: number; length: number }[],
+	visit: (index: number, otherIndex: number) => boolean | void
+): void {
+	const order = notes
+		.map((_, index) => index)
+		.sort((left, right) => notes[left]!.startRow - notes[right]!.startRow);
+	for (let position = 0; position < order.length; position++) {
+		const index = order[position]!;
+		const note = notes[index]!;
+		const end = note.startRow + note.length;
+		for (let next = position + 1; next < order.length; next++) {
+			const otherIndex = order[next]!;
+			const other = notes[otherIndex]!;
+			if (other.startRow >= end) break;
+			if (notesOverlap(note, other) && visit(index, otherIndex)) return;
+		}
+	}
+}
+
 export function overlapsAny(
 	incoming: readonly { startRow: number; length: number }[],
 	existing: readonly { startRow: number; length: number }[]
 ): boolean {
-	return incoming.some(
-		(note) =>
-			existing.some((other) => notesOverlap(note, other)) ||
-			incoming.some((other) => other !== note && notesOverlap(note, other))
-	);
+	let found = false;
+	eachOverlap([...incoming, ...existing], (index, otherIndex) => {
+		found = index < incoming.length || otherIndex < incoming.length;
+		return found;
+	});
+	return found;
+}
+
+function overlapNeighbours(notes: readonly OverlapNote[]): number[][] {
+	const neighbours = notes.map((): number[] => []);
+	eachOverlap(notes, (index, otherIndex) => {
+		neighbours[index]!.push(otherIndex);
+		neighbours[otherIndex]!.push(index);
+	});
+	return neighbours;
 }
 
 export function withoutSpots<T extends PianoNoteSpot>(
@@ -82,6 +112,7 @@ export function silencedIndexes(notes: readonly OverlapNote[]): Set<number> {
 		const note = notes[index];
 		return !note || note.length < 1;
 	};
+	const neighbours = overlapNeighbours(notes);
 	let silent = new Set<number>();
 	for (let index = 0; index < notes.length; index++) {
 		if (empty(index)) silent.add(index);
@@ -90,8 +121,8 @@ export function silencedIndexes(notes: readonly OverlapNote[]): Set<number> {
 		const next = new Set<number>([...silent].filter(empty));
 		for (let index = 0; index < notes.length; index++) {
 			if (next.has(index)) continue;
-			for (let otherIndex = 0; otherIndex < notes.length; otherIndex++) {
-				if (otherIndex === index || silent.has(otherIndex)) continue;
+			for (const otherIndex of neighbours[index]!) {
+				if (silent.has(otherIndex)) continue;
 				if (!beats(notes, index, otherIndex)) continue;
 				next.add(index);
 				break;
@@ -120,15 +151,15 @@ export function planPianoIntents(
 	const silentIndexes = silencedIndexes(intents);
 	const audible = intents.filter((_, index) => !silentIndexes.has(index));
 	const silent = intents.filter((_, index) => silentIndexes.has(index));
-	const placed = (note: PianoIntentNote, notes: readonly PianoIntentNote[]) =>
-		notes.find((item) => sameNoteSpot(item, note));
+	const audibleSpots = indexBySpot(audible);
+	const currentSpots = indexBySpot(current);
 	return {
 		audible,
 		silent,
-		remove: current.filter((note) => !placed(note, audible)),
-		add: audible.filter((note) => !placed(note, current)),
+		remove: current.filter((note) => !audibleSpots.has(noteSpotKey(note))),
+		add: audible.filter((note) => !currentSpots.has(noteSpotKey(note))),
 		reshape: audible.filter((note) => {
-			const existing = placed(note, current);
+			const existing = currentSpots.get(noteSpotKey(note));
 			return !!existing && !sameShape(existing, note);
 		})
 	};

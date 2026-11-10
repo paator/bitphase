@@ -101,14 +101,8 @@
 		if (uiFontFamily) {
 			const isGeneric = uiFontFamily === 'monospace' || uiFontFamily === 'sans-serif';
 			const fontStack = isGeneric ? uiFontFamily : `"${uiFontFamily}"`;
-			document.documentElement.style.setProperty(
-				'--font-sans',
-				`${fontStack}, sans-serif`
-			);
-			document.documentElement.style.setProperty(
-				'--font-mono',
-				`${fontStack}, monospace`
-			);
+			document.documentElement.style.setProperty('--font-sans', `${fontStack}, sans-serif`);
+			document.documentElement.style.setProperty('--font-mono', `${fontStack}, monospace`);
 		}
 	});
 
@@ -148,14 +142,14 @@
 
 	$effect(() => {
 		if (!projectStore.initialized) return;
-		projectStore.settings;
 		projectStore.songs;
 		projectStore.patterns;
 		projectStore.patternOrder;
 		projectStore.patternOrderColors;
-		projectStore.tables;
-		projectStore.instruments;
-		autobackupService.saveAutobackup(projectStore.getCurrentProject());
+		$state.snapshot(projectStore.settings);
+		$state.snapshot(projectStore.tables);
+		$state.snapshot(projectStore.instruments);
+		autobackupService.scheduleAutobackup(() => projectStore.getCurrentProject());
 	});
 
 	$effect(() => {
@@ -332,7 +326,7 @@
 				bind:patternEditor
 				bind:activeEditorIndex={activeSongIndex}
 				onaction={handleMenuAction}
-				chipProcessors={chipProcessors} />
+				{chipProcessors} />
 		{/if}
 	</div>
 	<ModalContainer />

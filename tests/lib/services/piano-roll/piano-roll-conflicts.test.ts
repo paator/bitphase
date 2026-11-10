@@ -146,3 +146,87 @@ describe('piano roll intent planning', () => {
 		expect(conflictNotesSignature(replaced)).not.toBe(conflictNotesSignature([other]));
 	});
 });
+
+describe('piano roll conflicts at scale', () => {
+	function randomNotes(seed: number, count: number): OverlapNote[] {
+		let state = seed;
+		const next = (limit: number) => {
+			state = (state * 1103515245 + 12345) % 2147483648;
+			return state % limit;
+		};
+		return Array.from({ length: count }, () => ({
+			startRow: next(80),
+			length: next(6),
+			pitchIndex: next(4),
+			preferred: next(2) === 0
+		}));
+	}
+
+	function overlaps(left: OverlapNote, right: OverlapNote): boolean {
+		return rangesOverlap(left.startRow, left.length, right.startRow, right.length);
+	}
+
+	function bruteSilenced(notes: readonly OverlapNote[]): Set<number> {
+		const beats = (index: number, otherIndex: number) => {
+			const note = notes[index]!;
+			const other = notes[otherIndex]!;
+			if (note.length < 1 || other.length < 1 || !overlaps(note, other)) return false;
+			if (other.pitchIndex !== note.pitchIndex) return other.pitchIndex > note.pitchIndex;
+			if (other.startRow !== note.startRow) return other.startRow < note.startRow;
+			if (other.preferred !== note.preferred) return other.preferred;
+			return otherIndex < index;
+		};
+		const empty = (index: number) => notes[index]!.length < 1;
+		let silent = new Set(notes.map((_, index) => index).filter(empty));
+		for (let pass = 0; pass < notes.length; pass++) {
+			const next = new Set([...silent].filter(empty));
+			notes.forEach((_, index) => {
+				if (next.has(index)) return;
+				if (
+					notes.some(
+						(__, other) => other !== index && !silent.has(other) && beats(index, other)
+					)
+				)
+					next.add(index);
+			});
+			if (next.size === silent.size && [...next].every((index) => silent.has(index)))
+				return next;
+			silent = next;
+		}
+		return silent;
+	}
+
+	it('silences the same notes as the exhaustive comparison', () => {
+		for (let seed = 1; seed <= 40; seed++) {
+			const notes = randomNotes(seed, 30);
+			expect([...silencedIndexes(notes)].sort((a, b) => a - b)).toEqual(
+				[...bruteSilenced(notes)].sort((a, b) => a - b)
+			);
+		}
+	});
+
+	it('detects overlaps the same way as the exhaustive comparison', () => {
+		for (let seed = 1; seed <= 40; seed++) {
+			const notes = randomNotes(seed, 12);
+			const incoming = notes.slice(0, 4);
+			const existing = notes.slice(4);
+			const expected = incoming.some(
+				(note) =>
+					existing.some((other) => overlaps(note, other)) ||
+					incoming.some((other) => other !== note && overlaps(note, other))
+			);
+			expect(overlapsAny(incoming, existing)).toBe(expected);
+		}
+	});
+
+	it('plans thousands of notes quickly', () => {
+		const current = Array.from({ length: 5000 }, (_, index) =>
+			intent(index * 4, 4, index % 48)
+		);
+		const started = performance.now();
+		const plan = planPianoIntents([...current, intent(2, 4, 60)], current);
+		expect(performance.now() - started).toBeLessThan(200);
+		expect(plan.remove).toHaveLength(2);
+		expect(plan.add).toHaveLength(1);
+	});
+});

@@ -40,6 +40,7 @@
 		carryAmplitude,
 		carryOrnament,
 		collectPianoNotes,
+		indexBySpot,
 		noteSpotKey,
 		PIANO_ROLL_PITCH_COUNT,
 		sameNoteSpot,
@@ -1046,12 +1047,17 @@
 		if (focus) focusLocation(focus.span, focus.localRow, scrollIntoView);
 	}
 
+	const blocksBySpot = $derived(indexBySpot(notes.blocks));
+	const conflictSpots = $derived(
+		new Set(notes.blocks.filter((block) => block.conflict === true).map(noteSpotKey))
+	);
+
 	function findBlock(spot: PianoNoteSpot): PianoTimelineBlock | undefined {
-		return notes.blocks.find((block) => sameNoteSpot(block, spot));
+		return blocksBySpot.get(noteSpotKey(spot));
 	}
 
 	function blockIsConflict(spot: PianoNoteSpot): boolean {
-		return notes.blocks.some((block) => block.conflict === true && sameNoteSpot(block, spot));
+		return conflictSpots.has(noteSpotKey(spot));
 	}
 
 	function openSession(): PianoPatternSession | null {
@@ -1075,7 +1081,9 @@
 		const { songIndex, channelIndex } = selected;
 		const held = heldIntents();
 		if (held.length > 0) {
-			const current = channelIntents(session.rowsForSpan);
+			const current = channelIntents(
+				(span) => session.loadedRows(span.patternId) ?? storedRowsForSpan(span)
+			);
 			const plan = planPianoIntents([...current, ...held], current);
 			const beforeHeld = pianoRollConflictStore.snapshot();
 			const afterHeld = replaceChannelConflicts(
@@ -1210,8 +1218,10 @@
 		);
 	}
 
+	const storedIntents = $derived.by(() => channelIntents());
+
 	function allIntents(): PianoIntentNote[] {
-		return [...channelIntents(), ...heldIntents()];
+		return [...storedIntents, ...heldIntents()];
 	}
 
 	function hitsOther(start: number, length: number, ignore: PianoNoteSpot | null): boolean {
@@ -1283,7 +1293,7 @@
 		const session = openSession();
 		if (!session) return unchanged;
 		const { songIndex, channelIndex } = selected;
-		const plan = planPianoIntents(intents, channelIntents());
+		const plan = planPianoIntents(intents, storedIntents);
 		const beforeHeld = pianoRollConflictStore.snapshot();
 		const afterHeld = replaceChannelConflicts(beforeHeld, songIndex, channelIndex, plan.silent);
 		if (
@@ -1515,11 +1525,12 @@
 	): boolean {
 		const all = allIntents();
 		const staying = withoutSpots(all, group);
+		const sources = indexBySpot(all);
 		const moved: PianoIntentNote[] = [];
 		for (const item of group) {
 			const pitchIndex = item.pitchIndex + deltaPitch;
 			const text = pitchNoteText(pitchIndex);
-			const source = all.find((note) => sameNoteSpot(note, item));
+			const source = sources.get(noteSpotKey(item));
 			if (!text || !source) return false;
 			moved.push({
 				...source,

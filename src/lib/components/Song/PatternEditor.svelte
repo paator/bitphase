@@ -434,7 +434,7 @@
 		clearAllCaches();
 		lastVisibleRowsCache = null;
 		untrack(() => {
-			if (!ctx || !renderer || !textParser) return;
+			if (!ctx || !renderer || !textParser || !patternEditorIsShown()) return;
 			const previousWidth = canvasWidth;
 			updateSize();
 			if (canvasWidth !== previousWidth) {

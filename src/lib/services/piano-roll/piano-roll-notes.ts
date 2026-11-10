@@ -62,6 +62,15 @@ export function noteSpotKey(spot: PianoNoteSpot): string {
 	return `${spot.startRow}:${spot.pitchIndex}`;
 }
 
+export function indexBySpot<T extends PianoNoteSpot>(notes: Iterable<T>): Map<string, T> {
+	const spots = new Map<string, T>();
+	for (const note of notes) {
+		const key = noteSpotKey(note);
+		if (!spots.has(key)) spots.set(key, note);
+	}
+	return spots;
+}
+
 export function blockLength(block: { startRow: number; endRow: number }): number {
 	return Math.max(1, block.endRow - block.startRow);
 }

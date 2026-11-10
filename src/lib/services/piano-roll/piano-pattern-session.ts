@@ -45,6 +45,10 @@ export class PianoPatternSession {
 		return this.generic(patternId)?.channels[this.channelIndex]?.rows;
 	}
 
+	loadedRows(patternId: number): GenericRow[] | undefined {
+		return this.entries.get(patternId)?.generic.channels[this.channelIndex]?.rows;
+	}
+
 	mark(patternId: number, changed = true): boolean {
 		if (changed) this.dirty.add(patternId);
 		return changed;

@@ -32,6 +32,16 @@ describe('piano pattern session', () => {
 		expect(pianoSession.generic(7)).toBeNull();
 	});
 
+	it('peeks loaded rows without loading untouched patterns', () => {
+		const { pianoSession, lookups } = session();
+		expect(pianoSession.loadedRows(0)).toBeUndefined();
+		expect(lookups()).toBe(0);
+		const rows = pianoSession.rows(0);
+		expect(pianoSession.loadedRows(0)).toBe(rows);
+		expect(pianoSession.loadedRows(1)).toBeUndefined();
+		expect(lookups()).toBe(1);
+	});
+
 	it('only returns edits for marked patterns', () => {
 		const { pianoSession, patterns } = session();
 		pianoSession.rows(0)![2]!.note = 'C-4';

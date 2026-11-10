@@ -18,7 +18,7 @@ import {
 } from '../services/piano-roll/piano-lane-codec';
 import {
 	noteLevelAlpha,
-	sameNoteSpot,
+	noteSpotKey,
 	type PianoGateMarker,
 	type PianoNoteBlock,
 	type PianoNoteSpot
@@ -196,8 +196,8 @@ function visibleRowRange(scrollX: number, width: number, metrics: PianoRollMetri
 	};
 }
 
-function containsSpot(spots: readonly PianoNoteSpot[], block: PianoNoteSpot): boolean {
-	return spots.some((spot) => sameNoteSpot(spot, block));
+function spotKeys(spots: readonly PianoNoteSpot[]): Set<string> {
+	return new Set(spots.map(noteSpotKey));
 }
 
 function pianoKeyPalette(colors: PianoPalette): {
@@ -386,13 +386,16 @@ function drawNoteBlocks(
 	};
 	const viewStart = scrollX - metrics.rowWidth;
 	const viewEnd = scrollX + width + metrics.rowWidth;
+	const hidden = spotKeys(options.hiddenBlocks);
+	const selected = spotKeys(options.selectedNotes);
 	const paint = (block: PianoNoteBlock, presence: number) => {
 		const blockStart = block.startRow * metrics.rowWidth;
 		const blockEnd = block.endRow * metrics.rowWidth;
 		if (blockEnd < viewStart || blockStart > viewEnd || presence <= 0) return;
-		if (containsSpot(options.hiddenBlocks, block)) return;
+		const key = noteSpotKey(block);
+		if (hidden.has(key)) return;
 		const fill = options.resolveColor(block) ?? colors.note;
-		drawBlock(ctx, block, frame, fill, containsSpot(options.selectedNotes, block), presence);
+		drawBlock(ctx, block, frame, fill, selected.has(key), presence);
 	};
 	for (const ghost of options.leavingBlocks ?? []) paint(ghost.block, ghost.presence);
 	for (const block of options.blocks) paint(block, options.presenceFor?.(block) ?? 1);
