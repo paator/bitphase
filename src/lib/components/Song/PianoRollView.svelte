@@ -97,6 +97,8 @@
 	} from '../../services/piano-roll/piano-note-fields';
 	import {
 		conflictNotesSignature,
+		expandConflictsAcrossRepeatedPatterns,
+		expandSpotsAcrossRepeatedPatterns,
 		heldConflictIntents,
 		overlapsAny,
 		planPianoIntents,
@@ -845,9 +847,10 @@
 	function conflictBlocks(visibleStart: number, visibleEnd: number): PianoTimelineBlock[] {
 		if (!selected) return [];
 		const blocks: PianoTimelineBlock[] = [];
-		for (const conflict of pianoRollConflictStore.forChannel(
-			selected.songIndex,
-			selected.channelIndex
+		const seen = new Set<string>();
+		for (const conflict of expandConflictsAcrossRepeatedPatterns(
+			timeline,
+			pianoRollConflictStore.forChannel(selected.songIndex, selected.channelIndex)
 		)) {
 			if (
 				conflict.startRow + conflict.length <= visibleStart ||
@@ -857,6 +860,9 @@
 			}
 			const located = timelineSpanAt(timeline, conflict.startRow);
 			if (!located) continue;
+			const key = `${conflict.startRow}:${conflict.pitchIndex}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
 			blocks.push({
 				startRow: conflict.startRow,
 				endRow: conflict.startRow + conflict.length,
@@ -1092,11 +1098,14 @@
 			const current = channelIntents(sessionRows);
 			const plan = planPianoIntents([...current, ...held], current);
 			const beforeHeld = pianoRollConflictStore.snapshot();
-			const afterHeld = replaceChannelConflicts(
-				beforeHeld,
-				songIndex,
-				channelIndex,
-				plan.silent.map((note) => withNoteFields(note, sessionRows))
+			const afterHeld = expandConflictsAcrossRepeatedPatterns(
+				timeline,
+				replaceChannelConflicts(
+					beforeHeld,
+					songIndex,
+					channelIndex,
+					plan.silent.map((note) => withNoteFields(note, sessionRows))
+				)
 			);
 			if (conflictNotesSignature(beforeHeld) !== conflictNotesSignature(afterHeld)) {
 				applyIntentPlan(session, plan);
@@ -1231,7 +1240,10 @@
 	function heldIntents(): PianoIntentNote[] {
 		if (!selected) return [];
 		return heldConflictIntents(
-			pianoRollConflictStore.forChannel(selected.songIndex, selected.channelIndex)
+			expandConflictsAcrossRepeatedPatterns(
+				timeline,
+				pianoRollConflictStore.forChannel(selected.songIndex, selected.channelIndex)
+			)
 		);
 	}
 
@@ -1241,10 +1253,21 @@
 		return [...storedIntents, ...heldIntents()];
 	}
 
-	function hitsOther(start: number, length: number, ignore: PianoNoteSpot | null): boolean {
+	function mirroredSpots<T extends PianoNoteSpot>(spots: readonly T[]): T[] {
+		return expandSpotsAcrossRepeatedPatterns(timeline, spots);
+	}
+
+	function hitsOther(
+		start: number,
+		length: number,
+		ignore: PianoNoteSpot | readonly PianoNoteSpot[] | null
+	): boolean {
+		const ignored = ignore
+			? new Set(mirroredSpots(Array.isArray(ignore) ? ignore : [ignore]).map(noteSpotKey))
+			: null;
 		return allIntents().some(
 			(note) =>
-				!(ignore && sameNoteSpot(note, ignore)) &&
+				!ignored?.has(noteSpotKey(note)) &&
 				rangesOverlap(start, length, note.startRow, note.length)
 		);
 	}
@@ -1294,7 +1317,7 @@
 	}
 
 	function eraseIntents(spots: readonly PianoNoteSpot[], cursor: PianoEditCursor): IntentResult {
-		return commitIntents(withoutSpots(allIntents(), spots), null, cursor);
+		return commitIntents(withoutSpots(allIntents(), mirroredSpots(spots)), null, cursor);
 	}
 
 	function commitIntents(
@@ -1311,11 +1334,14 @@
 		const { songIndex, channelIndex } = selected;
 		const plan = planPianoIntents(intents, storedIntents);
 		const beforeHeld = pianoRollConflictStore.snapshot();
-		const afterHeld = replaceChannelConflicts(
-			beforeHeld,
-			songIndex,
-			channelIndex,
-			plan.silent.map((note) => withNoteFields(note))
+		const afterHeld = expandConflictsAcrossRepeatedPatterns(
+			timeline,
+			replaceChannelConflicts(
+				beforeHeld,
+				songIndex,
+				channelIndex,
+				plan.silent.map((note) => withNoteFields(note))
+			)
 		);
 		if (
 			plan.remove.length === 0 &&
@@ -1540,7 +1566,7 @@
 		scrollIntoView: boolean
 	): boolean {
 		const all = allIntents();
-		const staying = withoutSpots(all, group);
+		const staying = withoutSpots(all, mirroredSpots(group));
 		const sources = indexBySpot(all);
 		const moved: PianoIntentNote[] = [];
 		for (const item of group) {
@@ -1694,7 +1720,7 @@
 			sourceIntent &&
 			(blockIsConflict(from) || hitsOther(toAbsolute, sourceIntent.length, from))
 		) {
-			const next = withoutSpots(allIntents(), [from]);
+			const next = withoutSpots(allIntents(), mirroredSpots([from]));
 			next.push({
 				...withNoteFields(sourceIntent),
 				startRow: toAbsolute,
@@ -1744,13 +1770,21 @@
 		return block ? blockLength(block) : null;
 	}
 
-	function commitResize(orderIndex: number, localStart: number, localEnd: number): void {
+	function commitResize(
+		orderIndex: number,
+		localStart: number,
+		localEnd: number,
+		pitchIndex: number
+	): void {
 		const span = timelineSpanForOrder(timeline, orderIndex);
 		const session = span ? editSession() : null;
 		const generic = span ? session?.generic(span.patternId) : null;
 		if (!span || !session || !generic || !noteKey) return;
 		const drawn = notes.blocks.find(
-			(block) => block.orderIndex === orderIndex && block.localStartRow === localStart
+			(block) =>
+				block.orderIndex === orderIndex &&
+				block.localStartRow === localStart &&
+				block.pitchIndex === pitchIndex
 		);
 		const release = drawn ? releaseAt(drawn.endRow) : false;
 		const target = Math.max(localStart + 1, localEnd);
@@ -1758,16 +1792,15 @@
 		const resizedLength = Math.max(1, target - localStart);
 		const cursor = { orderIndex, row: localStart };
 		const existing = allIntents().find(
-			(item) =>
-				item.startRow === absoluteStart &&
-				(drawn ? item.pitchIndex === drawn.pitchIndex : true)
+			(item) => item.startRow === absoluteStart && item.pitchIndex === pitchIndex
 		);
 		if (
 			existing &&
 			(blockIsConflict(existing) || hitsOther(absoluteStart, resizedLength, existing))
 		) {
+			const mirrored = mirroredSpots([existing]);
 			const next = allIntents().map((item) =>
-				sameNoteSpot(item, existing)
+				mirrored.some((spot) => sameNoteSpot(item, spot))
 					? { ...item, length: resizedLength, bounded: true, release, preferred: false }
 					: item
 			);
@@ -2023,7 +2056,8 @@
 					commitResize(
 						drag.orderIndex,
 						drag.localStart,
-						drag.endRow - (drag.startRow - drag.localStart)
+						drag.endRow - (drag.startRow - drag.localStart),
+						drag.pitch
 					);
 				}
 				drag = null;

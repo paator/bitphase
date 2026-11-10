@@ -48,6 +48,29 @@ describe('piano roll geometry', () => {
 		expect(yToPitch(-1, metrics)).toBeNull();
 	});
 
+	it('resizes the note on the pointed pitch when two notes share a start row', () => {
+		const low: PianoNoteBlock = {
+			startRow: 2,
+			endRow: 5,
+			pitchIndex: 10,
+			note: 'G-3',
+			instrument: 3,
+			gestures: []
+		};
+		const high: PianoNoteBlock = {
+			startRow: 2,
+			endRow: 9,
+			pitchIndex: 40,
+			note: 'E-4',
+			instrument: 3,
+			gestures: []
+		};
+		const hitLow = hitTestNoteContent(48, pitchToY(10, metrics) + 1, [high, low], metrics);
+		const hitHigh = hitTestNoteContent(88, pitchToY(40, metrics) + 1, [high, low], metrics);
+		expect(hitLow).toMatchObject({ type: 'resize', block: low });
+		expect(hitHigh).toMatchObject({ type: 'resize', block: high });
+	});
+
 	it('selects notes the marquee overlaps', () => {
 		const top = pitchToY(block.pitchIndex, metrics);
 		expect(

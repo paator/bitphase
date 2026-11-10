@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	conflictNotesSignature,
+	expandConflictsAcrossRepeatedPatterns,
+	expandSpotsAcrossRepeatedPatterns,
 	heldConflictIntents,
 	overlapsAny,
 	planPianoIntents,
@@ -12,6 +14,7 @@ import {
 	type PianoConflictNote,
 	type PianoIntentNote
 } from '@/lib/services/piano-roll/piano-roll-conflicts';
+import { buildPianoTimeline } from '@/lib/services/piano-roll/piano-roll-timeline';
 
 function intent(
 	startRow: number,
@@ -153,6 +156,49 @@ describe('piano roll intent planning', () => {
 		expect(heldConflictIntents([held!])[0]).toMatchObject({ startRow: 4, fields });
 		const [plain] = replaceChannelConflicts([], 0, 0, [intent(0, 2, 12)]);
 		expect(plain).not.toHaveProperty('fields');
+	});
+
+	it('mirrors conflicts onto every order slot that reuses the same pattern', () => {
+		const timeline = buildPianoTimeline([0, 0, 1, 0], () => 8);
+		const held: PianoConflictNote = {
+			songIndex: 0,
+			channelIndex: 0,
+			startRow: 10,
+			length: 3,
+			pitchIndex: 40,
+			note: 'E-4',
+			instrument: 2,
+			release: true,
+			fields: { volume: 9 }
+		};
+		expect(expandConflictsAcrossRepeatedPatterns(timeline, [held])).toEqual([
+			{ ...held, startRow: 2 },
+			held,
+			{ ...held, startRow: 26 }
+		]);
+		expect(
+			expandSpotsAcrossRepeatedPatterns(timeline, [{ startRow: 10, pitchIndex: 40 }])
+		).toEqual([
+			{ startRow: 2, pitchIndex: 40 },
+			{ startRow: 10, pitchIndex: 40 },
+			{ startRow: 26, pitchIndex: 40 }
+		]);
+		expect(
+			expandConflictsAcrossRepeatedPatterns(timeline, [{ ...held, startRow: 6, length: 10 }])
+		).toEqual([
+			{ ...held, startRow: 6, length: 10 },
+			{ ...held, startRow: 14, length: 10 },
+			{ ...held, startRow: 30, length: 10 }
+		]);
+	});
+
+	it('drops every repeated-pattern copy when a moved note is removed from intents', () => {
+		const timeline = buildPianoTimeline([0, 0], () => 64);
+		const note = intent(10, 8, 40);
+		const copy = intent(74, 8, 40);
+		const other = intent(20, 2, 12);
+		const ignored = expandSpotsAcrossRepeatedPatterns(timeline, [note]);
+		expect(withoutSpots([note, copy, other], ignored)).toEqual([other]);
 	});
 });
 

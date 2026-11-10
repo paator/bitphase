@@ -1,5 +1,6 @@
 import { indexBySpot, noteSpotKey, sameNoteSpot, type PianoNoteSpot } from './piano-roll-notes';
 import type { PianoNoteFields } from './piano-note-fields';
+import { eachRepeatedPatternPlacement, type PianoTimelineSpan } from './piano-roll-timeline';
 
 export interface OverlapNote extends PianoNoteSpot {
 	length: number;
@@ -199,6 +200,50 @@ export function replaceChannelConflicts(
 				...withFields(note.fields)
 			}))
 		);
+}
+
+export function expandConflictsAcrossRepeatedPatterns(
+	timeline: readonly PianoTimelineSpan[],
+	notes: readonly PianoConflictNote[]
+): PianoConflictNote[] {
+	const expanded: PianoConflictNote[] = [];
+	const seen = new Set<string>();
+	for (const note of notes) {
+		const mirrored = eachRepeatedPatternPlacement(timeline, note.startRow, (startRow) => ({
+			...note,
+			startRow
+		}));
+		const copies = mirrored.length > 0 ? mirrored : [note];
+		for (const copy of copies) {
+			const key = `${copy.songIndex}:${copy.channelIndex}:${copy.startRow}:${copy.length}:${copy.pitchIndex}:${copy.note}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			expanded.push(copy);
+		}
+	}
+	return expanded;
+}
+
+export function expandSpotsAcrossRepeatedPatterns<T extends PianoNoteSpot>(
+	timeline: readonly PianoTimelineSpan[],
+	spots: readonly T[]
+): T[] {
+	const expanded: T[] = [];
+	const seen = new Set<string>();
+	for (const spot of spots) {
+		const mirrored = eachRepeatedPatternPlacement(timeline, spot.startRow, (startRow) => ({
+			...spot,
+			startRow
+		}));
+		const copies = mirrored.length > 0 ? mirrored : [spot];
+		for (const copy of copies) {
+			const key = noteSpotKey(copy);
+			if (seen.has(key)) continue;
+			seen.add(key);
+			expanded.push(copy);
+		}
+	}
+	return expanded;
 }
 
 function withFields(fields: PianoNoteFields | undefined): { fields?: PianoNoteFields } {

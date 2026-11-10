@@ -95,6 +95,23 @@ export function timelineSpanAt(
 	return { span, localRow: absoluteRow - span.startRow };
 }
 
+export function eachRepeatedPatternPlacement<T>(
+	spans: readonly PianoTimelineSpan[],
+	absoluteRow: number,
+	build: (startRow: number, span: PianoTimelineSpan, localRow: number) => T | null
+): T[] {
+	const located = timelineSpanAt(spans, absoluteRow);
+	if (!located) return [];
+	const results: T[] = [];
+	for (const span of spans) {
+		if (span.patternId !== located.span.patternId) continue;
+		if (located.localRow < 0 || located.localRow >= span.length) continue;
+		const item = build(span.startRow + located.localRow, span, located.localRow);
+		if (item !== null) results.push(item);
+	}
+	return results;
+}
+
 export function timelineWindow(
 	spans: readonly PianoTimelineSpan[],
 	startRow: number,

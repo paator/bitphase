@@ -6,6 +6,7 @@ import {
 	clearSpilledNoteGate,
 	collectTimelineBlocks,
 	continueOpenNoteBlocks,
+	eachRepeatedPatternPlacement,
 	isTimelineBlock,
 	shiftPianoNotes,
 	timelineColumnCount,
@@ -60,6 +61,21 @@ describe('piano roll timeline', () => {
 		});
 		expect(isTimelineBlock(shifted.blocks[0]!)).toBe(true);
 		expect(shifted.gates[0]).toMatchObject({ row: 10, localRow: 2, orderIndex: 1 });
+	});
+
+	it('lists every order slot that reuses the same pattern row', () => {
+		const spans = buildPianoTimeline([2, 0, 2], (id) => (id === 0 ? 4 : 8));
+		expect(
+			eachRepeatedPatternPlacement(spans, 2, (startRow, span, localRow) => [
+				startRow,
+				span.orderIndex,
+				localRow
+			])
+		).toEqual([
+			[2, 0, 2],
+			[14, 2, 2]
+		]);
+		expect(eachRepeatedPatternPlacement(spans, 9, (startRow) => startRow)).toEqual([9]);
 	});
 
 	it('walks visible rows with the pattern each one belongs to', () => {
