@@ -11,6 +11,7 @@ import {
 	previousNoteEvent,
 	writeNoteGate
 } from './piano-note-events';
+import { clearNoteFields, NoteFieldsCarry } from './piano-note-fields';
 
 export interface PitchedBlockSpan {
 	length: number;
@@ -45,7 +46,7 @@ export function movePitchedNote(
 	generic: GenericPattern,
 	channelIndex: number,
 	noteKey: string,
-	instrumentKey: string | null,
+	blank: GenericRow | null,
 	fromRow: number,
 	toRow: number,
 	note: string,
@@ -57,15 +58,15 @@ export function movePitchedNote(
 	if (!rows || !source || !destination) return false;
 	if (noteEventKind(source[noteKey]) !== 'pitched') return false;
 	if (fromRow === toRow && source[noteKey] === note) return false;
-	const instrument = new InstrumentCarry(instrumentKey, source);
+	const fields = new NoteFieldsCarry(blank, noteKey, source);
 	const moving = fromRow !== toRow;
 	if (length === null || length < 1) {
 		if (moving) {
 			source[noteKey] = EMPTY_NOTE;
-			instrument.clear(source);
+			fields.clear(source);
 		}
 		destination[noteKey] = note;
-		if (moving) instrument.apply(destination);
+		if (moving) fields.apply(destination);
 		return true;
 	}
 	const release = noteEventKind(rows[fromRow + length]?.[noteKey]) === 'release';
@@ -76,7 +77,7 @@ export function movePitchedNote(
 	if (moving) {
 		const previousExtends = previousNoteEvent(rows, noteKey, fromRow - 1)?.kind === 'pitched';
 		source[noteKey] = previousExtends ? OFF_NOTE : EMPTY_NOTE;
-		instrument.clear(source);
+		fields.clear(source);
 		const terminator = following && isGateKind(following.kind) ? following.row : null;
 		if (
 			terminator !== null &&
@@ -87,7 +88,7 @@ export function movePitchedNote(
 		}
 	}
 	destination[noteKey] = note;
-	if (moving) instrument.apply(destination);
+	if (moving) fields.apply(destination);
 	writeBoundedBody(rows, noteKey, toRow, length, release);
 	if (covered && noteEventKind(rows[end]?.[noteKey]) !== 'pitched') {
 		clearFollowingGate(rows, noteKey, end + 1);
@@ -100,7 +101,7 @@ export function relocatePitchedNote(
 	destinationPattern: GenericPattern,
 	channelIndex: number,
 	noteKey: string,
-	instrumentKey: string | null,
+	blank: GenericRow | null,
 	fromRow: number,
 	toRow: number,
 	note: string,
@@ -111,7 +112,7 @@ export function relocatePitchedNote(
 			sourcePattern,
 			channelIndex,
 			noteKey,
-			instrumentKey,
+			blank,
 			fromRow,
 			toRow,
 			note,
@@ -124,15 +125,15 @@ export function relocatePitchedNote(
 	const destination = destinationRows?.[toRow];
 	if (!sourceRows || !destinationRows || !source || !destination) return false;
 	if (noteEventKind(source[noteKey]) !== 'pitched') return false;
-	const instrument = new InstrumentCarry(instrumentKey, source);
+	const fields = new NoteFieldsCarry(blank, noteKey, source);
 	const bounded = length !== null && length > 0;
 	const release = bounded && noteEventKind(sourceRows[fromRow + length]?.[noteKey]) === 'release';
 	const previousExtends = previousNoteEvent(sourceRows, noteKey, fromRow - 1)?.kind === 'pitched';
 	source[noteKey] = bounded && previousExtends ? OFF_NOTE : EMPTY_NOTE;
-	instrument.clear(source);
+	fields.clear(source);
 	if (bounded) clearFollowingGate(sourceRows, noteKey, fromRow + 1);
 	destination[noteKey] = note;
-	instrument.apply(destination);
+	fields.apply(destination);
 	if (bounded) writeBoundedBody(destinationRows, noteKey, toRow, length, release);
 	return true;
 }
@@ -145,22 +146,6 @@ export function removePitchedNote(
 	blank: GenericRow | null = null
 ): boolean {
 	return removePitchedNotes(generic, channelIndex, noteKey, [startRow], blank);
-}
-
-function clearNoteFields(row: GenericRow, noteKey: string, blank: GenericRow): boolean {
-	let changed = false;
-	for (const [key, empty] of Object.entries(blank)) {
-		if (key === noteKey || !(key in row) || sameFieldValue(row[key], empty)) continue;
-		row[key] = empty !== null && typeof empty === 'object' ? { ...empty } : empty;
-		changed = true;
-	}
-	return changed;
-}
-
-function sameFieldValue(left: unknown, right: unknown): boolean {
-	if (left === right) return true;
-	if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
-	return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function removePitchedNotes(
@@ -274,24 +259,4 @@ function previousRemovalNeighbour(
 		return kind === 'pitched' ? 'pitched' : 'other';
 	}
 	return 'empty';
-}
-
-class InstrumentCarry {
-	private readonly value: number | null;
-
-	constructor(
-		private readonly key: string | null,
-		source: GenericRow
-	) {
-		const raw = key ? source[key] : undefined;
-		this.value = typeof raw === 'number' && raw > 0 ? raw : null;
-	}
-
-	clear(row: GenericRow): void {
-		if (this.key && this.value !== null) row[this.key] = 0;
-	}
-
-	apply(row: GenericRow): void {
-		if (this.key && this.value !== null) row[this.key] = this.value;
-	}
 }

@@ -92,6 +92,10 @@
 		type PianoPasteNote
 	} from '../../services/piano-roll/piano-roll-clipboard';
 	import {
+		captureNoteFields,
+		writeNoteFields
+	} from '../../services/piano-roll/piano-note-fields';
+	import {
 		conflictNotesSignature,
 		heldConflictIntents,
 		overlapsAny,
@@ -144,6 +148,7 @@
 		ACTION_COPY,
 		ACTION_CUT,
 		ACTION_PASTE,
+		ACTION_SELECT_ALL,
 		ACTION_TOGGLE_PLAYBACK
 	} from '../../config/keybindings';
 	import type { Pattern } from '../../models/song';
@@ -567,7 +572,8 @@
 		blockFades.sync(
 			notes.blocks,
 			notes.patternIds,
-			`${selected?.songIndex ?? ''}:${selected?.channelIndex ?? ''}:${noteKey ?? ''}`
+			`${selected?.songIndex ?? ''}:${selected?.channelIndex ?? ''}:${noteKey ?? ''}`,
+			highlightedNotes
 		);
 	});
 
@@ -1081,16 +1087,16 @@
 		const { songIndex, channelIndex } = selected;
 		const held = heldIntents();
 		if (held.length > 0) {
-			const current = channelIntents(
-				(span) => session.loadedRows(span.patternId) ?? storedRowsForSpan(span)
-			);
+			const sessionRows: SpanRowsReader = (span) =>
+				session.loadedRows(span.patternId) ?? storedRowsForSpan(span);
+			const current = channelIntents(sessionRows);
 			const plan = planPianoIntents([...current, ...held], current);
 			const beforeHeld = pianoRollConflictStore.snapshot();
 			const afterHeld = replaceChannelConflicts(
 				beforeHeld,
 				songIndex,
 				channelIndex,
-				plan.silent
+				plan.silent.map((note) => withNoteFields(note, sessionRows))
 			);
 			if (conflictNotesSignature(beforeHeld) !== conflictNotesSignature(afterHeld)) {
 				applyIntentPlan(session, plan);
@@ -1211,6 +1217,17 @@
 		});
 	}
 
+	function withNoteFields(
+		note: PianoIntentNote,
+		rowsForSpan: SpanRowsReader = storedRowsForSpan
+	): PianoIntentNote {
+		if (note.fields || !noteKey) return note;
+		const located = timelineSpanAt(timeline, note.startRow);
+		const row = located ? rowsForSpan(located.span)?.[located.localRow] : undefined;
+		if (!row || notePitchIndex(row[noteKey]) !== note.pitchIndex) return note;
+		return { ...note, fields: captureNoteFields(row, noteKey) };
+	}
+
 	function heldIntents(): PianoIntentNote[] {
 		if (!selected) return [];
 		return heldConflictIntents(
@@ -1277,14 +1294,13 @@
 	}
 
 	function eraseIntents(spots: readonly PianoNoteSpot[], cursor: PianoEditCursor): IntentResult {
-		return commitIntents(withoutSpots(allIntents(), spots), null, cursor, spots);
+		return commitIntents(withoutSpots(allIntents(), spots), null, cursor);
 	}
 
 	function commitIntents(
 		intents: PianoIntentNote[],
 		fresh: PianoNoteSpot | null,
-		cursor: PianoEditCursor,
-		erased: readonly PianoNoteSpot[] = []
+		cursor: PianoEditCursor
 	): IntentResult {
 		const unchanged: IntentResult = { changed: false, preview: null, previewRow: cursor.row };
 		if (playbackStore.isPlaying || undoRedoStore.isApplying || !selected || !noteKey) {
@@ -1295,7 +1311,12 @@
 		const { songIndex, channelIndex } = selected;
 		const plan = planPianoIntents(intents, storedIntents);
 		const beforeHeld = pianoRollConflictStore.snapshot();
-		const afterHeld = replaceChannelConflicts(beforeHeld, songIndex, channelIndex, plan.silent);
+		const afterHeld = replaceChannelConflicts(
+			beforeHeld,
+			songIndex,
+			channelIndex,
+			plan.silent.map((note) => withNoteFields(note))
+		);
 		if (
 			plan.remove.length === 0 &&
 			plan.add.length === 0 &&
@@ -1304,7 +1325,7 @@
 		) {
 			return unchanged;
 		}
-		applyIntentPlan(session, plan, erased);
+		applyIntentPlan(session, plan);
 		const freshNote = fresh
 			? plan.audible.find((note) => sameNoteSpot(note, fresh))
 			: undefined;
@@ -1329,17 +1350,10 @@
 		};
 	}
 
-	function applyIntentPlan(
-		session: PianoPatternSession,
-		plan: PianoIntentPlan,
-		erased: readonly PianoNoteSpot[] = []
-	): void {
+	function applyIntentPlan(session: PianoPatternSession, plan: PianoIntentPlan): void {
 		const key = noteKey;
 		if (!key) return;
 		const { channelIndex } = session;
-		const erasedKeys = new Set(erased.map(noteSpotKey));
-		const blankFor = (note: PianoIntentNote) =>
-			erasedKeys.has(noteSpotKey(note)) ? blankRow : null;
 		const target = (note: PianoIntentNote) => {
 			const located = timelineSpanAt(timeline, note.startRow);
 			const generic = located ? session.generic(located.span.patternId) : null;
@@ -1351,7 +1365,7 @@
 			clearOpenTail(session, place.span, place.localRow);
 			session.mark(
 				place.span.patternId,
-				removePitchedNote(place.generic, channelIndex, key, place.localRow, blankFor(note))
+				removePitchedNote(place.generic, channelIndex, key, place.localRow, blankRow)
 			);
 		}
 		for (const note of plan.reshape) {
@@ -1374,7 +1388,9 @@
 				place.span.patternId,
 				setNoteValue(place.generic, channelIndex, place.localRow, key, note.note)
 			);
-			if (
+			if (note.fields) {
+				session.mark(place.span.patternId, writeNoteFields(cell, note.fields));
+			} else if (
 				instrumentKey &&
 				note.instrument &&
 				note.instrument > 0 &&
@@ -1533,7 +1549,7 @@
 			const source = sources.get(noteSpotKey(item));
 			if (!text || !source) return false;
 			moved.push({
-				...source,
+				...withNoteFields(source),
 				startRow: item.startRow + deltaRow,
 				pitchIndex,
 				note: text,
@@ -1592,7 +1608,6 @@
 			const target = timelineSpanAt(timeline, item.startRow + deltaRow);
 			if (!captured || !text || !target) continue;
 			session.generic(target.span.patternId);
-			const instrument = instrumentKey ? captured.fields[instrumentKey] : undefined;
 			const length = Math.max(1, item.length);
 			const bounded = item.startRow + length < columns;
 			moved.push({
@@ -1605,10 +1620,7 @@
 					length,
 					bounded,
 					release: bounded && releaseAt(item.startRow + length),
-					fields:
-						instrumentKey && typeof instrument === 'number' && instrument > 0
-							? { [instrumentKey]: instrument }
-							: {},
+					fields: captured.fields,
 					localRow: target.localRow
 				}
 			});
@@ -1626,16 +1638,7 @@
 		);
 		for (const [patternId, localRows] of removals) {
 			const generic = session.generic(patternId);
-			const rows = generic?.channels[channelIndex]?.rows;
-			if (!generic || !rows) continue;
-			removePitchedNotes(generic, channelIndex, key, localRows);
-			if (!instrumentKey) continue;
-			for (const localRow of localRows) {
-				const cell = rows[localRow];
-				const instrument = cell?.[instrumentKey];
-				if (cell && typeof instrument === 'number' && instrument > 0)
-					cell[instrumentKey] = 0;
-			}
+			if (generic) removePitchedNotes(generic, channelIndex, key, localRows, blankRow);
 		}
 		const pastes = groupBy(
 			moved,
@@ -1693,7 +1696,7 @@
 		) {
 			const next = withoutSpots(allIntents(), [from]);
 			next.push({
-				...sourceIntent,
+				...withNoteFields(sourceIntent),
 				startRow: toAbsolute,
 				pitchIndex,
 				note,
@@ -1714,7 +1717,7 @@
 			destGeneric,
 			session.channelIndex,
 			noteKey,
-			instrumentKey,
+			blankRow,
 			from.localStartRow,
 			dest.localRow,
 			note,
@@ -2188,15 +2191,30 @@
 					}
 					return;
 				}
-				const picked: NoteSelection[] = [];
-				for (const block of notes.blocks) {
-					if (!blockIntersectsMarquee(block, current, metrics)) continue;
-					const span = timelineSpanForOrder(timeline, block.orderIndex);
-					if (span)
-						picked.push(selectionFor(span, block.localStartRow, block.pitchIndex));
-				}
+				const picked = selectionsIn(current);
 				applySelection(additive ? mergeSelections(workingSelection(), picked) : picked);
 			}
+		);
+	}
+
+	function selectionsIn(area: ContentRect): NoteSelection[] {
+		const picked: NoteSelection[] = [];
+		for (const block of notes.blocks) {
+			if (!blockIntersectsMarquee(block, area, metrics)) continue;
+			const span = timelineSpanForOrder(timeline, block.orderIndex);
+			if (span) picked.push(selectionFor(span, block.localStartRow, block.pitchIndex));
+		}
+		return picked;
+	}
+
+	function selectVisibleNotes(): void {
+		applySelection(
+			selectionsIn({
+				x0: scrollX,
+				y0: scrollY,
+				x1: scrollX + gridWidth,
+				y1: scrollY + Math.max(0, gridHeight - RULER_HEIGHT)
+			})
 		);
 	}
 
@@ -2206,17 +2224,19 @@
 		for (const target of workingSelection()) {
 			const block = findBlock(target);
 			if (block?.conflict) {
+				const held = heldIntents().find((note) => sameNoteSpot(note, target));
 				captured.push({
 					absoluteRow: target.startRow,
 					rowOffset: 0,
 					note: block.note,
 					length: blockLength(block),
 					bounded: true,
-					release: false,
+					release: held?.release ?? false,
 					fields:
-						instrumentKey && block.instrument && block.instrument > 0
+						held?.fields ??
+						(instrumentKey && block.instrument && block.instrument > 0
 							? { [instrumentKey]: block.instrument }
-							: {}
+							: {})
 				});
 				continue;
 			}
@@ -2297,7 +2317,8 @@
 				instrument: typeof instrument === 'number' && instrument > 0 ? instrument : null,
 				release: clip.release,
 				bounded: true,
-				preferred: false
+				preferred: false,
+				fields: clip.fields
 			});
 		}
 		const existing = allIntents();
@@ -2323,19 +2344,24 @@
 		if (first && commitSession(session, selectionCursor(first))) applySelection(placed);
 	}
 
-	function handleClipboardShortcut(event: KeyboardEvent): boolean {
+	const commandShortcuts: Partial<Record<string, () => void>> = {
+		[ACTION_COPY]: copySelection,
+		[ACTION_CUT]: cutSelection,
+		[ACTION_PASTE]: pasteClipboard,
+		[ACTION_SELECT_ALL]: selectVisibleNotes
+	};
+
+	function handleCommandShortcut(event: KeyboardEvent): boolean {
 		const action = keybindingsStore.getActionForShortcut(ShortcutString.fromEvent(event));
-		if (action !== ACTION_COPY && action !== ACTION_CUT && action !== ACTION_PASTE)
-			return false;
+		const command = action ? commandShortcuts[action] : undefined;
+		if (!command) return false;
 		event.preventDefault();
-		if (action === ACTION_COPY) copySelection();
-		else if (action === ACTION_CUT) cutSelection();
-		else pasteClipboard();
+		command();
 		return true;
 	}
 
 	function onGridKeyDown(event: KeyboardEvent): void {
-		if (handleClipboardShortcut(event)) return;
+		if (handleCommandShortcut(event)) return;
 		if (event.metaKey || event.ctrlKey || event.altKey) return;
 		const action = keybindingsStore.getActionForShortcut(ShortcutString.fromEvent(event));
 		if (action === ACTION_TOGGLE_PLAYBACK) {
@@ -2538,7 +2564,7 @@
 	}
 
 	function onLaneKeyDown(event: KeyboardEvent): void {
-		if (handleClipboardShortcut(event)) return;
+		if (handleCommandShortcut(event)) return;
 		if (
 			!laneShowsNote(activeLane, editorStateStore.envelopeAsNote) ||
 			playbackStore.isPlaying ||

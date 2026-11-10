@@ -34,7 +34,7 @@ function notesOf(channel: GenericRow[]): unknown[] {
 }
 
 describe('piano roll note editing', () => {
-	it('moves a note and its instrument through each chip converter', () => {
+	it('moves a note and its schema fields through each chip converter', () => {
 		const cases: Array<[ChipSchema, PatternConverter]> = [
 			[AY_CHIP_SCHEMA, new AYConverter()],
 			[SAA_CHIP_SCHEMA, new SAAConverter()],
@@ -43,14 +43,22 @@ describe('piano roll note editing', () => {
 		for (const [schema, converter] of cases) {
 			const pattern = new Pattern(1, 8, schema);
 			const generic = converter.toGeneric(pattern);
+			const blank = blankChannelRow(converter, schema);
 			generic.channels[0].rows[1].note = 'C-4';
 			generic.channels[0].rows[1].instrument = 1;
-			expect(movePitchedNote(generic, 0, 'note', 'instrument', 1, 3, 'E-4')).toBe(true);
+			generic.channels[0].rows[1].table = 2;
+			expect(movePitchedNote(generic, 0, 'note', blank, 1, 3, 'E-4')).toBe(true);
 			const after = converter.toGeneric(converter.fromGeneric(generic));
-			expect(after.channels[0].rows[1].note).toBe('---');
-			expect(after.channels[0].rows[1].instrument).toBe(0);
-			expect(after.channels[0].rows[3].note).toBe('E-4');
-			expect(after.channels[0].rows[3].instrument).toBe(1);
+			expect(after.channels[0].rows[1]).toMatchObject({
+				note: '---',
+				instrument: 0,
+				table: 0
+			});
+			expect(after.channels[0].rows[3]).toMatchObject({
+				note: 'E-4',
+				instrument: 1,
+				table: 2
+			});
 		}
 	});
 
@@ -108,13 +116,14 @@ describe('piano roll note editing', () => {
 		const source = rows(['C-4', '---', '===', '---']);
 		const destination = rows(['---', '---', '---', '---']);
 		source[0].instrument = 2;
+		source[0].volume = 9;
 		expect(
 			relocatePitchedNote(
 				single(source),
 				single(destination),
 				0,
 				'note',
-				'instrument',
+				{ note: '---', instrument: 0, volume: 0 },
 				0,
 				1,
 				'D-4',
@@ -122,9 +131,9 @@ describe('piano roll note editing', () => {
 			)
 		).toBe(true);
 		expect(notesOf(source)).toEqual(['---', '---', '---', '---']);
-		expect(source[0].instrument).toBe(0);
+		expect(source[0]).toMatchObject({ instrument: 0, volume: 0 });
 		expect(notesOf(destination)).toEqual(['---', 'D-4', '---', '===']);
-		expect(destination[1].instrument).toBe(2);
+		expect(destination[1]).toMatchObject({ instrument: 2, volume: 9 });
 	});
 
 	it('leaves a note-off behind when the relocated note followed another note', () => {

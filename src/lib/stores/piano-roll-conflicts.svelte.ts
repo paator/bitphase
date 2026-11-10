@@ -30,12 +30,13 @@ function isConflictNote(value: unknown): value is PianoConflictNote {
 		note.pitchIndex >= 0 &&
 		typeof note.note === 'string' &&
 		(note.instrument === null || typeof note.instrument === 'number') &&
-		typeof note.release === 'boolean'
+		typeof note.release === 'boolean' &&
+		(note.fields === undefined || (typeof note.fields === 'object' && note.fields !== null))
 	);
 }
 
 class PianoRollConflictStore {
-	notes = $state<PianoConflictNote[]>([]);
+	notes = $state.raw<PianoConflictNote[]>([]);
 	revision = $state(0);
 
 	constructor() {

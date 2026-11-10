@@ -1,6 +1,7 @@
 import type { GenericRow } from '../../models/song/generic';
 import { clearNoteEvents, noteEventKind, writeNoteGate } from './piano-note-events';
 import { pitchedBlockSpan } from './piano-roll-editing';
+import { captureNoteFields, writeNoteFields, type PianoNoteFields } from './piano-note-fields';
 
 export interface PianoClipboardNote {
 	rowOffset: number;
@@ -8,16 +9,11 @@ export interface PianoClipboardNote {
 	length: number;
 	bounded: boolean;
 	release: boolean;
-	fields: Record<string, unknown>;
+	fields: PianoNoteFields;
 }
 
 export interface CapturedPianoNote extends PianoClipboardNote {
 	absoluteRow: number;
-}
-
-function cloneFieldValue(value: unknown): unknown {
-	if (value === null || typeof value !== 'object') return value;
-	return structuredClone(value);
 }
 
 export function capturePianoNote(
@@ -31,11 +27,7 @@ export function capturePianoNote(
 	const span = pitchedBlockSpan(rows, noteKey, localRow);
 	const length = span?.length ?? 1;
 	const bounded = span?.bounded ?? false;
-	const fields: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(source)) {
-		if (key === noteKey || value === undefined) continue;
-		fields[key] = cloneFieldValue(value);
-	}
+	const fields = captureNoteFields(source, noteKey);
 	return {
 		absoluteRow,
 		rowOffset: 0,
@@ -78,9 +70,7 @@ export function pastePianoNotes(
 		const cell = rows[note.localRow];
 		if (!cell) continue;
 		cell[noteKey] = note.note;
-		for (const [key, value] of Object.entries(note.fields)) {
-			cell[key] = cloneFieldValue(value) as GenericRow[string];
-		}
+		writeNoteFields(cell, note.fields);
 	}
 	const isWritten = (row: number) => written.has(row);
 	for (const note of accepted) {

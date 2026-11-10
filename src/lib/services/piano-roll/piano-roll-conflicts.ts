@@ -1,4 +1,5 @@
 import { indexBySpot, noteSpotKey, sameNoteSpot, type PianoNoteSpot } from './piano-roll-notes';
+import type { PianoNoteFields } from './piano-note-fields';
 
 export interface OverlapNote extends PianoNoteSpot {
 	length: number;
@@ -10,6 +11,7 @@ export interface PianoIntentNote extends OverlapNote {
 	instrument: number | null;
 	release: boolean;
 	bounded: boolean;
+	fields?: PianoNoteFields;
 }
 
 export interface PianoConflictNote {
@@ -21,6 +23,7 @@ export interface PianoConflictNote {
 	note: string;
 	instrument: number | null;
 	release: boolean;
+	fields?: PianoNoteFields;
 }
 
 export interface PianoIntentPlan {
@@ -192,9 +195,14 @@ export function replaceChannelConflicts(
 				pitchIndex: note.pitchIndex,
 				note: note.note,
 				instrument: note.instrument,
-				release: note.release
+				release: note.release,
+				...withFields(note.fields)
 			}))
 		);
+}
+
+function withFields(fields: PianoNoteFields | undefined): { fields?: PianoNoteFields } {
+	return fields ? { fields } : {};
 }
 
 export function heldConflictIntents(notes: readonly PianoConflictNote[]): PianoIntentNote[] {
@@ -206,6 +214,7 @@ export function heldConflictIntents(notes: readonly PianoConflictNote[]): PianoI
 		instrument: note.instrument,
 		release: note.release,
 		bounded: true,
-		preferred: false
+		preferred: false,
+		...withFields(note.fields)
 	}));
 }

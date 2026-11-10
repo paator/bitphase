@@ -65,7 +65,7 @@ export interface PianoGridDrawOptions {
 	marquee?: ContentRect | null;
 	hiddenBlocks: readonly PianoNoteSpot[];
 	previews: readonly PianoBlockPreview[];
-	leavingBlocks?: readonly { block: PianoNoteBlock; presence: number }[];
+	leavingBlocks?: readonly { block: PianoNoteBlock; presence: number; selected: boolean }[];
 	presenceFor?: (block: PianoNoteBlock) => number;
 	resolveColor: (block: PianoNoteBlock) => string | null;
 }
@@ -388,17 +388,21 @@ function drawNoteBlocks(
 	const viewEnd = scrollX + width + metrics.rowWidth;
 	const hidden = spotKeys(options.hiddenBlocks);
 	const selected = spotKeys(options.selectedNotes);
-	const paint = (block: PianoNoteBlock, presence: number) => {
+	const paint = (block: PianoNoteBlock, presence: number, isSelected: boolean) => {
 		const blockStart = block.startRow * metrics.rowWidth;
 		const blockEnd = block.endRow * metrics.rowWidth;
 		if (blockEnd < viewStart || blockStart > viewEnd || presence <= 0) return;
-		const key = noteSpotKey(block);
-		if (hidden.has(key)) return;
 		const fill = options.resolveColor(block) ?? colors.note;
-		drawBlock(ctx, block, frame, fill, selected.has(key), presence);
+		drawBlock(ctx, block, frame, fill, isSelected, presence);
 	};
-	for (const ghost of options.leavingBlocks ?? []) paint(ghost.block, ghost.presence);
-	for (const block of options.blocks) paint(block, options.presenceFor?.(block) ?? 1);
+	for (const ghost of options.leavingBlocks ?? []) {
+		if (!hidden.has(noteSpotKey(ghost.block)))
+			paint(ghost.block, ghost.presence, ghost.selected);
+	}
+	for (const block of options.blocks) {
+		const key = noteSpotKey(block);
+		if (!hidden.has(key)) paint(block, options.presenceFor?.(block) ?? 1, selected.has(key));
+	}
 	for (const preview of options.previews) {
 		drawBlock(ctx, { ...preview, note: '' }, frame, preview.color ?? colors.note, true);
 	}
@@ -627,17 +631,93 @@ function drawBlock(
 	presence = 1
 ): void {
 	if (presence <= 0) return;
+	const rect = blockRect(block, frame, presence);
+	if (!selected || presence >= 1) {
+		paintBlock(ctx, block, frame, rect, fill, selected, presence, presence);
+		return;
+	}
+	blendOverBackdrop(ctx, rect, presence, () =>
+		paintBlock(ctx, block, frame, rect, fill, true, presence, 1)
+	);
+}
+
+interface BlockRect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+function blockRect(block: PianoNoteBlock, frame: BlockFrame, presence: number): BlockRect {
 	const { metrics } = frame;
 	const x = block.startRow * metrics.rowWidth - frame.scrollX + 1;
 	const width = Math.max(4, (block.endRow - block.startRow) * metrics.rowWidth - 2);
 	const y = frame.rulerHeight + pitchToY(block.pitchIndex, metrics) - frame.scrollY + 1;
 	const height = Math.max(3, metrics.keyHeight - 2);
 	const scale = 0.86 + 0.14 * presence;
-	const drawWidth = Math.max(2, width * scale);
 	const drawHeight = Math.max(2, height * scale);
-	const drawY = y + (height - drawHeight) / 2;
+	return {
+		x,
+		y: y + (height - drawHeight) / 2,
+		width: Math.max(2, width * scale),
+		height: drawHeight
+	};
+}
+
+let backdropContext: CanvasRenderingContext2D | null = null;
+
+function backdropFor(width: number, height: number): CanvasRenderingContext2D | null {
+	if (!backdropContext) {
+		if (typeof document === 'undefined') return null;
+		backdropContext = document.createElement('canvas').getContext('2d');
+		if (!backdropContext) return null;
+	}
+	const canvas = backdropContext.canvas;
+	if (canvas.width < width) canvas.width = width;
+	if (canvas.height < height) canvas.height = height;
+	return backdropContext;
+}
+
+function blendOverBackdrop(
+	ctx: CanvasRenderingContext2D,
+	rect: BlockRect,
+	presence: number,
+	draw: () => void
+): void {
+	const transform = ctx.getTransform();
+	const left = Math.max(0, Math.floor((rect.x - 2) * transform.a + transform.e));
+	const top = Math.max(0, Math.floor((rect.y - 2) * transform.d + transform.f));
+	const width = Math.min(ctx.canvas.width - left, Math.ceil((rect.width + 4) * transform.a));
+	const height = Math.min(ctx.canvas.height - top, Math.ceil((rect.height + 4) * transform.d));
+	const backdrop = width > 0 && height > 0 ? backdropFor(width, height) : null;
+	if (!backdrop) {
+		draw();
+		return;
+	}
+	backdrop.clearRect(0, 0, width, height);
+	backdrop.drawImage(ctx.canvas, left, top, width, height, 0, 0, width, height);
+	draw();
+	ctx.save();
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	ctx.globalAlpha = 1 - presence;
+	ctx.drawImage(backdrop.canvas, 0, 0, width, height, left, top, width, height);
+	ctx.restore();
+}
+
+function paintBlock(
+	ctx: CanvasRenderingContext2D,
+	block: PianoNoteBlock,
+	frame: BlockFrame,
+	rect: BlockRect,
+	fill: string,
+	selected: boolean,
+	presence: number,
+	opacity: number
+): void {
+	const { metrics } = frame;
+	const { x, y: drawY, width: drawWidth, height: drawHeight } = rect;
 	const conflict = block.conflict === true;
-	const alpha = (conflict ? 0.96 : noteLevelAlpha(block.level)) * presence;
+	const alpha = (conflict ? 0.96 : noteLevelAlpha(block.level)) * opacity;
 	ctx.save();
 	ctx.globalAlpha = alpha;
 	ctx.fillStyle = conflict ? CONFLICT_FILL : fill;
@@ -659,7 +739,7 @@ function drawBlock(
 	ctx.lineWidth = selected ? 2 : 1;
 	ctx.strokeRect(x + 0.5, drawY + 0.5, drawWidth - 1, drawHeight - 1);
 	ctx.lineWidth = 1;
-	drawPitchGestures(ctx, block, metrics, x, drawY, drawWidth, drawHeight, fill, ink, presence);
+	drawPitchGestures(ctx, block, metrics, x, drawY, drawWidth, drawHeight, fill, ink, opacity);
 	if (drawHeight >= 8 && drawWidth >= 12 && presence > 0.45) {
 		ctx.font = '9px ui-monospace, monospace';
 		const label = blockCaption(ctx, block, Math.max(0, drawWidth - 6));

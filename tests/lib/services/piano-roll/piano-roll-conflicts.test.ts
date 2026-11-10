@@ -145,6 +145,15 @@ describe('piano roll intent planning', () => {
 		);
 		expect(conflictNotesSignature(replaced)).not.toBe(conflictNotesSignature([other]));
 	});
+
+	it('keeps the note fields of held conflicts', () => {
+		const fields = { instrument: 2, volume: 9, table: 3 };
+		const [held] = replaceChannelConflicts([], 0, 0, [intent(4, 2, 12, { fields })]);
+		expect(held).toMatchObject({ startRow: 4, fields });
+		expect(heldConflictIntents([held!])[0]).toMatchObject({ startRow: 4, fields });
+		const [plain] = replaceChannelConflicts([], 0, 0, [intent(0, 2, 12)]);
+		expect(plain).not.toHaveProperty('fields');
+	});
 });
 
 describe('piano roll conflicts at scale', () => {

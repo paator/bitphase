@@ -55,6 +55,18 @@ describe('piano roll block fades', () => {
 		const leaving = fades.leaving(50);
 		expect(leaving.map((item) => blockPlaceKey(item.block))).toEqual([blockPlaceKey(first)]);
 		expect(leaving[0]!.presence).toBe(1);
+		expect(leaving[0]!.selected).toBe(false);
+	});
+
+	it('remembers that a leaving block was selected before it moved', () => {
+		const first = block(0);
+		const moved = block(1);
+		fades.sync([first], [0], 'a');
+		fades.sync([first], [0], 'a', [first]);
+		fades.sync([moved], [0], 'a', [moved]);
+		expect(fades.leaving(now)).toEqual([
+			expect.objectContaining({ block: first, selected: true })
+		]);
 	});
 
 	it('skips fades for moved blocks and for a new scope', () => {

@@ -1,4 +1,8 @@
-import type { PianoNoteBlock } from '../services/piano-roll/piano-roll-notes';
+import {
+	noteSpotKey,
+	type PianoNoteBlock,
+	type PianoNoteSpot
+} from '../services/piano-roll/piano-roll-notes';
 import {
 	isTimelineBlock,
 	type PianoTimelineBlock
@@ -9,10 +13,17 @@ export type PianoBlockPlace = Pick<
 	'orderIndex' | 'patternId' | 'localStartRow' | 'pitchIndex'
 >;
 
+export interface PianoLeavingBlock {
+	block: PianoTimelineBlock;
+	presence: number;
+	selected: boolean;
+}
+
 interface BlockFade {
 	block: PianoTimelineBlock;
 	mode: 'in' | 'out';
 	started: number;
+	selected: boolean;
 }
 
 const BLOCK_FADE_MS = 160;
@@ -28,6 +39,7 @@ function easeOutCubic(t: number): number {
 export class PianoBlockFades {
 	private scope = '';
 	private keys = new Set<string>();
+	private selectedSpots = new Set<string>();
 	private skipIn = false;
 	private frame = 0;
 	private readonly patterns = new Set<number>();
@@ -44,7 +56,8 @@ export class PianoBlockFades {
 	sync(
 		blocks: readonly PianoTimelineBlock[],
 		patternIds: readonly number[],
-		scope: string
+		scope: string,
+		selection: readonly PianoNoteSpot[] = []
 	): void {
 		const now = this.clock();
 		if (scope !== this.scope) this.reset(scope);
@@ -62,7 +75,7 @@ export class PianoBlockFades {
 			const known = this.live.has(key);
 			this.live.set(key, block);
 			if (!fresh.has(block.patternId) && !known && !this.skipIn) {
-				this.fades.set(key, { block, mode: 'in', started: now });
+				this.fades.set(key, { block, mode: 'in', started: now, selected: false });
 				continue;
 			}
 			const fade = this.fades.get(key);
@@ -75,7 +88,12 @@ export class PianoBlockFades {
 			const held = this.held.delete(key);
 			if (held || !block || fresh.has(block.patternId) || !inWindow.has(block.patternId))
 				continue;
-			this.fades.set(key, { block, mode: 'out', started: now });
+			this.fades.set(key, {
+				block,
+				mode: 'out',
+				started: now,
+				selected: this.selectedSpots.has(noteSpotKey(block))
+			});
 		}
 		for (const key of this.held) {
 			if (next.has(key)) this.held.delete(key);
@@ -86,6 +104,7 @@ export class PianoBlockFades {
 		}
 		for (const id of inWindow) this.patterns.add(id);
 		this.keys = next;
+		this.selectedSpots = new Set(selection.map(noteSpotKey));
 		if ([...this.fades.values()].some((fade) => now - fade.started < this.duration))
 			this.animate();
 	}
@@ -102,11 +121,15 @@ export class PianoBlockFades {
 		return this.progress(fade, now);
 	}
 
-	leaving(now: number): { block: PianoTimelineBlock; presence: number }[] {
-		const leaving: { block: PianoTimelineBlock; presence: number }[] = [];
+	leaving(now: number): PianoLeavingBlock[] {
+		const leaving: PianoLeavingBlock[] = [];
 		for (const fade of this.fades.values()) {
 			if (fade.mode === 'out')
-				leaving.push({ block: fade.block, presence: 1 - this.progress(fade, now) });
+				leaving.push({
+					block: fade.block,
+					presence: 1 - this.progress(fade, now),
+					selected: fade.selected
+				});
 		}
 		return leaving;
 	}
@@ -125,6 +148,7 @@ export class PianoBlockFades {
 		this.patterns.clear();
 		this.live.clear();
 		this.keys = new Set();
+		this.selectedSpots = new Set();
 		this.fades.clear();
 		this.held.clear();
 		this.skipIn = false;
