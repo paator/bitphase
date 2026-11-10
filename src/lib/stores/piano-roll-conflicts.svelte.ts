@@ -1,15 +1,6 @@
-const STORAGE_KEY = 'bitphase.piano-roll-conflicts';
+import type { PianoConflictNote } from '../services/piano-roll/piano-roll-conflicts';
 
-export interface PianoConflictNote {
-	songIndex: number;
-	channelIndex: number;
-	startRow: number;
-	length: number;
-	pitchIndex: number;
-	note: string;
-	instrument: number | null;
-	release: boolean;
-}
+const STORAGE_KEY = 'bitphase.piano-roll-conflicts';
 
 function readStored(): PianoConflictNote[] {
 	try {

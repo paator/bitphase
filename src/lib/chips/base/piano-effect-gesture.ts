@@ -39,11 +39,13 @@ export function generalPianoEffectGesture(effect: EffectLike): PianoEffectGestur
 		case VIBRATO:
 			return {
 				kind: 'vibrato',
-				speed: table || ((parameter >> 4) & 0xf) === 0 ? 0.45 : ((parameter >> 4) & 0xf) / 15,
-				depth: table || (parameter & 0xf) === 0 ? 0.55 : Math.max(0.25, (parameter & 0xf) / 15)
+				speed:
+					table || ((parameter >> 4) & 0xf) === 0 ? 0.45 : ((parameter >> 4) & 0xf) / 15,
+				depth:
+					table || (parameter & 0xf) === 0 ? 0.55 : Math.max(0.25, (parameter & 0xf) / 15)
 			};
 		case ARPEGGIO: {
-			const steps = [((parameter >> 4) & 0xf), parameter & 0xf].filter((step) => step > 0);
+			const steps = [(parameter >> 4) & 0xf, parameter & 0xf].filter((step) => step > 0);
 			if (steps.length === 0) return table ? { kind: 'arpeggio', steps: [4, 7] } : null;
 			return { kind: 'arpeggio', steps };
 		}

@@ -1,10 +1,8 @@
-import { formatHex, formatSymbol } from '../chips/base/field-formatters';
 import { getColors } from '../utils/colors';
 import { numberToInstrumentId } from '../utils/instrument-id';
 import { formatNoteFromEnum, tuningTableIndexToNote } from '../utils/note-utils';
 import { NoteName } from '../models/song';
 import { EFFECT_FORMAT_COLORS, getEffectFormatCharColors } from '../chips/base/effect-format-color';
-import { PatternEffectHandling } from '../services/pattern/editing/pattern-effect-handling';
 import {
 	isBlackPitch,
 	pitchToY,
@@ -12,19 +10,43 @@ import {
 	type ContentRect,
 	type PianoRollMetrics
 } from '../services/piano-roll/piano-roll-geometry';
-import { formatPianoTypedLabel } from '../services/piano-roll/piano-hex-input';
-import { laneValueIsTyped } from '../services/piano-roll/piano-symbol-input';
+import { formatPianoEffectInput } from '../services/piano-roll/piano-effect-input';
 import {
-	pianoLaneBarValue,
+	laneValueIsTyped,
+	radixLaneCodec,
+	typedLaneCodec
+} from '../services/piano-roll/piano-lane-codec';
+import {
 	noteLevelAlpha,
-	timelineSpanIndex,
+	sameNoteSpot,
 	type PianoGateMarker,
 	type PianoNoteBlock,
-	type PianoRollLane,
+	type PianoNoteSpot
+} from '../services/piano-roll/piano-roll-notes';
+import { pianoLaneBarValue, type PianoRollLane } from '../services/piano-roll/piano-roll-schema';
+import {
+	timelineSpanIndex,
+	visibleTimelineRows,
 	type PianoTimelineSpan
-} from '../services/piano-roll/piano-roll-model';
+} from '../services/piano-roll/piano-roll-timeline';
 
 export type PianoRollColors = ReturnType<typeof getColors>;
+
+export interface PianoBlockPreview extends PianoNoteSpot {
+	endRow: number;
+	color: string | null;
+	instrument: number | null;
+	gestures: PianoNoteBlock['gestures'];
+	level?: number | null;
+}
+
+export interface PianoKeyboardDrawOptions {
+	colors: PianoRollColors;
+	width: number;
+	height: number;
+	scrollY: number;
+	metrics: PianoRollMetrics;
+}
 
 export interface PianoGridDrawOptions {
 	colors: PianoRollColors;
@@ -39,32 +61,91 @@ export interface PianoGridDrawOptions {
 	spans: readonly PianoTimelineSpan[];
 	currentOrderIndex: number;
 	cursorRow: number;
-	selectedBlock: { startRow: number; pitchIndex: number } | null;
-	selectedNotes?: readonly { startRow: number; pitchIndex: number }[];
+	selectedNotes: readonly PianoNoteSpot[];
 	marquee?: ContentRect | null;
-	hiddenBlock: { startRow: number; pitchIndex: number } | null;
-	hiddenBlocks?: readonly { startRow: number; pitchIndex: number }[];
-	preview: {
-		startRow: number;
-		endRow: number;
-		pitchIndex: number;
-		color: string | null;
-		instrument: number | null;
-		gestures: PianoNoteBlock['gestures'];
-		level?: number | null;
-	} | null;
-	previews?: readonly {
-		startRow: number;
-		endRow: number;
-		pitchIndex: number;
-		color: string | null;
-		instrument: number | null;
-		gestures: PianoNoteBlock['gestures'];
-		level?: number | null;
-	}[];
+	hiddenBlocks: readonly PianoNoteSpot[];
+	previews: readonly PianoBlockPreview[];
 	leavingBlocks?: readonly { block: PianoNoteBlock; presence: number }[];
 	presenceFor?: (block: PianoNoteBlock) => number;
 	resolveColor: (block: PianoNoteBlock) => string | null;
+}
+
+export interface PianoLaneDrawOptions {
+	colors: PianoRollColors;
+	width: number;
+	height: number;
+	scrollX: number;
+	metrics: PianoRollMetrics;
+	lane: PianoRollLane;
+	values: unknown[];
+	valueOrigin: number;
+	spans: readonly PianoTimelineSpan[];
+	draft: Record<number, number> | null;
+	cursorRow: number;
+	envelopeAsNote?: boolean;
+	tuningTable?: readonly number[];
+}
+
+interface PianoPalette {
+	background: string;
+	alternate: string;
+	text: string;
+	note: string;
+	accent: string;
+	grid: string;
+	separator: string;
+	noteOff: string;
+	effect: string;
+	envelope: string;
+	table: string;
+	instrument: string;
+	cursor: string;
+}
+
+interface RowRange {
+	firstRow: number;
+	lastRow: number;
+}
+
+interface BlockFrame {
+	metrics: PianoRollMetrics;
+	scrollX: number;
+	scrollY: number;
+	rulerHeight: number;
+	selectedStroke: string;
+}
+
+type LaneCellPainter = (row: number, x: number, raw: unknown) => void;
+
+const CONFLICT_FILL = '#e64553';
+const CONFLICT_MARK = '#fff7f7';
+
+const paletteCache = new WeakMap<PianoRollColors, PianoPalette>();
+
+function palette(colors: PianoRollColors): PianoPalette {
+	const cached = paletteCache.get(colors);
+	if (cached) return cached;
+	const resolved: PianoPalette = {
+		background: color(colors.patternBg, '#1e1e2e'),
+		alternate: color(colors.patternAlternate, '#181825'),
+		text: color(colors.patternText, '#cdd6f4'),
+		note: color(colors.patternNote, '#89b4fa'),
+		accent: color(colors.patternRowNum, '#89b4fa'),
+		grid: color(colors.patternEmpty, '#313244'),
+		separator: color(colors.patternChannelSeparator, '#45475a'),
+		noteOff: color(colors.patternNoteOff, '#f38ba8'),
+		effect: color(colors.patternEffect, '#cba6f7'),
+		envelope: color(colors.patternEnvelope, '#a6e3a1'),
+		table: color(colors.patternTable, '#a6e3a1'),
+		instrument: color(colors.patternInstrument, '#a6e3a1'),
+		cursor: color(colors.patternEmptySelected, '#5f6595')
+	};
+	paletteCache.set(colors, resolved);
+	return resolved;
+}
+
+function color(value: string | undefined, fallback: string): string {
+	return value && value.length > 0 ? value : fallback;
 }
 
 function parseColor(input: string): { r: number; g: number; b: number } | null {
@@ -79,7 +160,10 @@ function mixColors(from: string, to: string, amount: number): string {
 	const end = parseColor(to);
 	if (!start || !end) return from;
 	const ratio = Math.max(0, Math.min(1, amount));
-	const channel = (a: number, b: number) => Math.round(a + (b - a) * ratio).toString(16).padStart(2, '0');
+	const channel = (a: number, b: number) =>
+		Math.round(a + (b - a) * ratio)
+			.toString(16)
+			.padStart(2, '0');
 	return `#${channel(start.r, end.r)}${channel(start.g, end.g)}${channel(start.b, end.b)}`;
 }
 
@@ -93,7 +177,30 @@ function colorLuminance(input: string): number {
 	return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
 }
 
-function pianoKeyPalette(colors: PianoRollColors): {
+function strokePath(
+	ctx: CanvasRenderingContext2D,
+	path: Path2D,
+	style: string,
+	alpha: number
+): void {
+	ctx.strokeStyle = style;
+	ctx.globalAlpha = alpha;
+	ctx.stroke(path);
+	ctx.globalAlpha = 1;
+}
+
+function visibleRowRange(scrollX: number, width: number, metrics: PianoRollMetrics): RowRange {
+	return {
+		firstRow: Math.max(0, Math.floor(scrollX / metrics.rowWidth) - 1),
+		lastRow: Math.min(metrics.columns, Math.ceil((scrollX + width) / metrics.rowWidth) + 1)
+	};
+}
+
+function containsSpot(spots: readonly PianoNoteSpot[], block: PianoNoteSpot): boolean {
+	return spots.some((spot) => sameNoteSpot(spot, block));
+}
+
+function pianoKeyPalette(colors: PianoPalette): {
 	whiteKey: string;
 	cKey: string;
 	whiteLine: string;
@@ -101,17 +208,20 @@ function pianoKeyPalette(colors: PianoRollColors): {
 	blackKey: string;
 	label: string;
 } {
-	const background = color(colors.patternBg, '#1e1e2e');
-	const text = color(colors.patternText, '#cdd6f4');
+	const { background, text } = colors;
 	const light = colorLuminance(background) > 0.4;
-	const whiteKey = light ? mixColors(background, '#ffffff', 0.42) : mixColors(background, '#f3f5fa', 0.88);
+	const whiteKey = light
+		? mixColors(background, '#ffffff', 0.42)
+		: mixColors(background, '#f3f5fa', 0.88);
 	const cKey = light ? mixColors(whiteKey, text, 0.1) : mixColors(whiteKey, background, 0.2);
 	return {
 		whiteKey,
 		cKey,
 		whiteLine: mixColors(whiteKey, light ? text : background, 0.2),
 		cLine: mixColors(cKey, light ? text : background, 0.28),
-		blackKey: light ? mixColors(text, background, 0.08) : mixColors(background, '#05060a', 0.42),
+		blackKey: light
+			? mixColors(text, background, 0.08)
+			: mixColors(background, '#05060a', 0.42),
 		label: light ? text : mixColors(background, '#101218', 0.12)
 	};
 }
@@ -120,11 +230,17 @@ function pianoKeyLabel(noteName: NoteName, octave: number): string {
 	return formatNoteFromEnum(noteName, octave).replace('-', '');
 }
 
-function blockCaption(ctx: CanvasRenderingContext2D, block: PianoNoteBlock, maxWidth: number): string {
+function blockCaption(
+	ctx: CanvasRenderingContext2D,
+	block: PianoNoteBlock,
+	maxWidth: number
+): string {
 	const parsed = tuningTableIndexToNote(block.pitchIndex);
 	const pitch = parsed ? pianoKeyLabel(parsed.noteName, parsed.octave) : '';
 	const instrumentId =
-		block.instrument != null && block.instrument > 0 ? numberToInstrumentId(block.instrument) : '';
+		block.instrument != null && block.instrument > 0
+			? numberToInstrumentId(block.instrument)
+			: '';
 	const combined = pitch && instrumentId ? `${pitch} ${instrumentId}` : pitch || instrumentId;
 	if (maxWidth <= 0) return '';
 	if (combined && ctx.measureText(combined).width <= maxWidth) return combined;
@@ -135,15 +251,10 @@ function blockCaption(ctx: CanvasRenderingContext2D, block: PianoNoteBlock, maxW
 
 export function drawPianoKeyboard(
 	ctx: CanvasRenderingContext2D,
-	options: {
-		colors: PianoRollColors;
-		width: number;
-		height: number;
-		scrollY: number;
-		metrics: PianoRollMetrics;
-	}
+	options: PianoKeyboardDrawOptions
 ): void {
-	const { colors, width, height, scrollY, metrics } = options;
+	const { width, height, scrollY, metrics } = options;
+	const colors = palette(options.colors);
 	ctx.clearRect(0, 0, width, height);
 	const keyHeight = metrics.keyHeight;
 	const labelGutter = 28;
@@ -180,7 +291,7 @@ export function drawPianoKeyboard(
 		ctx.fillText(label, width - 4, y + keyHeight / 2);
 		ctx.restore();
 	}
-	ctx.strokeStyle = color(colors.patternChannelSeparator, '#313244');
+	ctx.strokeStyle = colors.separator;
 	ctx.beginPath();
 	ctx.moveTo(width - 0.5, 0);
 	ctx.lineTo(width - 0.5, height);
@@ -188,372 +299,335 @@ export function drawPianoKeyboard(
 }
 
 export function drawPianoGrid(ctx: CanvasRenderingContext2D, options: PianoGridDrawOptions): void {
-	const {
-		colors,
-		width,
-		height,
-		rulerHeight,
-		scrollX,
-		scrollY,
-		metrics,
-		blocks,
-		gates,
-		spans,
-		currentOrderIndex,
-		cursorRow,
-		selectedBlock,
-		selectedNotes,
-		marquee,
-		hiddenBlock,
-		hiddenBlocks,
-		preview,
-		previews,
-		leavingBlocks,
-		presenceFor,
-		resolveColor
-	} = options;
+	const { width, height, rulerHeight } = options;
+	const colors = palette(options.colors);
+	const rows = visibleRowRange(options.scrollX, width, options.metrics);
 	ctx.clearRect(0, 0, width, height);
+	ctx.fillStyle = colors.background;
+	ctx.fillRect(0, rulerHeight, width, Math.max(0, height - rulerHeight));
+	drawPitchRows(ctx, options, colors);
+	drawRowLines(ctx, options, colors, rows);
+	drawNoteBlocks(ctx, options, colors);
+	drawRuler(ctx, options, colors, rows);
+	drawMarquee(ctx, options, colors);
+	drawGridCursor(ctx, options, colors);
+}
+
+function drawPitchRows(
+	ctx: CanvasRenderingContext2D,
+	options: PianoGridDrawOptions,
+	colors: PianoPalette
+): void {
+	const { width, height, rulerHeight, scrollY, metrics } = options;
 	const noteHeight = Math.max(0, height - rulerHeight);
-	ctx.fillStyle = color(colors.patternBg, '#1e1e2e');
-	ctx.fillRect(0, rulerHeight, width, noteHeight);
-	const firstRow = Math.max(0, Math.floor(scrollX / metrics.rowWidth) - 1);
-	const lastRow = Math.min(
-		metrics.columns,
-		Math.ceil((scrollX + width) / metrics.rowWidth) + 1
-	);
 	const firstFromTop = Math.max(0, Math.floor(scrollY / metrics.keyHeight) - 1);
 	const lastFromTop = Math.min(
 		metrics.pitchCount,
 		Math.ceil((scrollY + noteHeight) / metrics.keyHeight) + 1
 	);
+	const octaveLines = new Path2D();
+	const pitchLines = new Path2D();
+	ctx.fillStyle = colors.alternate;
 	for (let fromTop = firstFromTop; fromTop < lastFromTop; fromTop++) {
 		const pitch = metrics.pitchCount - 1 - fromTop;
 		const y = rulerHeight + fromTop * metrics.keyHeight - scrollY;
-		if (isBlackPitch(pitch)) {
-			ctx.fillStyle = color(colors.patternAlternate, '#181825');
-			ctx.fillRect(0, y, width, metrics.keyHeight);
-		}
-	}
-	const octaveLines = new Path2D();
-	const pitchLines = new Path2D();
-	for (let fromTop = firstFromTop; fromTop < lastFromTop; fromTop++) {
-		const pitch = metrics.pitchCount - 1 - fromTop;
-		const y = rulerHeight + fromTop * metrics.keyHeight - scrollY + metrics.keyHeight - 0.5;
+		if (isBlackPitch(pitch)) ctx.fillRect(0, y, width, metrics.keyHeight);
+		const lineY = y + metrics.keyHeight - 0.5;
 		const path = pitch % 12 === 0 ? octaveLines : pitchLines;
-		path.moveTo(0, y);
-		path.lineTo(width, y);
+		path.moveTo(0, lineY);
+		path.lineTo(width, lineY);
 	}
-	ctx.strokeStyle = color(colors.patternEmpty, '#313244');
-	ctx.globalAlpha = 0.35;
-	ctx.stroke(pitchLines);
-	ctx.strokeStyle = color(colors.patternChannelSeparator, '#313244');
-	ctx.globalAlpha = 0.9;
-	ctx.stroke(octaveLines);
-	ctx.globalAlpha = 1;
+	strokePath(ctx, pitchLines, colors.grid, 0.35);
+	strokePath(ctx, octaveLines, colors.separator, 0.9);
+}
+
+function drawRowLines(
+	ctx: CanvasRenderingContext2D,
+	options: PianoGridDrawOptions,
+	colors: PianoPalette,
+	rows: RowRange
+): void {
+	const { height, rulerHeight, scrollX, metrics, spans } = options;
 	const boundaryLines = new Path2D();
 	const barLines = new Path2D();
 	const beatLines = new Path2D();
 	const rowLines = new Path2D();
-	let spanCursor = timelineSpanIndex(spans, firstRow);
-	if (spanCursor < 0) spanCursor = 0;
-	for (let row = firstRow; row < lastRow; row++) {
-		while (
-			spanCursor < spans.length - 1 &&
-			(spans[spanCursor + 1]?.startRow ?? Number.POSITIVE_INFINITY) <= row
-		) {
-			spanCursor++;
-		}
-		const span = spans[spanCursor];
-		const local = span && row >= span.startRow ? row - span.startRow : row;
-		const boundary = !!span && local === 0 && row === span.startRow;
+	for (const { row, span, localRow } of visibleTimelineRows(spans, rows.firstRow, rows.lastRow)) {
 		const x = row * metrics.rowWidth - scrollX + 0.5;
-		const path = boundary
-			? boundaryLines
-			: local % 16 === 0
-				? barLines
-				: local % 4 === 0
-					? beatLines
-					: rowLines;
+		const path =
+			span && row === span.startRow
+				? boundaryLines
+				: localRow % 16 === 0
+					? barLines
+					: localRow % 4 === 0
+						? beatLines
+						: rowLines;
 		path.moveTo(x, rulerHeight);
 		path.lineTo(x, height);
 	}
-	ctx.strokeStyle = color(colors.patternEmpty, '#313244');
-	ctx.globalAlpha = 0.14;
-	ctx.stroke(rowLines);
-	ctx.globalAlpha = 0.28;
-	ctx.stroke(beatLines);
-	ctx.strokeStyle = color(colors.patternChannelSeparator, '#45475a');
-	ctx.globalAlpha = 0.55;
-	ctx.stroke(barLines);
-	ctx.globalAlpha = 0.95;
-	ctx.stroke(boundaryLines);
-	ctx.globalAlpha = 1;
+	strokePath(ctx, rowLines, colors.grid, 0.14);
+	strokePath(ctx, beatLines, colors.grid, 0.28);
+	strokePath(ctx, barLines, colors.separator, 0.55);
+	strokePath(ctx, boundaryLines, colors.separator, 0.95);
+}
+
+function drawNoteBlocks(
+	ctx: CanvasRenderingContext2D,
+	options: PianoGridDrawOptions,
+	colors: PianoPalette
+): void {
+	const { width, scrollX, metrics } = options;
+	const frame: BlockFrame = {
+		metrics,
+		scrollX,
+		scrollY: options.scrollY,
+		rulerHeight: options.rulerHeight,
+		selectedStroke: colors.accent
+	};
 	const viewStart = scrollX - metrics.rowWidth;
 	const viewEnd = scrollX + width + metrics.rowWidth;
-	const paintBlock = (block: PianoNoteBlock, presence: number) => {
+	const paint = (block: PianoNoteBlock, presence: number) => {
 		const blockStart = block.startRow * metrics.rowWidth;
 		const blockEnd = block.endRow * metrics.rowWidth;
 		if (blockEnd < viewStart || blockStart > viewEnd || presence <= 0) return;
-		if (isSelected(block, hiddenBlock, hiddenBlocks)) return;
-		drawBlock(
-			ctx,
-			block,
-			metrics,
-			scrollX,
-			scrollY,
-			rulerHeight,
-			resolveColor(block) ?? color(colors.patternNote, '#89b4fa'),
-			isSelected(block, selectedBlock, selectedNotes),
-			color(colors.patternRowNum, '#89b4fa'),
-			presence
-		);
+		if (containsSpot(options.hiddenBlocks, block)) return;
+		const fill = options.resolveColor(block) ?? colors.note;
+		drawBlock(ctx, block, frame, fill, containsSpot(options.selectedNotes, block), presence);
 	};
-	for (const ghost of leavingBlocks ?? []) paintBlock(ghost.block, ghost.presence);
-	for (const block of blocks) paintBlock(block, presenceFor?.(block) ?? 1);
-	for (const item of [...(previews ?? []), ...(preview ? [preview] : [])]) {
-		drawBlock(
-			ctx,
-			{
-				startRow: item.startRow,
-				endRow: item.endRow,
-				pitchIndex: item.pitchIndex,
-				note: '',
-				instrument: item.instrument,
-				gestures: item.gestures,
-				level: item.level
-			},
-			metrics,
-			scrollX,
-			scrollY,
-			rulerHeight,
-			item.color ?? color(colors.patternNote, '#89b4fa'),
-			true,
-			color(colors.patternRowNum, '#89b4fa')
-		);
+	for (const ghost of options.leavingBlocks ?? []) paint(ghost.block, ghost.presence);
+	for (const block of options.blocks) paint(block, options.presenceFor?.(block) ?? 1);
+	for (const preview of options.previews) {
+		drawBlock(ctx, { ...preview, note: '' }, frame, preview.color ?? colors.note, true);
 	}
-	ctx.fillStyle = color(colors.patternBg, '#1e1e2e');
+}
+
+function drawRuler(
+	ctx: CanvasRenderingContext2D,
+	options: PianoGridDrawOptions,
+	colors: PianoPalette,
+	rows: RowRange
+): void {
+	const { width, rulerHeight, scrollX, metrics, spans } = options;
+	ctx.fillStyle = colors.background;
 	ctx.fillRect(0, 0, width, rulerHeight);
-	ctx.strokeStyle = color(colors.patternChannelSeparator, '#313244');
+	ctx.strokeStyle = colors.separator;
 	ctx.beginPath();
 	ctx.moveTo(0, rulerHeight - 0.5);
 	ctx.lineTo(width, rulerHeight - 0.5);
 	ctx.stroke();
 	ctx.font = '10px ui-monospace, monospace';
 	ctx.textBaseline = 'middle';
-	const gateRows = new Map(gates.map((gate) => [gate.row, gate.kind]));
-	const accent = color(colors.patternRowNum, '#89b4fa');
-	const firstSpan = timelineSpanIndex(spans, firstRow);
-	const lastSpan = timelineSpanIndex(spans, Math.max(firstRow, lastRow - 1));
-	ctx.fillStyle = accent;
-	for (let index = Math.max(0, firstSpan); index <= (lastSpan < 0 ? firstSpan : lastSpan); index++) {
+	const firstSpan = timelineSpanIndex(spans, rows.firstRow);
+	const lastSpan = timelineSpanIndex(spans, Math.max(rows.firstRow, rows.lastRow - 1));
+	ctx.fillStyle = colors.accent;
+	ctx.globalAlpha = 0.9;
+	for (
+		let index = Math.max(0, firstSpan);
+		index <= (lastSpan < 0 ? firstSpan : lastSpan);
+		index++
+	) {
 		const span = spans[index];
-		if (!span || span.orderIndex !== currentOrderIndex) continue;
-		const x = span.startRow * metrics.rowWidth - scrollX;
-		ctx.globalAlpha = 0.9;
-		ctx.fillRect(x, 0, span.length * metrics.rowWidth, 2);
-		ctx.globalAlpha = 1;
+		if (!span || span.orderIndex !== options.currentOrderIndex) continue;
+		ctx.fillRect(
+			span.startRow * metrics.rowWidth - scrollX,
+			0,
+			span.length * metrics.rowWidth,
+			2
+		);
 	}
-	spanCursor = timelineSpanIndex(spans, firstRow);
-	if (spanCursor < 0) spanCursor = 0;
-	for (let row = firstRow; row < lastRow; row++) {
-		while (
-			spanCursor < spans.length - 1 &&
-			(spans[spanCursor + 1]?.startRow ?? Number.POSITIVE_INFINITY) <= row
-		) {
-			spanCursor++;
-		}
-		const span = spans[spanCursor];
+	ctx.globalAlpha = 1;
+	const gateRows = new Map(options.gates.map((gate) => [gate.row, gate.kind]));
+	for (const { row, span, localRow } of visibleTimelineRows(spans, rows.firstRow, rows.lastRow)) {
 		const x = row * metrics.rowWidth - scrollX;
-		const local = span && row >= span.startRow ? row - span.startRow : row;
 		const boundary = !!span && row === span.startRow;
-		if (boundary || (local % 4 === 0 && metrics.rowWidth >= 12)) {
-			ctx.fillStyle = boundary ? accent : color(colors.patternRowNum, '#a6adc8');
-			const label = boundary && span ? String(span.patternId).padStart(2, '0') : String(local);
-			if (!boundary || span.length * metrics.rowWidth >= 12) ctx.fillText(label, x + 3, rulerHeight / 2);
+		if (boundary || (localRow % 4 === 0 && metrics.rowWidth >= 12)) {
+			ctx.fillStyle = colors.accent;
+			const label = boundary ? String(span.patternId).padStart(2, '0') : String(localRow);
+			if (!boundary || span.length * metrics.rowWidth >= 12) {
+				ctx.fillText(label, x + 3, rulerHeight / 2);
+			}
 		}
 		const gate = gateRows.get(row);
 		if (!gate) continue;
-		ctx.fillStyle =
-			gate === 'off'
-				? color(colors.patternNoteOff, '#f38ba8')
-				: color(colors.patternEffect, '#cba6f7');
+		ctx.fillStyle = gate === 'off' ? colors.noteOff : colors.effect;
 		ctx.fillRect(x + 2, rulerHeight - 5, Math.max(4, metrics.rowWidth - 4), 3);
-	}
-	if (marquee) {
-		const left = Math.min(marquee.x0, marquee.x1) - scrollX;
-		const top = rulerHeight + Math.min(marquee.y0, marquee.y1) - scrollY;
-		const boxWidth = Math.abs(marquee.x1 - marquee.x0);
-		const boxHeight = Math.abs(marquee.y1 - marquee.y0);
-		ctx.save();
-		ctx.beginPath();
-		ctx.rect(0, rulerHeight, width, noteHeight);
-		ctx.clip();
-		ctx.fillStyle = color(colors.patternRowNum, '#89b4fa');
-		ctx.globalAlpha = 0.18;
-		ctx.fillRect(left, top, boxWidth, boxHeight);
-		ctx.globalAlpha = 0.9;
-		ctx.strokeStyle = color(colors.patternRowNum, '#89b4fa');
-		ctx.lineWidth = 1;
-		ctx.strokeRect(left + 0.5, top + 0.5, Math.max(0, boxWidth - 1), Math.max(0, boxHeight - 1));
-		ctx.restore();
-	}
-	if (cursorRow >= 0 && cursorRow < metrics.columns) {
-		const x = rowToX(cursorRow, metrics) - scrollX;
-		ctx.fillStyle = color(colors.patternEmptySelected, '#5f6595');
-		ctx.globalAlpha = 0.28;
-		ctx.fillRect(x, rulerHeight, metrics.rowWidth, noteHeight);
-		ctx.globalAlpha = 1;
-		ctx.fillStyle = color(colors.patternRowNum, '#89b4fa');
-		ctx.globalAlpha = 0.9;
-		ctx.fillRect(x, 0, 2, height);
-		ctx.globalAlpha = 1;
 	}
 }
 
-export function drawPianoLane(
+function drawMarquee(
 	ctx: CanvasRenderingContext2D,
-	options: {
-		colors: PianoRollColors;
-		width: number;
-		height: number;
-		scrollX: number;
-		metrics: PianoRollMetrics;
-		lane: PianoRollLane;
-		values: unknown[];
-		valueOrigin: number;
-		spans: readonly PianoTimelineSpan[];
-		draft: Record<number, number> | null;
-		cursorRow: number;
-		envelopeAsNote?: boolean;
-		tuningTable?: readonly number[];
-	}
+	options: PianoGridDrawOptions,
+	colors: PianoPalette
 ): void {
-	const {
-		colors,
-		width,
-		height,
-		scrollX,
-		metrics,
-		lane,
-		values,
-		valueOrigin,
-		spans,
-		draft,
-		cursorRow,
-		envelopeAsNote = false,
-		tuningTable
-	} = options;
+	const { marquee, width, height, rulerHeight, scrollX, scrollY } = options;
+	if (!marquee) return;
+	const left = Math.min(marquee.x0, marquee.x1) - scrollX;
+	const top = rulerHeight + Math.min(marquee.y0, marquee.y1) - scrollY;
+	const boxWidth = Math.abs(marquee.x1 - marquee.x0);
+	const boxHeight = Math.abs(marquee.y1 - marquee.y0);
+	ctx.save();
+	ctx.beginPath();
+	ctx.rect(0, rulerHeight, width, Math.max(0, height - rulerHeight));
+	ctx.clip();
+	ctx.fillStyle = colors.accent;
+	ctx.globalAlpha = 0.18;
+	ctx.fillRect(left, top, boxWidth, boxHeight);
+	ctx.globalAlpha = 0.9;
+	ctx.strokeStyle = colors.accent;
+	ctx.lineWidth = 1;
+	ctx.strokeRect(left + 0.5, top + 0.5, Math.max(0, boxWidth - 1), Math.max(0, boxHeight - 1));
+	ctx.restore();
+}
+
+function drawGridCursor(
+	ctx: CanvasRenderingContext2D,
+	options: PianoGridDrawOptions,
+	colors: PianoPalette
+): void {
+	const { cursorRow, metrics, scrollX, height, rulerHeight } = options;
+	if (cursorRow < 0 || cursorRow >= metrics.columns) return;
+	const x = rowToX(cursorRow, metrics) - scrollX;
+	ctx.fillStyle = colors.cursor;
+	ctx.globalAlpha = 0.28;
+	ctx.fillRect(x, rulerHeight, metrics.rowWidth, Math.max(0, height - rulerHeight));
+	drawCursorLine(ctx, colors, x, height);
+}
+
+function drawCursorLine(
+	ctx: CanvasRenderingContext2D,
+	colors: PianoPalette,
+	x: number,
+	height: number
+): void {
+	ctx.fillStyle = colors.accent;
+	ctx.globalAlpha = 0.9;
+	ctx.fillRect(x, 0, 2, height);
+	ctx.globalAlpha = 1;
+}
+
+export function drawPianoLane(ctx: CanvasRenderingContext2D, options: PianoLaneDrawOptions): void {
+	const { width, height, scrollX, metrics, lane, cursorRow } = options;
+	const colors = palette(options.colors);
+	const rows = visibleRowRange(scrollX, width, metrics);
 	ctx.clearRect(0, 0, width, height);
-	ctx.fillStyle = color(colors.patternBg, '#1e1e2e');
+	ctx.fillStyle = colors.background;
 	ctx.fillRect(0, 0, width, height);
-	const firstRow = Math.max(0, Math.floor(scrollX / metrics.rowWidth) - 1);
-	const lastRow = Math.min(
-		metrics.columns,
-		Math.ceil((scrollX + width) / metrics.rowWidth) + 1
-	);
 	const boundaries = new Path2D();
 	const rowLines = new Path2D();
-	let spanCursor = timelineSpanIndex(spans, firstRow);
-	if (spanCursor < 0) spanCursor = 0;
-	for (let row = firstRow; row < lastRow; row++) {
-		while (
-			spanCursor < spans.length - 1 &&
-			(spans[spanCursor + 1]?.startRow ?? Number.POSITIVE_INFINITY) <= row
-		) {
-			spanCursor++;
-		}
-		const span = spans[spanCursor];
+	for (const { row, span } of visibleTimelineRows(options.spans, rows.firstRow, rows.lastRow)) {
 		const x = row * metrics.rowWidth - scrollX + 0.5;
 		const path = span && row === span.startRow ? boundaries : rowLines;
 		path.moveTo(x, 0);
 		path.lineTo(x, height);
 	}
-	ctx.strokeStyle = color(colors.patternEmpty, '#313244');
-	ctx.globalAlpha = 0.14;
-	ctx.stroke(rowLines);
-	ctx.strokeStyle = color(colors.patternChannelSeparator, '#45475a');
-	ctx.globalAlpha = 0.65;
-	ctx.stroke(boundaries);
-	ctx.globalAlpha = 1;
-	const barColor = laneColor(colors, lane);
+	strokePath(ctx, rowLines, colors.grid, 0.14);
+	strokePath(ctx, boundaries, colors.separator, 0.65);
+	const paintCell = laneCellPainter(ctx, options, colors);
 	ctx.font = '9px ui-monospace, monospace';
 	ctx.textBaseline = 'top';
-	for (let row = firstRow; row < lastRow; row++) {
-		const x = row * metrics.rowWidth - scrollX;
-		const valueIndex = row - valueOrigin;
-		const raw =
-			draft && row in draft
-				? draft[row]
-				: valueIndex >= 0 && valueIndex < values.length
-					? values[valueIndex]
-					: undefined;
-		if (lane.kind === 'effect') {
-			const label = effectLabel(raw);
-			if (label) drawEffectColumn(ctx, colors, label, x, metrics.rowWidth, height);
-			if (row === cursorRow) {
-				ctx.strokeStyle = color(colors.patternRowNum, '#89b4fa');
-				ctx.strokeRect(x + 1.5, 3.5, Math.max(2, metrics.rowWidth - 3), height - 7);
-			}
-			continue;
-		}
-		if (laneValueIsTyped(lane)) {
-			const label = formatPianoTypedLabel(raw, lane, envelopeAsNote, tuningTable);
-			if (label) drawTypedLaneValue(ctx, colors, barColor, label, x, metrics.rowWidth, height);
-			if (row === cursorRow) {
-				ctx.strokeStyle = color(colors.patternRowNum, '#89b4fa');
-				ctx.strokeRect(x + 1.5, 3.5, Math.max(2, metrics.rowWidth - 3), height - 7);
-			}
-			continue;
-		}
-		const bar = pianoLaneBarValue(raw, lane);
-		const label = valueLabel(raw, lane);
-		if (bar === null && !label) continue;
-		const ratio = bar === null || lane.maxValue <= 0 ? 0 : bar / lane.maxValue;
-		const barHeight = bar === null ? 0 : Math.max(8, ratio * (height - 16));
-		if (barHeight > 0) {
-			ctx.fillStyle = barColor;
-			ctx.globalAlpha = row === cursorRow ? 1 : 0.8;
-			ctx.fillRect(x + 1, height - 4 - barHeight, Math.max(2, metrics.rowWidth - 2), barHeight);
-			ctx.globalAlpha = 1;
-		}
-		if (label && metrics.rowWidth >= 16) {
-			ctx.fillStyle = color(colors.patternText, '#cdd6f4');
-			ctx.fillText(label, x + 2, 3);
-		}
+	for (let row = rows.firstRow; row < rows.lastRow; row++) {
+		paintCell(row, row * metrics.rowWidth - scrollX, laneValueAt(options, row));
 	}
 	if (cursorRow >= 0 && cursorRow < metrics.columns) {
-		const x = cursorRow * metrics.rowWidth - scrollX;
-		ctx.fillStyle = color(colors.patternRowNum, '#89b4fa');
-		ctx.globalAlpha = 0.9;
-		ctx.fillRect(x, 0, 2, height);
-		ctx.globalAlpha = 1;
+		drawCursorLine(ctx, colors, cursorRow * metrics.rowWidth - scrollX, height);
 	}
 	if (lane.kind === 'effect') return;
 	ctx.save();
 	ctx.globalAlpha = 0.34;
-	ctx.fillStyle = color(colors.patternText, '#cdd6f4');
+	ctx.fillStyle = colors.text;
 	ctx.font = '13px ui-sans-serif, system-ui, sans-serif';
 	ctx.textBaseline = 'top';
 	ctx.fillText(lane.isGlobal ? `Chip ${lane.label}` : lane.label, 8, 6);
 	ctx.restore();
 }
 
+function laneValueAt(options: PianoLaneDrawOptions, row: number): unknown {
+	const { draft, values, valueOrigin } = options;
+	if (draft && row in draft) return draft[row];
+	const index = row - valueOrigin;
+	return index >= 0 && index < values.length ? values[index] : undefined;
+}
+
+function laneCellPainter(
+	ctx: CanvasRenderingContext2D,
+	options: PianoLaneDrawOptions,
+	colors: PianoPalette
+): LaneCellPainter {
+	const { lane, metrics, height, cursorRow } = options;
+	const outlineCursor = (row: number, x: number) => {
+		if (row !== cursorRow) return;
+		ctx.strokeStyle = colors.accent;
+		ctx.strokeRect(x + 1.5, 3.5, Math.max(2, metrics.rowWidth - 3), height - 7);
+	};
+	if (lane.kind === 'effect') {
+		return (row, x, raw) => {
+			const label = formatPianoEffectInput(raw);
+			if (label) drawEffectColumn(ctx, colors, label, x, metrics.rowWidth, height);
+			outlineCursor(row, x);
+		};
+	}
+	const barColor = laneColor(options.colors, colors, lane);
+	if (laneValueIsTyped(lane)) {
+		const codec = typedLaneCodec(lane, {
+			envelopeAsNote: options.envelopeAsNote ?? false,
+			tuningTable: options.tuningTable
+		});
+		return (row, x, raw) => {
+			const label = codec?.format(raw) ?? '';
+			if (label) drawTypedLaneValue(ctx, barColor, label, x, metrics.rowWidth, height);
+			outlineCursor(row, x);
+		};
+	}
+	const labelFor = barLabel(lane);
+	return (row, x, raw) => {
+		const bar = pianoLaneBarValue(raw, lane);
+		const label = labelFor(raw);
+		if (bar === null && !label) return;
+		const ratio = bar === null || lane.maxValue <= 0 ? 0 : bar / lane.maxValue;
+		const barHeight = bar === null ? 0 : Math.max(8, ratio * (height - 16));
+		if (barHeight > 0) {
+			ctx.fillStyle = barColor;
+			ctx.globalAlpha = row === cursorRow ? 1 : 0.8;
+			ctx.fillRect(
+				x + 1,
+				height - 4 - barHeight,
+				Math.max(2, metrics.rowWidth - 2),
+				barHeight
+			);
+			ctx.globalAlpha = 1;
+		}
+		if (label && metrics.rowWidth >= 16) {
+			ctx.fillStyle = colors.text;
+			ctx.fillText(label, x + 2, 3);
+		}
+	};
+}
+
+function barLabel(lane: PianoRollLane): (raw: unknown) => string {
+	const radix = radixLaneCodec(lane);
+	if (radix) return (raw) => radix.format(raw);
+	return (raw) => (typeof raw === 'number' && raw !== 0 ? String(Math.max(0, raw)) : '');
+}
+
+function laneColor(colors: PianoRollColors, fallback: PianoPalette, lane: PianoRollLane): string {
+	const key = lane.color as keyof PianoRollColors | undefined;
+	if (key && colors[key]) return colors[key];
+	return fallback.instrument;
+}
+
 function drawBlock(
 	ctx: CanvasRenderingContext2D,
 	block: PianoNoteBlock,
-	metrics: PianoRollMetrics,
-	scrollX: number,
-	scrollY: number,
-	rulerHeight: number,
+	frame: BlockFrame,
 	fill: string,
 	selected: boolean,
-	selectedStroke: string,
 	presence = 1
 ): void {
 	if (presence <= 0) return;
-	const x = block.startRow * metrics.rowWidth - scrollX + 1;
+	const { metrics } = frame;
+	const x = block.startRow * metrics.rowWidth - frame.scrollX + 1;
 	const width = Math.max(4, (block.endRow - block.startRow) * metrics.rowWidth - 2);
-	const y = rulerHeight + pitchToY(block.pitchIndex, metrics) - scrollY + 1;
+	const y = frame.rulerHeight + pitchToY(block.pitchIndex, metrics) - frame.scrollY + 1;
 	const height = Math.max(3, metrics.keyHeight - 2);
 	const scale = 0.86 + 0.14 * presence;
 	const drawWidth = Math.max(2, width * scale);
@@ -563,7 +637,7 @@ function drawBlock(
 	const alpha = (conflict ? 0.96 : noteLevelAlpha(block.level)) * presence;
 	ctx.save();
 	ctx.globalAlpha = alpha;
-	ctx.fillStyle = conflict ? '#e64553' : fill;
+	ctx.fillStyle = conflict ? CONFLICT_FILL : fill;
 	ctx.fillRect(x, drawY, drawWidth, drawHeight);
 	const lightBlock = colorLuminance(fill) > 0.55;
 	const ink = lightBlock ? '#1a1c23' : '#f8fafc';
@@ -574,7 +648,11 @@ function drawBlock(
 		ctx.fillRect(x + drawWidth - 3, drawY + 1, 2, Math.max(1, drawHeight - 2));
 		ctx.globalAlpha = alpha;
 	}
-	ctx.strokeStyle = selected ? selectedStroke : lightBlock ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.28)';
+	ctx.strokeStyle = selected
+		? frame.selectedStroke
+		: lightBlock
+			? 'rgba(0,0,0,0.4)'
+			: 'rgba(255,255,255,0.28)';
 	ctx.lineWidth = selected ? 2 : 1;
 	ctx.strokeRect(x + 0.5, drawY + 0.5, drawWidth - 1, drawHeight - 1);
 	ctx.lineWidth = 1;
@@ -598,7 +676,7 @@ function drawBlock(
 	}
 	if (conflict && drawHeight >= 8 && drawWidth >= 8) {
 		ctx.font = 'bold 12px ui-monospace, monospace';
-		ctx.fillStyle = '#fff7f7';
+		ctx.fillStyle = CONFLICT_MARK;
 		ctx.textAlign = 'right';
 		ctx.textBaseline = 'middle';
 		ctx.fillText('!', x + drawWidth - 3, drawY + drawHeight / 2);
@@ -720,25 +798,8 @@ function drawPitchGestures(
 	ctx.restore();
 }
 
-function sameNote(
-	block: { startRow: number; pitchIndex: number },
-	selected: { startRow: number; pitchIndex: number }
-): boolean {
-	return selected.startRow === block.startRow && selected.pitchIndex === block.pitchIndex;
-}
-
-function isSelected(
-	block: PianoNoteBlock,
-	selected: { startRow: number; pitchIndex: number } | null,
-	selectedNotes?: readonly { startRow: number; pitchIndex: number }[]
-): boolean {
-	if (selected && sameNote(block, selected)) return true;
-	return selectedNotes?.some((note) => sameNote(block, note)) ?? false;
-}
-
 function drawTypedLaneValue(
 	ctx: CanvasRenderingContext2D,
-	_colors: PianoRollColors,
 	barColor: string,
 	label: string,
 	x: number,
@@ -775,22 +836,9 @@ function drawTypedLaneValue(
 	ctx.restore();
 }
 
-function valueLabel(raw: unknown, lane: PianoRollLane): string {
-	if (lane.kind === 'effect') return effectLabel(raw);
-	if (lane.fieldType === 'hex' || lane.fieldType === 'symbol') {
-		const text =
-			lane.fieldType === 'hex'
-				? formatHex(raw as number | string | null | undefined, lane.length, lane.allowZeroValue)
-				: formatSymbol(raw as number | string | null | undefined, lane.length, lane.allowZeroValue);
-		return /^\.+$/.test(text) ? '' : text;
-	}
-	if (typeof raw === 'number' && raw !== 0) return String(raw < 0 ? 0 : raw);
-	return '';
-}
-
 function drawEffectColumn(
 	ctx: CanvasRenderingContext2D,
-	colors: PianoRollColors,
+	colors: PianoPalette,
 	label: string,
 	x: number,
 	rowWidth: number,
@@ -818,43 +866,12 @@ function drawEffectColumn(
 }
 
 function effectGlyphPaint(
-	colors: PianoRollColors,
+	colors: PianoPalette,
 	glyphColor: string
 ): { fill: string; alpha: number } {
-	if (glyphColor === EFFECT_FORMAT_COLORS.code) {
-		return { fill: color(colors.patternEffect, '#cba6f7'), alpha: 1 };
-	}
-	if (glyphColor === EFFECT_FORMAT_COLORS.delay) {
-		return { fill: color(colors.patternEnvelope, '#a6e3a1'), alpha: 1 };
-	}
-	if (glyphColor === EFFECT_FORMAT_COLORS.parameter) {
-		return { fill: color(colors.patternNote, '#89b4fa'), alpha: 1 };
-	}
-	if (glyphColor === EFFECT_FORMAT_COLORS.table) {
-		return { fill: color(colors.patternTable, '#a6e3a1'), alpha: 1 };
-	}
-	return { fill: color(colors.patternText, '#cdd6f4'), alpha: 0.45 };
-}
-
-function effectLabel(raw: unknown): string {
-	if (!raw || typeof raw !== 'object') return '';
-	const effect = raw as { effect?: number; delay?: number; parameter?: number; tableIndex?: number };
-	if (typeof effect.effect !== 'number') return '';
-	const text = PatternEffectHandling.formatEffectAsString({
-		effect: effect.effect,
-		delay: effect.delay ?? 0,
-		parameter: effect.parameter ?? 0,
-		tableIndex: effect.tableIndex
-	});
-	return text === '....' ? '' : text;
-}
-
-function laneColor(colors: PianoRollColors, lane: PianoRollLane): string {
-	const key = lane.color as keyof PianoRollColors | undefined;
-	if (key && colors[key]) return colors[key];
-	return color(colors.patternInstrument, '#a6e3a1');
-}
-
-function color(value: string | undefined, fallback: string): string {
-	return value && value.length > 0 ? value : fallback;
+	if (glyphColor === EFFECT_FORMAT_COLORS.code) return { fill: colors.effect, alpha: 1 };
+	if (glyphColor === EFFECT_FORMAT_COLORS.delay) return { fill: colors.envelope, alpha: 1 };
+	if (glyphColor === EFFECT_FORMAT_COLORS.parameter) return { fill: colors.note, alpha: 1 };
+	if (glyphColor === EFFECT_FORMAT_COLORS.table) return { fill: colors.table, alpha: 1 };
+	return { fill: colors.text, alpha: 0.45 };
 }

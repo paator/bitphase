@@ -9,7 +9,7 @@ import {
 	yToPitch,
 	type PianoRollMetrics
 } from '@/lib/services/piano-roll/piano-roll-geometry';
-import type { PianoNoteBlock } from '@/lib/services/piano-roll/piano-roll-model';
+import type { PianoNoteBlock } from '@/lib/services/piano-roll/piano-roll-notes';
 
 const metrics: PianoRollMetrics = {
 	rowWidth: 10,
@@ -67,6 +67,9 @@ describe('piano roll geometry', () => {
 			{ startRow: 6, length: 4, pitchIndex: 14 }
 		];
 		expect(clampSelectionDelta(notes, -8, 3, 16, 20)).toEqual({ deltaRow: -2, deltaPitch: 3 });
-		expect(clampSelectionDelta(notes, 20, -30, 16, 20)).toEqual({ deltaRow: 6, deltaPitch: -10 });
+		expect(clampSelectionDelta(notes, 20, -30, 16, 20)).toEqual({
+			deltaRow: 6,
+			deltaPitch: -10
+		});
 	});
 });

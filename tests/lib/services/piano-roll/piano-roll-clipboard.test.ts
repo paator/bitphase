@@ -6,9 +6,11 @@ import {
 	pastePianoNotes,
 	type CapturedPianoNote
 } from '@/lib/services/piano-roll/piano-roll-clipboard';
-import { removePitchedNotes } from '@/lib/services/piano-roll/piano-roll-model';
+import { removePitchedNotes } from '@/lib/services/piano-roll/piano-roll-editing';
 
-function pattern(notes: Array<string | { note: string; instrument?: number; volume?: number }>): GenericPattern {
+function pattern(
+	notes: Array<string | { note: string; instrument?: number; volume?: number }>
+): GenericPattern {
 	const rows: GenericRow[] = notes.map((entry) => {
 		if (typeof entry === 'string') return { note: entry };
 		return { note: entry.note, instrument: entry.instrument ?? 0, volume: entry.volume ?? 0 };
@@ -18,17 +20,20 @@ function pattern(notes: Array<string | { note: string; instrument?: number; volu
 
 describe('piano roll clipboard', () => {
 	it('copies note spacing, length, and row fields', () => {
-		const rows = pattern([
-			{ note: 'C-4', instrument: 2, volume: 10 },
-			'---',
-			'OFF',
-			{ note: 'E-4', instrument: 3, volume: 4 },
-			'==='
-		]).channels[0]?.rows ?? [];
+		const rows =
+			pattern([
+				{ note: 'C-4', instrument: 2, volume: 10 },
+				'---',
+				'OFF',
+				{ note: 'E-4', instrument: 3, volume: 4 },
+				'==='
+			]).channels[0]?.rows ?? [];
 		const first = capturePianoNote(rows, 'note', 0, 8);
 		const second = capturePianoNote(rows, 'note', 3, 11);
 		expect(first && second).toBeTruthy();
-		const clipboard = clipboardFromCaptures([second, first].filter((note): note is CapturedPianoNote => !!note));
+		const clipboard = clipboardFromCaptures(
+			[second, first].filter((note): note is CapturedPianoNote => !!note)
+		);
 		expect(clipboard).toEqual([
 			{
 				rowOffset: 0,

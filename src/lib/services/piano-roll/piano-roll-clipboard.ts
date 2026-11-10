@@ -1,5 +1,6 @@
 import type { GenericRow } from '../../models/song/generic';
-import { noteEventKind, pitchedBlockSpan } from './piano-roll-model';
+import { clearNoteEvents, noteEventKind, writeNoteGate } from './piano-note-events';
+import { pitchedBlockSpan } from './piano-roll-editing';
 
 export interface PianoClipboardNote {
 	rowOffset: number;
@@ -81,18 +82,12 @@ export function pastePianoNotes(
 			cell[key] = cloneFieldValue(value) as GenericRow[string];
 		}
 	}
+	const isWritten = (row: number) => written.has(row);
 	for (const note of accepted) {
 		if (!note.bounded) continue;
 		const end = note.localRow + note.length;
-		for (let row = note.localRow + 1; row < end && row < rows.length; row++) {
-			if (written.has(row)) continue;
-			const cell = rows[row];
-			if (cell && noteEventKind(cell[noteKey]) !== 'empty') cell[noteKey] = '---';
-		}
-		if (end < rows.length && !written.has(end) && noteEventKind(rows[end]?.[noteKey]) !== 'pitched') {
-			const cell = rows[end];
-			if (cell) cell[noteKey] = note.release ? '===' : 'OFF';
-		}
+		clearNoteEvents(rows, noteKey, note.localRow + 1, end, isWritten);
+		if (!isWritten(end)) writeNoteGate(rows, noteKey, end, note.release);
 	}
 	return true;
 }

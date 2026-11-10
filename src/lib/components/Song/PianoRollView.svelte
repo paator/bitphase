@@ -1,69 +1,74 @@
 <script lang="ts">
 	import { getContext, tick } from 'svelte';
 	import { CSS_VAR_MAP, type ThemeColorKey } from '../../config/theme-colors';
-	import type { ChipProcessor, PreviewNoteSupport } from '../../chips/base/processor';
+	import type { ChipProcessor } from '../../chips/base/processor';
+	import { pianoEffectGestureFor } from '../../chips/base/piano-effect-gesture';
+	import { listPatternEffectStatusHints } from '../../chips/base/effect-status';
+	import { getEffectFormatCharColors } from '../../chips/base/effect-format-color';
+	import { parseSymbol } from '../../chips/base/field-formatters';
 	import type { AudioService } from '../../services/audio/audio-service';
-	import { PreviewService } from '../../services/audio/preview-service';
 	import { AutoEnvService } from '../../services/pattern/auto-env-service';
 	import type { EditingContext, FieldInfo } from '../../services/pattern/editing/editing-context';
 	import { PatternNoteInput } from '../../services/pattern/editing/pattern-note-input';
-	import { PatternService } from '../../services/pattern/pattern-service';
+	import { effectCommandFromFormat } from '../../services/piano-roll/piano-effect-input';
+	import {
+		laneShowsNote,
+		pianoLaneCodec,
+		type PianoFieldValue
+	} from '../../services/piano-roll/piano-lane-codec';
+	import {
+		EMPTY_NOTE,
+		gateNote,
+		noteEventKind,
+		notePitchIndex,
+		pitchNoteText,
+		RELEASE_NOTE
+	} from '../../services/piano-roll/piano-note-events';
 	import {
 		amplitudeFields,
-		buildPianoTimeline,
-		carryAmplitude,
-		carryOrnament,
-		clearSpilledNoteGate,
-		collectPianoNotes,
-		continueOpenNoteBlocks,
-		findNoteFieldKey,
 		listPianoRollChannels,
 		listPianoRollLanes,
-		movePitchedNote,
-		noteEventKind,
-		pitchedBlockSpan,
+		pianoLaneValueFromRatio,
+		pianoRollFieldKeys,
+		readPianoFieldValue,
+		setPianoFieldValue,
+		type PianoRollLane
+	} from '../../services/piano-roll/piano-roll-schema';
+	import {
+		blockLength,
+		carryAmplitude,
+		carryOrnament,
+		collectPianoNotes,
+		noteSpotKey,
 		PIANO_ROLL_PITCH_COUNT,
+		sameNoteSpot,
+		type PianoNoteBlock,
+		type PianoNoteSpot
+	} from '../../services/piano-roll/piano-roll-notes';
+	import {
+		buildPianoTimeline,
+		clearSpilledNoteGate,
+		collectTimelineBlocks,
+		isTimelineBlock,
+		spanEnd,
+		timelineColumnCount,
+		timelineSpanAt,
+		timelineSpanForOrder,
+		timelineWindow,
+		writeSpilledNoteTail,
+		type PianoTimelineBlock,
+		type PianoTimelineGate,
+		type PianoTimelineLocation,
+		type PianoTimelineSpan
+	} from '../../services/piano-roll/piano-roll-timeline';
+	import {
+		pitchedBlockSpan,
 		relocatePitchedNote,
 		removePitchedNote,
 		removePitchedNotes,
-		pianoLaneValueFromRatio,
-		readPianoFieldValue,
 		resizePitchedNote,
-		setNoteValue,
-		setPianoFieldValue,
-		shiftPianoNotes,
-		timelineColumnCount,
-		timelineSpanAt,
-		timelineWindow,
-		writeSpilledNoteTail,
-		type PianoNoteBlock,
-		type PianoRollLane,
-		type PianoTimelineBlock,
-		type PianoTimelineSpan
-	} from '../../services/piano-roll/piano-roll-model';
-	import { pianoEffectGestureFor, type PianoEffectGesture } from '../../chips/base/piano-effect-gesture';
-	import { listPatternEffectStatusHints } from '../../chips/base/effect-status';
-	import { getEffectFormatCharColors } from '../../chips/base/effect-format-color';
-	import {
-		clampPianoEffectInput,
-		effectCommandFromFormat,
-		formatPianoEffectInput,
-		pianoEffectInputValue
-	} from '../../services/piano-roll/piano-effect-input';
-	import {
-		clampPianoSymbolInput,
-		laneValueIsTyped,
-		pianoSymbolInputValue
-	} from '../../services/piano-roll/piano-symbol-input';
-	import {
-		clampPianoHexInput,
-		clampPianoNoteInput,
-		formatPianoTypedLabel,
-		laneShowsNote,
-		pianoHexInputValue,
-		pianoNoteInputPeriod
-	} from '../../services/piano-roll/piano-hex-input';
-	import { noteToEnvelopePeriod } from '../../utils/envelope-note-conversion';
+		setNoteValue
+	} from '../../services/piano-roll/piano-roll-editing';
 	import {
 		blockIntersectsMarquee,
 		clampSelectionDelta,
@@ -84,38 +89,49 @@
 		type PianoPasteNote
 	} from '../../services/piano-roll/piano-roll-clipboard';
 	import {
+		conflictNotesSignature,
+		heldConflictIntents,
+		overlapsAny,
+		planPianoIntents,
+		rangesOverlap,
+		replaceChannelConflicts,
+		withoutSpots,
+		type PianoIntentNote
+	} from '../../services/piano-roll/piano-roll-conflicts';
+	import { PianoPatternSession } from '../../services/piano-roll/piano-pattern-session';
+	import {
+		commitPianoConflictEdits,
+		commitPianoPatternEdits,
+		type PianoEditCursor
+	} from '../../services/piano-roll/piano-roll-history';
+	import { PianoNotePreview } from '../../services/piano-roll/piano-note-preview';
+	import {
 		drawPianoGrid,
 		drawPianoKeyboard,
-		drawPianoLane
+		drawPianoLane,
+		type PianoBlockPreview
 	} from '../../ui-rendering/piano-roll-renderer';
+	import { PianoBlockFades } from '../../ui-rendering/piano-roll-block-fades';
 	import {
 		instrumentColorsById,
 		patternRowInstrumentId
 	} from '../../ui-rendering/instrument-pattern-colors';
 	import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
-	import { rangesOverlap, silencedIndexes } from '../../services/piano-roll/piano-roll-conflicts';
 	import { editorStateStore } from '../../stores/editor-state.svelte';
 	import { playbackStore } from '../../stores/playback.svelte';
-	import {
-		pianoRollConflictStore,
-		type PianoConflictNote
-	} from '../../stores/piano-roll-conflicts.svelte';
+	import { pianoRollConflictStore } from '../../stores/piano-roll-conflicts.svelte';
 	import { projectStore } from '../../stores/project.svelte';
 	import { undoRedoStore } from '../../stores/undo-redo.svelte';
 	import { autoEnvStore } from '../../stores/auto-env.svelte';
 	import { settingsStore } from '../../stores/settings.svelte';
+	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { themeService } from '../../services/theme/theme-service';
 	import { midiService } from '../../services/midi/midi-service';
 	import { getColors } from '../../utils/colors';
-	import { parseSymbol } from '../../chips/base/field-formatters';
-	import {
-		formatNoteFromEnum,
-		midiNoteToNoteNameAndOctave,
-		noteToTuningTableIndex,
-		parseNoteFromString,
-		tuningTableIndexToNote
-	} from '../../utils/note-utils';
-	import { keybindingsStore } from '../../stores/keybindings.svelte';
+	import { groupBy } from '../../utils/group-by';
+	import { onPointerDownOutside } from '../../utils/outside-pointer';
+	import { noteToEnvelopePeriod } from '../../utils/envelope-note-conversion';
+	import { midiNoteToNoteNameAndOctave, noteToTuningTableIndex } from '../../utils/note-utils';
 	import { ShortcutString } from '../../utils/shortcut-string';
 	import {
 		ACTION_COPY,
@@ -129,39 +145,71 @@
 	const KEYBOARD_WIDTH = 76;
 	const RULER_HEIGHT = 22;
 	const LANE_HEIGHT = 88;
+	const LANE_EDITOR_WIDTH = 176;
 	const WINDOW_OVERSCAN_ROWS = 48;
+	const ROW_WIDTH_RANGE = { min: 8, max: 40 };
+	const KEY_HEIGHT_RANGE = { min: 8, max: 28 };
 	const genericCache = new WeakMap<Pattern, GenericPattern>();
 	const patternTokens = new WeakMap<Pattern, number>();
 	let patternTokenSeq = 1;
 
-	interface IntentNote {
-		startRow: number;
-		length: number;
-		pitchIndex: number;
-		note: string;
-		instrument: number | null;
-		release: boolean;
-		bounded: boolean;
-		preferred: boolean;
-	}
-
-	interface NoteSelection {
+	interface NoteSelection extends PianoNoteSpot {
 		orderIndex: number;
 		patternId: number;
 		localStartRow: number;
-		startRow: number;
-		pitchIndex: number;
 	}
 
 	interface MoveGroupNote extends NoteSelection {
 		length: number;
 		color: string | null;
 		instrument: number | null;
-		gestures: PianoEffectGesture[];
+		gestures: PianoNoteBlock['gestures'];
 		level: number | null;
 	}
+
+	interface LaneCell {
+		orderIndex: number;
+		patternId: number;
+		localRow: number;
+	}
+
+	interface LaneEditor extends LaneCell {
+		kind: 'effect' | 'value';
+		laneKey: string;
+		absoluteRow: number;
+		text: string;
+		original: string;
+		left: number;
+	}
+
+	interface IntentResult {
+		changed: boolean;
+		preview: Pattern | null;
+		previewRow: number;
+	}
+
+	interface TimelineView {
+		key: string;
+		blocks: PianoTimelineBlock[];
+		gates: PianoTimelineGate[];
+		valueOrigin: number;
+		laneValues: unknown[];
+		patternIds: number[];
+	}
+
+	type GridPoint = { x: number; y: number; inRuler: boolean };
+
+	const EMPTY_VIEW: TimelineView = {
+		key: '',
+		blocks: [],
+		gates: [],
+		valueOrigin: 0,
+		laneValues: [],
+		patternIds: []
+	};
+
 	const services: { audioService: AudioService } = getContext('container');
-	const previewService = new PreviewService();
+	const notePreview = new PianoNotePreview(services.audioService);
 
 	let {
 		chipProcessors,
@@ -199,57 +247,34 @@
 	let drag = $state<
 		| {
 				kind: 'move';
-				fromOrder: number;
-				fromPatternId: number;
-				fromLocal: number;
-				fromRow: number;
-				fromPitch: number;
+				from: NoteSelection;
 				row: number;
 				pitch: number;
-				length: number;
 				grabOffset: number;
-				color: string | null;
-				instrument: number | null;
-				gestures: PianoEffectGesture[];
 				group: MoveGroupNote[];
 		  }
 		| {
 				kind: 'resize';
 				orderIndex: number;
-				patternId: number;
 				localStart: number;
 				startRow: number;
 				pitch: number;
 				instrument: number | null;
-				gestures: PianoEffectGesture[];
+				gestures: PianoNoteBlock['gestures'];
 				endRow: number;
 				originEnd: number;
-				spanEnd: number;
 		  }
 		| { kind: 'lane'; rows: Record<number, number> }
 		| null
 	>(null);
-	let scrollFrame = 0;
-	let blockFadeFrame = 0;
 	let blockFadeNow = $state(0);
-	let blockFadeScope = '';
-	let blockFadeKeys = new Set<string>();
-	const blockFadePatterns = new Set<number>();
-	const blockFadeLive = new Map<string, PianoTimelineBlock>();
-	const blockFades = new Map<string, { block: PianoTimelineBlock; mode: 'in' | 'out'; started: number }>();
-	const blockFadeHold = new Set<string>();
-	let blockFadeSkipIn = false;
+	const blockFades = new PianoBlockFades((now) => (blockFadeNow = now));
+	let scrollFrame = 0;
 	let followedOrder = -1;
 	let seenOrderListPick = 0;
 	let lockOrderSync = false;
-	let viewCache: {
-		key: string;
-		blocks: PianoTimelineBlock[];
-		gates: ReturnType<typeof shiftPianoNotes>['gates'];
-		valueOrigin: number;
-		laneValues: unknown[];
-		patternIds: number[];
-	} | null = null;
+	let centered = false;
+	let viewCache: TimelineView | null = null;
 
 	let gridScroller = $state<HTMLDivElement | null>(null);
 	let keyboardViewport = $state<HTMLDivElement | null>(null);
@@ -258,36 +283,13 @@
 	let keyboardCanvas = $state<HTMLCanvasElement | null>(null);
 	let laneCanvas = $state<HTMLCanvasElement | null>(null);
 	let removeDragListeners: (() => void) | null = null;
-	let previewChannel: number | null = null;
-	let previewTimer: number | null = null;
 	let laneMenuOpen = $state(false);
 	let laneMenuRoot: HTMLDivElement | null = null;
-	let closeLaneMenuListener: (() => void) | null = null;
-	let effectEditor = $state<{
-		absoluteRow: number;
-		orderIndex: number;
-		patternId: number;
-		localRow: number;
-		text: string;
-		original: string;
-		left: number;
-	} | null>(null);
-	let effectEditorRoot = $state<HTMLDivElement | null>(null);
-	let effectInput = $state<HTMLInputElement | null>(null);
-	let effectEditorListener: (() => void) | null = null;
-	let valueEditor = $state<{
-		absoluteRow: number;
-		orderIndex: number;
-		patternId: number;
-		localRow: number;
-		text: string;
-		original: string;
-		left: number;
-	} | null>(null);
-	let valueEditorRoot = $state<HTMLDivElement | null>(null);
-	let valueInput = $state<HTMLInputElement | null>(null);
-	let valueEditorListener: (() => void) | null = null;
-	let centered = false;
+	let releaseLaneMenuListener: (() => void) | null = null;
+	let laneEditor = $state<LaneEditor | null>(null);
+	let laneEditorRoot = $state<HTMLDivElement | null>(null);
+	let laneEditorInput = $state<HTMLInputElement | null>(null);
+	let releaseLaneEditorListener: (() => void) | null = null;
 
 	const channels = $derived(
 		listPianoRollChannels(
@@ -295,24 +297,13 @@
 			chipProcessors.map((processor) => processor.chip)
 		)
 	);
-	const groups = $derived.by(() => {
-		const grouped: Array<{
-			songIndex: number;
-			chipName: string;
-			channels: typeof channels;
-		}> = [];
-		for (const channel of channels) {
-			const group = grouped.find((item) => item.songIndex === channel.songIndex);
-			if (group) group.channels.push(channel);
-			else
-				grouped.push({
-					songIndex: channel.songIndex,
-					chipName: channel.chipName,
-					channels: [channel]
-				});
-		}
-		return grouped;
-	});
+	const groups = $derived(
+		[...groupBy(channels, (channel) => channel.songIndex)].map(([songIndex, items]) => ({
+			songIndex,
+			chipName: items[0]?.chipName ?? '',
+			channels: items
+		}))
+	);
 	const selected = $derived(
 		channels.find(
 			(channel) =>
@@ -322,11 +313,12 @@
 			channels[0] ??
 			null
 	);
-	const chip = $derived(
-		selected ? (chipProcessors[selected.songIndex]?.chip ?? null) : null
-	);
+	const chip = $derived(selected ? (chipProcessors[selected.songIndex]?.chip ?? null) : null);
 	const converter = $derived(chip ? chip.createConverter() : null);
-	const noteKey = $derived(chip ? findNoteFieldKey(chip.schema) : null);
+	const fieldKeys = $derived(chip ? pianoRollFieldKeys(chip.schema) : null);
+	const noteKey = $derived(fieldKeys?.note ?? null);
+	const instrumentKey = $derived(fieldKeys?.instrument ?? null);
+	const tuningTable = $derived(projectStore.songs[selected?.songIndex ?? -1]?.tuningTable ?? []);
 	const songPatterns = $derived(
 		selected ? (projectStore.patterns[selected.songIndex] ?? []) : []
 	);
@@ -338,13 +330,11 @@
 		return map;
 	});
 	const timeline = $derived(
-		buildPianoTimeline(projectStore.patternOrder, (patternId) => patternById.get(patternId)?.length)
+		buildPianoTimeline(
+			projectStore.patternOrder,
+			(patternId) => patternById.get(patternId)?.length
+		)
 	);
-	const pattern = $derived.by(() => {
-		const span = timeline.find((item) => item.orderIndex === currentPatternOrderIndex);
-		if (!span) return null;
-		return patternById.get(span.patternId) ?? null;
-	});
 	const effectCount = $derived.by(() => {
 		if (!selected) return 1;
 		let max = 1;
@@ -356,8 +346,21 @@
 	});
 	const lanes = $derived(chip ? listPianoRollLanes(chip.schema, effectCount) : []);
 	const effectHints = $derived(chip ? listPatternEffectStatusHints(chip) : []);
+	const activeLane = $derived(
+		lanes.find((lane) => lane.key === editorStateStore.pianoRollLaneKey) ??
+			lanes.find((lane) => lane.kind === 'value') ??
+			lanes[0] ??
+			null
+	);
+	const laneCodec = $derived(
+		pianoLaneCodec(activeLane, {
+			envelopeAsNote: editorStateStore.envelopeAsNote,
+			tuningTable
+		})
+	);
 	const effectEditorGlyphs = $derived.by(() => {
-		const text = clampPianoEffectInput(effectEditor?.text ?? '');
+		const text =
+			laneEditor?.kind === 'effect' && laneCodec ? laneCodec.clamp(laneEditor.text) : '';
 		const shown = (text + '....').slice(0, 4);
 		const colors = getEffectFormatCharColors(shown);
 		return [...shown].map((char, index) => ({
@@ -365,154 +368,12 @@
 			color: colors[index] ?? 'var(--color-app-text-muted)'
 		}));
 	});
-	const activeLane = $derived(
-		lanes.find((lane) => lane.key === editorStateStore.pianoRollLaneKey) ??
-			lanes.find((lane) => lane.kind === 'value') ??
-			lanes[0] ??
-			null
-	);
-	const typedInputMaxLength = $derived(
-		laneShowsNote(activeLane, editorStateStore.envelopeAsNote) ? 3 : (activeLane?.length ?? 2)
-	);
 	const typedLaneColor = $derived.by(() => {
 		const key = activeLane?.color;
 		if (key && key in CSS_VAR_MAP) return `var(${CSS_VAR_MAP[key as ThemeColorKey]})`;
 		return 'var(--color-app-text-primary)';
 	});
-	const timelineView = $derived.by(() => {
-		const empty = {
-			key: '',
-			blocks: [] as PianoTimelineBlock[],
-			gates: [] as ReturnType<typeof shiftPianoNotes>['gates'],
-			valueOrigin: 0,
-			laneValues: [] as unknown[],
-			patternIds: [] as number[]
-		};
-		if (!selected || !converter || !noteKey || timeline.length === 0) {
-			viewCache = empty;
-			return empty;
-		}
-		const step = WINDOW_OVERSCAN_ROWS;
-		const origin = Math.max(0, scrollBucket * step - step);
-		const extent = (scrollBucket + 2) * step + Math.ceil(Math.max(gridWidth, rowWidth) / rowWidth);
-		const windowSpans = timelineWindow(timeline, origin, extent);
-		let key = `${selected.songIndex}:${selected.channelIndex}:${noteKey}:${activeLane?.key ?? ''}:`;
-		const keyStart = windowSpans[0]?.orderIndex ?? 0;
-		for (const span of timeline) {
-			if (span.orderIndex < keyStart) continue;
-			const item = patternById.get(span.patternId);
-			key += `${span.orderIndex}.${span.startRow}.${item ? patternToken(item) : 0}:`;
-		}
-		for (const table of projectStore.tables) {
-			key += `${table.id}.${table.additive ? 1 : 0}.${table.rows.join(',')}|`;
-		}
-		key += `conflicts.${pianoRollConflictStore.revision}`;
-		if (viewCache && viewCache.key === key) return viewCache;
-		const blocks: PianoTimelineBlock[] = [];
-		const gates: ReturnType<typeof shiftPianoNotes>['gates'] = [];
-		const valueOrigin = windowSpans[0]?.startRow ?? 0;
-		const tail = windowSpans[windowSpans.length - 1];
-		const laneValues = new Array<unknown>(tail ? tail.startRow + tail.length - valueOrigin : 0);
-		const seen = new Map<number, GenericPattern>();
-		const amplitudes = chip ? amplitudeFields(chip.schema) : [];
-		const amplitudeCarry = new Map<string, number>();
-		const ornamentCarry = { id: null as number | null };
-		const hasTable = Boolean(chip?.schema.fields.table);
-		const ornamentLookup = (id: number) => {
-			const table = projectStore.tables.find((item) => item.id === id);
-			return table ? { rows: table.rows, additive: table.additive } : null;
-		};
-		const windowStart = windowSpans[0]?.orderIndex ?? Number.POSITIVE_INFINITY;
-		if (amplitudes.length > 0 || hasTable) {
-			for (const span of timeline) {
-				if (span.orderIndex >= windowStart) break;
-				const item = patternById.get(span.patternId);
-				if (!item) continue;
-				let generic = seen.get(item.id);
-				if (!generic) {
-					generic = cachedGeneric(item);
-					seen.set(item.id, generic);
-				}
-				const earlierRows = generic.channels[selected.channelIndex]?.rows ?? [];
-				if (amplitudes.length > 0) carryAmplitude(earlierRows, amplitudes, amplitudeCarry);
-				if (hasTable) carryOrnament(earlierRows, ornamentCarry);
-			}
-		}
-		for (const span of windowSpans) {
-			const item = patternById.get(span.patternId);
-			if (!item) continue;
-			let generic = seen.get(item.id);
-			if (!generic) {
-				generic = cachedGeneric(item);
-				seen.set(item.id, generic);
-			}
-			const shifted = shiftPianoNotes(
-				collectPianoNotes(
-					generic.channels[selected.channelIndex]?.rows ?? [],
-					noteKey,
-					(effect) => pianoEffectGestureFor(effect, chip),
-					amplitudes,
-					amplitudeCarry,
-					hasTable ? { lookup: ornamentLookup, carry: ornamentCarry } : undefined
-				),
-				span
-			);
-			blocks.push(...shifted.blocks);
-			gates.push(...shifted.gates);
-			if (!activeLane) continue;
-			for (let localRow = 0; localRow < span.length; localRow++) {
-				laneValues[span.startRow - valueOrigin + localRow] = readPianoFieldValue(
-					generic,
-					activeLane,
-					selected.channelIndex,
-					localRow
-				);
-			}
-		}
-		continueOpenNoteBlocks(blocks, timeline, noteKey, (later) => {
-			const laterItem = patternById.get(later.patternId);
-			if (!laterItem) return undefined;
-			let laterGeneric = seen.get(laterItem.id);
-			if (!laterGeneric) {
-				laterGeneric = cachedGeneric(laterItem);
-				seen.set(laterItem.id, laterGeneric);
-			}
-			return laterGeneric.channels[selected.channelIndex]?.rows;
-		});
-		const visibleStart = windowSpans[0]?.startRow ?? 0;
-		const visibleEnd = tail ? tail.startRow + tail.length : 0;
-		for (const conflict of pianoRollConflictStore.forChannel(
-			selected.songIndex,
-			selected.channelIndex
-		)) {
-			if (conflict.startRow + conflict.length <= visibleStart || conflict.startRow >= visibleEnd) continue;
-			const located = timelineSpanAt(timeline, conflict.startRow);
-			if (!located) continue;
-			blocks.push({
-				startRow: conflict.startRow,
-				endRow: conflict.startRow + conflict.length,
-				pitchIndex: conflict.pitchIndex,
-				note: conflict.note,
-				instrument: conflict.instrument,
-				gestures: [],
-				level: null,
-				orderIndex: located.span.orderIndex,
-				patternId: located.span.patternId,
-				localStartRow: located.localRow,
-				conflict: true
-			});
-		}
-		viewCache = {
-			key,
-			blocks,
-			gates,
-			valueOrigin,
-			laneValues,
-			patternIds: windowSpans.map((span) => span.patternId)
-		};
-		return viewCache;
-	});
-	const notes = $derived(timelineView);
+	const notes = $derived.by(buildTimelineView);
 	const metrics = $derived<PianoRollMetrics>({
 		rowWidth,
 		keyHeight,
@@ -521,42 +382,40 @@
 	});
 	const content = $derived(noteContentSize(metrics));
 	const cursorRow = $derived.by(() => {
-		const span = timeline.find((item) => item.orderIndex === currentPatternOrderIndex);
+		const span = timelineSpanForOrder(timeline, currentPatternOrderIndex);
 		if (!span) return 0;
 		return span.startRow + Math.min(Math.max(0, selectedRow), Math.max(0, span.length - 1));
 	});
 	const instrumentColorMap = $derived(
 		instrumentColorsById(filterInstrumentsForChip(projectStore.instruments, chip?.type ?? ''))
 	);
-	const hiddenBlock = $derived.by(() => {
-		if (drag?.kind !== 'resize') return null;
-		return { startRow: drag.startRow, pitchIndex: drag.pitch };
+	const hiddenBlocks = $derived.by((): PianoNoteSpot[] => {
+		if (drag?.kind === 'resize') return [{ startRow: drag.startRow, pitchIndex: drag.pitch }];
+		if (drag?.kind === 'move') {
+			return drag.group.map((item) => ({
+				startRow: item.startRow,
+				pitchIndex: item.pitchIndex
+			}));
+		}
+		return [];
 	});
-	const hiddenBlocks = $derived.by(() => {
+	const dragPreviews = $derived.by((): PianoBlockPreview[] => {
+		if (drag?.kind === 'resize') {
+			const spot = { startRow: drag.startRow, pitchIndex: drag.pitch };
+			return [
+				{
+					...spot,
+					endRow: drag.endRow,
+					color: null,
+					instrument: drag.instrument,
+					gestures: drag.gestures,
+					level: findBlock(spot)?.level
+				}
+			];
+		}
 		if (drag?.kind !== 'move') return [];
-		return drag.group.map((item) => ({ startRow: item.startRow, pitchIndex: item.pitchIndex }));
-	});
-	const preview = $derived.by(() => {
-		if (drag?.kind !== 'resize') return null;
-		const startRow = drag.startRow;
-		const pitch = drag.pitch;
-		const source = notes.blocks.find(
-			(block) => block.startRow === startRow && block.pitchIndex === pitch
-		);
-		return {
-			startRow: drag.startRow,
-			endRow: drag.endRow,
-			pitchIndex: drag.pitch,
-			color: null,
-			instrument: drag.instrument,
-			gestures: drag.gestures,
-			level: source?.level
-		};
-	});
-	const movePreviews = $derived.by(() => {
-		if (drag?.kind !== 'move') return [];
-		const deltaRow = drag.row - drag.fromRow;
-		const deltaPitch = drag.pitch - drag.fromPitch;
+		const deltaRow = drag.row - drag.from.startRow;
+		const deltaPitch = drag.pitch - drag.from.pitchIndex;
 		return drag.group.map((item) => ({
 			startRow: item.startRow + deltaRow,
 			endRow: item.startRow + deltaRow + item.length,
@@ -572,20 +431,21 @@
 		const current = selectedBlock;
 		if (!current) return null;
 		if (drag?.kind === 'move' || drag?.kind === 'resize') return current;
-		const span = timeline.find((item) => item.orderIndex === current.orderIndex);
-		if (!span || span.patternId !== current.patternId || !converter || !noteKey || !selected) {
+		const span = timelineSpanForOrder(timeline, current.orderIndex);
+		if (!span || span.patternId !== current.patternId || !noteKey) return null;
+		if (
+			noteEventKind(channelRows(span.patternId)?.[current.localStartRow]?.[noteKey]) !==
+			'pitched'
+		) {
 			return null;
 		}
-		const item = patternById.get(span.patternId);
-		if (!item) return null;
-		const value = cachedGeneric(item).channels[selected.channelIndex]?.rows[current.localStartRow]?.[
-			noteKey
-		];
-		if (noteEventKind(value) !== 'pitched') return null;
 		const startRow = span.startRow + current.localStartRow;
 		if (current.startRow === startRow) return current;
 		return { ...current, startRow };
 	});
+	const highlightedNotes = $derived(
+		visibleSelection ? [visibleSelection, ...selectedNotes] : selectedNotes
+	);
 
 	$effect(() => {
 		if (!selected) return;
@@ -625,8 +485,9 @@
 		const onWheel = (event: WheelEvent) => {
 			event.preventDefault();
 			if (event.ctrlKey || event.metaKey || event.altKey) {
-				if (event.altKey) keyHeight = clamp(keyHeight + (event.deltaY < 0 ? 1 : -1), 8, 28);
-				else rowWidth = clamp(rowWidth + (event.deltaY < 0 ? 1 : -1), 8, 40);
+				const step = event.deltaY < 0 ? 1 : -1;
+				if (event.altKey) zoomPitch(step);
+				else zoomTime(step);
 				return;
 			}
 			scroller.scrollLeft += event.deltaX;
@@ -650,7 +511,7 @@
 	$effect(() => {
 		const index = currentPatternOrderIndex;
 		const playing = playbackStore.isPlaying;
-		const span = timeline.find((item) => item.orderIndex === index);
+		const span = timelineSpanForOrder(timeline, index);
 		const scroller = gridScroller;
 		if (!span || !scroller || gridWidth <= 0) return;
 		if (orderListPick !== seenOrderListPick) {
@@ -677,14 +538,14 @@
 		return midiService.addNoteListener((midiNote, velocity) => {
 			if (!gridCanvas || document.activeElement !== gridCanvas) return;
 			if (velocity === 0) {
-				stopPreview();
+				notePreview.stop();
 				return;
 			}
 			const parsed = midiNoteToNoteNameAndOctave(midiNote);
 			if (!parsed) return;
 			const pitch = noteToTuningTableIndex(parsed.noteName, parsed.octave);
 			if (pitch === null) return;
-			const span = spanForOrder(currentPatternOrderIndex);
+			const span = timelineSpanForOrder(timeline, currentPatternOrderIndex);
 			if (span) placePitched(span, selectedRow, pitch, true, false);
 		});
 	});
@@ -695,7 +556,7 @@
 	});
 
 	$effect(() => {
-		syncBlockFades(
+		blockFades.sync(
 			notes.blocks,
 			notes.patternIds,
 			`${selected?.songIndex ?? ''}:${selected?.channelIndex ?? ''}:${noteKey ?? ''}`
@@ -704,14 +565,10 @@
 
 	$effect(() => {
 		colorVersion;
-		scrollY;
-		keyboardHeight;
-		keyHeight;
-		metrics.pitchCount;
 		if (!keyboardCanvas || keyboardHeight <= 0) return;
-		const keyCtx = prepareCanvas(keyboardCanvas, KEYBOARD_WIDTH, keyboardHeight);
-		if (!keyCtx) return;
-		drawPianoKeyboard(keyCtx, {
+		const ctx = prepareCanvas(keyboardCanvas, KEYBOARD_WIDTH, keyboardHeight);
+		if (!ctx) return;
+		drawPianoKeyboard(ctx, {
 			colors: rollColors(),
 			width: KEYBOARD_WIDTH,
 			height: keyboardHeight,
@@ -721,26 +578,12 @@
 	});
 
 	$effect(() => {
-		scrollX;
-		scrollY;
-		gridWidth;
-		gridHeight;
-		notes;
-		metrics;
-		cursorRow;
-		currentPatternOrderIndex;
-		timeline;
-		visibleSelection;
-		preview;
-		movePreviews;
-		hiddenBlock;
-		hiddenBlocks;
-		instrumentColorMap;
-		blockFadeNow;
+		colorVersion;
 		if (!gridCanvas || gridWidth <= 0 || gridHeight <= 0) return;
-		const gridCtx = prepareCanvas(gridCanvas, gridWidth, gridHeight);
-		if (!gridCtx) return;
-		drawPianoGrid(gridCtx, {
+		const ctx = prepareCanvas(gridCanvas, gridWidth, gridHeight);
+		if (!ctx) return;
+		const now = blockFadeNow;
+		drawPianoGrid(ctx, {
 			colors: rollColors(),
 			width: gridWidth,
 			height: gridHeight,
@@ -753,38 +596,26 @@
 			spans: timeline,
 			currentOrderIndex: currentPatternOrderIndex,
 			cursorRow,
-			selectedBlock: visibleSelection,
-			selectedNotes,
+			selectedNotes: highlightedNotes,
 			marquee,
-			hiddenBlock,
 			hiddenBlocks,
-			preview,
-			previews: movePreviews,
-			leavingBlocks: leavingBlockFades(),
-			presenceFor: blockPresence,
+			previews: dragPreviews,
+			leavingBlocks: blockFades.leaving(now),
+			presenceFor: (block) => blockFades.presence(block, now),
 			resolveColor: resolveNoteColor
 		});
 	});
 
 	$effect(() => {
-		scrollX;
-		laneWidth;
-		notes;
-		metrics;
-		cursorRow;
-		laneDraft;
-		activeLane;
-		timeline;
-		const envelopeAsNote = editorStateStore.envelopeAsNote;
-		const tuningTable = projectStore.songs[selected?.songIndex ?? -1]?.tuningTable;
+		colorVersion;
 		if (!laneCanvas || !activeLane || laneWidth <= 0) return;
-		const laneHeight = Math.max(1, laneViewport?.clientHeight ?? LANE_HEIGHT);
-		const laneCtx = prepareCanvas(laneCanvas, laneWidth, laneHeight);
-		if (!laneCtx) return;
-		drawPianoLane(laneCtx, {
+		const height = Math.max(1, laneViewport?.clientHeight ?? LANE_HEIGHT);
+		const ctx = prepareCanvas(laneCanvas, laneWidth, height);
+		if (!ctx) return;
+		drawPianoLane(ctx, {
 			colors: rollColors(),
 			width: laneWidth,
-			height: laneHeight,
+			height,
 			scrollX,
 			metrics,
 			lane: activeLane,
@@ -793,7 +624,7 @@
 			spans: timeline,
 			draft: laneDraft,
 			cursorRow,
-			envelopeAsNote,
+			envelopeAsNote: editorStateStore.envelopeAsNote,
 			tuningTable
 		});
 	});
@@ -804,29 +635,20 @@
 		activeLane?.key;
 		playbackStore.isPlaying;
 		editorStateStore.envelopeAsNote;
-		return () => {
-			dismissEffectEditor();
-			dismissValueEditor();
-		};
+		return () => dismissLaneEditor();
 	});
 
 	$effect(() => () => {
 		removeDragListeners?.();
-		stopPreview();
+		notePreview.stop();
 		if (scrollFrame) cancelAnimationFrame(scrollFrame);
-		if (blockFadeFrame) cancelAnimationFrame(blockFadeFrame);
-		closeLaneMenuListener?.();
-		effectEditorListener?.();
-		valueEditorListener?.();
+		blockFades.dispose();
+		releaseLaneMenuListener?.();
+		releaseLaneEditorListener?.();
 	});
 
 	let rollPalette = getColors();
 	let rollPaletteVersion = -1;
-
-	function noteScrollBucket(left: number): void {
-		const next = Math.floor(left / (WINDOW_OVERSCAN_ROWS * Math.max(1, rowWidth)));
-		if (next !== scrollBucket) scrollBucket = next;
-	}
 
 	function rollColors() {
 		if (rollPaletteVersion !== colorVersion) {
@@ -838,6 +660,19 @@
 
 	function clamp(value: number, min: number, max: number): number {
 		return Math.min(max, Math.max(min, value));
+	}
+
+	function zoomTime(step: number): void {
+		rowWidth = clamp(rowWidth + step, ROW_WIDTH_RANGE.min, ROW_WIDTH_RANGE.max);
+	}
+
+	function zoomPitch(step: number): void {
+		keyHeight = clamp(keyHeight + step, KEY_HEIGHT_RANGE.min, KEY_HEIGHT_RANGE.max);
+	}
+
+	function noteScrollBucket(left: number): void {
+		const next = Math.floor(left / (WINDOW_OVERSCAN_ROWS * Math.max(1, rowWidth)));
+		if (next !== scrollBucket) scrollBucket = next;
 	}
 
 	function prepareCanvas(
@@ -868,102 +703,161 @@
 		return id ? (instrumentColorMap.get(id) ?? null) : null;
 	}
 
-	const BLOCK_FADE_MS = 160;
-
-	function blockFadeKey(block: PianoTimelineBlock): string {
-		return `${block.orderIndex}:${block.patternId}:${block.localStartRow}:${block.pitchIndex}`;
+	function patternToken(item: Pattern): number {
+		const existing = patternTokens.get(item);
+		if (existing !== undefined) return existing;
+		const next = patternTokenSeq++;
+		patternTokens.set(item, next);
+		return next;
 	}
 
-	function blockFadePresence(started: number): number {
-		const t = Math.min(1, Math.max(0, (blockFadeNow - started) / BLOCK_FADE_MS));
-		return 1 - (1 - t) ** 3;
+	function cachedGeneric(item: Pattern): GenericPattern {
+		const hit = genericCache.get(item);
+		if (hit) return hit;
+		if (!converter) return { id: item.id, length: item.length, channels: [], patternRows: [] };
+		const generic = converter.toGeneric(item);
+		genericCache.set(item, generic);
+		return generic;
 	}
 
-	function syncBlockFades(blocks: PianoTimelineBlock[], patternIds: number[], scope: string): void {
-		const now = performance.now();
-		if (scope !== blockFadeScope) {
-			blockFadeScope = scope;
-			blockFadePatterns.clear();
-			blockFadeLive.clear();
-			blockFadeKeys = new Set();
-			blockFades.clear();
-			blockFadeHold.clear();
-			blockFadeSkipIn = false;
-		}
-		const inWindow = new Set(patternIds);
-		const fresh = new Set<number>();
-		for (const id of inWindow) {
-			if (!blockFadePatterns.has(id)) fresh.add(id);
-		}
-		for (const [key, block] of blockFadeLive) {
-			if (!inWindow.has(block.patternId)) {
-				blockFadeLive.delete(key);
-				blockFades.delete(key);
-			}
-		}
-		const next = new Set<string>();
-		for (const block of blocks) {
-			const key = blockFadeKey(block);
-			next.add(key);
-			const known = blockFadeLive.has(key);
-			blockFadeLive.set(key, block);
-			if (!fresh.has(block.patternId) && !known && !blockFadeSkipIn) {
-				blockFades.set(key, { block, mode: 'in', started: now });
-			} else {
-				const fade = blockFades.get(key);
-				if (fade?.mode === 'in') fade.block = block;
-			}
-		}
-		for (const key of blockFadeKeys) {
-			if (next.has(key)) continue;
-			const block = blockFadeLive.get(key);
-			blockFadeLive.delete(key);
-			const held = blockFadeHold.delete(key);
-			if (held || !block || fresh.has(block.patternId) || !inWindow.has(block.patternId)) continue;
-			blockFades.set(key, { block, mode: 'out', started: now });
-		}
-		for (const key of blockFadeHold) {
-			if (next.has(key)) blockFadeHold.delete(key);
-		}
-		blockFadeSkipIn = false;
-		for (const id of blockFadePatterns) {
-			if (!inWindow.has(id)) blockFadePatterns.delete(id);
-		}
-		for (const id of inWindow) blockFadePatterns.add(id);
-		blockFadeKeys = next;
-		if ([...blockFades.values()].some((fade) => now - fade.started < BLOCK_FADE_MS)) startBlockFadeLoop();
+	function channelRows(patternId: number): GenericRow[] | undefined {
+		const item = patternById.get(patternId);
+		if (!item || !selected) return undefined;
+		return cachedGeneric(item).channels[selected.channelIndex]?.rows;
 	}
 
-	function startBlockFadeLoop(): void {
-		if (blockFadeFrame) return;
-		const tick = () => {
-			blockFadeFrame = 0;
-			const now = performance.now();
-			let active = false;
-			for (const [key, fade] of blockFades) {
-				if (now - fade.started >= BLOCK_FADE_MS) blockFades.delete(key);
-				else active = true;
+	function timelineViewKey(windowSpans: readonly PianoTimelineSpan[]): string {
+		if (!selected) return '';
+		let key = `${selected.songIndex}:${selected.channelIndex}:${noteKey}:${activeLane?.key ?? ''}:`;
+		const keyStart = windowSpans[0]?.orderIndex ?? 0;
+		for (const span of timeline) {
+			if (span.orderIndex < keyStart) continue;
+			const item = patternById.get(span.patternId);
+			key += `${span.orderIndex}.${span.startRow}.${item ? patternToken(item) : 0}:`;
+		}
+		for (const table of projectStore.tables) {
+			key += `${table.id}.${table.additive ? 1 : 0}.${table.rows.join(',')}|`;
+		}
+		return key + `conflicts.${pianoRollConflictStore.revision}`;
+	}
+
+	function buildTimelineView(): TimelineView {
+		if (!selected || !chip || !converter || !noteKey || timeline.length === 0) {
+			viewCache = EMPTY_VIEW;
+			return EMPTY_VIEW;
+		}
+		const step = WINDOW_OVERSCAN_ROWS;
+		const origin = Math.max(0, scrollBucket * step - step);
+		const extent =
+			(scrollBucket + 2) * step + Math.ceil(Math.max(gridWidth, rowWidth) / rowWidth);
+		const windowSpans = timelineWindow(timeline, origin, extent);
+		const key = timelineViewKey(windowSpans);
+		if (viewCache && viewCache.key === key) return viewCache;
+		const rowsForSpan = (span: PianoTimelineSpan) => channelRows(span.patternId);
+		const amplitude = amplitudeFields(chip.schema);
+		const amplitudeCarry = new Map<string, number>();
+		const ornament = fieldKeys?.table
+			? { lookup: ornamentTable, carry: { id: null as number | null } }
+			: undefined;
+		const windowStart = windowSpans[0]?.orderIndex ?? Number.POSITIVE_INFINITY;
+		if (amplitude.length > 0 || ornament) {
+			for (const span of timeline) {
+				if (span.orderIndex >= windowStart) break;
+				const rows = rowsForSpan(span);
+				if (!rows) continue;
+				carryAmplitude(rows, amplitude, amplitudeCarry);
+				if (ornament) carryOrnament(rows, ornament.carry);
 			}
-			blockFadeNow = now;
-			if (active) blockFadeFrame = requestAnimationFrame(tick);
+		}
+		const gestureFor = (effect: Parameters<typeof pianoEffectGestureFor>[0]) =>
+			pianoEffectGestureFor(effect, chip);
+		const { blocks, gates } = collectTimelineBlocks({
+			timeline,
+			spans: windowSpans,
+			noteKey,
+			rowsForSpan,
+			collect: (rows) =>
+				collectPianoNotes(rows, noteKey, {
+					gestureFor,
+					amplitude,
+					amplitudeCarry,
+					ornament
+				})
+		});
+		const valueOrigin = windowSpans[0]?.startRow ?? 0;
+		const tail = windowSpans.at(-1);
+		const visibleEnd = tail ? spanEnd(tail) : 0;
+		blocks.push(...conflictBlocks(valueOrigin, visibleEnd));
+		viewCache = {
+			key,
+			blocks,
+			gates,
+			valueOrigin,
+			laneValues: laneValuesFor(windowSpans, valueOrigin, visibleEnd),
+			patternIds: windowSpans.map((span) => span.patternId)
 		};
-		blockFadeFrame = requestAnimationFrame(tick);
+		return viewCache;
 	}
 
-	function blockPresence(block: PianoNoteBlock): number {
-		if (!('orderIndex' in block) || !('patternId' in block) || !('localStartRow' in block)) return 1;
-		const fade = blockFades.get(blockFadeKey(block as PianoTimelineBlock));
-		if (!fade || fade.mode !== 'in') return 1;
-		return blockFadePresence(fade.started);
+	function ornamentTable(id: number) {
+		const table = projectStore.tables.find((item) => item.id === id);
+		return table ? { rows: table.rows, additive: table.additive } : null;
 	}
 
-	function leavingBlockFades(): { block: PianoTimelineBlock; presence: number }[] {
-		const leaving: { block: PianoTimelineBlock; presence: number }[] = [];
-		for (const fade of blockFades.values()) {
-			if (fade.mode !== 'out') continue;
-			leaving.push({ block: fade.block, presence: 1 - blockFadePresence(fade.started) });
+	function laneValuesFor(
+		windowSpans: readonly PianoTimelineSpan[],
+		valueOrigin: number,
+		visibleEnd: number
+	): unknown[] {
+		const values = new Array<unknown>(Math.max(0, visibleEnd - valueOrigin));
+		const lane = activeLane;
+		if (!lane || !selected) return values;
+		for (const span of windowSpans) {
+			const item = patternById.get(span.patternId);
+			if (!item) continue;
+			const generic = cachedGeneric(item);
+			for (let localRow = 0; localRow < span.length; localRow++) {
+				values[span.startRow - valueOrigin + localRow] = readPianoFieldValue(
+					generic,
+					lane,
+					selected.channelIndex,
+					localRow
+				);
+			}
 		}
-		return leaving;
+		return values;
+	}
+
+	function conflictBlocks(visibleStart: number, visibleEnd: number): PianoTimelineBlock[] {
+		if (!selected) return [];
+		const blocks: PianoTimelineBlock[] = [];
+		for (const conflict of pianoRollConflictStore.forChannel(
+			selected.songIndex,
+			selected.channelIndex
+		)) {
+			if (
+				conflict.startRow + conflict.length <= visibleStart ||
+				conflict.startRow >= visibleEnd
+			) {
+				continue;
+			}
+			const located = timelineSpanAt(timeline, conflict.startRow);
+			if (!located) continue;
+			blocks.push({
+				startRow: conflict.startRow,
+				endRow: conflict.startRow + conflict.length,
+				pitchIndex: conflict.pitchIndex,
+				note: conflict.note,
+				instrument: conflict.instrument,
+				gestures: [],
+				level: null,
+				orderIndex: located.span.orderIndex,
+				patternId: located.span.patternId,
+				localStartRow: located.localRow,
+				conflict: true
+			});
+		}
+		return blocks;
 	}
 
 	function onGridScroll(): void {
@@ -993,7 +887,10 @@
 
 	function syncOrderToScroll(scrollLeft: number): void {
 		if (playbackStore.isPlaying || rowWidth <= 0 || timeline.length === 0) return;
-		const absolute = Math.min(metrics.columns - 1, Math.max(0, Math.floor(scrollLeft / rowWidth)));
+		const absolute = Math.min(
+			metrics.columns - 1,
+			Math.max(0, Math.floor(scrollLeft / rowWidth))
+		);
 		const located = timelineSpanAt(timeline, absolute);
 		if (!located || located.span.orderIndex === currentPatternOrderIndex) return;
 		followedOrder = located.span.orderIndex;
@@ -1002,38 +899,21 @@
 		if (selectedRow !== row) selectedRow = row;
 	}
 
-	function patternToken(item: Pattern): number {
-		const existing = patternTokens.get(item);
-		if (existing !== undefined) return existing;
-		const next = patternTokenSeq++;
-		patternTokens.set(item, next);
-		return next;
-	}
-
-	function cachedGeneric(item: Pattern): GenericPattern {
-		const hit = genericCache.get(item);
-		if (hit) return hit;
-		if (!converter) return { id: item.id, length: item.length, channels: [], patternRows: [] };
-		const generic = converter.toGeneric(item);
-		genericCache.set(item, generic);
-		return generic;
-	}
-
-	function spanForOrder(orderIndex: number): PianoTimelineSpan | null {
-		return timeline.find((item) => item.orderIndex === orderIndex) ?? null;
-	}
-
 	function focusLocation(span: PianoTimelineSpan, localRow: number, scrollIntoView = true): void {
 		const row = Math.min(Math.max(0, localRow), Math.max(0, span.length - 1));
-		if (currentPatternOrderIndex !== span.orderIndex) currentPatternOrderIndex = span.orderIndex;
+		if (currentPatternOrderIndex !== span.orderIndex)
+			currentPatternOrderIndex = span.orderIndex;
 		if (selectedRow !== row) selectedRow = row;
 		if (scrollIntoView) reveal(span.startRow + row);
 	}
 
 	function moveCursorTo(absoluteRow: number): void {
-		const located = timelineSpanAt(timeline, Math.min(Math.max(0, absoluteRow), metrics.columns - 1));
-		if (!located) return;
-		focusLocation(located.span, located.localRow);
+		const located = timelineSpanAt(timeline, clamp(absoluteRow, 0, metrics.columns - 1));
+		if (located) focusLocation(located.span, located.localRow);
+	}
+
+	function advanceCursor(advance: boolean, absoluteRow: number): void {
+		if (advance && editorStateStore.step > 0) moveCursorTo(absoluteRow + editorStateStore.step);
 	}
 
 	function reveal(absoluteRow: number): void {
@@ -1046,7 +926,7 @@
 		}
 	}
 
-	function contentPoint(event: MouseEvent): { x: number; y: number; inRuler: boolean } | null {
+	function contentPoint(event: MouseEvent): GridPoint | null {
 		if (!gridCanvas) return null;
 		const rect = gridCanvas.getBoundingClientRect();
 		const localX = event.clientX - rect.left;
@@ -1063,18 +943,20 @@
 		return { row, ratio: 1 - (event.clientY - rect.top) / rect.height };
 	}
 
-	function trackPointer(onMove: (event: MouseEvent) => void, onUp: (event: MouseEvent) => void): void {
+	function trackPointer(
+		onMove: (event: MouseEvent) => void,
+		onUp: (event: MouseEvent) => void = () => {}
+	): void {
 		removeDragListeners?.();
-		const move = (event: MouseEvent) => onMove(event);
 		const up = (event: MouseEvent) => {
 			removeDragListeners?.();
 			removeDragListeners = null;
 			onUp(event);
 		};
-		window.addEventListener('mousemove', move);
+		window.addEventListener('mousemove', onMove);
 		window.addEventListener('mouseup', up);
 		removeDragListeners = () => {
-			window.removeEventListener('mousemove', move);
+			window.removeEventListener('mousemove', onMove);
 			window.removeEventListener('mouseup', up);
 		};
 	}
@@ -1093,8 +975,21 @@
 		};
 	}
 
-	function selectionKey(note: { startRow: number; pitchIndex: number }): string {
-		return `${note.startRow}:${note.pitchIndex}`;
+	function selectionsAt(spots: readonly PianoNoteSpot[]): NoteSelection[] {
+		const selections: NoteSelection[] = [];
+		for (const spot of spots) {
+			const home = timelineSpanAt(timeline, spot.startRow);
+			if (home) selections.push(selectionFor(home.span, home.localRow, spot.pitchIndex));
+		}
+		return selections;
+	}
+
+	function selectionCursor(selection: NoteSelection): PianoEditCursor {
+		return { orderIndex: selection.orderIndex, row: selection.localStartRow };
+	}
+
+	function locationCursor(location: PianoTimelineLocation): PianoEditCursor {
+		return { orderIndex: location.span.orderIndex, row: location.localRow };
 	}
 
 	function applySelection(next: NoteSelection[]): void {
@@ -1108,10 +1003,10 @@
 	}
 
 	function mergeSelections(current: NoteSelection[], added: NoteSelection[]): NoteSelection[] {
-		const seen = new Set(current.map(selectionKey));
+		const seen = new Set(current.map(noteSpotKey));
 		const next = [...current];
 		for (const note of added) {
-			const key = selectionKey(note);
+			const key = noteSpotKey(note);
 			if (seen.has(key)) continue;
 			seen.add(key);
 			next.push(note);
@@ -1121,64 +1016,58 @@
 
 	function toggleSelected(note: NoteSelection): void {
 		const current = workingSelection();
-		const key = selectionKey(note);
-		const next = current.some((item) => selectionKey(item) === key)
-			? current.filter((item) => selectionKey(item) !== key)
+		const next = current.some((item) => sameNoteSpot(item, note))
+			? withoutSpots(current, [note])
 			: [...current, note];
 		applySelection(next);
 	}
 
 	function dropSelectionAt(orderIndex: number, localRow: number): void {
-		const next = workingSelection().filter(
+		const current = workingSelection();
+		const next = current.filter(
 			(item) => item.orderIndex !== orderIndex || item.localStartRow !== localRow
 		);
-		if (next.length !== workingSelection().length) applySelection(next);
+		if (next.length !== current.length) applySelection(next);
 	}
 
-	function commitEdits(
-		songIndex: number,
-		edits: Map<number, { before: Pattern; after: Pattern }>,
-		orderIndex: number,
-		row: number
+	function land(
+		selection: NoteSelection[],
+		focus: PianoTimelineLocation | null,
+		scrollIntoView = true
 	): void {
-		if (edits.size === 0) return;
-		let patterns = projectStore.patterns[songIndex] ?? [];
-		const diffs = [];
-		for (const { before, after } of edits.values()) {
-			if (before === after) continue;
-			const patternIndex = patterns.findIndex((item) => item.id === before.id);
-			if (patternIndex < 0) continue;
-			diffs.push(
-				projectStore.createSetDiff(['patterns', songIndex, patternIndex], before, after)
-			);
-			patterns = PatternService.updatePatternInArray(patterns, after);
-		}
-		if (diffs.length === 0) return;
-		const only = edits.size === 1 ? edits.values().next().value : undefined;
-		projectStore.recordHistory(
-			{
-				type: 'pattern.edit',
-				label: only ? `Edit pattern ${only.before.id}` : 'Edit patterns',
-				affectedDomains: ['patterns'],
-				beforeSelection: {
-					songIndex,
-					row,
-					column: 0,
-					patternOrderIndex: orderIndex
-				},
-				afterSelection: {
-					songIndex,
-					row,
-					column: 0,
-					patternOrderIndex: orderIndex
-				}
-			},
-			diffs
-		);
-		projectStore.updatePatterns(songIndex, patterns);
+		applySelection(selection);
+		if (focus) focusLocation(focus.span, focus.localRow, scrollIntoView);
 	}
 
-	function editingContext(source: Pattern, row: number, channelIndex: number): EditingContext | null {
+	function findBlock(spot: PianoNoteSpot): PianoTimelineBlock | undefined {
+		return notes.blocks.find((block) => sameNoteSpot(block, spot));
+	}
+
+	function blockIsConflict(spot: PianoNoteSpot): boolean {
+		return notes.blocks.some((block) => block.conflict === true && sameNoteSpot(block, spot));
+	}
+
+	function openSession(): PianoPatternSession | null {
+		if (!converter || !selected) return null;
+		return new PianoPatternSession(
+			converter,
+			(id) => patternById.get(id),
+			selected.channelIndex
+		);
+	}
+
+	function editSession(): PianoPatternSession | null {
+		return playbackStore.isPlaying ? null : openSession();
+	}
+
+	function commitSession(session: PianoPatternSession, cursor: PianoEditCursor): boolean {
+		const edits = session.edits();
+		if (edits.size === 0 || !selected) return false;
+		commitPianoPatternEdits(selected.songIndex, edits, cursor);
+		return true;
+	}
+
+	function editingContext(source: Pattern, row: number): EditingContext | null {
 		if (!chip || !converter) return null;
 		return {
 			pattern: source,
@@ -1189,108 +1078,82 @@
 			formatter: chip.createFormatter(),
 			schema: chip.schema,
 			instruments: filterInstrumentsForChip(projectStore.instruments, chip.type),
-			tuningTable: projectStore.songs[selected?.songIndex ?? 0]?.tuningTable ?? []
+			tuningTable
 		};
 	}
 
-	function channelRowsFor(
-		generics: Map<number, { before: Pattern; generic: GenericPattern }>
-	): (span: PianoTimelineSpan) => GenericRow[] | undefined {
-		return (span) => {
-			if (!converter || !selected) return undefined;
-			let entry = generics.get(span.patternId);
-			if (!entry) {
-				const item = patternById.get(span.patternId);
-				if (!item) return undefined;
-				entry = { before: item, generic: converter.toGeneric(item) };
-				generics.set(item.id, entry);
-			}
-			return entry.generic.channels[selected.channelIndex]?.rows;
-		};
+	function withAutoEnvelope(source: Pattern, row: number): Pattern {
+		if (!selected || !noteKey) return source;
+		return AutoEnvService.applyAutoEnvelopeIfEligible(
+			source,
+			row,
+			{ channelIndex: selected.channelIndex, fieldType: 'note', fieldKey: noteKey },
+			tuningTable,
+			autoEnvStore.currentRatio,
+			autoEnvStore.enabled
+		);
+	}
+
+	function noteEventAt(absoluteRow: number) {
+		const located = timelineSpanAt(timeline, absoluteRow);
+		if (!located || !noteKey) return 'empty';
+		return noteEventKind(channelRows(located.span.patternId)?.[located.localRow]?.[noteKey]);
 	}
 
 	function releaseAt(absoluteRow: number): boolean {
-		if (!noteKey || !selected) return false;
-		const located = timelineSpanAt(timeline, absoluteRow);
-		if (!located) return false;
-		const item = patternById.get(located.span.patternId);
-		if (!item) return false;
-		const value =
-			cachedGeneric(item).channels[selected.channelIndex]?.rows[located.localRow]?.[noteKey];
-		return noteEventKind(value) === 'release';
+		return noteEventAt(absoluteRow) === 'release';
 	}
 
 	function sealTail(
-		generics: Map<number, { before: Pattern; generic: GenericPattern }>,
+		session: PianoPatternSession,
 		absoluteStart: number,
 		length: number | null,
 		release: boolean
-	): Set<number> {
+	): boolean {
 		const located = timelineSpanAt(timeline, absoluteStart);
-		if (!noteKey || length === null || length < 1 || !located) return new Set();
-		if (absoluteStart + length < located.span.startRow + located.span.length) return new Set();
-		return writeSpilledNoteTail(
+		if (!noteKey || length === null || length < 1 || !located) return false;
+		if (absoluteStart + length < spanEnd(located.span)) return false;
+		const changed = writeSpilledNoteTail(
 			timeline,
 			noteKey,
 			absoluteStart,
 			length,
 			release,
-			channelRowsFor(generics)
+			session.rowsForSpan
 		);
+		session.markAll(changed);
+		return changed.size > 0;
 	}
 
 	function clearOpenTail(
-		generics: Map<number, { before: Pattern; generic: GenericPattern }>,
+		session: PianoPatternSession,
 		span: PianoTimelineSpan,
 		localStart: number
-	): Set<number> {
-		if (!noteKey || !selected) return new Set();
-		const rows = generics.get(span.patternId)?.generic.channels[selected.channelIndex]?.rows;
+	): void {
+		if (!noteKey) return;
+		const rows = session.rows(span.patternId);
 		const block = rows ? pitchedBlockSpan(rows, noteKey, localStart) : null;
-		if (!block || block.bounded) return new Set();
-		return clearSpilledNoteGate(
-			timeline,
-			noteKey,
-			span.startRow + span.length,
-			channelRowsFor(generics)
+		if (!block || block.bounded) return;
+		session.markAll(
+			clearSpilledNoteGate(timeline, noteKey, spanEnd(span), session.rowsForSpan)
 		);
 	}
 
-	function channelIntents(): IntentNote[] {
-		if (!selected || !noteKey) return [];
-		const blocks: PianoTimelineBlock[] = [];
-		const seen = new Map<number, GenericPattern>();
-		for (const span of timeline) {
-			const item = patternById.get(span.patternId);
-			if (!item) continue;
-			let generic = seen.get(item.id);
-			if (!generic) {
-				generic = cachedGeneric(item);
-				seen.set(item.id, generic);
-			}
-			blocks.push(
-				...shiftPianoNotes(
-					collectPianoNotes(generic.channels[selected.channelIndex]?.rows ?? [], noteKey),
-					span
-				).blocks
-			);
-		}
-		continueOpenNoteBlocks(blocks, timeline, noteKey, (later) => {
-			const laterItem = patternById.get(later.patternId);
-			if (!laterItem) return undefined;
-			let laterGeneric = seen.get(laterItem.id);
-			if (!laterGeneric) {
-				laterGeneric = cachedGeneric(laterItem);
-				seen.set(laterItem.id, laterGeneric);
-			}
-			return laterGeneric.channels[selected.channelIndex]?.rows;
+	function channelIntents(): PianoIntentNote[] {
+		const key = noteKey;
+		if (!selected || !key) return [];
+		const { blocks } = collectTimelineBlocks({
+			timeline,
+			noteKey: key,
+			rowsForSpan: (span) => channelRows(span.patternId),
+			collect: (rows) => collectPianoNotes(rows, key)
 		});
 		const columns = timelineColumnCount(timeline);
 		return blocks.map((block) => {
 			const bounded = block.endRow < columns;
 			return {
 				startRow: block.startRow,
-				length: Math.max(1, block.endRow - block.startRow),
+				length: blockLength(block),
 				pitchIndex: block.pitchIndex,
 				note: block.note,
 				instrument: block.instrument,
@@ -1301,51 +1164,28 @@
 		});
 	}
 
-	function heldIntents(): IntentNote[] {
+	function heldIntents(): PianoIntentNote[] {
 		if (!selected) return [];
-		return pianoRollConflictStore
-			.forChannel(selected.songIndex, selected.channelIndex)
-			.map((note) => ({
-				startRow: note.startRow,
-				length: note.length,
-				pitchIndex: note.pitchIndex,
-				note: note.note,
-				instrument: note.instrument,
-				release: note.release,
-				bounded: true,
-				preferred: false
-			}));
+		return heldConflictIntents(
+			pianoRollConflictStore.forChannel(selected.songIndex, selected.channelIndex)
+		);
 	}
 
-	function allIntents(): IntentNote[] {
+	function allIntents(): PianoIntentNote[] {
 		return [...channelIntents(), ...heldIntents()];
 	}
 
-	function hitsOther(
-		start: number,
-		length: number,
-		ignoreStart: number | null,
-		ignorePitch: number | null
-	): boolean {
-		return allIntents().some((note) => {
-			if (note.startRow === ignoreStart && note.pitchIndex === ignorePitch) return false;
-			return rangesOverlap(start, length, note.startRow, note.length);
-		});
-	}
-
-	function blockIsConflict(note: { startRow: number; pitchIndex: number }): boolean {
-		return notes.blocks.some(
-			(block) =>
-				block.conflict === true &&
-				block.startRow === note.startRow &&
-				block.pitchIndex === note.pitchIndex
+	function hitsOther(start: number, length: number, ignore: PianoNoteSpot | null): boolean {
+		return allIntents().some(
+			(note) =>
+				!(ignore && sameNoteSpot(note, ignore)) &&
+				rangesOverlap(start, length, note.startRow, note.length)
 		);
 	}
 
 	function placedInstrument(): number | null {
-		if (!chip || !settingsStore.autoEnterInstrument) return null;
-		const field = chip.schema.fields.instrument;
-		if (!field) return null;
+		const field = instrumentKey ? chip?.schema.fields[instrumentKey] : undefined;
+		if (!chip || !field || !settingsStore.autoEnterInstrument) return null;
 		const id = editorStateStore.getCurrentInstrument(chip.schema.chipType);
 		if (!id) return null;
 		const value = parseSymbol(id, field.length);
@@ -1357,236 +1197,138 @@
 		return Math.max(1, span.length - localRow);
 	}
 
-	function noteText(pitchIndex: number): string | null {
-		const parsed = tuningTableIndexToNote(pitchIndex);
-		if (!parsed) return null;
-		return formatNoteFromEnum(parsed.noteName, parsed.octave);
-	}
-
-	function heldSignature(notes: readonly PianoConflictNote[]): string {
-		return notes
-			.map(
-				(note) =>
-					`${note.songIndex}:${note.channelIndex}:${note.startRow}:${note.length}:${note.pitchIndex}:${note.note}:${note.instrument ?? ''}:${note.release ? 1 : 0}`
-			)
-			.sort()
-			.join('|');
+	function writeIntentGate(session: PianoPatternSession, note: PianoIntentNote): void {
+		const located = timelineSpanAt(timeline, note.startRow);
+		const generic = located ? session.generic(located.span.patternId) : null;
+		const rows = generic?.channels[session.channelIndex]?.rows;
+		if (!noteKey || !located || !generic || !rows) return;
+		const patternId = located.span.patternId;
+		const { localRow } = located;
+		const resize = (end: number) =>
+			session.mark(
+				patternId,
+				resizePitchedNote(generic, session.channelIndex, noteKey, localRow, end)
+			);
+		if (!note.bounded) {
+			resize(rows.length);
+			return;
+		}
+		const end = localRow + note.length;
+		if (end >= rows.length) {
+			resize(rows.length);
+			sealTail(session, note.startRow, note.length, note.release);
+			return;
+		}
+		resize(end);
+		const gate = rows[end];
+		if (note.release && gate && gate[noteKey] !== RELEASE_NOTE) {
+			gate[noteKey] = RELEASE_NOTE;
+			session.mark(patternId);
+		}
 	}
 
 	function commitIntents(
-		intents: IntentNote[],
-		freshStart: number | null,
-		freshPitch: number | null,
-		orderIndex: number,
-		row: number
-	): { changed: boolean; preview: Pattern | null; previewRow: number } {
-		const unchanged = { changed: false, preview: null, previewRow: row };
-		if (
-			playbackStore.isPlaying ||
-			undoRedoStore.isApplying ||
-			!selected ||
-			!converter ||
-			!noteKey ||
-			!chip
-		) {
+		intents: PianoIntentNote[],
+		fresh: PianoNoteSpot | null,
+		cursor: PianoEditCursor
+	): IntentResult {
+		const unchanged: IntentResult = { changed: false, preview: null, previewRow: cursor.row };
+		if (playbackStore.isPlaying || undoRedoStore.isApplying || !selected || !noteKey) {
 			return unchanged;
 		}
-		const songIndex = selected.songIndex;
-		const channelIndex = selected.channelIndex;
-		const silent = silencedIndexes(intents);
-		const audible = intents.filter((_, index) => !silent.has(index));
-		const current = channelIntents();
-		const samePlace = (left: IntentNote, right: IntentNote) =>
-			left.startRow === right.startRow && left.pitchIndex === right.pitchIndex;
-		const sameShape = (left: IntentNote, right: IntentNote) =>
-			samePlace(left, right) &&
-			left.length === right.length &&
-			left.bounded === right.bounded &&
-			left.release === right.release &&
-			left.note === right.note;
-		const remove = current.filter((note) => !audible.some((item) => samePlace(item, note)));
-		const add = audible.filter((note) => !current.some((item) => samePlace(item, note)));
-		const reshape = audible.filter((note) => {
-			const existing = current.find((item) => samePlace(item, note));
-			return !!existing && !sameShape(existing, note);
-		});
+		const session = openSession();
+		if (!session) return unchanged;
+		const { songIndex, channelIndex } = selected;
+		const key = noteKey;
+		const plan = planPianoIntents(intents, channelIntents());
 		const beforeHeld = pianoRollConflictStore.snapshot();
-		const held = intents.flatMap((note, index) =>
-			silent.has(index)
-				? [
-						{
-							songIndex,
-							channelIndex,
-							startRow: note.startRow,
-							length: note.length,
-							pitchIndex: note.pitchIndex,
-							note: note.note,
-							instrument: note.instrument,
-							release: note.release
-						}
-					]
-				: []
-		);
-		const afterHeld = beforeHeld
-			.filter((note) => note.songIndex !== songIndex || note.channelIndex !== channelIndex)
-			.concat(held);
+		const afterHeld = replaceChannelConflicts(beforeHeld, songIndex, channelIndex, plan.silent);
 		if (
-			remove.length === 0 &&
-			add.length === 0 &&
-			reshape.length === 0 &&
-			heldSignature(beforeHeld) === heldSignature(afterHeld)
+			plan.remove.length === 0 &&
+			plan.add.length === 0 &&
+			plan.reshape.length === 0 &&
+			conflictNotesSignature(beforeHeld) === conflictNotesSignature(afterHeld)
 		) {
 			return unchanged;
 		}
-		const patternConverter = converter;
-		const generics = new Map<number, { before: Pattern; generic: GenericPattern }>();
-		const dirty = new Set<number>();
-		const ensure = (patternId: number) => {
-			const existing = generics.get(patternId);
-			if (existing) return existing;
-			const item = patternById.get(patternId);
-			if (!item) return null;
-			const entry = { before: item, generic: patternConverter.toGeneric(item) };
-			generics.set(item.id, entry);
-			return entry;
-		};
-		const writeGate = (note: IntentNote) => {
+		const target = (note: PianoIntentNote) => {
 			const located = timelineSpanAt(timeline, note.startRow);
-			if (!located) return;
-			const entry = ensure(located.span.patternId);
-			const rows = entry?.generic.channels[channelIndex]?.rows;
-			if (!entry || !rows) return;
-			if (!note.bounded) {
-				if (
-					resizePitchedNote(entry.generic, channelIndex, noteKey, located.localRow, rows.length)
-				) {
-					dirty.add(located.span.patternId);
-				}
-				return;
-			}
-			if (located.localRow + note.length < rows.length) {
-				if (
-					resizePitchedNote(
-						entry.generic,
-						channelIndex,
-						noteKey,
-						located.localRow,
-						located.localRow + note.length
-					)
-				) {
-					dirty.add(located.span.patternId);
-				}
-				const gate = rows[located.localRow + note.length];
-				if (note.release && gate && gate[noteKey] !== '===') {
-					gate[noteKey] = '===';
-					dirty.add(located.span.patternId);
-				}
-				return;
-			}
-			resizePitchedNote(entry.generic, channelIndex, noteKey, located.localRow, rows.length);
-			for (const id of sealTail(generics, note.startRow, note.length, note.release)) dirty.add(id);
+			const generic = located ? session.generic(located.span.patternId) : null;
+			return located && generic ? { ...located, generic } : null;
 		};
-		for (const note of [...remove].sort((left, right) => right.startRow - left.startRow)) {
-			const located = timelineSpanAt(timeline, note.startRow);
-			if (!located) continue;
-			const entry = ensure(located.span.patternId);
-			if (!entry) continue;
-			for (const id of clearOpenTail(generics, located.span, located.localRow)) dirty.add(id);
-			if (removePitchedNote(entry.generic, channelIndex, noteKey, located.localRow)) {
-				dirty.add(located.span.patternId);
-			}
+		for (const note of [...plan.remove].sort((left, right) => right.startRow - left.startRow)) {
+			const place = target(note);
+			if (!place) continue;
+			clearOpenTail(session, place.span, place.localRow);
+			session.mark(
+				place.span.patternId,
+				removePitchedNote(place.generic, channelIndex, key, place.localRow)
+			);
 		}
-		for (const note of reshape) {
-			const located = timelineSpanAt(timeline, note.startRow);
-			if (!located) continue;
-			ensure(located.span.patternId);
-			for (const id of clearOpenTail(generics, located.span, located.localRow)) dirty.add(id);
+		for (const note of plan.reshape) {
+			const place = target(note);
+			if (!place) continue;
+			clearOpenTail(session, place.span, place.localRow);
 			if (note.note) {
-				const entry = generics.get(located.span.patternId);
-				if (
-					entry &&
-					setNoteValue(entry.generic, channelIndex, located.localRow, noteKey, note.note)
-				) {
-					dirty.add(located.span.patternId);
-				}
-			}
-			writeGate(note);
-		}
-		const instrumentKey = chip.schema.fields.instrument ? 'instrument' : null;
-		for (const note of add) {
-			const located = timelineSpanAt(timeline, note.startRow);
-			if (!located) continue;
-			const entry = ensure(located.span.patternId);
-			const cell = entry?.generic.channels[channelIndex]?.rows[located.localRow];
-			if (!entry || !cell) continue;
-			if (setNoteValue(entry.generic, channelIndex, located.localRow, noteKey, note.note)) {
-				dirty.add(located.span.patternId);
-			}
-			if (instrumentKey && note.instrument && note.instrument > 0 && cell[instrumentKey] !== note.instrument) {
-				cell[instrumentKey] = note.instrument;
-				dirty.add(located.span.patternId);
-			}
-			writeGate(note);
-		}
-		const edits = new Map<number, { before: Pattern; after: Pattern }>();
-		let preview: Pattern | null = null;
-		let previewRow = row;
-		const fresh = audible.find(
-			(note) => note.startRow === freshStart && note.pitchIndex === freshPitch
-		);
-		const freshLocated = fresh ? timelineSpanAt(timeline, fresh.startRow) : null;
-		for (const id of dirty) {
-			const entry = generics.get(id);
-			if (!entry) continue;
-			let after = patternConverter.fromGeneric(entry.generic);
-			if (fresh && freshLocated && freshLocated.span.patternId === id) {
-				after = AutoEnvService.applyAutoEnvelopeIfEligible(
-					after,
-					freshLocated.localRow,
-					{
-						channelIndex,
-						fieldType: 'note',
-						fieldKey: noteKey
-					},
-					projectStore.songs[songIndex]?.tuningTable ?? [],
-					autoEnvStore.currentRatio,
-					autoEnvStore.enabled
+				session.mark(
+					place.span.patternId,
+					setNoteValue(place.generic, channelIndex, place.localRow, key, note.note)
 				);
-				preview = after;
-				previewRow = freshLocated.localRow;
 			}
-			edits.set(id, { before: entry.before, after });
+			writeIntentGate(session, note);
 		}
-		let patterns = projectStore.patterns[songIndex] ?? [];
-		for (const { before, after } of edits.values()) {
-			patterns = PatternService.updatePatternInArray(patterns, after);
-		}
-		if (edits.size > 0) projectStore.updatePatterns(songIndex, patterns);
-		pianoRollConflictStore.replaceAll(afterHeld);
-		const patternEdits = [...edits.values()];
-		const cursor = { row, column: 0, patternOrderIndex: orderIndex };
-		undoRedoStore.pushAction({
-			execute() {
-				let next = projectStore.patterns[songIndex] ?? [];
-				for (const edit of patternEdits) {
-					next = PatternService.updatePatternInArray(next, edit.after);
-				}
-				if (patternEdits.length > 0) projectStore.updatePatterns(songIndex, next);
-				pianoRollConflictStore.replaceAll(afterHeld);
-			},
-			undo() {
-				let next = projectStore.patterns[songIndex] ?? [];
-				for (const edit of patternEdits) {
-					next = PatternService.updatePatternInArray(next, edit.before);
-				}
-				if (patternEdits.length > 0) projectStore.updatePatterns(songIndex, next);
-				pianoRollConflictStore.replaceAll(beforeHeld);
-			},
-			getCursorPosition() {
-				return cursor;
+		for (const note of plan.add) {
+			const place = target(note);
+			const cell = place?.generic.channels[channelIndex]?.rows[place.localRow];
+			if (!place || !cell) continue;
+			session.mark(
+				place.span.patternId,
+				setNoteValue(place.generic, channelIndex, place.localRow, key, note.note)
+			);
+			if (
+				instrumentKey &&
+				note.instrument &&
+				note.instrument > 0 &&
+				cell[instrumentKey] !== note.instrument
+			) {
+				cell[instrumentKey] = note.instrument;
+				session.mark(place.span.patternId);
 			}
-		});
-		return { changed: true, preview, previewRow };
+			writeIntentGate(session, note);
+		}
+		const freshNote = fresh
+			? plan.audible.find((note) => sameNoteSpot(note, fresh))
+			: undefined;
+		const freshAt = freshNote ? timelineSpanAt(timeline, freshNote.startRow) : null;
+		if (freshAt) {
+			session.finish(freshAt.span.patternId, (after) =>
+				withAutoEnvelope(after, freshAt.localRow)
+			);
+		}
+		const edits = session.edits();
+		commitPianoConflictEdits(
+			songIndex,
+			edits,
+			{ before: beforeHeld, after: afterHeld },
+			cursor
+		);
+		const preview = freshAt ? (edits.get(freshAt.span.patternId)?.after ?? null) : null;
+		return {
+			changed: true,
+			preview,
+			previewRow: preview && freshAt ? freshAt.localRow : cursor.row
+		};
+	}
+
+	function landIntents(
+		result: IntentResult,
+		selection: NoteSelection[],
+		focus: PianoTimelineLocation | null,
+		scrollIntoView: boolean,
+		timedPreview: boolean
+	): void {
+		land(selection, focus, scrollIntoView);
+		if (result.preview) playPreview(result.preview, result.previewRow, timedPreview);
 	}
 
 	function placePitched(
@@ -1597,14 +1339,14 @@
 		timedPreview: boolean
 	): boolean {
 		const source = patternById.get(span.patternId);
-		if (playbackStore.isPlaying || !source || !selected || !noteKey || !chip) return false;
-		const parsed = tuningTableIndexToNote(pitchIndex);
-		if (!parsed) return false;
+		const text = pitchNoteText(pitchIndex);
+		if (playbackStore.isPlaying || !source || !selected || !noteKey || !text) return false;
 		const length = placementLength(span, localRow);
 		const start = span.startRow + localRow;
-		if (hitsOther(start, length, null, null)) {
-			const text = formatNoteFromEnum(parsed.noteName, parsed.octave);
-			const fresh: IntentNote = {
+		const placed = selectionFor(span, localRow, pitchIndex);
+		const cursor = { orderIndex: span.orderIndex, row: localRow };
+		if (hitsOther(start, length, null)) {
+			const fresh: PianoIntentNote = {
 				startRow: start,
 				length,
 				pitchIndex,
@@ -1614,33 +1356,16 @@
 				bounded: true,
 				preferred: false
 			};
-			const result = commitIntents(
-				[...channelIntents(), ...heldIntents(), fresh],
-				start,
-				pitchIndex,
-				span.orderIndex,
-				localRow
-			);
+			const result = commitIntents([...allIntents(), fresh], placed, cursor);
 			if (!result.changed) return false;
 			placedBlockLength = length;
-			applySelection([selectionFor(span, localRow, pitchIndex)]);
-			focusLocation(span, localRow);
-			if (result.preview) {
-				playPreview(
-					result.preview,
-					selected.songIndex,
-					selected.channelIndex,
-					result.previewRow,
-					timedPreview
-				);
-			}
-			if (advance && editorStateStore.step > 0) {
-				moveCursorTo(span.startRow + localRow + editorStateStore.step);
-			}
+			landIntents(result, [placed], { span, localRow }, true, timedPreview);
+			advanceCursor(advance, start);
 			return true;
 		}
-		const context = editingContext(source, localRow, selected.channelIndex);
-		if (!context) return false;
+		const context = editingContext(source, localRow);
+		const session = openSession();
+		if (!context || !session || !converter) return false;
 		const fieldInfo: FieldInfo = {
 			fieldKey: noteKey,
 			fieldType: 'note',
@@ -1648,128 +1373,82 @@
 			channelIndex: selected.channelIndex,
 			charOffset: 0
 		};
-		const result = PatternNoteInput.applyNoteString(
-			context,
-			fieldInfo,
-			formatNoteFromEnum(parsed.noteName, parsed.octave)
-		);
-		applySelection([selectionFor(span, localRow, pitchIndex)]);
-		focusLocation(span, localRow);
+		const result = PatternNoteInput.applyNoteString(context, fieldInfo, text);
+		land([placed], { span, localRow });
 		if (!result || result.didChange === false) return false;
-		let updated = AutoEnvService.applyAutoEnvelopeIfEligible(
-			result.updatedPattern,
-			localRow,
-			fieldInfo,
-			context.tuningTable ?? [],
-			autoEnvStore.currentRatio,
-			autoEnvStore.enabled
-		);
-		const edits = new Map<number, { before: Pattern; after: Pattern }>();
-		if (converter) {
-			const generic = converter.toGeneric(updated);
-			const generics = new Map([[source.id, { before: source, generic }]]);
-			const rows = generic.channels[selected.channelIndex]?.rows;
-			const touched = new Set<number>();
-			if (rows && placedBlockLength !== null) {
-				if (localRow + placedBlockLength < rows.length) {
-					if (
-						resizePitchedNote(
-							generic,
-							selected.channelIndex,
-							noteKey,
-							localRow,
-							localRow + placedBlockLength
-						)
-					) {
-						touched.add(source.id);
-					}
-				} else {
-					for (const id of sealTail(generics, span.startRow + localRow, placedBlockLength, false)) {
-						touched.add(id);
-					}
-				}
-			}
-			const blockSpan = rows ? pitchedBlockSpan(rows, noteKey, localRow) : null;
-			if (placedBlockLength === null && blockSpan?.bounded) placedBlockLength = blockSpan.length;
-			if (touched.has(source.id)) updated = converter.fromGeneric(generic);
-			for (const id of touched) {
-				if (id === source.id) continue;
-				const entry = generics.get(id);
-				if (!entry) continue;
-				edits.set(id, { before: entry.before, after: converter.fromGeneric(entry.generic) });
+		const updated = withAutoEnvelope(result.updatedPattern, localRow);
+		const generic = session.adopt(source, converter.toGeneric(updated));
+		const rows = generic.channels[selected.channelIndex]?.rows;
+		if (rows && placedBlockLength !== null) {
+			if (localRow + placedBlockLength < rows.length) {
+				session.mark(
+					source.id,
+					resizePitchedNote(
+						generic,
+						selected.channelIndex,
+						noteKey,
+						localRow,
+						localRow + placedBlockLength
+					)
+				);
+			} else {
+				sealTail(session, start, placedBlockLength, false);
 			}
 		}
-		edits.set(source.id, { before: source, after: updated });
-		commitEdits(selected.songIndex, edits, span.orderIndex, localRow);
-		playPreview(updated, selected.songIndex, selected.channelIndex, localRow, timedPreview);
-		if (advance && editorStateStore.step > 0) moveCursorTo(span.startRow + localRow + editorStateStore.step);
+		const blockSpan = rows ? pitchedBlockSpan(rows, noteKey, localRow) : null;
+		if (placedBlockLength === null && blockSpan?.bounded) placedBlockLength = blockSpan.length;
+		const edits = session.edits();
+		const after = edits.get(source.id)?.after ?? updated;
+		edits.set(source.id, { before: source, after });
+		commitPianoPatternEdits(selected.songIndex, edits, cursor);
+		playPreview(after, localRow, timedPreview);
+		advanceCursor(advance, start);
 		return true;
 	}
 
 	function placeGate(span: PianoTimelineSpan, localRow: number, kind: 'off' | 'release'): void {
-		const source = patternById.get(span.patternId);
-		if (playbackStore.isPlaying || !source || !converter || !selected || !noteKey) return;
-		const genericPattern = converter.toGeneric(source);
-		if (
-			!setNoteValue(
-				genericPattern,
-				selected.channelIndex,
-				localRow,
-				noteKey,
-				kind === 'off' ? 'OFF' : '==='
-			)
-		) {
-			return;
-		}
-		commitEdits(
-			selected.songIndex,
-			new Map([[source.id, { before: source, after: converter.fromGeneric(genericPattern) }]]),
-			span.orderIndex,
-			localRow
+		const session = editSession();
+		const generic = session?.generic(span.patternId);
+		if (!session || !generic || !noteKey) return;
+		const gate = gateNote(kind === 'release');
+		session.mark(
+			span.patternId,
+			setNoteValue(generic, session.channelIndex, localRow, noteKey, gate)
 		);
+		if (!commitSession(session, { orderIndex: span.orderIndex, row: localRow })) return;
 		focusLocation(span, localRow);
 		applySelection([]);
 	}
 
 	function clearNote(span: PianoTimelineSpan, localRow: number): void {
-		const source = patternById.get(span.patternId);
-		if (playbackStore.isPlaying || !source || !converter || !selected || !noteKey) return;
-		const genericPattern = converter.toGeneric(source);
-		const generics = new Map([[source.id, { before: source, generic: genericPattern }]]);
-		const kind = noteEventKind(
-			genericPattern.channels[selected.channelIndex]?.rows[localRow]?.[noteKey]
-		);
+		const session = editSession();
+		const generic = session?.generic(span.patternId);
+		if (!session || !generic || !noteKey) return;
+		const value = generic.channels[session.channelIndex]?.rows[localRow]?.[noteKey];
+		const kind = noteEventKind(value);
+		const cursor = { orderIndex: span.orderIndex, row: localRow };
 		if (kind === 'pitched' && heldIntents().length > 0) {
-			const start = span.startRow + localRow;
-			const raw = genericPattern.channels[selected.channelIndex]?.rows[localRow]?.[noteKey];
-			const parsed = typeof raw === 'string' ? parseNoteFromString(raw) : null;
-			const pitch = parsed ? noteToTuningTableIndex(parsed.noteName, parsed.octave) : null;
-			if (pitch !== null) {
-				const next = allIntents().filter(
-					(note) => !(note.startRow === start && note.pitchIndex === pitch)
-				);
-				commitIntents(next, null, null, span.orderIndex, localRow);
+			const pitchIndex = notePitchIndex(value);
+			if (pitchIndex !== null) {
+				const spot = { startRow: span.startRow + localRow, pitchIndex };
+				commitIntents(withoutSpots(allIntents(), [spot]), null, cursor);
 				dropSelectionAt(span.orderIndex, localRow);
 				return;
 			}
 		}
-		const tail = kind === 'pitched' ? clearOpenTail(generics, span, localRow) : new Set<number>();
-		const cleared =
-			kind === 'pitched'
-				? removePitchedNote(genericPattern, selected.channelIndex, noteKey, localRow)
-				: setNoteValue(genericPattern, selected.channelIndex, localRow, noteKey, '---');
-		if (!cleared && tail.size === 0) return;
-		const edits = new Map<number, { before: Pattern; after: Pattern }>([
-			[source.id, { before: source, after: converter.fromGeneric(genericPattern) }]
-		]);
-		for (const id of tail) {
-			if (id === source.id) continue;
-			const entry = generics.get(id);
-			if (!entry) continue;
-			edits.set(id, { before: entry.before, after: converter.fromGeneric(entry.generic) });
+		if (kind === 'pitched') {
+			clearOpenTail(session, span, localRow);
+			session.mark(
+				span.patternId,
+				removePitchedNote(generic, session.channelIndex, noteKey, localRow)
+			);
+		} else {
+			session.mark(
+				span.patternId,
+				setNoteValue(generic, session.channelIndex, localRow, noteKey, EMPTY_NOTE)
+			);
 		}
-		commitEdits(selected.songIndex, edits, span.orderIndex, localRow);
-		dropSelectionAt(span.orderIndex, localRow);
+		if (commitSession(session, cursor)) dropSelectionAt(span.orderIndex, localRow);
 	}
 
 	function moveGroupThroughOverlaps(
@@ -1779,16 +1458,13 @@
 		anchor: NoteSelection,
 		scrollIntoView: boolean
 	): boolean {
-		const keys = new Set(group.map((item) => selectionKey(item)));
 		const all = allIntents();
-		const staying = all.filter((note) => !keys.has(`${note.startRow}:${note.pitchIndex}`));
-		const moved: IntentNote[] = [];
+		const staying = withoutSpots(all, group);
+		const moved: PianoIntentNote[] = [];
 		for (const item of group) {
 			const pitchIndex = item.pitchIndex + deltaPitch;
-			const text = noteText(pitchIndex);
-			const source = all.find(
-				(note) => note.startRow === item.startRow && note.pitchIndex === item.pitchIndex
-			);
+			const text = pitchNoteText(pitchIndex);
+			const source = all.find((note) => sameNoteSpot(note, item));
 			if (!text || !source) return false;
 			moved.push({
 				...source,
@@ -1798,46 +1474,18 @@
 				preferred: false
 			});
 		}
-		const overlaps = moved.some(
-			(note) =>
-				staying.some((other) =>
-					rangesOverlap(note.startRow, note.length, other.startRow, other.length)
-				) ||
-				moved.some(
-					(other) =>
-						other !== note &&
-						rangesOverlap(note.startRow, note.length, other.startRow, other.length)
-				)
-		);
-		if (!overlaps && !group.some((item) => blockIsConflict(item))) return false;
-		const focusStart = anchor.startRow + deltaRow;
-		const focusPitch = anchor.pitchIndex + deltaPitch;
-		const located = timelineSpanAt(timeline, focusStart);
-		const result = commitIntents(
-			[...staying, ...moved],
-			focusStart,
-			focusPitch,
-			located?.span.orderIndex ?? anchor.orderIndex,
-			located?.localRow ?? 0
-		);
-		if (!result.changed) return true;
-		const placed: NoteSelection[] = [];
-		for (const item of moved) {
-			const home = timelineSpanAt(timeline, item.startRow);
-			if (!home) continue;
-			placed.push(selectionFor(home.span, home.localRow, item.pitchIndex));
-		}
-		applySelection(placed);
-		if (located) focusLocation(located.span, located.localRow, scrollIntoView);
-		if (result.preview && selected) {
-			playPreview(
-				result.preview,
-				selected.songIndex,
-				selected.channelIndex,
-				result.previewRow,
-				true
-			);
-		}
+		if (!overlapsAny(moved, staying) && !group.some((item) => blockIsConflict(item)))
+			return false;
+		const focusSpot = {
+			startRow: anchor.startRow + deltaRow,
+			pitchIndex: anchor.pitchIndex + deltaPitch
+		};
+		const focus = timelineSpanAt(timeline, focusSpot.startRow);
+		const result = commitIntents([...staying, ...moved], focusSpot, {
+			orderIndex: focus?.span.orderIndex ?? anchor.orderIndex,
+			row: focus?.localRow ?? 0
+		});
+		if (result.changed) landIntents(result, selectionsAt(moved), focus, scrollIntoView, true);
 		return true;
 	}
 
@@ -1850,153 +1498,114 @@
 	): void {
 		if (
 			playbackStore.isPlaying ||
-			!converter ||
 			!selected ||
 			!noteKey ||
-			!chip ||
 			(deltaRow === 0 && deltaPitch === 0)
 		) {
 			return;
 		}
-		const overlapMove = moveGroupThroughOverlaps(group, deltaRow, deltaPitch, anchor, scrollIntoView);
-		if (overlapMove) return;
-		const patternConverter = converter;
-		const channelIndex = selected.channelIndex;
-		const instrumentKey = chip.schema.fields.instrument ? 'instrument' : null;
-		const generics = new Map<number, { before: Pattern; generic: GenericPattern }>();
-		const ensure = (patternId: number) => {
-			const existing = generics.get(patternId);
-			if (existing) return existing;
-			const item = patternById.get(patternId);
-			if (!item) return null;
-			const entry = { before: item, generic: patternConverter.toGeneric(item) };
-			generics.set(item.id, entry);
-			return entry;
-		};
+		if (moveGroupThroughOverlaps(group, deltaRow, deltaPitch, anchor, scrollIntoView)) return;
+		const session = openSession();
+		if (!session) return;
+		const key = noteKey;
+		const channelIndex = session.channelIndex;
+		const columns = timelineColumnCount(timeline);
 		const moved: Array<{
-			patternId: number;
-			orderIndex: number;
-			localRow: number;
+			source: MoveGroupNote;
+			target: PianoTimelineLocation;
 			pitchIndex: number;
-			sourcePatternId: number;
-			sourceLocalRow: number;
 			note: PianoPasteNote;
 		}> = [];
 		for (const item of group) {
-			const source = ensure(item.patternId);
-			const rows = source?.generic.channels[channelIndex]?.rows;
-			if (!source || !rows) continue;
-			const captured = capturePianoNote(rows, noteKey, item.localStartRow, item.startRow);
-			if (!captured) continue;
+			const rows = session.rows(item.patternId);
+			const captured = rows
+				? capturePianoNote(rows, key, item.localStartRow, item.startRow)
+				: null;
 			const pitchIndex = item.pitchIndex + deltaPitch;
-			const parsed = tuningTableIndexToNote(pitchIndex);
-			if (!parsed) continue;
-			const located = timelineSpanAt(timeline, item.startRow + deltaRow);
-			if (!located) continue;
-			ensure(located.span.patternId);
-			const fields: Record<string, unknown> = {};
+			const text = pitchNoteText(pitchIndex);
+			const target = timelineSpanAt(timeline, item.startRow + deltaRow);
+			if (!captured || !text || !target) continue;
+			session.generic(target.span.patternId);
 			const instrument = instrumentKey ? captured.fields[instrumentKey] : undefined;
-			if (instrumentKey && typeof instrument === 'number' && instrument > 0) fields[instrumentKey] = instrument;
 			const length = Math.max(1, item.length);
-			const bounded = item.startRow + length < timelineColumnCount(timeline);
+			const bounded = item.startRow + length < columns;
 			moved.push({
-				patternId: located.span.patternId,
-				orderIndex: located.span.orderIndex,
-				localRow: located.localRow,
+				source: item,
+				target,
 				pitchIndex,
-				sourcePatternId: item.patternId,
-				sourceLocalRow: item.localStartRow,
 				note: {
 					rowOffset: captured.rowOffset,
-					note: formatNoteFromEnum(parsed.noteName, parsed.octave),
+					note: text,
 					length,
 					bounded,
 					release: bounded && releaseAt(item.startRow + length),
-					fields,
-					localRow: located.localRow
+					fields:
+						instrumentKey && typeof instrument === 'number' && instrument > 0
+							? { [instrumentKey]: instrument }
+							: {},
+					localRow: target.localRow
 				}
 			});
 		}
 		if (moved.length === 0) return;
-		const clearedTails = new Set<number>();
 		for (const item of group) {
-			const span = spanForOrder(item.orderIndex);
-			if (!span || !ensure(item.patternId)) continue;
-			for (const id of clearOpenTail(generics, span, item.localStartRow)) clearedTails.add(id);
+			const span = timelineSpanForOrder(timeline, item.orderIndex);
+			if (span && session.generic(item.patternId))
+				clearOpenTail(session, span, item.localStartRow);
 		}
-		const removals = new Map<number, number[]>();
-		for (const item of moved) {
-			const rows = removals.get(item.sourcePatternId) ?? [];
-			rows.push(item.sourceLocalRow);
-			removals.set(item.sourcePatternId, rows);
-		}
+		const removals = groupBy(
+			moved,
+			(item) => item.source.patternId,
+			(item) => item.source.localStartRow
+		);
 		for (const [patternId, localRows] of removals) {
-			const entry = generics.get(patternId);
-			const channelRows = entry?.generic.channels[channelIndex]?.rows;
-			if (!entry || !channelRows) continue;
-			removePitchedNotes(entry.generic, channelIndex, noteKey, localRows);
+			const generic = session.generic(patternId);
+			const rows = generic?.channels[channelIndex]?.rows;
+			if (!generic || !rows) continue;
+			removePitchedNotes(generic, channelIndex, key, localRows);
 			if (!instrumentKey) continue;
 			for (const localRow of localRows) {
-				const cell = channelRows[localRow];
+				const cell = rows[localRow];
 				const instrument = cell?.[instrumentKey];
-				if (typeof instrument === 'number' && instrument > 0 && cell) cell[instrumentKey] = 0;
+				if (cell && typeof instrument === 'number' && instrument > 0)
+					cell[instrumentKey] = 0;
 			}
 		}
-		const pasteGroups = new Map<number, PianoPasteNote[]>();
-		for (const item of moved) {
-			const notesForPattern = pasteGroups.get(item.patternId) ?? [];
-			notesForPattern.push(item.note);
-			pasteGroups.set(item.patternId, notesForPattern);
-		}
-		const edited = new Set<number>(clearedTails);
-		for (const item of moved) {
-			edited.add(item.sourcePatternId);
-			edited.add(item.patternId);
-		}
-		for (const [patternId, notesForPattern] of pasteGroups) {
-			const entry = generics.get(patternId);
-			const rows = entry?.generic.channels[channelIndex]?.rows;
-			if (!entry || !rows) continue;
-			pastePianoNotes(rows, noteKey, notesForPattern);
+		const pastes = groupBy(
+			moved,
+			(item) => item.target.span.patternId,
+			(item) => item.note
+		);
+		for (const [patternId, notesForPattern] of pastes) {
+			const rows = session.rows(patternId);
+			if (rows) pastePianoNotes(rows, key, notesForPattern);
 		}
 		for (const item of moved) {
-			if (!item.note.bounded) continue;
-			const span = timeline.find((entry) => entry.orderIndex === item.orderIndex);
-			if (!span || item.localRow + item.note.length < span.length) continue;
-			for (const id of sealTail(
-				generics,
-				span.startRow + item.localRow,
-				item.note.length,
-				item.note.release
-			)) {
-				edited.add(id);
+			session.mark(item.source.patternId);
+			session.mark(item.target.span.patternId);
+			const { span, localRow } = item.target;
+			if (item.note.bounded && localRow + item.note.length >= span.length) {
+				sealTail(session, span.startRow + localRow, item.note.length, item.note.release);
 			}
 		}
-		const edits = new Map<number, { before: Pattern; after: Pattern }>();
-		for (const id of edited) {
-			const entry = generics.get(id);
-			if (!entry) continue;
-			edits.set(entry.before.id, {
-				before: entry.before,
-				after: converter.fromGeneric(entry.generic)
-			});
-		}
-		const focus = moved.find(
-			(item) => item.sourcePatternId === anchor.patternId && item.sourceLocalRow === anchor.localStartRow
-		) ?? moved[0];
+		const focus =
+			moved.find(
+				(item) =>
+					item.source.patternId === anchor.patternId &&
+					item.source.localStartRow === anchor.localStartRow
+			) ?? moved[0];
 		if (!focus) return;
-		commitEdits(selected.songIndex, edits, focus.orderIndex, focus.localRow);
-		const placed: NoteSelection[] = [];
-		for (const item of moved) {
-			const span = timeline.find((entry) => entry.orderIndex === item.orderIndex);
-			if (!span) continue;
-			placed.push(selectionFor(span, item.localRow, item.pitchIndex));
-		}
-		applySelection(placed);
-		const focusSpan = timeline.find((entry) => entry.orderIndex === focus.orderIndex);
-		if (focusSpan) focusLocation(focusSpan, focus.localRow, scrollIntoView);
-		const after = edits.get(focus.patternId)?.after;
-		if (after) playPreview(after, selected.songIndex, selected.channelIndex, focus.localRow, true);
+		const edits = session.edits();
+		commitPianoPatternEdits(selected.songIndex, edits, locationCursor(focus.target));
+		land(
+			moved.map((item) =>
+				selectionFor(item.target.span, item.target.localRow, item.pitchIndex)
+			),
+			focus.target,
+			scrollIntoView
+		);
+		const after = edits.get(focus.target.span.patternId)?.after;
+		if (after) playPreview(after, focus.target.localRow, true);
 	}
 
 	function commitMove(
@@ -2005,39 +1614,19 @@
 		pitchIndex: number,
 		scrollIntoView = true
 	): void {
-		const fromSpan = spanForOrder(from.orderIndex);
+		const fromSpan = timelineSpanForOrder(timeline, from.orderIndex);
 		const dest = timelineSpanAt(timeline, toAbsolute);
-		const source = fromSpan ? patternById.get(fromSpan.patternId) : undefined;
-		const destination = dest ? patternById.get(dest.span.patternId) : undefined;
-		if (
-			playbackStore.isPlaying ||
-			!fromSpan ||
-			!dest ||
-			!source ||
-			!destination ||
-			!converter ||
-			!selected ||
-			!noteKey ||
-			!chip
-		) {
-			return;
-		}
-		const parsed = tuningTableIndexToNote(pitchIndex);
-		if (!parsed) return;
-		const note = formatNoteFromEnum(parsed.noteName, parsed.octave);
-		const instrumentKey = chip.schema.fields.instrument ? 'instrument' : null;
+		const note = pitchNoteText(pitchIndex);
+		if (playbackStore.isPlaying || !fromSpan || !dest || !selected || !noteKey || !note) return;
 		const length = draggedBlockLength(from);
-		const sourceIntent = allIntents().find(
-			(item) => item.startRow === from.startRow && item.pitchIndex === from.pitchIndex
-		);
+		const landing = selectionFor(dest.span, dest.localRow, pitchIndex);
+		const cursor = locationCursor(dest);
+		const sourceIntent = allIntents().find((item) => sameNoteSpot(item, from));
 		if (
 			sourceIntent &&
-			(blockIsConflict(from) ||
-				hitsOther(toAbsolute, sourceIntent.length, from.startRow, from.pitchIndex))
+			(blockIsConflict(from) || hitsOther(toAbsolute, sourceIntent.length, from))
 		) {
-			const next = allIntents().filter(
-				(item) => !(item.startRow === from.startRow && item.pitchIndex === from.pitchIndex)
-			);
+			const next = withoutSpots(allIntents(), [from]);
 			next.push({
 				...sourceIntent,
 				startRow: toAbsolute,
@@ -2045,111 +1634,54 @@
 				note,
 				preferred: false
 			});
-			const result = commitIntents(next, toAbsolute, pitchIndex, dest.span.orderIndex, dest.localRow);
-			if (!result.changed) return;
-			applySelection([selectionFor(dest.span, dest.localRow, pitchIndex)]);
-			focusLocation(dest.span, dest.localRow, scrollIntoView);
-			if (result.preview) {
-				playPreview(
-					result.preview,
-					selected.songIndex,
-					selected.channelIndex,
-					result.previewRow,
-					true
-				);
-			}
+			const result = commitIntents(next, landing, cursor);
+			if (result.changed) landIntents(result, [landing], dest, scrollIntoView, true);
 			return;
 		}
+		const session = openSession();
+		const sourceGeneric = session?.generic(fromSpan.patternId);
+		const destGeneric = session?.generic(dest.span.patternId);
+		if (!session || !sourceGeneric || !destGeneric) return;
 		const release = length === null ? false : releaseAt(from.startRow + length);
-		const field = {
-			channelIndex: selected.channelIndex,
-			fieldType: 'note' as const,
-			fieldKey: noteKey
-		};
-		const tuning = projectStore.songs[selected.songIndex]?.tuningTable ?? [];
-		const sourceGeneric = converter.toGeneric(source);
-		const destGeneric = source.id === destination.id ? sourceGeneric : converter.toGeneric(destination);
-		const generics = new Map<number, { before: Pattern; generic: GenericPattern }>([
-			[source.id, { before: source, generic: sourceGeneric }]
-		]);
-		if (source.id !== destination.id) {
-			generics.set(destination.id, { before: destination, generic: destGeneric });
-		}
-		const cleared = clearOpenTail(generics, fromSpan, from.localStartRow);
-		const moved =
-			source.id === destination.id
-				? movePitchedNote(
-						sourceGeneric,
-						selected.channelIndex,
-						noteKey,
-						instrumentKey,
-						from.localStartRow,
-						dest.localRow,
-						note,
-						length
-					)
-				: relocatePitchedNote(
-						sourceGeneric,
-						destGeneric,
-						selected.channelIndex,
-						noteKey,
-						instrumentKey,
-						from.localStartRow,
-						dest.localRow,
-						note,
-						length
-					);
-		if (!moved) return;
-		const spilled = sealTail(generics, dest.span.startRow + dest.localRow, length, release);
-		let destAfter = converter.fromGeneric(destGeneric);
-		destAfter = AutoEnvService.applyAutoEnvelopeIfEligible(
-			destAfter,
+		clearOpenTail(session, fromSpan, from.localStartRow);
+		const moved = relocatePitchedNote(
+			sourceGeneric,
+			destGeneric,
+			session.channelIndex,
+			noteKey,
+			instrumentKey,
+			from.localStartRow,
 			dest.localRow,
-			field,
-			tuning,
-			autoEnvStore.currentRatio,
-			autoEnvStore.enabled
+			note,
+			length
 		);
-		const edits = new Map<number, { before: Pattern; after: Pattern }>([
-			[destination.id, { before: destination, after: destAfter }]
-		]);
-		if (source.id !== destination.id) {
-			edits.set(source.id, { before: source, after: converter.fromGeneric(sourceGeneric) });
-		}
-		for (const id of [...cleared, ...spilled]) {
-			if (edits.has(id)) continue;
-			const entry = generics.get(id);
-			if (!entry) continue;
-			edits.set(id, { before: entry.before, after: converter.fromGeneric(entry.generic) });
-		}
-		commitEdits(selected.songIndex, edits, dest.span.orderIndex, dest.localRow);
-		applySelection([selectionFor(dest.span, dest.localRow, pitchIndex)]);
-		focusLocation(dest.span, dest.localRow, scrollIntoView);
-		playPreview(destAfter, selected.songIndex, selected.channelIndex, dest.localRow, true);
+		if (!moved) return;
+		session.mark(fromSpan.patternId);
+		session.mark(dest.span.patternId);
+		sealTail(session, toAbsolute, length, release);
+		session.finish(dest.span.patternId, (after) => withAutoEnvelope(after, dest.localRow));
+		const edits = session.edits();
+		commitPianoPatternEdits(selected.songIndex, edits, cursor);
+		land([landing], dest, scrollIntoView);
+		const after = edits.get(dest.span.patternId)?.after;
+		if (after) playPreview(after, dest.localRow, true);
 	}
 
 	function draggedBlockLength(from: NoteSelection): number | null {
-		for (const block of notes.blocks) {
-			const item = noteBlock(block);
-			if (
-				!item ||
-				item.orderIndex !== from.orderIndex ||
-				item.localStartRow !== from.localStartRow ||
-				item.pitchIndex !== from.pitchIndex
-			) {
-				continue;
-			}
-			return Math.max(1, item.endRow - item.startRow);
-		}
-		return null;
+		const block = notes.blocks.find(
+			(item) =>
+				item.orderIndex === from.orderIndex &&
+				item.localStartRow === from.localStartRow &&
+				item.pitchIndex === from.pitchIndex
+		);
+		return block ? blockLength(block) : null;
 	}
 
 	function commitResize(orderIndex: number, localStart: number, localEnd: number): void {
-		const span = spanForOrder(orderIndex);
-		const source = span ? patternById.get(span.patternId) : undefined;
-		if (playbackStore.isPlaying || !span || !source || !converter || !selected || !noteKey) return;
-		const genericPattern = converter.toGeneric(source);
-		const generics = new Map([[source.id, { before: source, generic: genericPattern }]]);
+		const span = timelineSpanForOrder(timeline, orderIndex);
+		const session = span ? editSession() : null;
+		const generic = span ? session?.generic(span.patternId) : null;
+		if (!span || !session || !generic || !noteKey) return;
 		const drawn = notes.blocks.find(
 			(block) => block.orderIndex === orderIndex && block.localStartRow === localStart
 		);
@@ -2157,6 +1689,7 @@
 		const target = Math.max(localStart + 1, localEnd);
 		const absoluteStart = span.startRow + localStart;
 		const resizedLength = Math.max(1, target - localStart);
+		const cursor = { orderIndex, row: localStart };
 		const existing = allIntents().find(
 			(item) =>
 				item.startRow === absoluteStart &&
@@ -2164,203 +1697,130 @@
 		);
 		if (
 			existing &&
-			(blockIsConflict(existing) ||
-				hitsOther(absoluteStart, resizedLength, existing.startRow, existing.pitchIndex))
+			(blockIsConflict(existing) || hitsOther(absoluteStart, resizedLength, existing))
 		) {
 			const next = allIntents().map((item) =>
-				item.startRow === existing.startRow && item.pitchIndex === existing.pitchIndex
+				sameNoteSpot(item, existing)
 					? { ...item, length: resizedLength, bounded: true, release, preferred: false }
 					: item
 			);
-			commitIntents(next, absoluteStart, existing.pitchIndex, orderIndex, localStart);
+			commitIntents(next, existing, cursor);
 			placedBlockLength = resizedLength;
 			return;
 		}
-		const absoluteEnd = span.startRow + target;
-		const songEnd = timelineColumnCount(timeline);
-		const spilled = new Set<number>();
-		const cleared = new Set<number>();
-		let changed = false;
-		if (target > span.length && absoluteEnd >= songEnd) {
-			for (const id of clearOpenTail(generics, span, localStart)) cleared.add(id);
-			changed =
-				resizePitchedNote(
-					genericPattern,
-					selected.channelIndex,
-					noteKey,
-					localStart,
-					Math.max(localStart + 1, span.length - 1)
-				) || cleared.size > 0;
+		const resizeTo = (end: number) =>
+			session.mark(
+				span.patternId,
+				resizePitchedNote(generic, session.channelIndex, noteKey, localStart, end)
+			);
+		clearOpenTail(session, span, localStart);
+		if (target > span.length && span.startRow + target >= timelineColumnCount(timeline)) {
+			resizeTo(Math.max(localStart + 1, span.length - 1));
 		} else if (target >= span.length) {
-			for (const id of clearOpenTail(generics, span, localStart)) cleared.add(id);
-			changed =
-				resizePitchedNote(genericPattern, selected.channelIndex, noteKey, localStart, span.length) ||
-				changed;
-			for (const id of sealTail(generics, span.startRow + localStart, target - localStart, release)) {
-				spilled.add(id);
-				changed = true;
-			}
+			resizeTo(span.length);
+			sealTail(session, absoluteStart, target - localStart, release);
 		} else {
-			for (const id of clearOpenTail(generics, span, localStart)) cleared.add(id);
-			changed =
-				resizePitchedNote(genericPattern, selected.channelIndex, noteKey, localStart, target) ||
-				cleared.size > 0;
+			resizeTo(target);
 		}
-		if (!changed) return;
-		placedBlockLength = target - localStart;
-		const edits = new Map<number, { before: Pattern; after: Pattern }>([
-			[source.id, { before: source, after: converter.fromGeneric(genericPattern) }]
-		]);
-		for (const id of [...cleared, ...spilled]) {
-			if (id === source.id) continue;
-			const entry = generics.get(id);
-			if (!entry) continue;
-			edits.set(id, { before: entry.before, after: converter.fromGeneric(entry.generic) });
-		}
-		commitEdits(selected.songIndex, edits, orderIndex, localStart);
+		if (commitSession(session, cursor)) placedBlockLength = target - localStart;
+	}
+
+	function laneCellAt(location: PianoTimelineLocation): LaneCell {
+		return {
+			orderIndex: location.span.orderIndex,
+			patternId: location.span.patternId,
+			localRow: location.localRow
+		};
+	}
+
+	function setLaneCell(
+		session: PianoPatternSession,
+		lane: PianoRollLane,
+		cell: LaneCell,
+		value: PianoFieldValue
+	): boolean {
+		const generic = session.generic(cell.patternId);
+		if (!generic) return false;
+		return session.mark(
+			cell.patternId,
+			setPianoFieldValue(generic, lane, session.channelIndex, cell.localRow, value)
+		);
+	}
+
+	function writeLaneCell(cell: LaneCell, value: PianoFieldValue): boolean {
+		const lane = activeLane;
+		const session = editSession();
+		if (!lane || !session || !setLaneCell(session, lane, cell, value)) return false;
+		return commitSession(session, { orderIndex: cell.orderIndex, row: cell.localRow });
 	}
 
 	function commitLaneDraft(rows: Record<number, number>): void {
-		if (playbackStore.isPlaying || !converter || !selected || !activeLane) return;
-		if (activeLane.kind !== 'value') return;
-		const generics = new Map<number, { before: Pattern; generic: GenericPattern }>();
-		let changed = false;
+		const lane = activeLane;
+		const session = editSession();
+		if (!session || lane?.kind !== 'value') return;
 		for (const [rowText, value] of Object.entries(rows)) {
 			const located = timelineSpanAt(timeline, Number(rowText));
-			if (!located) continue;
-			const item = patternById.get(located.span.patternId);
-			if (!item) continue;
-			let entry = generics.get(item.id);
-			if (!entry) {
-				entry = { before: item, generic: converter.toGeneric(item) };
-				generics.set(item.id, entry);
-			}
-			changed =
-				setPianoFieldValue(
-					entry.generic,
-					activeLane,
-					selected.channelIndex,
-					located.localRow,
-					value
-				) || changed;
-		}
-		if (!changed) return;
-		const edits = new Map<number, { before: Pattern; after: Pattern }>();
-		for (const [id, entry] of generics) {
-			edits.set(id, { before: entry.before, after: converter.fromGeneric(entry.generic) });
+			if (located) setLaneCell(session, lane, laneCellAt(located), value);
 		}
 		const first = Object.keys(rows)[0];
 		const located = first === undefined ? null : timelineSpanAt(timeline, Number(first));
-		commitEdits(
-			selected.songIndex,
-			edits,
-			located?.span.orderIndex ?? currentPatternOrderIndex,
-			located?.localRow ?? selectedRow
-		);
+		commitSession(session, {
+			orderIndex: located?.span.orderIndex ?? currentPatternOrderIndex,
+			row: located?.localRow ?? selectedRow
+		});
 	}
 
 	function clearLane(absoluteRow: number): void {
 		const located = timelineSpanAt(timeline, absoluteRow);
-		const source = located ? patternById.get(located.span.patternId) : undefined;
-		if (playbackStore.isPlaying || !located || !source || !converter || !selected || !activeLane) {
-			return;
-		}
-		const genericPattern = converter.toGeneric(source);
+		if (!located || !activeLane) return;
 		const value = activeLane.kind === 'effect' ? null : 0;
-		if (
-			!setPianoFieldValue(
-				genericPattern,
-				activeLane,
-				selected.channelIndex,
-				located.localRow,
-				value
-			)
-		) {
-			return;
-		}
-		commitEdits(
-			selected.songIndex,
-			new Map([[source.id, { before: source, after: converter.fromGeneric(genericPattern) }]]),
-			located.span.orderIndex,
-			located.localRow
-		);
-		focusLocation(located.span, located.localRow);
+		if (writeLaneCell(laneCellAt(located), value))
+			focusLocation(located.span, located.localRow);
 	}
 
-	function playPreview(
-		source: Pattern,
-		songIndex: number,
-		channelIndex: number,
-		row: number,
-		timed: boolean
-	): void {
-		if (playbackStore.isPlaying || !chip || !converter) return;
-		const processor = chipProcessors[songIndex];
-		if (!processor || !('playPreviewRow' in processor)) return;
-		services.audioService.setPreviewActiveForChips(songIndex);
-		const played = previewService.playFromContext(
-			processor as ChipProcessor & PreviewNoteSupport,
-			source,
-			channelIndex,
+	function playPreview(source: Pattern, row: number, timed: boolean): void {
+		if (playbackStore.isPlaying || !chip || !converter || !selected) return;
+		notePreview.play({
+			processor: chipProcessors[selected.songIndex],
+			songIndex: selected.songIndex,
+			pattern: source,
+			channelIndex: selected.channelIndex,
 			row,
-			chip.schema,
+			schema: chip.schema,
 			converter,
-			{ previewFullRow: settingsStore.previewFullRow, isGlobalField: false }
-		);
-		if (played !== undefined) previewChannel = played;
-		if (timed) schedulePreviewStop();
-		else if (previewTimer !== null) {
-			window.clearTimeout(previewTimer);
-			previewTimer = null;
-		}
+			previewFullRow: settingsStore.previewFullRow,
+			timed
+		});
 	}
 
-	function schedulePreviewStop(): void {
-		if (previewTimer !== null) window.clearTimeout(previewTimer);
-		previewTimer = window.setTimeout(() => {
-			previewTimer = null;
-			stopPreview();
-		}, 450);
-	}
-
-	function stopPreview(): void {
-		if (previewTimer !== null) {
-			window.clearTimeout(previewTimer);
-			previewTimer = null;
-		}
-		if (previewChannel === null || !selected) return;
-		const processor = chipProcessors[selected.songIndex];
-		if (processor && 'stopPreviewNote' in processor) {
-			previewService.stopNote(
-				processor as ChipProcessor & PreviewNoteSupport,
-				previewChannel === -1 ? undefined : previewChannel
-			);
-		}
-		services.audioService.setPreviewActiveForChips(null);
-		previewChannel = null;
-	}
-
-	function locateRow(absoluteRow: number): { span: PianoTimelineSpan; localRow: number } | null {
+	function locateRow(absoluteRow: number): PianoTimelineLocation | null {
 		const gate = notes.gates.find((item) => item.row === absoluteRow);
-		if (gate) {
-			const span = spanForOrder(gate.orderIndex);
-			if (span) return { span, localRow: gate.localRow };
-		}
+		const gateSpan = gate ? timelineSpanForOrder(timeline, gate.orderIndex) : null;
+		if (gate && gateSpan) return { span: gateSpan, localRow: gate.localRow };
 		return timelineSpanAt(timeline, absoluteRow);
 	}
 
-	function eraseBlockAt(point: { x: number; y: number; inRuler: boolean }): boolean {
+	function toggleGateAt(
+		row: number,
+		located: PianoTimelineLocation,
+		kind: 'off' | 'release'
+	): void {
+		if (notes.gates.some((item) => item.row === row)) clearNote(located.span, located.localRow);
+		else placeGate(located.span, located.localRow, kind);
+	}
+
+	function eraseBlockAt(point: GridPoint): boolean {
 		if (point.inRuler || !noteKey) return false;
 		const hit = hitTestNoteContent(point.x, point.y, notes.blocks, metrics);
-		if (!hit || hit.type === 'grid') return false;
-		const block = noteBlock(hit.block);
-		const span = block ? spanForOrder(block.orderIndex) : null;
-		if (!block || !span) return false;
+		if (!hit || hit.type === 'grid' || !isTimelineBlock(hit.block)) return false;
+		const block = hit.block;
+		const span = timelineSpanForOrder(timeline, block.orderIndex);
+		if (!span) return false;
 		if (block.conflict) {
-			const next = allIntents().filter(
-				(note) => !(note.startRow === block.startRow && note.pitchIndex === block.pitchIndex)
-			);
-			commitIntents(next, null, null, block.orderIndex, block.localStartRow);
+			commitIntents(withoutSpots(allIntents(), [block]), null, {
+				orderIndex: block.orderIndex,
+				row: block.localStartRow
+			});
 			dropSelectionAt(block.orderIndex, block.localStartRow);
 			return true;
 		}
@@ -2375,39 +1835,21 @@
 		if (point) eraseBlockAt(point);
 	}
 
-	function noteBlock(block: PianoNoteBlock): PianoTimelineBlock | null {
-		if (!('orderIndex' in block) || !('patternId' in block) || !('localStartRow' in block)) return null;
-		return block as PianoTimelineBlock;
-	}
-
-	function resizeLimit(dragState: { startRow: number }): number {
-		return Math.max(dragState.startRow + 1, metrics.columns);
-	}
-
 	function onGridMouseDown(event: MouseEvent): void {
 		gridCanvas?.focus({ preventScroll: true });
 		focusTarget = 'note';
 		const point = contentPoint(event);
 		if (playbackStore.isPlaying) {
-			if (event.button !== 0 || !point?.inRuler) return;
-			const row = xToRow(point.x, metrics);
-			const located = row === null ? null : locateRow(row);
-			if (!located) return;
-			focusLocation(located.span, located.localRow, false);
-			onseekplayback?.(located.span.orderIndex, located.localRow);
+			seekFromRuler(event, point);
 			return;
 		}
 		if (!point || !noteKey) return;
 		if (point.inRuler) {
 			const row = xToRow(point.x, metrics);
 			const located = row === null ? null : locateRow(row);
-			if (!located) return;
+			if (row === null || !located) return;
 			focusLocation(located.span, located.localRow);
-			if (event.button === 2) {
-				const gate = notes.gates.find((item) => item.row === row);
-				if (gate) clearNote(located.span, located.localRow);
-				else placeGate(located.span, located.localRow, event.shiftKey ? 'release' : 'off');
-			}
+			if (event.button === 2) toggleGateAt(row, located, event.shiftKey ? 'release' : 'off');
 			return;
 		}
 		const hit = hitTestNoteContent(point.x, point.y, notes.blocks, metrics);
@@ -2418,100 +1860,107 @@
 					if ((move.buttons & 2) === 0) return;
 					const next = contentPoint(move);
 					if (next) eraseBlockAt(next);
-				}, () => {});
+				});
 				return;
 			}
-			if (hit.type === 'grid') {
-				const located = locateRow(hit.row);
-				if (!located) return;
-				const gate = notes.gates.find((item) => item.row === hit.row);
-				if (gate) clearNote(located.span, located.localRow);
-				else placeGate(located.span, located.localRow, 'off');
-			}
+			const located = hit.type === 'grid' ? locateRow(hit.row) : null;
+			if (hit.type === 'grid' && located) toggleGateAt(hit.row, located, 'off');
 			return;
 		}
 		if (event.button !== 0) return;
 		if (event.metaKey || event.ctrlKey) {
 			event.preventDefault();
 			gridCanvas?.focus({ preventScroll: true });
-			startMarquee(point, event.shiftKey, hit.type === 'grid' ? null : noteBlock(hit.block));
+			const block = hit.type !== 'grid' && isTimelineBlock(hit.block) ? hit.block : null;
+			startMarquee(point, event.shiftKey, block);
 			return;
 		}
 		if (hit.type === 'grid') {
-			const located = locateRow(hit.row);
-			if (!located) return;
-			if (event.shiftKey) placeGate(located.span, located.localRow, 'release');
-			else if (event.altKey) placeGate(located.span, located.localRow, 'off');
-			else if (placePitched(located.span, located.localRow, hit.pitchIndex, false, true)) {
-				const from = selectedBlock;
-				if (from) startMoveDrag(from, draggedBlockLength(from) ?? placedBlockLength ?? 1);
-			}
+			placeOnGrid(event, hit.row, hit.pitchIndex);
 			return;
 		}
-		const block = noteBlock(hit.block);
-		const span = block ? spanForOrder(block.orderIndex) : null;
-		if (!block || !span) return;
+		if (!isTimelineBlock(hit.block)) return;
+		const block = hit.block;
+		const span = timelineSpanForOrder(timeline, block.orderIndex);
+		if (!span) return;
 		const grabbed = selectionFor(span, block.localStartRow, block.pitchIndex);
 		const current = workingSelection();
-		const inSelection = current.some((item) => selectionKey(item) === selectionKey(grabbed));
+		const inSelection = current.some((item) => sameNoteSpot(item, grabbed));
 		const moveGroup = inSelection && current.length > 1 ? current : [grabbed];
 		if (hit.type === 'resize' || moveGroup.length === 1) applySelection([grabbed]);
 		focusLocation(span, block.localStartRow, false);
 		if (hit.type === 'resize') {
-			drag = {
-				kind: 'resize',
-				orderIndex: span.orderIndex,
-				patternId: span.patternId,
-				localStart: block.localStartRow,
-				startRow: block.startRow,
-				pitch: block.pitchIndex,
-				instrument: block.instrument,
-				gestures: block.gestures,
-				endRow: block.endRow,
-				originEnd: block.endRow,
-				spanEnd: span.startRow + span.length
-			};
-			trackPointer(
-				(move) => {
-					if (drag?.kind !== 'resize') return;
-					const next = contentPoint(move);
-					if (!next) return;
-					const maxX = Math.max(0, metrics.columns * metrics.rowWidth - 1);
-					const row = xToRow(Math.max(0, Math.min(maxX, next.x)), metrics);
-					if (row === null) return;
-					drag = {
-						...drag,
-						endRow: Math.max(drag.startRow + 1, Math.min(resizeLimit(drag), row + 1))
-					};
-				},
-				() => {
-					if (drag?.kind === 'resize' && drag.endRow !== drag.originEnd) {
-						commitResize(drag.orderIndex, drag.localStart, drag.endRow - (drag.startRow - drag.localStart));
-					}
-					drag = null;
-				}
-			);
+			startResizeDrag(span, block);
 			return;
 		}
 		const pointerRow = xToRow(point.x, metrics);
 		const grabOffset = pointerRow === null ? 0 : Math.max(0, pointerRow - block.startRow);
-		startMoveDrag(
-			grabbed,
-			Math.max(1, block.endRow - block.startRow),
-			resolveNoteColor(block),
-			block.instrument,
-			grabOffset,
-			moveGroup
+		startMoveDrag(grabbed, moveGroup, grabOffset);
+	}
+
+	function seekFromRuler(event: MouseEvent, point: GridPoint | null): void {
+		if (event.button !== 0 || !point?.inRuler) return;
+		const row = xToRow(point.x, metrics);
+		const located = row === null ? null : locateRow(row);
+		if (!located) return;
+		focusLocation(located.span, located.localRow, false);
+		onseekplayback?.(located.span.orderIndex, located.localRow);
+	}
+
+	function placeOnGrid(event: MouseEvent, row: number, pitchIndex: number): void {
+		const located = locateRow(row);
+		if (!located) return;
+		if (event.shiftKey) placeGate(located.span, located.localRow, 'release');
+		else if (event.altKey) placeGate(located.span, located.localRow, 'off');
+		else if (
+			placePitched(located.span, located.localRow, pitchIndex, false, true) &&
+			selectedBlock
+		) {
+			startMoveDrag(selectedBlock, [selectedBlock], 0, placedBlockLength ?? 1);
+		}
+	}
+
+	function startResizeDrag(span: PianoTimelineSpan, block: PianoTimelineBlock): void {
+		drag = {
+			kind: 'resize',
+			orderIndex: span.orderIndex,
+			localStart: block.localStartRow,
+			startRow: block.startRow,
+			pitch: block.pitchIndex,
+			instrument: block.instrument,
+			gestures: block.gestures,
+			endRow: block.endRow,
+			originEnd: block.endRow
+		};
+		trackPointer(
+			(move) => {
+				if (drag?.kind !== 'resize') return;
+				const next = contentPoint(move);
+				if (!next) return;
+				const maxX = Math.max(0, metrics.columns * metrics.rowWidth - 1);
+				const row = xToRow(clamp(next.x, 0, maxX), metrics);
+				if (row === null) return;
+				const limit = Math.max(drag.startRow + 1, metrics.columns);
+				drag = { ...drag, endRow: Math.max(drag.startRow + 1, Math.min(limit, row + 1)) };
+			},
+			() => {
+				if (drag?.kind === 'resize' && drag.endRow !== drag.originEnd) {
+					commitResize(
+						drag.orderIndex,
+						drag.localStart,
+						drag.endRow - (drag.startRow - drag.localStart)
+					);
+				}
+				drag = null;
+			}
 		);
 	}
 
 	function moveGroupNote(selection: NoteSelection, fallbackLength = 1): MoveGroupNote {
-		const block = notes.blocks.find(
-			(item) => item.startRow === selection.startRow && item.pitchIndex === selection.pitchIndex
-		);
+		const block = findBlock(selection);
 		return {
 			...selection,
-			length: block ? Math.max(1, block.endRow - block.startRow) : Math.max(1, fallbackLength),
+			length: block ? blockLength(block) : Math.max(1, fallbackLength),
 			color: block ? resolveNoteColor(block) : null,
 			instrument: block?.instrument ?? null,
 			gestures: block?.gestures ?? [],
@@ -2521,37 +1970,19 @@
 
 	function startMoveDrag(
 		from: NoteSelection,
-		length: number,
-		color: string | null = null,
-		instrument: number | null = null,
-		grabOffset = 0,
-		selections: NoteSelection[] = [from]
+		selections: NoteSelection[],
+		grabOffset: number,
+		fallbackLength = 1
 	): void {
-		const group = selections.map((item) => {
-			const note = moveGroupNote(item, selectionKey(item) === selectionKey(from) ? length : 1);
-			if (selectionKey(item) !== selectionKey(from)) return note;
-			return {
-				...note,
-				color: color ?? note.color,
-				instrument: instrument ?? note.instrument
-			};
-		});
-		const anchor = group.find((item) => selectionKey(item) === selectionKey(from)) ?? group[0];
-		if (!anchor) return;
+		const group = selections.map((item) =>
+			moveGroupNote(item, sameNoteSpot(item, from) ? fallbackLength : 1)
+		);
 		drag = {
 			kind: 'move',
-			fromOrder: from.orderIndex,
-			fromPatternId: from.patternId,
-			fromLocal: from.localStartRow,
-			fromRow: from.startRow,
-			fromPitch: from.pitchIndex,
+			from,
 			row: from.startRow,
 			pitch: from.pitchIndex,
-			length: anchor.length,
 			grabOffset: Math.max(0, grabOffset),
-			color: anchor.color,
-			instrument: anchor.instrument,
-			gestures: anchor.gestures,
 			group
 		};
 		trackPointer(
@@ -2562,60 +1993,39 @@
 				const row = xToRow(next.x, metrics);
 				const pitch = yToPitch(next.y, metrics);
 				if (row === null || pitch === null) return;
-				const desiredRow = row - drag.grabOffset - drag.fromRow;
-				const desiredPitch = pitch - drag.fromPitch;
 				const clamped = clampSelectionDelta(
 					drag.group,
-					desiredRow,
-					desiredPitch,
+					row - drag.grabOffset - drag.from.startRow,
+					pitch - drag.from.pitchIndex,
 					metrics.columns,
 					metrics.pitchCount
 				);
 				drag = {
 					...drag,
-					row: drag.fromRow + clamped.deltaRow,
-					pitch: drag.fromPitch + clamped.deltaPitch
+					row: drag.from.startRow + clamped.deltaRow,
+					pitch: drag.from.pitchIndex + clamped.deltaPitch
 				};
 			},
 			() => {
-				if (drag?.kind === 'move') {
-					const deltaRow = drag.row - drag.fromRow;
-					const deltaPitch = drag.pitch - drag.fromPitch;
-					if (deltaRow !== 0 || deltaPitch !== 0) {
-						for (const item of drag.group) {
-							blockFadeHold.add(
-								`${item.orderIndex}:${item.patternId}:${item.localStartRow}:${item.pitchIndex}`
-							);
-						}
-						blockFadeSkipIn = true;
-						if (drag.group.length > 1) {
-							commitSelectionMove(drag.group, deltaRow, deltaPitch, {
-								orderIndex: drag.fromOrder,
-								patternId: drag.fromPatternId,
-								localStartRow: drag.fromLocal,
-								startRow: drag.fromRow,
-								pitchIndex: drag.fromPitch
-							});
-						}
-						else {
-							commitMove(
-								{
-									orderIndex: drag.fromOrder,
-									patternId: drag.fromPatternId,
-									localStartRow: drag.fromLocal,
-									startRow: drag.fromRow,
-									pitchIndex: drag.fromPitch
-								},
-								drag.row,
-								drag.pitch,
-								false
-							);
-						}
-					}
-				}
+				if (drag?.kind === 'move')
+					finishMoveDrag(drag.from, drag.group, drag.row, drag.pitch);
 				drag = null;
 			}
 		);
+	}
+
+	function finishMoveDrag(
+		from: NoteSelection,
+		group: MoveGroupNote[],
+		row: number,
+		pitch: number
+	): void {
+		const deltaRow = row - from.startRow;
+		const deltaPitch = pitch - from.pitchIndex;
+		if (deltaRow === 0 && deltaPitch === 0) return;
+		blockFades.holdMoved(group);
+		if (group.length > 1) commitSelectionMove(group, deltaRow, deltaPitch, from);
+		else commitMove(from, row, pitch, false);
 	}
 
 	function onGridMouseMove(event: MouseEvent): void {
@@ -2640,19 +2050,13 @@
 		const located = locateRow(point.row);
 		if (located) focusLocation(located.span, located.localRow);
 		if (event.button === 2) {
-			dismissEffectEditor();
-			dismissValueEditor();
+			dismissLaneEditor();
 			clearLane(point.row);
 			return;
 		}
-		if (activeLane.kind === 'effect') {
+		if (laneCodec) {
 			event.preventDefault();
-			openEffectEditor(point.row);
-			return;
-		}
-		if (laneValueIsTyped(activeLane)) {
-			event.preventDefault();
-			openValueEditor(point.row);
+			openLaneEditor(point.row);
 			return;
 		}
 		if (event.button !== 0) return;
@@ -2697,12 +2101,14 @@
 			() => {
 				marquee = null;
 				if (!moved) {
-					if (hitBlock) {
-						const span = spanForOrder(hitBlock.orderIndex);
-						if (span) {
-							toggleSelected(selectionFor(span, hitBlock.localStartRow, hitBlock.pitchIndex));
-						}
-					} else if (!additive) {
+					const span = hitBlock
+						? timelineSpanForOrder(timeline, hitBlock.orderIndex)
+						: null;
+					if (hitBlock && span) {
+						toggleSelected(
+							selectionFor(span, hitBlock.localStartRow, hitBlock.pitchIndex)
+						);
+					} else if (!hitBlock && !additive) {
 						applySelection([]);
 					}
 					return;
@@ -2710,10 +2116,9 @@
 				const picked: NoteSelection[] = [];
 				for (const block of notes.blocks) {
 					if (!blockIntersectsMarquee(block, current, metrics)) continue;
-					const item = noteBlock(block);
-					const span = item ? spanForOrder(item.orderIndex) : null;
-					if (!item || !span) continue;
-					picked.push(selectionFor(span, item.localStartRow, item.pitchIndex));
+					const span = timelineSpanForOrder(timeline, block.orderIndex);
+					if (span)
+						picked.push(selectionFor(span, block.localStartRow, block.pitchIndex));
 				}
 				applySelection(additive ? mergeSelections(workingSelection(), picked) : picked);
 			}
@@ -2724,27 +2129,26 @@
 		if (!selected || !noteKey) return;
 		const captured: CapturedPianoNote[] = [];
 		for (const target of workingSelection()) {
-			const block = notes.blocks.find(
-				(item) => item.startRow === target.startRow && item.pitchIndex === target.pitchIndex
-			);
+			const block = findBlock(target);
 			if (block?.conflict) {
 				captured.push({
 					absoluteRow: target.startRow,
 					rowOffset: 0,
 					note: block.note,
-					length: Math.max(1, block.endRow - block.startRow),
+					length: blockLength(block),
 					bounded: true,
 					release: false,
 					fields:
-						block.instrument && block.instrument > 0 ? { instrument: block.instrument } : {}
+						instrumentKey && block.instrument && block.instrument > 0
+							? { [instrumentKey]: block.instrument }
+							: {}
 				});
 				continue;
 			}
-			const source = patternById.get(target.patternId);
-			if (!source) continue;
-			const rows = cachedGeneric(source).channels[selected.channelIndex]?.rows;
-			if (!rows) continue;
-			const note = capturePianoNote(rows, noteKey, target.localStartRow, target.startRow);
+			const rows = channelRows(target.patternId);
+			const note = rows
+				? capturePianoNote(rows, noteKey, target.localStartRow, target.startRow)
+				: null;
 			if (note) captured.push(note);
 		}
 		const clipboard = clipboardFromCaptures(captured);
@@ -2752,56 +2156,34 @@
 	}
 
 	function removeTargets(targets: NoteSelection[]): boolean {
-		if (playbackStore.isPlaying || !converter || !selected || !noteKey || targets.length === 0) {
-			return false;
-		}
-		if (targets.some((target) => blockIsConflict(target)) || heldIntents().length > 0) {
-			const keys = new Set(targets.map((target) => selectionKey(target)));
-			const next = allIntents().filter((note) => !keys.has(`${note.startRow}:${note.pitchIndex}`));
-			const first = targets[0];
-			if (!first) return false;
-			return commitIntents(next, null, null, first.orderIndex, first.localStartRow).changed;
-		}
-		const groups = new Map<number, { before: Pattern; generic: GenericPattern; rows: number[] }>();
-		for (const target of targets) {
-			const item = patternById.get(target.patternId);
-			if (!item) continue;
-			let entry = groups.get(item.id);
-			if (!entry) {
-				entry = { before: item, generic: converter.toGeneric(item), rows: [] };
-				groups.set(item.id, entry);
-			}
-			entry.rows.push(target.localStartRow);
-		}
-		const generics = new Map<number, { before: Pattern; generic: GenericPattern }>();
-		for (const entry of groups.values()) {
-			generics.set(entry.before.id, { before: entry.before, generic: entry.generic });
-		}
-		const tails = new Set<number>();
-		for (const target of targets) {
-			const span = spanForOrder(target.orderIndex);
-			if (!span || !generics.has(span.patternId)) continue;
-			for (const id of clearOpenTail(generics, span, target.localStartRow)) tails.add(id);
-		}
-		const edits = new Map<number, { before: Pattern; after: Pattern }>();
-		for (const entry of groups.values()) {
-			if (!removePitchedNotes(entry.generic, selected.channelIndex, noteKey, entry.rows)) continue;
-			edits.set(entry.before.id, {
-				before: entry.before,
-				after: converter.fromGeneric(entry.generic)
-			});
-		}
-		for (const id of tails) {
-			if (edits.has(id)) continue;
-			const entry = generics.get(id);
-			if (!entry) continue;
-			edits.set(id, { before: entry.before, after: converter.fromGeneric(entry.generic) });
-		}
-		if (edits.size === 0) return false;
 		const first = targets[0];
-		if (!first) return false;
-		commitEdits(selected.songIndex, edits, first.orderIndex, first.localStartRow);
-		return true;
+		if (playbackStore.isPlaying || !selected || !noteKey || !first) return false;
+		if (targets.some((target) => blockIsConflict(target)) || heldIntents().length > 0) {
+			return commitIntents(withoutSpots(allIntents(), targets), null, selectionCursor(first))
+				.changed;
+		}
+		const session = openSession();
+		if (!session) return false;
+		const rowsByPattern = groupBy(
+			targets,
+			(target) => target.patternId,
+			(target) => target.localStartRow
+		);
+		for (const target of targets) {
+			const span = timelineSpanForOrder(timeline, target.orderIndex);
+			if (span && rowsByPattern.has(span.patternId)) {
+				clearOpenTail(session, span, target.localStartRow);
+			}
+		}
+		for (const [patternId, localRows] of rowsByPattern) {
+			const generic = session.generic(patternId);
+			if (!generic) continue;
+			session.mark(
+				patternId,
+				removePitchedNotes(generic, session.channelIndex, noteKey, localRows)
+			);
+		}
+		return commitSession(session, selectionCursor(first));
 	}
 
 	function cutSelection(): void {
@@ -2813,50 +2195,24 @@
 
 	function pasteClipboard(): void {
 		const clips = pianoRollClipboard.get();
-		if (
-			!clips ||
-			clips.length === 0 ||
-			playbackStore.isPlaying ||
-			!converter ||
-			!selected ||
-			!noteKey
-		) {
+		if (!clips || clips.length === 0 || playbackStore.isPlaying || !selected || !noteKey)
 			return;
-		}
-		const groups = new Map<
-			number,
-			{
-				before: Pattern;
-				generic: GenericPattern;
-				notes: PianoPasteNote[];
-				orderIndex: number;
-				localRow: number;
-			}
-		>();
+		const session = openSession();
+		if (!session) return;
 		const placed: NoteSelection[] = [];
-		const incoming: IntentNote[] = [];
+		const incoming: PianoIntentNote[] = [];
+		const pastes: Array<{ patternId: number; note: PianoPasteNote }> = [];
 		for (const clip of clips) {
 			const located = timelineSpanAt(timeline, cursorRow + clip.rowOffset);
-			if (!located) continue;
-			const parsed = parseNoteFromString(clip.note);
-			const pitchIndex = noteToTuningTableIndex(parsed.noteName, parsed.octave);
-			if (pitchIndex === null) continue;
-			const item = patternById.get(located.span.patternId);
-			if (!item) continue;
-			let entry = groups.get(item.id);
-			if (!entry) {
-				entry = {
-					before: item,
-					generic: converter.toGeneric(item),
-					notes: [],
-					orderIndex: located.span.orderIndex,
-					localRow: located.localRow
-				};
-				groups.set(item.id, entry);
-			}
-			entry.notes.push({ ...clip, localRow: located.localRow });
+			const pitchIndex = notePitchIndex(clip.note);
+			if (!located || pitchIndex === null || !patternById.has(located.span.patternId))
+				continue;
+			pastes.push({
+				patternId: located.span.patternId,
+				note: { ...clip, localRow: located.localRow }
+			});
 			placed.push(selectionFor(located.span, located.localRow, pitchIndex));
-			const instrument = clip.fields.instrument;
+			const instrument = instrumentKey ? clip.fields[instrumentKey] : undefined;
 			incoming.push({
 				startRow: located.span.startRow + located.localRow,
 				length: clip.bounded
@@ -2871,51 +2227,32 @@
 			});
 		}
 		const existing = allIntents();
-		const overlaps = incoming.some(
-			(note) =>
-				existing.some((other) =>
-					rangesOverlap(note.startRow, note.length, other.startRow, other.length)
-				) ||
-				incoming.some(
-					(other) =>
-						other !== note &&
-						rangesOverlap(note.startRow, note.length, other.startRow, other.length)
-				)
-		);
-		if (overlaps) {
+		if (overlapsAny(incoming, existing)) {
 			const first = incoming[0];
 			const home = first ? timelineSpanAt(timeline, first.startRow) : null;
 			if (first && home) {
-				commitIntents(
-					[...existing, ...incoming],
-					first.startRow,
-					first.pitchIndex,
-					home.span.orderIndex,
-					home.localRow
-				);
+				commitIntents([...existing, ...incoming], first, locationCursor(home));
 				applySelection(placed);
 			}
 			return;
 		}
-		const edits = new Map<number, { before: Pattern; after: Pattern }>();
-		for (const entry of groups.values()) {
-			const rows = entry.generic.channels[selected.channelIndex]?.rows;
-			if (!rows || !pastePianoNotes(rows, noteKey, entry.notes)) continue;
-			edits.set(entry.before.id, {
-				before: entry.before,
-				after: converter.fromGeneric(entry.generic)
-			});
+		const grouped = groupBy(
+			pastes,
+			(item) => item.patternId,
+			(item) => item.note
+		);
+		for (const [patternId, notesForPattern] of grouped) {
+			const rows = session.rows(patternId);
+			if (rows) session.mark(patternId, pastePianoNotes(rows, noteKey, notesForPattern));
 		}
-		if (edits.size === 0) return;
 		const first = placed[0];
-		if (!first) return;
-		commitEdits(selected.songIndex, edits, first.orderIndex, first.localStartRow);
-		applySelection(placed);
+		if (first && commitSession(session, selectionCursor(first))) applySelection(placed);
 	}
 
 	function handleClipboardShortcut(event: KeyboardEvent): boolean {
 		const action = keybindingsStore.getActionForShortcut(ShortcutString.fromEvent(event));
-		if (action !== ACTION_COPY && action !== ACTION_CUT && action !== ACTION_PASTE) return false;
+		if (action !== ACTION_COPY && action !== ACTION_CUT && action !== ACTION_PASTE)
+			return false;
 		event.preventDefault();
 		if (action === ACTION_COPY) copySelection();
 		else if (action === ACTION_CUT) cutSelection();
@@ -2935,25 +2272,21 @@
 		if (playbackStore.isPlaying) return;
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			event.preventDefault();
-			if (selectedNotes.length > 0) {
-				if (removeTargets(selectedNotes)) applySelection([]);
-				return;
-			}
-			const selection = visibleSelection;
-			const span = selection
-				? spanForOrder(selection.orderIndex)
-				: spanForOrder(currentPatternOrderIndex);
-			const localRow = selection ? selection.localStartRow : selectedRow;
-			if (span) clearNote(span, localRow);
+			deleteAtCursor();
 			return;
 		}
-		if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+		if (
+			event.key === 'ArrowLeft' ||
+			event.key === 'ArrowRight' ||
+			event.key === 'ArrowUp' ||
+			event.key === 'ArrowDown'
+		) {
 			event.preventDefault();
 			nudge(event.key, event.shiftKey);
 			return;
 		}
 		if (event.repeat || !noteKey) return;
-		const cursor = spanForOrder(currentPatternOrderIndex);
+		const cursor = timelineSpanForOrder(timeline, currentPatternOrderIndex);
 		const mapped = PatternNoteInput.mapKeyboardCodeToNote(event.code);
 		if (!mapped || !cursor) return;
 		const pitch = noteToTuningTableIndex(mapped.noteName, mapped.octave);
@@ -2962,17 +2295,34 @@
 		placePitched(cursor, selectedRow, pitch, true, false);
 	}
 
+	function deleteAtCursor(): void {
+		if (selectedNotes.length > 0) {
+			if (removeTargets(selectedNotes)) applySelection([]);
+			return;
+		}
+		const selection = visibleSelection;
+		const span = timelineSpanForOrder(
+			timeline,
+			selection?.orderIndex ?? currentPatternOrderIndex
+		);
+		if (span) clearNote(span, selection ? selection.localStartRow : selectedRow);
+	}
+
+	function clampedMove(selection: NoteSelection, deltaRow: number, deltaPitch: number): void {
+		commitMove(
+			selection,
+			clamp(selection.startRow + deltaRow, 0, metrics.columns - 1),
+			clamp(selection.pitchIndex + deltaPitch, 0, PIANO_ROLL_PITCH_COUNT - 1)
+		);
+	}
+
 	function nudge(key: string, shift: boolean): void {
 		const deltaRow = key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0;
-		const deltaPitch =
-			key === 'ArrowUp' ? (shift ? 12 : 1) : key === 'ArrowDown' ? (shift ? -12 : -1) : 0;
+		const octave = shift ? 12 : 1;
+		const deltaPitch = key === 'ArrowUp' ? octave : key === 'ArrowDown' ? -octave : 0;
 		const group = workingSelection();
 		if (group.length > 1) {
-			const live = group.filter((item) =>
-				notes.blocks.some(
-					(block) => block.startRow === item.startRow && block.pitchIndex === item.pitchIndex
-				)
-			);
+			const live = group.filter((item) => findBlock(item));
 			if (live.length > 1) {
 				const moving = live.map((item) => moveGroupNote(item));
 				const clamped = clampSelectionDelta(
@@ -2983,32 +2333,25 @@
 					metrics.pitchCount
 				);
 				const anchor = live.reduce((best, item) =>
-					Math.abs(item.startRow - cursorRow) < Math.abs(best.startRow - cursorRow) ? item : best
+					Math.abs(item.startRow - cursorRow) < Math.abs(best.startRow - cursorRow)
+						? item
+						: best
 				);
 				commitSelectionMove(moving, clamped.deltaRow, clamped.deltaPitch, anchor, true);
 				return;
 			}
 			const only = live[0];
 			if (only) {
-				commitMove(
-					only,
-					clamp(only.startRow + deltaRow, 0, metrics.columns - 1),
-					clamp(only.pitchIndex + deltaPitch, 0, PIANO_ROLL_PITCH_COUNT - 1)
-				);
+				clampedMove(only, deltaRow, deltaPitch);
 				return;
 			}
 		}
 		const selection = visibleSelection;
 		if (!selection) {
-			const delta = key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1;
-			moveCursorTo(cursorRow + delta);
+			moveCursorTo(cursorRow + (key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1));
 			return;
 		}
-		commitMove(
-			selection,
-			clamp(selection.startRow + deltaRow, 0, metrics.columns - 1),
-			clamp(selection.pitchIndex + deltaPitch, 0, PIANO_ROLL_PITCH_COUNT - 1)
-		);
+		clampedMove(selection, deltaRow, deltaPitch);
 	}
 
 	function selectChannel(songIndex: number, channelIndex: number): void {
@@ -3021,202 +2364,103 @@
 		editorStateStore.setPianoRollLaneKey(lane.key);
 		focusTarget = 'lane';
 		closeLaneMenu();
-		dismissEffectEditor();
-		dismissValueEditor();
+		dismissLaneEditor();
 	}
 
-	function effectEditorLeft(absoluteRow: number): number {
-		const width = 176;
+	function laneEditorLeft(absoluteRow: number): number {
 		const x = absoluteRow * rowWidth - scrollX;
-		const max = Math.max(0, (laneViewport?.clientWidth ?? width) - width);
-		return Math.max(0, Math.min(x, max));
-	}
-
-	function dismissEffectEditor(): void {
-		effectEditor = null;
-		effectEditorListener?.();
-		effectEditorListener = null;
-	}
-
-	function ensureEffectEditorListener(): void {
-		if (effectEditorListener) return;
-		const close = (event: PointerEvent) => {
-			const target = event.target;
-			if (target instanceof Node && effectEditorRoot?.contains(target)) return;
-			const current = effectEditor;
-			if (current) writeEffect(current);
-			dismissEffectEditor();
-		};
-		window.addEventListener('pointerdown', close);
-		effectEditorListener = () => window.removeEventListener('pointerdown', close);
-	}
-
-	function writeEffect(editor: {
-		patternId: number;
-		localRow: number;
-		orderIndex: number;
-		text: string;
-		original: string;
-	}): void {
-		if (!converter || !selected || !activeLane || activeLane.kind !== 'effect') return;
-		const text = clampPianoEffectInput(editor.text);
-		if (text === clampPianoEffectInput(editor.original)) return;
-		const value = pianoEffectInputValue(text);
-		if (value === undefined) return;
-		const source = patternById.get(editor.patternId);
-		if (!source) return;
-		const generic = converter.toGeneric(source);
-		const stored = value
-			? {
-					effect: value.effect,
-					delay: value.delay,
-					parameter: value.parameter,
-					tableIndex: value.tableIndex
-				}
-			: null;
-		if (!setPianoFieldValue(generic, activeLane, selected.channelIndex, editor.localRow, stored)) {
-			return;
-		}
-		commitEdits(
-			selected.songIndex,
-			new Map([[source.id, { before: source, after: converter.fromGeneric(generic) }]]),
-			editor.orderIndex,
-			editor.localRow
+		const max = Math.max(
+			0,
+			(laneViewport?.clientWidth ?? LANE_EDITOR_WIDTH) - LANE_EDITOR_WIDTH
 		);
-		const formatted = formatPianoEffectInput(value);
+		return clamp(x, 0, max);
+	}
+
+	function dismissLaneEditor(): void {
+		laneEditor = null;
+		releaseLaneEditorListener?.();
+		releaseLaneEditorListener = null;
+	}
+
+	function commitLaneEditor(editor: LaneEditor): void {
+		const codec = laneCodec;
+		if (!codec || editor.laneKey !== activeLane?.key) return;
+		const text = codec.clamp(editor.text);
+		if (text === codec.clamp(editor.original)) return;
+		const value = codec.parse(text);
+		if (value === undefined || !writeLaneCell(editor, value)) return;
+		const formatted = codec.format(value);
 		editor.text = formatted;
 		editor.original = formatted;
 	}
 
-	function dismissValueEditor(): void {
-		valueEditor = null;
-		valueEditorListener?.();
-		valueEditorListener = null;
-	}
-
-	function ensureValueEditorListener(): void {
-		if (valueEditorListener) return;
-		const close = (event: PointerEvent) => {
-			const target = event.target;
-			if (target instanceof Node && valueEditorRoot?.contains(target)) return;
-			const current = valueEditor;
-			if (current) writeValue(current);
-			dismissValueEditor();
-		};
-		window.addEventListener('pointerdown', close);
-		valueEditorListener = () => window.removeEventListener('pointerdown', close);
-	}
-
-	function songTuning(): number[] {
-		return projectStore.songs[selected?.songIndex ?? -1]?.tuningTable ?? [];
-	}
-
-	function clampTypedText(text: string): string {
-		if (!activeLane) return text;
-		if (laneShowsNote(activeLane, editorStateStore.envelopeAsNote)) return clampPianoNoteInput(text);
-		if (activeLane.fieldType === 'hex') return clampPianoHexInput(text, activeLane.length);
-		return clampPianoSymbolInput(text, activeLane.length);
-	}
-
-	function parseTypedText(text: string): number | undefined {
-		if (!activeLane) return undefined;
-		if (laneShowsNote(activeLane, editorStateStore.envelopeAsNote)) {
-			return pianoNoteInputPeriod(text, songTuning());
-		}
-		if (activeLane.fieldType === 'hex') {
-			return pianoHexInputValue(text, activeLane.length, activeLane.allowZeroValue);
-		}
-		return pianoSymbolInputValue(text, activeLane.length, activeLane.allowZeroValue);
-	}
-
-	function formatTypedValue(value: unknown): string {
-		if (!activeLane) return '';
-		return formatPianoTypedLabel(value, activeLane, editorStateStore.envelopeAsNote, songTuning());
-	}
-
-	function writeTypedNumber(
-		patternId: number,
-		localRow: number,
-		orderIndex: number,
-		value: number
-	): boolean {
-		if (!converter || !selected || !activeLane) return false;
-		const source = patternById.get(patternId);
-		if (!source) return false;
-		const generic = converter.toGeneric(source);
-		if (!setPianoFieldValue(generic, activeLane, selected.channelIndex, localRow, value)) {
-			return false;
-		}
-		commitEdits(
-			selected.songIndex,
-			new Map([[source.id, { before: source, after: converter.fromGeneric(generic) }]]),
-			orderIndex,
-			localRow
-		);
-		return true;
-	}
-
-	function writeValue(editor: {
-		patternId: number;
-		localRow: number;
-		orderIndex: number;
-		text: string;
-		original: string;
-	}): void {
-		if (!laneValueIsTyped(activeLane)) return;
-		const text = clampTypedText(editor.text);
-		if (text === clampTypedText(editor.original)) return;
-		const value = parseTypedText(text);
-		if (value === undefined) return;
-		if (!writeTypedNumber(editor.patternId, editor.localRow, editor.orderIndex, value)) return;
-		const formatted = formatTypedValue(value);
-		editor.text = formatted;
-		editor.original = formatted;
-	}
-
-	function openValueEditor(absoluteRow: number): void {
-		if (playbackStore.isPlaying || !laneValueIsTyped(activeLane) || !activeLane || !converter || !selected) {
-			return;
-		}
-		const current = valueEditor;
-		if (current && current.absoluteRow !== absoluteRow) writeValue(current);
-		dismissEffectEditor();
+	function openLaneEditor(absoluteRow: number): void {
+		const lane = activeLane;
+		const codec = laneCodec;
+		if (playbackStore.isPlaying || !lane || !codec || !selected) return;
+		const current = laneEditor;
+		if (current && current.absoluteRow !== absoluteRow) commitLaneEditor(current);
 		const located = timelineSpanAt(timeline, absoluteRow);
-		if (!located) return;
-		const item = patternById.get(located.span.patternId);
-		if (!item) return;
-		const raw = readPianoFieldValue(
-			converter.toGeneric(item),
-			activeLane,
-			selected.channelIndex,
-			located.localRow
+		const item = located ? patternById.get(located.span.patternId) : undefined;
+		if (!located || !item) return;
+		const text = codec.format(
+			readPianoFieldValue(cachedGeneric(item), lane, selected.channelIndex, located.localRow)
 		);
-		const text = formatTypedValue(raw);
 		focusLocation(located.span, located.localRow);
-		valueEditor = {
+		laneEditor = {
+			kind: lane.kind === 'effect' ? 'effect' : 'value',
+			laneKey: lane.key,
 			absoluteRow,
-			orderIndex: located.span.orderIndex,
-			patternId: located.span.patternId,
-			localRow: located.localRow,
+			...laneCellAt(located),
 			text,
 			original: text,
-			left: effectEditorLeft(absoluteRow)
+			left: laneEditorLeft(absoluteRow)
 		};
-		ensureValueEditorListener();
-		void tick().then(() => valueInput?.select());
+		releaseLaneEditorListener ??= onPointerDownOutside(
+			() => laneEditorRoot,
+			() => {
+				const editor = laneEditor;
+				if (editor) commitLaneEditor(editor);
+				dismissLaneEditor();
+			}
+		);
+		void tick().then(() => laneEditorInput?.select());
 	}
 
-	function onValueEditorInput(event: Event): void {
+	function applyEffectFormat(format: string): void {
+		const current = laneEditor;
+		if (!current) return;
+		current.text = effectCommandFromFormat(format);
+		commitLaneEditor(current);
+		void tick().then(() => laneEditorInput?.select());
+	}
+
+	function onLaneEditorInput(event: Event): void {
 		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement) || !valueEditor || !activeLane) return;
-		const next = clampTypedText(input.value);
+		if (!(input instanceof HTMLInputElement) || !laneEditor || !laneCodec) return;
+		const next = laneCodec.clamp(input.value);
 		if (input.value !== next) {
-			const caret = input.selectionStart ?? next.length;
+			const caret = Math.min(input.selectionStart ?? next.length, next.length);
 			input.value = next;
-			const pos = Math.min(caret, next.length);
-			input.setSelectionRange(pos, pos);
+			input.setSelectionRange(caret, caret);
 		}
-		if (valueEditor.text !== next) valueEditor.text = next;
+		if (laneEditor.text !== next) laneEditor.text = next;
+	}
+
+	function onLaneEditorKeydown(event: KeyboardEvent): void {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			dismissLaneEditor();
+			return;
+		}
+		if (event.key !== 'Enter') return;
+		event.preventDefault();
+		const current = laneEditor;
+		if (!current) return;
+		commitLaneEditor(current);
+		const nextRow = current.absoluteRow + 1;
+		if (timelineSpanAt(timeline, nextRow)) openLaneEditor(nextRow);
+		else dismissLaneEditor();
 	}
 
 	function onLaneKeyDown(event: KeyboardEvent): void {
@@ -3233,117 +2477,19 @@
 			return;
 		}
 		const mapped = PatternNoteInput.mapKeyboardCodeToNote(event.code);
-		const tuning = songTuning();
-		if (!mapped || tuning.length === 0) return;
+		if (!mapped || tuningTable.length === 0) return;
 		const pitch = noteToTuningTableIndex(mapped.noteName, mapped.octave);
-		if (pitch === null) return;
 		const located = timelineSpanAt(timeline, cursorRow);
-		if (!located) return;
+		if (pitch === null || !located) return;
 		event.preventDefault();
-		dismissValueEditor();
-		writeTypedNumber(
-			located.span.patternId,
-			located.localRow,
-			located.span.orderIndex,
-			noteToEnvelopePeriod(pitch, tuning)
-		);
-	}
-
-	function onValueEditorKeydown(event: KeyboardEvent): void {
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			dismissValueEditor();
-			return;
-		}
-		if (event.key !== 'Enter') return;
-		event.preventDefault();
-		const current = valueEditor;
-		if (!current) return;
-		writeValue(current);
-		const next = timelineSpanAt(timeline, current.absoluteRow + 1);
-		if (!next) {
-			dismissValueEditor();
-			return;
-		}
-		openValueEditor(current.absoluteRow + 1);
-	}
-
-	function openEffectEditor(absoluteRow: number): void {
-		if (playbackStore.isPlaying || !activeLane || activeLane.kind !== 'effect' || !converter || !selected) {
-			return;
-		}
-		dismissValueEditor();
-		const current = effectEditor;
-		if (current && current.absoluteRow !== absoluteRow) writeEffect(current);
-		const located = timelineSpanAt(timeline, absoluteRow);
-		if (!located) return;
-		const item = patternById.get(located.span.patternId);
-		if (!item) return;
-		const raw = readPianoFieldValue(
-			converter.toGeneric(item),
-			activeLane,
-			selected.channelIndex,
-			located.localRow
-		);
-		const text = formatPianoEffectInput(raw);
-		focusLocation(located.span, located.localRow);
-		effectEditor = {
-			absoluteRow,
-			orderIndex: located.span.orderIndex,
-			patternId: located.span.patternId,
-			localRow: located.localRow,
-			text,
-			original: text,
-			left: effectEditorLeft(absoluteRow)
-		};
-		ensureEffectEditorListener();
-		void tick().then(() => effectInput?.select());
-	}
-
-	function applyEffectFormat(format: string): void {
-		const current = effectEditor;
-		if (!current) return;
-		current.text = effectCommandFromFormat(format);
-		writeEffect(current);
-		void tick().then(() => effectInput?.select());
-	}
-
-	function onEffectEditorInput(event: Event): void {
-		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement) || !effectEditor) return;
-		const next = clampPianoEffectInput(input.value);
-		if (input.value !== next) {
-			const caret = input.selectionStart ?? next.length;
-			input.value = next;
-			const pos = Math.min(caret, next.length);
-			input.setSelectionRange(pos, pos);
-		}
-		if (effectEditor.text !== next) effectEditor.text = next;
-	}
-
-	function onEffectEditorKeydown(event: KeyboardEvent): void {
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			dismissEffectEditor();
-			return;
-		}
-		if (event.key !== 'Enter') return;
-		event.preventDefault();
-		const current = effectEditor;
-		if (!current) return;
-		writeEffect(current);
-		const next = timelineSpanAt(timeline, current.absoluteRow + 1);
-		if (!next) {
-			dismissEffectEditor();
-			return;
-		}
-		openEffectEditor(current.absoluteRow + 1);
+		dismissLaneEditor();
+		writeLaneCell(laneCellAt(located), noteToEnvelopePeriod(pitch, tuningTable));
 	}
 
 	function closeLaneMenu(): void {
 		laneMenuOpen = false;
-		closeLaneMenuListener?.();
-		closeLaneMenuListener = null;
+		releaseLaneMenuListener?.();
+		releaseLaneMenuListener = null;
 	}
 
 	function toggleLaneMenu(): void {
@@ -3352,15 +2498,26 @@
 			return;
 		}
 		laneMenuOpen = true;
-		const close = (event: PointerEvent) => {
-			const target = event.target;
-			if (target instanceof Node && laneMenuRoot?.contains(target)) return;
-			closeLaneMenu();
-		};
-		window.addEventListener('pointerdown', close);
-		closeLaneMenuListener = () => window.removeEventListener('pointerdown', close);
+		releaseLaneMenuListener = onPointerDownOutside(() => laneMenuRoot, closeLaneMenu);
+	}
+
+	function laneLabel(lane: PianoRollLane | null): string {
+		if (!lane) return '';
+		return lane.isGlobal ? `Chip · ${lane.label}` : lane.label;
 	}
 </script>
+
+{#snippet zoomControl(label: string, zoom: (step: number) => void)}
+	<span>{label}</span>
+	<button
+		type="button"
+		class="cursor-pointer rounded-sm border border-[var(--color-app-border)] px-1"
+		onclick={() => zoom(-2)}>−</button>
+	<button
+		type="button"
+		class="cursor-pointer rounded-sm border border-[var(--color-app-border)] px-1"
+		onclick={() => zoom(2)}>+</button>
+{/snippet}
 
 <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-x-none">
 	<div
@@ -3388,25 +2545,10 @@
 				</div>
 			{/each}
 		</div>
-		<div class="ml-auto flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-app-text-tertiary)]">
-				<span>Time</span>
-				<button
-					type="button"
-					class="cursor-pointer rounded-sm border border-[var(--color-app-border)] px-1"
-					onclick={() => (rowWidth = clamp(rowWidth - 2, 8, 40))}>−</button>
-				<button
-					type="button"
-					class="cursor-pointer rounded-sm border border-[var(--color-app-border)] px-1"
-					onclick={() => (rowWidth = clamp(rowWidth + 2, 8, 40))}>+</button>
-				<span>Pitch</span>
-				<button
-					type="button"
-					class="cursor-pointer rounded-sm border border-[var(--color-app-border)] px-1"
-					onclick={() => (keyHeight = clamp(keyHeight - 2, 8, 28))}>−</button>
-				<button
-					type="button"
-					class="cursor-pointer rounded-sm border border-[var(--color-app-border)] px-1"
-					onclick={() => (keyHeight = clamp(keyHeight + 2, 8, 28))}>+</button>
+		<div
+			class="ml-auto flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-app-text-tertiary)]">
+			{@render zoomControl('Time', zoomTime)}
+			{@render zoomControl('Pitch', zoomPitch)}
 		</div>
 	</div>
 	{#if timeline.length === 0}
@@ -3421,8 +2563,13 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1">
-			<div class="flex shrink-0 flex-col border-r border-[var(--color-app-border)]" style:width="{KEYBOARD_WIDTH}px">
-				<div class="shrink-0 border-b border-[var(--color-app-border)]" style:height="{RULER_HEIGHT}px"></div>
+			<div
+				class="flex shrink-0 flex-col border-r border-[var(--color-app-border)]"
+				style:width="{KEYBOARD_WIDTH}px">
+				<div
+					class="shrink-0 border-b border-[var(--color-app-border)]"
+					style:height="{RULER_HEIGHT}px">
+				</div>
 				<div class="min-h-0 flex-1 overflow-hidden" bind:this={keyboardViewport}>
 					<canvas bind:this={keyboardCanvas} class="block"></canvas>
 				</div>
@@ -3448,7 +2595,7 @@
 					onmousedown={onGridMouseDown}
 					onmousemove={onGridMouseMove}
 					onkeydown={onGridKeyDown}
-					onkeyup={() => stopPreview()}
+					onkeyup={() => notePreview.stop()}
 					oncontextmenu={onGridContextMenu}>
 				</canvas>
 			</div>
@@ -3457,33 +2604,34 @@
 	<div
 		class="relative z-20 flex shrink-0 border-t border-[var(--color-app-border)]"
 		style:height="{LANE_HEIGHT}px">
-		{#if effectEditor}
+		{#if laneEditor?.kind === 'effect'}
 			<div
-				bind:this={effectEditorRoot}
+				bind:this={laneEditorRoot}
 				class="absolute z-40 mb-1 flex max-h-64 w-44 flex-col overflow-hidden rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-surface)] shadow-lg"
-				style:left="{KEYBOARD_WIDTH + effectEditor.left}px"
+				style:left="{KEYBOARD_WIDTH + laneEditor.left}px"
 				style:bottom="100%">
-				{#key effectEditor.absoluteRow}
+				{#key laneEditor.absoluteRow}
 					<div
 						class="relative m-1 w-fit rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-bg)]">
 						<div
 							class="pointer-events-none flex px-1.5 py-1 font-mono text-[13px] leading-none"
 							aria-hidden="true">
 							{#each effectEditorGlyphs as glyph, index (index)}
-								<span class="inline-block w-[1ch] text-center" style:color={glyph.color}
-									>{glyph.char}</span>
+								<span
+									class="inline-block w-[1ch] text-center"
+									style:color={glyph.color}>{glyph.char}</span>
 							{/each}
 						</div>
 						<input
-							bind:this={effectInput}
-							bind:value={effectEditor.text}
-							maxlength="4"
+							bind:this={laneEditorInput}
+							bind:value={laneEditor.text}
+							maxlength={laneCodec?.maxLength}
 							class="absolute inset-0 w-full bg-transparent px-1.5 py-1 font-mono text-[13px] leading-none text-transparent uppercase caret-[var(--color-app-text-primary)] outline-none"
 							aria-label="Effect command"
 							spellcheck="false"
 							autocomplete="off"
-							oninput={onEffectEditorInput}
-							onkeydown={onEffectEditorKeydown} />
+							oninput={onLaneEditorInput}
+							onkeydown={onLaneEditorKeydown} />
 					</div>
 				{/key}
 				<div class="min-h-0 overflow-auto py-1">
@@ -3495,7 +2643,8 @@
 							class="flex w-full cursor-pointer items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--color-app-surface-hover)]"
 							onmousedown={(event) => event.preventDefault()}
 							onclick={() => applyEffectFormat(hint.format)}>
-							<span class="min-w-0 flex-1 truncate text-[11px] text-[var(--color-app-text-primary)]">
+							<span
+								class="min-w-0 flex-1 truncate text-[11px] text-[var(--color-app-text-primary)]">
 								{hint.name}
 							</span>
 							<span class="font-mono text-[10px]">
@@ -3507,24 +2656,26 @@
 					{/each}
 				</div>
 			</div>
-		{/if}
-		{#if valueEditor}
+		{:else if laneEditor}
 			<div
-				bind:this={valueEditorRoot}
+				bind:this={laneEditorRoot}
 				class="absolute z-40 mb-1 rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-surface)] p-1 shadow-lg"
-				style:left="{KEYBOARD_WIDTH + valueEditor.left}px"
+				style:left="{KEYBOARD_WIDTH + laneEditor.left}px"
 				style:bottom="100%">
 				<input
-					bind:this={valueInput}
-					bind:value={valueEditor.text}
-					maxlength={typedInputMaxLength}
-					class="rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-bg)] px-1.5 py-1 text-center font-mono text-[13px] uppercase outline-none {(activeLane?.length ?? 2) <= 1 ? 'w-8' : 'w-12'}"
+					bind:this={laneEditorInput}
+					bind:value={laneEditor.text}
+					maxlength={laneCodec?.maxLength}
+					class="rounded-sm border border-[var(--color-app-border)] bg-[var(--color-app-bg)] px-1.5 py-1 text-center font-mono text-[13px] uppercase outline-none {(laneCodec?.maxLength ??
+						2) <= 1
+						? 'w-8'
+						: 'w-12'}"
 					style:color={typedLaneColor}
 					aria-label={activeLane?.label ?? 'Value'}
 					spellcheck="false"
 					autocomplete="off"
-					oninput={onValueEditorInput}
-					onkeydown={onValueEditorKeydown} />
+					oninput={onLaneEditorInput}
+					onkeydown={onLaneEditorKeydown} />
 			</div>
 		{/if}
 		<div
@@ -3543,7 +2694,7 @@
 				></span>
 			</button>
 			<span class="truncate px-1.5 text-[11px] text-[var(--color-app-text-muted)]">
-				{activeLane?.isGlobal ? `Chip · ${activeLane.label}` : (activeLane?.label ?? '')}
+				{laneLabel(activeLane)}
 			</span>
 			{#if laneMenuOpen}
 				<div
@@ -3551,11 +2702,12 @@
 					{#each lanes as lane (lane.key)}
 						<button
 							type="button"
-							class="block w-full cursor-pointer px-2 py-1 text-left text-[11px] {lane.key === activeLane?.key
+							class="block w-full cursor-pointer px-2 py-1 text-left text-[11px] {lane.key ===
+							activeLane?.key
 								? 'bg-[var(--color-app-surface-active)] text-[var(--color-app-text-primary)]'
 								: 'text-[var(--color-app-text-secondary)] hover:bg-[var(--color-app-surface-hover)]'}"
 							onclick={() => selectLane(lane)}>
-							{lane.isGlobal ? `Chip · ${lane.label}` : lane.label}
+							{laneLabel(lane)}
 						</button>
 					{/each}
 				</div>
@@ -3566,9 +2718,7 @@
 				bind:this={laneCanvas}
 				tabindex="0"
 				aria-label={activeLane?.label ?? 'Event lane'}
-				class="block outline-none {activeLane?.kind === 'effect' || laneValueIsTyped(activeLane)
-					? 'cursor-text'
-					: ''}"
+				class="block outline-none {laneCodec ? 'cursor-text' : ''}"
 				onmousedown={onLaneMouseDown}
 				onkeydown={onLaneKeyDown}
 				oncontextmenu={(event) => event.preventDefault()}>

@@ -11,22 +11,30 @@ describe('piano effect gestures', () => {
 			kind: 'slide-up',
 			amount: 0.5
 		});
-		expect(generalPianoEffectGesture({ effect: 1, delay: 0, parameter: 0, tableIndex: 2 })).toEqual({
+		expect(
+			generalPianoEffectGesture({ effect: 1, delay: 0, parameter: 0, tableIndex: 2 })
+		).toEqual({
 			kind: 'slide-down',
 			amount: 0.45
 		});
-		expect(generalPianoEffectGesture({ effect: 'A'.charCodeAt(0), delay: 0, parameter: 0x37 })).toEqual({
+		expect(
+			generalPianoEffectGesture({ effect: 'A'.charCodeAt(0), delay: 0, parameter: 0x37 })
+		).toEqual({
 			kind: 'arpeggio',
 			steps: [3, 7]
 		});
-		expect(generalPianoEffectGesture({ effect: 'A'.charCodeAt(0), delay: 0, parameter: 0 })).toBeNull();
+		expect(
+			generalPianoEffectGesture({ effect: 'A'.charCodeAt(0), delay: 0, parameter: 0 })
+		).toBeNull();
 		expect(generalPianoEffectGesture({ effect: 7, delay: 0, parameter: 4 })).toEqual({
 			kind: 'delay',
 			portion: 0.25
 		});
 		expect(generalPianoEffectGesture({ effect: 8, delay: 0, parameter: 0 })).toBeNull();
 		expect(generalPianoEffectGesture({ effect: 6, delay: 0, parameter: 1 })).toBeNull();
-		expect(generalPianoEffectGesture({ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x20 })).toBeNull();
+		expect(
+			generalPianoEffectGesture({ effect: 'E'.charCodeAt(0), delay: 1, parameter: 0x20 })
+		).toBeNull();
 	});
 
 	it('lets a chip picture win, then falls back to the shared commands', () => {
