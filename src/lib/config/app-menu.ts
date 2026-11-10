@@ -75,13 +75,13 @@ export function buildMenuItems(
 		{
 			label: 'View',
 			items: [
-				{
-					label: 'Tracker',
-					type: 'normal',
-					action: 'edit-view-tracker'
-				},
 				...(experimentalFeatures
 					? [
+							{
+								label: 'Tracker',
+								type: 'normal' as const,
+								action: 'edit-view-tracker'
+							},
 							{
 								label: 'Piano roll',
 								type: 'normal' as const,
