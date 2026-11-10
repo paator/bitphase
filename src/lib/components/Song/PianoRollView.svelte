@@ -538,8 +538,10 @@
 	});
 	const preview = $derived.by(() => {
 		if (drag?.kind !== 'resize') return null;
+		const startRow = drag.startRow;
+		const pitch = drag.pitch;
 		const source = notes.blocks.find(
-			(block) => block.startRow === drag.startRow && block.pitchIndex === drag.pitch
+			(block) => block.startRow === startRow && block.pitchIndex === pitch
 		);
 		return {
 			startRow: drag.startRow,
