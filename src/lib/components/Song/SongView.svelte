@@ -195,7 +195,9 @@
 		isRightPanelExpanded ? 'pointer-events-none opacity-50' : ''
 	);
 	const pianoRollActive = $derived(
-		settingsStore.experimentalFeatures && editorStateStore.editView === 'piano-roll'
+		settingsStore.experimentalFeatures &&
+			editorStateStore.editView === 'piano-roll' &&
+			projectStore.songs.length > 0
 	);
 
 	const activeChipProcessor = $derived(chipProcessors[activeEditorIndex]);
@@ -743,7 +745,7 @@
 						{/if}
 					</div>
 				{/if}
-				{#if projectStore.songs.length > 0 && pianoRollActive}
+				{#if pianoRollActive}
 					<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 					<PianoRollView
 						{chipProcessors}
