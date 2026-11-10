@@ -23,6 +23,7 @@ class SettingsStore {
 	selectionStyle = $state<'inverted' | 'filled'>('inverted');
 	emptyNoteAlignment = $state<'center' | 'baseline'>('center');
 	classicInstrumentEditor = $state(false);
+	pianoRollGhostNotes = $state(false);
 
 	init(): void {
 		const stored = localStorage.getItem(STORAGE_KEY);

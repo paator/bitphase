@@ -15,10 +15,11 @@ The piano roll is unfinished. It stays hidden until you turn on **Settings → E
 
 ## Layout
 
-The bar across the top lists every song in the project and a button for each of its channels. The roll always shows one channel. Click another button to edit that voice. Chip-wide columns (AY envelope and noise, SAA noise and envelope, and so on) are edited from the lane, not as their own channel.
+The bar across the top lists every song in the project and a button for each of its channels. The roll edits one channel. **Ghost channels**, to the left of the time zoom, shows notes from the other channels as faint gray blocks marked with their channel. Those notes cannot be selected or edited. It starts off. The same switch is in **Settings → Appearance → Piano roll ghost notes**. Click another channel button to edit that voice. Chip-wide columns (AY envelope and noise, SAA noise and envelope, and so on) are edited from the lane, not as their own channel.
 
 | Control | What it does |
 | ------- | ------------ |
+| Ghost channels | Show notes from the other channels |
 | Time + / − | Zoom the row width |
 | Pitch + / − | Zoom the key height |
 | Lane menu | Choose which non-note field the bottom strip edits |

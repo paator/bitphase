@@ -27,6 +27,8 @@ export interface PianoNoteBlock extends PianoNoteSpot {
 	gestures: PianoEffectGesture[];
 	level?: number | null;
 	conflict?: boolean;
+	ghostChannel?: number;
+	ghostLabel?: string;
 }
 
 export interface PianoGateMarker {

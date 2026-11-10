@@ -109,7 +109,7 @@ export function hitTestNoteContent(
 	let trailingEdge: PianoNoteBlock | null = null;
 	for (let index = blocks.length - 1; index >= 0; index--) {
 		const block = blocks[index];
-		if (!block || block.pitchIndex !== pitchIndex) continue;
+		if (!block || block.ghostChannel !== undefined || block.pitchIndex !== pitchIndex) continue;
 		const endX = block.endRow * metrics.rowWidth;
 		const startX = block.startRow * metrics.rowWidth;
 		const width = Math.max(metrics.rowWidth, endX - startX);

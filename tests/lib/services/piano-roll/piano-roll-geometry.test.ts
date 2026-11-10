@@ -48,6 +48,12 @@ describe('piano roll geometry', () => {
 		expect(yToPitch(-1, metrics)).toBeNull();
 	});
 
+	it('ignores notes that belong to another channel', () => {
+		const ghost: PianoNoteBlock = { ...block, ghostChannel: 1 };
+		const hit = hitTestNoteContent(30, pitchToY(10, metrics), [ghost], metrics);
+		expect(hit).toMatchObject({ type: 'grid', row: 3, pitchIndex: 10 });
+	});
+
 	it('keeps the resize handle near the trailing edge', () => {
 		const wide: PianoRollMetrics = { ...metrics, rowWidth: 40 };
 		const y = pitchToY(10, wide) + 1;

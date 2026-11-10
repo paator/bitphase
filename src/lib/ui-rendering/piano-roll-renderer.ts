@@ -57,6 +57,7 @@ export interface PianoGridDrawOptions {
 	scrollY: number;
 	metrics: PianoRollMetrics;
 	blocks: PianoNoteBlock[];
+	ghosts?: readonly PianoNoteBlock[];
 	gates: PianoGateMarker[];
 	spans: readonly PianoTimelineSpan[];
 	currentOrderIndex: number;
@@ -119,6 +120,8 @@ type LaneCellPainter = (row: number, x: number, raw: unknown) => void;
 
 const CONFLICT_FILL = '#e64553';
 const CONFLICT_MARK = '#fff7f7';
+const GHOST_ALPHA = 0.07;
+const GHOST_LABEL_ALPHA = 0.4;
 
 const paletteCache = new WeakMap<PianoRollColors, PianoPalette>();
 
@@ -395,6 +398,12 @@ function drawNoteBlocks(
 		const fill = options.resolveColor(block) ?? colors.note;
 		drawBlock(ctx, block, frame, fill, isSelected, presence);
 	};
+	for (const block of options.ghosts ?? []) {
+		const blockStart = block.startRow * metrics.rowWidth;
+		const blockEnd = block.endRow * metrics.rowWidth;
+		if (blockEnd < viewStart || blockStart > viewEnd) continue;
+		drawBlock(ctx, block, frame, colors.text, false);
+	}
 	for (const ghost of options.leavingBlocks ?? []) {
 		if (!hidden.has(noteSpotKey(ghost.block)))
 			paint(ghost.block, ghost.presence, ghost.selected);
@@ -704,6 +713,40 @@ function blendOverBackdrop(
 	ctx.restore();
 }
 
+function paintGhost(
+	ctx: CanvasRenderingContext2D,
+	block: PianoNoteBlock,
+	x: number,
+	drawY: number,
+	drawWidth: number,
+	drawHeight: number,
+	fill: string
+): void {
+	ctx.save();
+	ctx.globalAlpha = GHOST_ALPHA;
+	ctx.fillStyle = fill;
+	ctx.fillRect(x, drawY, drawWidth, drawHeight);
+	ctx.restore();
+	const label = block.ghostLabel;
+	if (!label || drawHeight < 7 || drawWidth < 6) return;
+	ctx.save();
+	ctx.beginPath();
+	ctx.rect(x, drawY, drawWidth, drawHeight);
+	ctx.clip();
+	ctx.globalAlpha = GHOST_LABEL_ALPHA;
+	ctx.fillStyle = fill;
+	ctx.font = '8px ui-monospace, monospace';
+	ctx.textBaseline = 'middle';
+	const textY = drawY + drawHeight / 2;
+	let textX = Math.max(x + 2, 2);
+	const end = x + drawWidth - 2;
+	while (textX < end) {
+		ctx.fillText(label, textX, textY);
+		textX += 64;
+	}
+	ctx.restore();
+}
+
 function paintBlock(
 	ctx: CanvasRenderingContext2D,
 	block: PianoNoteBlock,
@@ -717,6 +760,11 @@ function paintBlock(
 	const { metrics } = frame;
 	const { x, y: drawY, width: drawWidth, height: drawHeight } = rect;
 	const conflict = block.conflict === true;
+	const ghost = block.ghostChannel !== undefined;
+	if (ghost) {
+		paintGhost(ctx, block, x, drawY, drawWidth, drawHeight, fill);
+		return;
+	}
 	const alpha = (conflict ? 0.96 : noteLevelAlpha(block.level)) * opacity;
 	ctx.save();
 	ctx.globalAlpha = alpha;

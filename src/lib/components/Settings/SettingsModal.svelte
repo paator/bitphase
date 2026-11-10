@@ -46,7 +46,8 @@
 		experimentalFeatures: settingsStore.experimentalFeatures,
 		selectionStyle: settingsStore.selectionStyle,
 		emptyNoteAlignment: settingsStore.emptyNoteAlignment,
-		classicInstrumentEditor: settingsStore.classicInstrumentEditor
+		classicInstrumentEditor: settingsStore.classicInstrumentEditor,
+		pianoRollGhostNotes: settingsStore.pianoRollGhostNotes
 	};
 	let tempSettings = $state<Settings>({ ...currentSettings });
 	let activeTabId = $state(initialTabId || 'general');

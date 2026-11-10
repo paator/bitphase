@@ -187,6 +187,15 @@ export const settingsItems: SettingsItem[] = [
 		]
 	},
 	{
+		label: 'Piano roll ghost notes',
+		description:
+			'Show notes from the other channels as faint gray blocks on the piano roll. They are marked with their channel and cannot be edited',
+		type: 'toggle',
+		defaultValue: false,
+		setting: 'pianoRollGhostNotes',
+		category: 'appearance'
+	},
+	{
 		label: 'Empty note alignment',
 		description:
 			'Vertical position of empty notes (`---`). Down-aligned matches empty fields that use dots',

@@ -18,6 +18,7 @@ export interface Settings {
 	selectionStyle: 'inverted' | 'filled';
 	emptyNoteAlignment: 'center' | 'baseline';
 	classicInstrumentEditor: boolean;
+	pianoRollGhostNotes: boolean;
 }
 
 export interface SettingsItem {

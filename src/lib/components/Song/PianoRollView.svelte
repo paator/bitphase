@@ -138,6 +138,7 @@
 	import { undoRedoStore } from '../../stores/undo-redo.svelte';
 	import { autoEnvStore } from '../../stores/auto-env.svelte';
 	import { settingsStore } from '../../stores/settings.svelte';
+	import IconLucideGhost from '~icons/lucide/ghost';
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { themeService } from '../../services/theme/theme-service';
 	import { midiService } from '../../services/midi/midi-service';
@@ -206,6 +207,7 @@
 	interface TimelineView {
 		key: string;
 		blocks: PianoTimelineBlock[];
+		ghosts: PianoTimelineBlock[];
 		gates: PianoTimelineGate[];
 		valueOrigin: number;
 		laneValues: unknown[];
@@ -217,6 +219,7 @@
 	const EMPTY_VIEW: TimelineView = {
 		key: '',
 		blocks: [],
+		ghosts: [],
 		gates: [],
 		valueOrigin: 0,
 		laneValues: [],
@@ -609,6 +612,7 @@
 			scrollY,
 			metrics,
 			blocks: notes.blocks,
+			ghosts: notes.ghosts,
 			gates: notes.gates,
 			spans: timeline,
 			currentOrderIndex: currentPatternOrderIndex,
@@ -737,20 +741,25 @@
 		return generic;
 	}
 
-	function channelRows(patternId: number): GenericRow[] | undefined {
+	function channelRows(
+		patternId: number,
+		channelIndex = selected?.channelIndex
+	): GenericRow[] | undefined {
 		const item = patternById.get(patternId);
-		if (!item || !selected) return undefined;
-		return cachedGeneric(item).channels[selected.channelIndex]?.rows;
+		if (!item || channelIndex === undefined) return undefined;
+		return cachedGeneric(item).channels[channelIndex]?.rows;
 	}
 
 	function timelineViewKey(windowSpans: readonly PianoTimelineSpan[]): string {
 		if (!selected) return '';
-		let key = `${selected.songIndex}:${selected.channelIndex}:${noteKey}:${activeLane?.key ?? ''}:`;
-		const keyStart = windowSpans[0]?.orderIndex ?? 0;
-		for (const span of timeline) {
-			if (span.orderIndex < keyStart) continue;
+		let key = `${selected.songIndex}:${selected.channelIndex}:${noteKey}:${activeLane?.key ?? ''}:${settingsStore.pianoRollGhostNotes ? 1 : 0}:`;
+		for (const channel of channels) {
+			if (channel.songIndex !== selected.songIndex) continue;
+			key += `${channel.channelIndex}${channel.label},`;
+		}
+		for (const span of windowSpans) {
 			const item = patternById.get(span.patternId);
-			key += `${span.orderIndex}.${span.startRow}.${item ? patternToken(item) : 0}:`;
+			key += `${span.orderIndex}.${span.startRow}.${span.length}.${item ? patternToken(item) : 0}:`;
 		}
 		for (const table of projectStore.tables) {
 			key += `${table.id}.${table.additive ? 1 : 0}.${table.rows.join(',')}|`;
@@ -808,12 +817,49 @@
 		viewCache = {
 			key,
 			blocks,
+			ghosts: settingsStore.pianoRollGhostNotes ? ghostBlocksFor(windowSpans) : [],
 			gates,
 			valueOrigin,
 			laneValues: laneValuesFor(windowSpans, valueOrigin, visibleEnd),
 			patternIds: windowSpans.map((span) => span.patternId)
 		};
 		return viewCache;
+	}
+
+	function ghostBlocksFor(windowSpans: readonly PianoTimelineSpan[]): PianoTimelineBlock[] {
+		if (!selected || !noteKey || windowSpans.length === 0) return [];
+		let channelCount = 0;
+		for (const span of windowSpans) {
+			const item = patternById.get(span.patternId);
+			if (!item) continue;
+			channelCount = Math.max(channelCount, cachedGeneric(item).channels.length);
+		}
+		const ghosts: PianoTimelineBlock[] = [];
+		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+			if (channelIndex === selected.channelIndex) continue;
+			const { blocks } = collectTimelineBlocks({
+				timeline,
+				spans: windowSpans,
+				noteKey,
+				rowsForSpan: (span) => channelRows(span.patternId, channelIndex),
+				collect: (rows) => collectPianoNotes(rows, noteKey, { gestureFor: () => null })
+			});
+			const label = ghostChannelLabel(channelIndex);
+			for (const block of blocks) {
+				ghosts.push({ ...block, ghostChannel: channelIndex, ghostLabel: label, gestures: [] });
+			}
+		}
+		return ghosts;
+	}
+
+	function ghostChannelLabel(channelIndex: number): string {
+		if (!selected) return String(channelIndex + 1);
+		return (
+			channels.find(
+				(channel) =>
+					channel.songIndex === selected.songIndex && channel.channelIndex === channelIndex
+			)?.label ?? String(channelIndex + 1)
+		);
 	}
 
 	function ornamentTable(id: number) {
@@ -2701,6 +2747,18 @@
 		</div>
 		<div
 			class="ml-auto flex shrink-0 items-center gap-1 text-[10px] text-[var(--color-app-text-tertiary)]">
+			<label
+				class="mr-4 flex cursor-pointer items-center gap-1"
+				title="Show notes from the other channels">
+				<input
+					type="checkbox"
+					class="h-3 w-3 cursor-pointer accent-[var(--color-app-primary)]"
+					checked={settingsStore.pianoRollGhostNotes}
+					onchange={(event) =>
+						settingsStore.set('pianoRollGhostNotes', event.currentTarget.checked)} />
+				<IconLucideGhost class="h-3 w-3" />
+				Ghost channels
+			</label>
 			{@render zoomControl('Time', zoomTime)}
 			{@render zoomControl('Pitch', zoomPitch)}
 		</div>
