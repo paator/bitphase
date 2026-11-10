@@ -141,16 +141,34 @@ export function removePitchedNote(
 	generic: GenericPattern,
 	channelIndex: number,
 	noteKey: string,
-	startRow: number
+	startRow: number,
+	blank: GenericRow | null = null
 ): boolean {
-	return removePitchedNotes(generic, channelIndex, noteKey, [startRow]);
+	return removePitchedNotes(generic, channelIndex, noteKey, [startRow], blank);
+}
+
+function clearNoteFields(row: GenericRow, noteKey: string, blank: GenericRow): boolean {
+	let changed = false;
+	for (const [key, empty] of Object.entries(blank)) {
+		if (key === noteKey || !(key in row) || sameFieldValue(row[key], empty)) continue;
+		row[key] = empty !== null && typeof empty === 'object' ? { ...empty } : empty;
+		changed = true;
+	}
+	return changed;
+}
+
+function sameFieldValue(left: unknown, right: unknown): boolean {
+	if (left === right) return true;
+	if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+	return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function removePitchedNotes(
 	generic: GenericPattern,
 	channelIndex: number,
 	noteKey: string,
-	startRows: readonly number[]
+	startRows: readonly number[],
+	blank: GenericRow | null = null
 ): boolean {
 	const rows = generic.channels[channelIndex]?.rows;
 	if (!rows) return false;
@@ -183,7 +201,9 @@ export function removePitchedNotes(
 	}
 	for (const [row, value] of replacements) {
 		const cell = rows[row];
-		if (cell) cell[noteKey] = value;
+		if (!cell) continue;
+		cell[noteKey] = value;
+		if (blank) clearNoteFields(cell, noteKey, blank);
 	}
 	for (const gate of gates) {
 		const cell = rows[gate];

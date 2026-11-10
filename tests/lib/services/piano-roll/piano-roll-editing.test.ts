@@ -19,6 +19,7 @@ import {
 	setNoteValue
 } from '@/lib/services/piano-roll/piano-roll-editing';
 import { collectPianoNotes } from '@/lib/services/piano-roll/piano-roll-notes';
+import { blankChannelRow } from '@/lib/services/piano-roll/piano-roll-schema';
 
 function rows(notes: string[]): GenericRow[] {
 	return notes.map((note) => ({ note }));
@@ -157,6 +158,31 @@ describe('piano roll note editing', () => {
 		expect(removePitchedNotes(single(channel), 0, 'note', [3, 2])).toBe(true);
 		expect(notesOf(channel)).toEqual(['C-4', '---', 'OFF', '---', '---', '---', 'G-4']);
 		expect(removePitchedNotes(single(channel), 0, 'note', [1])).toBe(false);
+	});
+
+	it('clears the removed note parameters from a blank schema row', () => {
+		const blank = blankChannelRow(new AYConverter(), AY_CHIP_SCHEMA)!;
+		const channel: GenericRow[] = [
+			{
+				...blank,
+				note: 'C-4',
+				instrument: 2,
+				volume: 12,
+				table: 3,
+				envelopeShape: 8,
+				effect: { effect: 1, delay: 0, parameter: 4 }
+			},
+			{ ...blank, note: '---', volume: 9 },
+			{ ...blank, note: 'E-4', instrument: 1, volume: 5 }
+		];
+		expect(removePitchedNote(single(channel), 0, 'note', 0, blank)).toBe(true);
+		expect(channel[0]).toEqual(blank);
+		expect(channel[1]!.volume).toBe(9);
+		expect(channel[2]).toMatchObject({ note: 'E-4', instrument: 1, volume: 5 });
+
+		const kept = [{ ...blank, note: 'C-4', instrument: 2, volume: 12 }];
+		removePitchedNote(single(kept), 0, 'note', 0);
+		expect(kept[0]).toMatchObject({ note: '---', instrument: 2, volume: 12 });
 	});
 
 	it('reports whether a block ends on another event', () => {

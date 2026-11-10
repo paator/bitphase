@@ -3,8 +3,12 @@ import { AY_CHIP_SCHEMA } from '@/lib/chips/ay/schema';
 import { NES_CHIP_SCHEMA } from '@/lib/chips/nes/schema';
 import { SAA_CHIP_SCHEMA } from '@/lib/chips/saa/schema';
 import type { ChipSchema } from '@/lib/chips/base/schema';
+import { AYConverter } from '@/lib/chips/ay/adapter';
+import { NESConverter } from '@/lib/chips/nes/adapter';
+import { SAAConverter } from '@/lib/chips/saa/adapter';
 import {
 	amplitudeFields,
+	blankChannelRow,
 	findNoteFieldKey,
 	listPianoRollChannels,
 	listPianoRollLanes,
@@ -97,6 +101,33 @@ describe('piano roll schema lanes', () => {
 			fields: { volume: AY_CHIP_SCHEMA.fields.volume }
 		} as ChipSchema;
 		expect(pianoRollFieldKeys(bare)).toEqual({ note: null, instrument: null, table: null });
+	});
+
+	it('builds an empty channel row with every field each chip defines', () => {
+		const effects = { effect: null, effect1: null, effect2: null, effect3: null };
+		expect(blankChannelRow(new AYConverter(), AY_CHIP_SCHEMA)).toEqual({
+			note: '---',
+			instrument: 0,
+			volume: 0,
+			table: 0,
+			envelopeShape: 0,
+			...effects
+		});
+		expect(blankChannelRow(new SAAConverter(), SAA_CHIP_SCHEMA)).toEqual({
+			note: '---',
+			instrument: 0,
+			table: 0,
+			left: 0,
+			right: 0,
+			...effects
+		});
+		expect(blankChannelRow(new NESConverter(), NES_CHIP_SCHEMA)).toEqual({
+			note: '---',
+			instrument: 0,
+			volume: 0,
+			table: 0,
+			...effects
+		});
 	});
 
 	it('lists the amplitude columns with their range', () => {

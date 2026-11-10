@@ -30,6 +30,7 @@
 		listPianoRollLanes,
 		pianoLaneValueFromRatio,
 		pianoRollFieldKeys,
+		blankChannelRow,
 		readPianoFieldValue,
 		setPianoFieldValue,
 		type PianoRollLane
@@ -59,7 +60,8 @@
 		type PianoTimelineBlock,
 		type PianoTimelineGate,
 		type PianoTimelineLocation,
-		type PianoTimelineSpan
+		type PianoTimelineSpan,
+		type SpanRowsReader
 	} from '../../services/piano-roll/piano-roll-timeline';
 	import {
 		pitchedBlockSpan,
@@ -96,9 +98,13 @@
 		rangesOverlap,
 		replaceChannelConflicts,
 		withoutSpots,
-		type PianoIntentNote
+		type PianoIntentNote,
+		type PianoIntentPlan
 	} from '../../services/piano-roll/piano-roll-conflicts';
-	import { PianoPatternSession } from '../../services/piano-roll/piano-pattern-session';
+	import {
+		PianoPatternSession,
+		type PatternEdits
+	} from '../../services/piano-roll/piano-pattern-session';
 	import {
 		commitPianoConflictEdits,
 		commitPianoPatternEdits,
@@ -316,6 +322,7 @@
 	const chip = $derived(selected ? (chipProcessors[selected.songIndex]?.chip ?? null) : null);
 	const converter = $derived(chip ? chip.createConverter() : null);
 	const fieldKeys = $derived(chip ? pianoRollFieldKeys(chip.schema) : null);
+	const blankRow = $derived(chip && converter ? blankChannelRow(converter, chip.schema) : null);
 	const noteKey = $derived(fieldKeys?.note ?? null);
 	const instrumentKey = $derived(fieldKeys?.instrument ?? null);
 	const tuningTable = $derived(projectStore.songs[selected?.songIndex ?? -1]?.tuningTable ?? []);
@@ -1060,11 +1067,39 @@
 		return playbackStore.isPlaying ? null : openSession();
 	}
 
-	function commitSession(session: PianoPatternSession, cursor: PianoEditCursor): boolean {
+	function commitSession(
+		session: PianoPatternSession,
+		cursor: PianoEditCursor
+	): PatternEdits | null {
+		if (!selected) return null;
+		const { songIndex, channelIndex } = selected;
+		const held = heldIntents();
+		if (held.length > 0) {
+			const current = channelIntents(session.rowsForSpan);
+			const plan = planPianoIntents([...current, ...held], current);
+			const beforeHeld = pianoRollConflictStore.snapshot();
+			const afterHeld = replaceChannelConflicts(
+				beforeHeld,
+				songIndex,
+				channelIndex,
+				plan.silent
+			);
+			if (conflictNotesSignature(beforeHeld) !== conflictNotesSignature(afterHeld)) {
+				applyIntentPlan(session, plan);
+				const edits = session.edits();
+				commitPianoConflictEdits(
+					songIndex,
+					edits,
+					{ before: beforeHeld, after: afterHeld },
+					cursor
+				);
+				return edits;
+			}
+		}
 		const edits = session.edits();
-		if (edits.size === 0 || !selected) return false;
-		commitPianoPatternEdits(selected.songIndex, edits, cursor);
-		return true;
+		if (edits.size === 0) return null;
+		commitPianoPatternEdits(songIndex, edits, cursor);
+		return edits;
 	}
 
 	function editingContext(source: Pattern, row: number): EditingContext | null {
@@ -1094,14 +1129,18 @@
 		);
 	}
 
-	function noteEventAt(absoluteRow: number) {
-		const located = timelineSpanAt(timeline, absoluteRow);
-		if (!located || !noteKey) return 'empty';
-		return noteEventKind(channelRows(located.span.patternId)?.[located.localRow]?.[noteKey]);
+	function storedRowsForSpan(span: PianoTimelineSpan): GenericRow[] | undefined {
+		return channelRows(span.patternId);
 	}
 
-	function releaseAt(absoluteRow: number): boolean {
-		return noteEventAt(absoluteRow) === 'release';
+	function noteEventAt(absoluteRow: number, rowsForSpan: SpanRowsReader = storedRowsForSpan) {
+		const located = timelineSpanAt(timeline, absoluteRow);
+		if (!located || !noteKey) return 'empty';
+		return noteEventKind(rowsForSpan(located.span)?.[located.localRow]?.[noteKey]);
+	}
+
+	function releaseAt(absoluteRow: number, rowsForSpan?: SpanRowsReader): boolean {
+		return noteEventAt(absoluteRow, rowsForSpan) === 'release';
 	}
 
 	function sealTail(
@@ -1139,13 +1178,13 @@
 		);
 	}
 
-	function channelIntents(): PianoIntentNote[] {
+	function channelIntents(rowsForSpan: SpanRowsReader = storedRowsForSpan): PianoIntentNote[] {
 		const key = noteKey;
 		if (!selected || !key) return [];
 		const { blocks } = collectTimelineBlocks({
 			timeline,
 			noteKey: key,
-			rowsForSpan: (span) => channelRows(span.patternId),
+			rowsForSpan,
 			collect: (rows) => collectPianoNotes(rows, key)
 		});
 		const columns = timelineColumnCount(timeline);
@@ -1157,7 +1196,7 @@
 				pitchIndex: block.pitchIndex,
 				note: block.note,
 				instrument: block.instrument,
-				release: bounded && releaseAt(block.endRow),
+				release: bounded && releaseAt(block.endRow, rowsForSpan),
 				bounded,
 				preferred: true
 			};
@@ -1227,10 +1266,15 @@
 		}
 	}
 
+	function eraseIntents(spots: readonly PianoNoteSpot[], cursor: PianoEditCursor): IntentResult {
+		return commitIntents(withoutSpots(allIntents(), spots), null, cursor, spots);
+	}
+
 	function commitIntents(
 		intents: PianoIntentNote[],
 		fresh: PianoNoteSpot | null,
-		cursor: PianoEditCursor
+		cursor: PianoEditCursor,
+		erased: readonly PianoNoteSpot[] = []
 	): IntentResult {
 		const unchanged: IntentResult = { changed: false, preview: null, previewRow: cursor.row };
 		if (playbackStore.isPlaying || undoRedoStore.isApplying || !selected || !noteKey) {
@@ -1239,7 +1283,6 @@
 		const session = openSession();
 		if (!session) return unchanged;
 		const { songIndex, channelIndex } = selected;
-		const key = noteKey;
 		const plan = planPianoIntents(intents, channelIntents());
 		const beforeHeld = pianoRollConflictStore.snapshot();
 		const afterHeld = replaceChannelConflicts(beforeHeld, songIndex, channelIndex, plan.silent);
@@ -1251,6 +1294,42 @@
 		) {
 			return unchanged;
 		}
+		applyIntentPlan(session, plan, erased);
+		const freshNote = fresh
+			? plan.audible.find((note) => sameNoteSpot(note, fresh))
+			: undefined;
+		const freshAt = freshNote ? timelineSpanAt(timeline, freshNote.startRow) : null;
+		if (freshAt) {
+			session.finish(freshAt.span.patternId, (after) =>
+				withAutoEnvelope(after, freshAt.localRow)
+			);
+		}
+		const edits = session.edits();
+		commitPianoConflictEdits(
+			songIndex,
+			edits,
+			{ before: beforeHeld, after: afterHeld },
+			cursor
+		);
+		const preview = freshAt ? (edits.get(freshAt.span.patternId)?.after ?? null) : null;
+		return {
+			changed: true,
+			preview,
+			previewRow: preview && freshAt ? freshAt.localRow : cursor.row
+		};
+	}
+
+	function applyIntentPlan(
+		session: PianoPatternSession,
+		plan: PianoIntentPlan,
+		erased: readonly PianoNoteSpot[] = []
+	): void {
+		const key = noteKey;
+		if (!key) return;
+		const { channelIndex } = session;
+		const erasedKeys = new Set(erased.map(noteSpotKey));
+		const blankFor = (note: PianoIntentNote) =>
+			erasedKeys.has(noteSpotKey(note)) ? blankRow : null;
 		const target = (note: PianoIntentNote) => {
 			const located = timelineSpanAt(timeline, note.startRow);
 			const generic = located ? session.generic(located.span.patternId) : null;
@@ -1262,7 +1341,7 @@
 			clearOpenTail(session, place.span, place.localRow);
 			session.mark(
 				place.span.patternId,
-				removePitchedNote(place.generic, channelIndex, key, place.localRow)
+				removePitchedNote(place.generic, channelIndex, key, place.localRow, blankFor(note))
 			);
 		}
 		for (const note of plan.reshape) {
@@ -1296,28 +1375,6 @@
 			}
 			writeIntentGate(session, note);
 		}
-		const freshNote = fresh
-			? plan.audible.find((note) => sameNoteSpot(note, fresh))
-			: undefined;
-		const freshAt = freshNote ? timelineSpanAt(timeline, freshNote.startRow) : null;
-		if (freshAt) {
-			session.finish(freshAt.span.patternId, (after) =>
-				withAutoEnvelope(after, freshAt.localRow)
-			);
-		}
-		const edits = session.edits();
-		commitPianoConflictEdits(
-			songIndex,
-			edits,
-			{ before: beforeHeld, after: afterHeld },
-			cursor
-		);
-		const preview = freshAt ? (edits.get(freshAt.span.patternId)?.after ?? null) : null;
-		return {
-			changed: true,
-			preview,
-			previewRow: preview && freshAt ? freshAt.localRow : cursor.row
-		};
 	}
 
 	function landIntents(
@@ -1397,10 +1454,8 @@
 		}
 		const blockSpan = rows ? pitchedBlockSpan(rows, noteKey, localRow) : null;
 		if (placedBlockLength === null && blockSpan?.bounded) placedBlockLength = blockSpan.length;
-		const edits = session.edits();
-		const after = edits.get(source.id)?.after ?? updated;
-		edits.set(source.id, { before: source, after });
-		commitPianoPatternEdits(selected.songIndex, edits, cursor);
+		session.mark(source.id);
+		const after = commitSession(session, cursor)?.get(source.id)?.after ?? updated;
 		playPreview(after, localRow, timedPreview);
 		advanceCursor(advance, start);
 		return true;
@@ -1431,7 +1486,7 @@
 			const pitchIndex = notePitchIndex(value);
 			if (pitchIndex !== null) {
 				const spot = { startRow: span.startRow + localRow, pitchIndex };
-				commitIntents(withoutSpots(allIntents(), [spot]), null, cursor);
+				eraseIntents([spot], cursor);
 				dropSelectionAt(span.orderIndex, localRow);
 				return;
 			}
@@ -1440,7 +1495,7 @@
 			clearOpenTail(session, span, localRow);
 			session.mark(
 				span.patternId,
-				removePitchedNote(generic, session.channelIndex, noteKey, localRow)
+				removePitchedNote(generic, session.channelIndex, noteKey, localRow, blankRow)
 			);
 		} else {
 			session.mark(
@@ -1595,8 +1650,7 @@
 					item.source.localStartRow === anchor.localStartRow
 			) ?? moved[0];
 		if (!focus) return;
-		const edits = session.edits();
-		commitPianoPatternEdits(selected.songIndex, edits, locationCursor(focus.target));
+		const edits = commitSession(session, locationCursor(focus.target));
 		land(
 			moved.map((item) =>
 				selectionFor(item.target.span, item.target.localRow, item.pitchIndex)
@@ -1604,7 +1658,7 @@
 			focus.target,
 			scrollIntoView
 		);
-		const after = edits.get(focus.target.span.patternId)?.after;
+		const after = edits?.get(focus.target.span.patternId)?.after;
 		if (after) playPreview(after, focus.target.localRow, true);
 	}
 
@@ -1660,10 +1714,9 @@
 		session.mark(dest.span.patternId);
 		sealTail(session, toAbsolute, length, release);
 		session.finish(dest.span.patternId, (after) => withAutoEnvelope(after, dest.localRow));
-		const edits = session.edits();
-		commitPianoPatternEdits(selected.songIndex, edits, cursor);
+		const edits = commitSession(session, cursor);
 		land([landing], dest, scrollIntoView);
-		const after = edits.get(dest.span.patternId)?.after;
+		const after = edits?.get(dest.span.patternId)?.after;
 		if (after) playPreview(after, dest.localRow, true);
 	}
 
@@ -1751,7 +1804,7 @@
 		const lane = activeLane;
 		const session = editSession();
 		if (!lane || !session || !setLaneCell(session, lane, cell, value)) return false;
-		return commitSession(session, { orderIndex: cell.orderIndex, row: cell.localRow });
+		return commitSession(session, { orderIndex: cell.orderIndex, row: cell.localRow }) !== null;
 	}
 
 	function commitLaneDraft(rows: Record<number, number>): void {
@@ -1793,6 +1846,13 @@
 		});
 	}
 
+	function previewSelection(selection: NoteSelection): void {
+		const source = patternById.get(selection.patternId);
+		if (source && !blockIsConflict(selection)) {
+			playPreview(source, selection.localStartRow, true);
+		}
+	}
+
 	function locateRow(absoluteRow: number): PianoTimelineLocation | null {
 		const gate = notes.gates.find((item) => item.row === absoluteRow);
 		const gateSpan = gate ? timelineSpanForOrder(timeline, gate.orderIndex) : null;
@@ -1817,7 +1877,7 @@
 		const span = timelineSpanForOrder(timeline, block.orderIndex);
 		if (!span) return false;
 		if (block.conflict) {
-			commitIntents(withoutSpots(allIntents(), [block]), null, {
+			eraseIntents([block], {
 				orderIndex: block.orderIndex,
 				row: block.localStartRow
 			});
@@ -1889,6 +1949,7 @@
 		const moveGroup = inSelection && current.length > 1 ? current : [grabbed];
 		if (hit.type === 'resize' || moveGroup.length === 1) applySelection([grabbed]);
 		focusLocation(span, block.localStartRow, false);
+		previewSelection(grabbed);
 		if (hit.type === 'resize') {
 			startResizeDrag(span, block);
 			return;
@@ -2022,7 +2083,10 @@
 	): void {
 		const deltaRow = row - from.startRow;
 		const deltaPitch = pitch - from.pitchIndex;
-		if (deltaRow === 0 && deltaPitch === 0) return;
+		if (deltaRow === 0 && deltaPitch === 0) {
+			previewSelection(from);
+			return;
+		}
 		blockFades.holdMoved(group);
 		if (group.length > 1) commitSelectionMove(group, deltaRow, deltaPitch, from);
 		else commitMove(from, row, pitch, false);
@@ -2159,8 +2223,7 @@
 		const first = targets[0];
 		if (playbackStore.isPlaying || !selected || !noteKey || !first) return false;
 		if (targets.some((target) => blockIsConflict(target)) || heldIntents().length > 0) {
-			return commitIntents(withoutSpots(allIntents(), targets), null, selectionCursor(first))
-				.changed;
+			return eraseIntents(targets, selectionCursor(first)).changed;
 		}
 		const session = openSession();
 		if (!session) return false;
@@ -2180,10 +2243,10 @@
 			if (!generic) continue;
 			session.mark(
 				patternId,
-				removePitchedNotes(generic, session.channelIndex, noteKey, localRows)
+				removePitchedNotes(generic, session.channelIndex, noteKey, localRows, blankRow)
 			);
 		}
-		return commitSession(session, selectionCursor(first));
+		return commitSession(session, selectionCursor(first)) !== null;
 	}
 
 	function cutSelection(): void {

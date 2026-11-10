@@ -1,11 +1,14 @@
 import type { ChipField, ChipSchema, FieldType } from '../../chips/base/schema';
 import { getGlobalColumnLabel } from '../../chips/base/schema';
+import type { PatternConverter } from '../../chips/base/adapter';
 import {
 	getChannelEffectColumnLabel,
 	getChannelLayout,
-	isEffectFieldKey
+	isEffectFieldKey,
+	MAX_CHANNEL_EFFECT_COLUMNS
 } from '../../chips/base/channel-effect-columns';
-import type { GenericPattern } from '../../models/song/generic';
+import { Pattern } from '../../models/song';
+import type { GenericPattern, GenericRow } from '../../models/song/generic';
 
 export const INSTRUMENT_FIELD_KEY = 'instrument';
 export const TABLE_FIELD_KEY = 'table';
@@ -222,4 +225,13 @@ const FIELD_RADIX: Partial<Record<FieldType, number>> = { hex: 16, symbol: 36, d
 function fieldMaxValue(field: ChipField): number {
 	const radix = FIELD_RADIX[field.type];
 	return radix ? radix ** Math.max(1, field.length) - 1 : 0;
+}
+
+export function blankChannelRow(
+	converter: PatternConverter,
+	schema: ChipSchema
+): GenericRow | null {
+	const pattern = new Pattern(0, 1, schema);
+	for (const channel of pattern.channels) channel.effectColumnCount = MAX_CHANNEL_EFFECT_COLUMNS;
+	return converter.toGeneric(pattern).channels[0]?.rows[0] ?? null;
 }

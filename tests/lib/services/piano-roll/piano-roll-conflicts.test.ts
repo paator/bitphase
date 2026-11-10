@@ -110,6 +110,16 @@ describe('piano roll intent planning', () => {
 		expect(plan.reshape).toEqual([intent(8, 4, 30)]);
 	});
 
+	it('restores a held note once the note above it moves out of the way', () => {
+		const higher = intent(4, 4, 50, { preferred: true });
+		const held = intent(0, 4, 38);
+		const plan = planPianoIntents([higher, held], [higher]);
+		expect(plan.silent).toEqual([]);
+		expect(plan.add).toEqual([held]);
+		expect(plan.remove).toEqual([]);
+		expect(plan.reshape).toEqual([]);
+	});
+
 	it('swaps one channel of held conflicts and keeps a stable signature', () => {
 		const other: PianoConflictNote = {
 			songIndex: 0,
