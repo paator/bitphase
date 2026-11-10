@@ -203,7 +203,7 @@ Forces this channel's tone, noise, and envelope outputs. Stays until the next `E
 
 ## SAA1099
 
-Chip commands are entered in the channel effect column. `E1`, `E2`, and `E6` stay until the next command of the same kind. `EA` stays until a newer `EA` in the same channel group. `E6` and `EA` can step a table (`E6TX`, `EATX`). The table value replaces `XY` on each tick, starting with the first row. A later command of the same kind replaces the running table.
+SAA1099 support is still work in progress. Chip commands are entered in the channel effect column. `E1`, `E2`, and `E6` stay until the next command of the same kind. `EA` stays until a newer `EA` in the same channel group. `E6` and `EA` can step a table (`E6TX`, `EATX`). The table value replaces `XY` on each tick, starting with the first row. A later command of the same kind replaces the running table.
 
 ### E1 - Stereo invert
 

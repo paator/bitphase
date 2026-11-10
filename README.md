@@ -12,6 +12,7 @@ A modern web-based chiptune tracker for composing on retro sound chips. A projec
 
 - **AY-3-8910 / YM2149F** - ZX Spectrum, MSX, Atari ST, and other 8-bit machines
 - **2A03 / 2A07** - NES / Famicom. Each song is NTSC, PAL, or Dendy
+- **SAA1099** (work in progress) - SAM Coupé and Creative Music System / Game Blaster
 
 User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
@@ -20,6 +21,7 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 ### Tracking
 
 - Canvas-based pattern editor with order list
+- Piano roll (experimental): draw, move, and resize notes on a pitch grid, with a lane for the other pattern fields. Turn it on under **Settings → Experimental features**, then **View → Piano roll**
 - Field-based editing with selection, copy/cut/paste, and magic paste
 - Virtual channels - map multiple pattern columns onto a single hardware channel
 - Transpose, increment/decrement, and channel swap editing tools
@@ -31,6 +33,7 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 - AY/YM instrument editor with tone, noise, envelope, and sample playback
 - Timer effects (waveform, PWM, and related AY timer instruments)
 - NES instrument editor for the five 2A03 channels: two pulses, triangle, noise, and DPCM
+- SAA1099 instrument editor (work in progress) with stereo volume, tone, noise, and envelope macros
 - Tables (known as Ornaments in Vortex Tracker 2)
 - Built-in instrument presets
 - Instrument preview playground
@@ -46,7 +49,8 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 - Open and save Bitphase projects (`.btp`)
 - Import ProTracker 3 (`.pt3`), Vortex Tracker 2 (`.vt2`), TAYM (`.taym`), and PSG (`.psg`)
 - Import FamiTracker (`.ftm`) and 0CC-FamiTracker (`.0cc`) as a 2A03 song, and Dn-FamiTracker (`.dnm`) when the module is NES or NES plus Sunsoft 5B. A Sunsoft 5B module also adds an AY song.
-- Export WAV for any project, PSG / TAYM / SNDH for AY songs, VGM for AY and NES (at most two of each), and NSF when the project has at most one AY song and one NES song
+- Import E-Tracker SAA1099 modules (`.cop`, `.etc`, `.saa`, `.sng`, `.m`) as an SAA song
+- Export WAV for any project, PSG / TAYM / SNDH for AY songs, VGM for AY, NES, and SAA (at most two of each), and NSF when the project has at most one AY song and one NES song (SAA songs are not included in NSF)
 - AY timer effects are rendered in WAV and written into TAYM and VGM. PSG and SNDH stay one register frame per interrupt
 - Several AY songs export as a ZIP of PSG or TAYM files
 - Command-line export: `pnpm btp-to-wav`, `pnpm btp-to-psg`, `pnpm btp-to-taym`
@@ -62,8 +66,8 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
 - **Node.js** (v18 or higher; v20 recommended)
 - **pnpm** (v10.11.0 or higher)
-- **Emscripten SDK** - required for building WebAssembly modules (AY and NES)
-- **Git submodules** - the Ayumi emulator lives in `external/ayumi`. NES APU sources ship in `external/nsfplug`
+- **Emscripten SDK** - required for building WebAssembly modules (AY, NES, and SAA)
+- **Git submodules** - the Ayumi emulator lives in `external/ayumi`. NES APU sources ship in `external/nsfplug`. SAA1099 sources ship in `external/saasound`
 
 ### Installing Emscripten
 
@@ -98,7 +102,7 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
    pnpm dev
    ```
 
-   This builds the WASM modules (Ayumi + NES) and starts Vite. You can also run `pnpm build:wasm` on its own when the C sources change.
+   This builds the WASM modules (Ayumi, NES, and SAA) and starts Vite. You can also run `pnpm build:wasm` on its own when the C sources change.
 
 4. **Open your browser**
 
@@ -108,7 +112,7 @@ User documentation lives in [`docs/`](docs/index.md) (`pnpm docs:dev`).
 
 - `pnpm dev` - build WASM and start the development server with hot module replacement
 - `pnpm build` - build WASM, the tracker production bundle, and the docs site into `dist/`
-- `pnpm build:wasm` - build only the WebAssembly modules (`public/ay/ayumi.wasm`, `public/nes/*.wasm`)
+- `pnpm build:wasm` - build only the WebAssembly modules (`public/ay/ayumi.wasm`, `public/nes/*.wasm`, `public/saa/saasound.wasm`)
 - `pnpm docs:dev` - run the VitePress docs site locally
 - `pnpm docs:build` - build docs into `dist/docs`
 - `pnpm preview` - preview the production tracker build locally
@@ -127,11 +131,13 @@ bitphase/
 ├── docs/                    # User docs (VitePress) and format specs
 ├── external/
 │   ├── ayumi/               # AY-8910 emulator C source (git submodule)
-│   └── nsfplug/             # NES APU C sources compiled to WASM
+│   ├── nsfplug/             # NES APU C sources compiled to WASM
+│   └── saasound/            # SAA1099 emulator C++ sources compiled to WASM
 ├── public/                  # Static assets and runtime audio code
 │   ├── audio/               # AudioWorklet processor
 │   ├── ay/                  # AY runtime and ayumi.wasm
 │   ├── nes/                 # 2A03 runtime and nes_apu.wasm
+│   ├── saa/                 # SAA1099 runtime and saasound.wasm
 │   ├── tracker/             # Shared tracker playback pipeline
 │   ├── fonts/
 │   └── worklet/
@@ -145,6 +151,7 @@ bitphase/
 │       ├── chips/           # Chip implementations and registry
 │       │   ├── ay/          # AY-8910 (schema, adapter, renderer, processor)
 │       │   ├── nes/         # 2A03 (schema, adapter, renderer, processor)
+│       │   ├── saa/         # SAA1099, work in progress
 │       │   └── base/        # Shared chip interfaces
 │       ├── components/      # Svelte UI components
 │       │   ├── AppLayout/
@@ -168,18 +175,19 @@ bitphase/
 │       │   ├── app/         # Menu actions and app context
 │       │   ├── audio/       # Playback and AudioWorklet bridge
 │       │   ├── backup/      # Autobackup
-│       │   ├── file/        # Import/export (BTP, PT3, VT2, TAYM, PSG, FTM, DNM, WAV, VGM, SNDH)
+│       │   ├── file/        # Import/export (BTP, PT3, VT2, TAYM, PSG, FTM, DNM, E-Tracker, WAV, VGM, SNDH)
 │       │   ├── history/     # Undo/redo diff tracking
 │       │   ├── midi/        # MIDI input
 │       │   ├── modal/
 │       │   ├── pattern/     # Pattern editing, navigation, clipboard
+│       │   ├── piano-roll/  # Piano roll notes, lanes, and editing
 │       │   │   └── editing/ # Field-based editing strategies
 │       │   ├── project/     # Project management and migration
 │       │   ├── theme/
 │       │   └── user-scripts/  # Lua user scripts
 │       ├── stores/          # Reactive state (Svelte 5 runes, .svelte.ts)
 │       ├── types/
-│       ├── ui-rendering/    # Canvas-based pattern editor and order list
+│       ├── ui-rendering/    # Canvas renderers (pattern editor, order list, piano roll)
 │       └── utils/
 └── tests/                   # Tests mirroring src/ structure
     ├── fixtures/

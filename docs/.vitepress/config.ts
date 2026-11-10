@@ -30,6 +30,7 @@ export default defineConfig({
 					{ text: 'Keyboard', link: '/keyboard' },
 					{ text: 'Effects', link: '/effects' },
 					{ text: 'Pattern editor', link: '/pattern-editor' },
+					{ text: 'Piano roll', link: '/piano-roll' },
 					{ text: 'Order list', link: '/order-list' },
 					{ text: 'Instruments', link: '/instruments' },
 					{ text: 'Import & export', link: '/import-export' },

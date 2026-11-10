@@ -90,3 +90,18 @@ Press `A` for **OFF** (note cut / note off).
 ### MIDI
 
 MIDI keyboards can also enter notes when MIDI input is enabled in settings.
+
+## Piano roll
+
+The [piano roll](/piano-roll) is experimental. Once it is open, these shortcuts apply on the grid:
+
+| Action                         | Default                          |
+| ------------------------------ | -------------------------------- |
+| Play / pause                   | `Space`                          |
+| Move the selected note         | Arrow keys                       |
+| Move the selected note an octave | `Shift` + `↑` / `↓`            |
+| Delete the selection           | `Delete` / `Backspace`           |
+| Copy / cut / paste             | `Mod+C` / `Mod+X` / `Mod+V`      |
+| Select visible notes           | `Mod+A`                          |
+
+Note keys use the same piano layout as the pattern editor, and land on the current row.

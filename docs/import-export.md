@@ -28,7 +28,7 @@ Save always downloads a file named from the project title (browsers do not overw
 | `.dnm`                               | Dn-FamiTracker modules            |
 | `.cop`, `.etc`, `.saa`, `.sng`, `.m` | E-Tracker SAA1099 modules         |
 
-`.pt3` and `.vt2` bring in classic AY tracker songs.
+`.pt3` and `.vt2` bring in classic AY tracker songs. E-Tracker files (`.cop`, `.etc`, `.saa`, `.sng`, `.m`) import as one SAA1099 song.
 
 ### FamiTracker (`.ftm` / `.0cc` / `.dnm`)
 
@@ -57,7 +57,7 @@ Open **File → Export** and pick a format. Availability:
 | **SNDH**       | Exactly one AY song                                |
 | **PSG (ZIP)**  | More than one AY song                              |
 | **TAYM (ZIP)** | More than one AY song                              |
-| **VGM**        | AY and/or NES, at most 2 of each type (one `.vgm`) |
+| **VGM**        | AY, NES, and/or SAA, at most 2 of each type (one `.vgm`) |
 | **NSF**        | Only AY and NES songs, at most one of each         |
 
 A NES-only project exports **WAV**, **VGM**, and **NSF**. PSG, TAYM, and SNDH are AY paths. An AY-only project can also export **NSF** (as Sunsoft 5B).
@@ -100,7 +100,7 @@ Available for a **single** AY song. Used for Atari ST hardware playback. Bitphas
 
 ### VGM
 
-One file for [VGM](https://vgmrips.net/wiki/VGM_Specification) players. The project can mix AY and NES, up to two songs of each chip. NES APU writes and DPCM samples are included. AY timer effects are written into the file.
+One file for [VGM](https://vgmrips.net/wiki/VGM_Specification) players. The project can mix AY, NES, and SAA1099, up to two songs of each chip. Two SAA songs in one file need the same chip clock. NES APU writes and DPCM samples are included. AY timer effects are written into the file.
 
 ### NSF
 

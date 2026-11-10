@@ -40,6 +40,6 @@ Bitphase is a chiptune tracker for creating music on retro sound chips. Built wi
 - Follow KISS, DRY, SOLID principles. Keep very good OOP practices.
 - Tests go in `tests/` directory mirroring `src/` structure
 
-Currently bitphase supports only AY-8910/YM2149F chip, but architecture needs to support other chips in the future. Therefore, it is important to keep the code modular and easy to extend. Using AY specific code in generic parts is not allowed, because when we get to the point of adding another chip, we will have to rewrite a lot of code.
+Bitphase currently ships AY-8910/YM2149F, 2A03/2A07, and SAA1099 (work in progress). The architecture needs to keep supporting more chips. Therefore, it is important to keep the code modular and easy to extend. Using chip-specific code in generic parts is not allowed, because adding another chip should not require rewriting shared code.
 
 Please never allow lint errors. If you see any, fix them. We had lots of production bugs because of lint errors.

@@ -4,7 +4,9 @@ The pattern editor is where most of the music gets written. Think of it as a spr
 
 Which pattern you are looking at comes from the [order list](/order-list). Change the order slot, and the grid updates to that pattern.
 
-In Bitphase a **song is per chip**, so the columns match that chip (AY, NES, and so on). A project can hold several songs side by side - each one gets its own pattern editor.
+In Bitphase a **song is per chip**, so the columns match that chip (AY, NES, SAA1099, and so on). A project can hold several songs side by side - each one gets its own pattern editor.
+
+The same patterns can also be edited on a pitch grid. That view is experimental; see [Piano roll](/piano-roll).
 
 See also [Keyboard](/keyboard) for shortcuts and the piano layout, and [Effects](/effects) for the effect column.
 
@@ -52,6 +54,32 @@ Channels are **Pulse 1**, **Pulse 2**, **Triangle**, **Noise**, and **DPCM**. Th
 Each channel is:
 
 `note` - `instrument` + `table` + `volume` - `effect`
+
+### SAA1099
+
+Work in progress. Six channels, **A** through **F**, split into two groups of three. Each group has its own noise and envelope columns, placed between the channel blocks:
+
+| Label | Where     | What it is                                      |
+| ----- | --------- | ----------------------------------------------- |
+| N     | before A  | Noise for channels A–C (one hex digit)          |
+| E     | before C  | Envelope shape for A–C (one hex digit)          |
+| N     | before D  | Noise for channels D–F                          |
+| E     | before F  | Envelope shape for D–F                          |
+
+Each channel is:
+
+`note` - `instrument` + `table` + `left` + `right` - `effect`
+
+| Field      | Looks like         | What it does                                              |
+| ---------- | ------------------ | --------------------------------------------------------- |
+| Note       | `C-4`, or `---` / `OFF` | Pitch. `OFF` stops the note                          |
+| Instrument | `01`-`ZZ`, or `..` | Instrument id                                             |
+| Table      | `0`-`Z`, or `.`    | Ornament / arpeggio table                                 |
+| Left       | `0`-`F`, or `.`    | Left volume. `.` keeps the previous level                 |
+| Right      | `0`-`F`, or `.`    | Right volume                                              |
+| Effect     | 4 chars, or `....` | Pattern effect - see [SAA1099 effects](/effects#saa1099) |
+
+Song fields for an SAA song are the chip clock (**SAM Coupé** at 8 MHz, or **CMS / Game Blaster** at 7.159 MHz), the interrupt rate (50 Hz or 60 Hz), and A4 tuning.
 
 ## Entering data
 

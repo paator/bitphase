@@ -8,8 +8,8 @@ Bitphase can be accessed via [bitphase.app](https://bitphase.app/), which always
 
 - **Node.js** (v18 or higher; v20 recommended)
 - **pnpm** (v10.11.0 or higher)
-- **Emscripten SDK** - required for building WebAssembly modules (AY and NES)
-- **Git submodules** - the Ayumi emulator lives in `external/ayumi`. NES APU sources ship in `external/nsfplug`
+- **Emscripten SDK** - required for building WebAssembly modules (AY, NES, and SAA)
+- **Git submodules** - the Ayumi emulator lives in `external/ayumi`. NES APU sources ship in `external/nsfplug`. SAA1099 sources ship in `external/saasound`
 
 ### Installing Emscripten
 
@@ -44,7 +44,7 @@ Bitphase can be accessed via [bitphase.app](https://bitphase.app/), which always
     pnpm dev
     ```
 
-    This builds the WASM modules (Ayumi + NES) and starts Vite. You can also run `pnpm build:wasm` on its own when the C sources change.
+    This builds the WASM modules (Ayumi, NES, and SAA) and starts Vite. You can also run `pnpm build:wasm` on its own when the C sources change.
 
 4. **Open your browser**
 
@@ -54,7 +54,7 @@ Bitphase can be accessed via [bitphase.app](https://bitphase.app/), which always
 
 - `pnpm dev` - build WASM and start the development server with hot module replacement
 - `pnpm build` - build WASM, the tracker production bundle, and the docs site into `dist/`
-- `pnpm build:wasm` - build only the WebAssembly modules (`public/ay/ayumi.wasm`, `public/nes/*.wasm`)
+- `pnpm build:wasm` - build only the WebAssembly modules (`public/ay/ayumi.wasm`, `public/nes/*.wasm`, `public/saa/saasound.wasm`)
 - `pnpm docs:dev` - run the VitePress docs site locally
 - `pnpm docs:build` - build docs into `dist/docs`
 - `pnpm preview` - preview the production tracker build locally
@@ -83,6 +83,7 @@ Regardless whether you built your own instance or you went to bitphase.app, you 
 | Area                  | What it’s for                                     |
 | --------------------- | ------------------------------------------------- |
 | Pattern editor        | Enter notes, table arpeggios, volumes and effects |
+| Piano roll            | Same song data on a pitch grid. Experimental; see [Piano roll](/piano-roll) |
 | Order list            | Arrange which patterns play, and in what order    |
 | Instruments           | Edit sound and behavior settings for instruments  |
 | Tables                | Tables used by instruments and effects            |
@@ -94,15 +95,16 @@ Regardless whether you built your own instance or you went to bitphase.app, you 
 2. Add a song by choosing a chip from the empty-state buttons, or use **File → New → Song**:
     - **AY-3-8910 / YM2149F** - recommended starting point
     - **NES (2A03 / 2A07)** - NES, Famicom
+    - **SAA1099 (WIP)** - SAM Coupé, Creative Music System / Game Blaster
 3. You will now see a blank song with an empty pattern, ready for notes, instruments, and effects.
 
-You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import a module with **File → Import Module** (`.vt2`, `.pt3`, `.taym`, `.psg`, `.ftm`, `.0cc`, `.dnm`).
+You can also open an existing Bitphase project (`.btp`) with **File → Open**, or import a module with **File → Import Module** (`.vt2`, `.pt3`, `.taym`, `.psg`, `.ftm`, `.0cc`, `.dnm`, and E-Tracker `.cop` / `.etc` / `.saa` / `.sng` / `.m`).
 
 ## Songs and chips
 
 In Bitphase, a **song is per chip**.
 
-- Each song targets one sound chip (for example AY or NES).
+- Each song targets one sound chip (for example AY, NES, or SAA1099).
 - Its instruments, pattern layout, and chip settings belong to that chip.
 - A **project** can contain several songs. You can mix chip types in one project (for example one AY song and one NES song), but each song stays bound to its own chip.
 
@@ -126,6 +128,7 @@ Use **File → New → Song** to add another song for a chosen chip without star
 
 - Learn [note entry and shortcuts](/keyboard)
 - Read the [pattern editor](/pattern-editor) overview
+- Try the experimental [piano roll](/piano-roll)
 - Arrange patterns in the [order list](/order-list)
 - Browse the [effects reference](/effects)
 - Try a demo song under **Help → Demo songs**
