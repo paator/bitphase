@@ -139,6 +139,12 @@ class AYAudioDriver {
 		return !!instrumentRow?.envelope;
 	}
 
+	patternEnvelopeShapeForSyncbuzzer(state, channelIndex) {
+		const current = state.channelPatternEnvelopeShapes?.[channelIndex] ?? 0;
+		if (current !== 0) return current;
+		return state.channelEnvelopeColumnShape?.[channelIndex] ?? 0;
+	}
+
 	syncbuzzerHasExplicitShape(state, channelIndex) {
 		if (!this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)) return false;
 		const instrument = state.instruments[state.channelInstruments[channelIndex]];
@@ -1262,7 +1268,7 @@ class AYAudioDriver {
 				const timerPwmPeriods = computeTimerPwmPeriods(timerEffectPeriod, effectivePwmDuty);
 				const syncbuzzerWaveform = resolveSyncbuzzerWaveform(
 					timerRow,
-					state.channelPatternEnvelopeShapes?.[channelIndex] ?? 0,
+					this.patternEnvelopeShapeForSyncbuzzer(state, channelIndex),
 					instrumentRow.envelopeShape | 0
 				);
 				const syncbuzzerUsesPwm = syncbuzzerPwmSupported && syncbuzzerWaveform.length === 2;
