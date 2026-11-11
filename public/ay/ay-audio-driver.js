@@ -139,6 +139,25 @@ class AYAudioDriver {
 		return !!instrumentRow?.envelope;
 	}
 
+	syncbuzzerHasExplicitShape(state, channelIndex) {
+		if (!this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)) return false;
+		const instrument = state.instruments[state.channelInstruments[channelIndex]];
+		const timerRow = sampleAyTimerRow(
+			instrument,
+			state.instrumentPositions[channelIndex],
+			channelInstrumentReleaseTick(state, channelIndex)
+		);
+		return effectiveRowTimerWaveform(timerRow).some((step) => isPatternEnvelopeShapeSet(step));
+	}
+
+	syncbuzzerOutranksPatternEnvelopeOff(state, channelIndex) {
+		if (this.syncbuzzerHasExplicitShape(state, channelIndex)) return true;
+		return (
+			this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex) &&
+			isPatternEnvelopeShapeSet(this.instrumentEnvelopeShape(state, channelIndex))
+		);
+	}
+
 	advanceChannelInstrumentRows(state, channelIndex, _timerRowsLength, _timerLoop, onOffHalted) {
 		if (onOffHalted) {
 			return;
@@ -551,9 +570,21 @@ class AYAudioDriver {
 				}
 			}
 		} else if (row.envelopeShape === 15) {
-			state.channelEnvelopeEnabled[channelIndex] = false;
-			this.channelMixerState[channelIndex].envelope = false;
-			registerState.channels[channelIndex].mixer.envelope = false;
+			if (this.syncbuzzerOutranksPatternEnvelopeOff(state, channelIndex)) {
+				state.channelEnvelopeEnabled[channelIndex] = true;
+				const envelopeDisabledByOnOff = this.envelopeOffPhase(state);
+				if (!envelopeDisabledByOnOff) {
+					this.channelMixerState[channelIndex].envelope = true;
+					registerState.channels[channelIndex].mixer.envelope = true;
+				} else {
+					this.channelMixerState[channelIndex].envelope = false;
+					registerState.channels[channelIndex].mixer.envelope = false;
+				}
+			} else {
+				state.channelEnvelopeEnabled[channelIndex] = false;
+				this.channelMixerState[channelIndex].envelope = false;
+				registerState.channels[channelIndex].mixer.envelope = false;
+			}
 		}
 
 		this._processEnvelopeEffects(state, channelIndex, row, patternRow);
@@ -959,6 +990,10 @@ class AYAudioDriver {
 	writeEnvelopeShape(state, registerState, channelIndex, shape) {
 		if (shape <= 0) return;
 		if (shape >= 15) {
+			if (this.syncbuzzerHasExplicitShape(state, channelIndex)) {
+				state.channelEnvelopeEnabled[channelIndex] = true;
+				return;
+			}
 			state.channelEnvelopeEnabled[channelIndex] = false;
 			this.channelMixerState[channelIndex].envelope = false;
 			registerState.channels[channelIndex].mixer.envelope = false;
@@ -1227,7 +1262,8 @@ class AYAudioDriver {
 				const timerPwmPeriods = computeTimerPwmPeriods(timerEffectPeriod, effectivePwmDuty);
 				const syncbuzzerWaveform = resolveSyncbuzzerWaveform(
 					timerRow,
-					state.channelPatternEnvelopeShapes?.[channelIndex] ?? 0
+					state.channelPatternEnvelopeShapes?.[channelIndex] ?? 0,
+					instrumentRow.envelopeShape | 0
 				);
 				const syncbuzzerUsesPwm = syncbuzzerPwmSupported && syncbuzzerWaveform.length === 2;
 

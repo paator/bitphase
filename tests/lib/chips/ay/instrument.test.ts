@@ -233,13 +233,17 @@ describe('ay instrument timer fields', () => {
 		).toBe(false);
 	});
 
-	it('resolves syncbuzzer steps with zero placeholders from pattern envelope shape', () => {
+	it('fills syncbuzzer zeros from the mixer shape, then the pattern shape', () => {
 		const timerRow = { sid: false, syncbuzzer: true, timerWaveform: [0, 8, 0, 8] };
 		expect(resolveSyncbuzzerWaveform(timerRow, 0)).toEqual([0, 8, 0, 8]);
 		expect(resolveSyncbuzzerWaveform(timerRow, 15)).toEqual([0, 8, 0, 8]);
 		expect(resolveSyncbuzzerWaveform(timerRow, 12)).toEqual([12, 8, 12, 8]);
+		expect(resolveSyncbuzzerWaveform(timerRow, 12, 4)).toEqual([4, 8, 4, 8]);
+		expect(resolveSyncbuzzerWaveform(timerRow, 0, 4)).toEqual([4, 8, 4, 8]);
+		expect(resolveSyncbuzzerWaveform(timerRow, 12, 0)).toEqual([12, 8, 12, 8]);
+		expect(resolveSyncbuzzerWaveform(timerRow, 12, 15)).toEqual([12, 8, 12, 8]);
 		expect(
-			resolveSyncbuzzerWaveform({ sid: false, syncbuzzer: true, timerWaveform: [8] }, 12)
+			resolveSyncbuzzerWaveform({ sid: false, syncbuzzer: true, timerWaveform: [8] }, 12, 4)
 		).toEqual([8]);
 	});
 

@@ -348,14 +348,19 @@ export function isDefaultSidTimerWaveform(waveform: readonly number[]): boolean 
 
 export function resolveSyncbuzzerWaveform(
 	timerRow: AyTimerRow | undefined,
-	patternEnvelopeShape: number
+	patternEnvelopeShape: number,
+	mixerEnvelopeShape = 0
 ): number[] {
 	const steps = effectiveRowTimerWaveform(timerRow).map((value) => value & 0xf);
-	if (!isPatternEnvelopeShapeSet(patternEnvelopeShape)) {
+	const fallbackShape = isPatternEnvelopeShapeSet(mixerEnvelopeShape)
+		? mixerEnvelopeShape & 0xf
+		: isPatternEnvelopeShapeSet(patternEnvelopeShape)
+			? patternEnvelopeShape & 0xf
+			: 0;
+	if (fallbackShape === 0) {
 		return steps;
 	}
-	const patternShape = patternEnvelopeShape & 0xf;
-	return steps.map((step) => (step === 0 ? patternShape : step));
+	return steps.map((step) => (step === 0 ? fallbackShape : step));
 }
 
 export function rowSupportsSidTimerPwm(row: AyTimerRow | undefined): boolean {

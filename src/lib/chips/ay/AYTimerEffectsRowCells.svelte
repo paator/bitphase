@@ -47,7 +47,7 @@
 					? 'Space-separated raw tone period offsets added to base period (signed)'
 					: 'Space-separated semitone offsets (signed)'
 				: usesEnvelopeShapes
-					? 'Space-separated envelope shapes (0–15 hex). Pattern envelope digit overrides when set.'
+					? 'Space-separated envelope shapes (0–15 hex). 0 uses the mixer shape, then the pattern envelope digit.'
 					: 'Space-separated SID steps (0–15)'
 	);
 	const waveformEditorTitle = $derived(
