@@ -514,7 +514,11 @@
 			const withVirtual = chipProcessor as ChipProcessor & Partial<VirtualChannelSupport>;
 			if (withVirtual.sendVirtualChannelConfig) {
 				const hwLabels = chipProcessor.chip?.schema?.channelLabels ?? ['A', 'B', 'C'];
-				withVirtual.sendVirtualChannelConfig(song.virtualChannelMap ?? {}, hwLabels.length);
+				withVirtual.sendVirtualChannelConfig(
+					song.virtualChannelMap ?? {},
+					hwLabels.length,
+					song.virtualChannelRoles ?? {}
+				);
 			}
 
 			chipProcessor.sendInitTables(projectStore.tables);

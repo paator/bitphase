@@ -334,7 +334,7 @@ function createAyCaptureSlot(
 	const registerState = new modules.AYChipRegisterState(totalChannelCount);
 	const mixer = new modules.VirtualChannelMixer();
 	if (hasVirtual) {
-		mixer.configure(virtualChannelMap, TONE_CHANNELS);
+		mixer.configure(virtualChannelMap, TONE_CHANNELS, song.virtualChannelRoles ?? {});
 	}
 	const patternProcessor = new modules.TrackerPatternProcessor(state, audioDriver, {
 		postMessage: () => {}

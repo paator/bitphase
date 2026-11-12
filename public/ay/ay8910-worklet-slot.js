@@ -19,6 +19,7 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 		this.registerState = new AYChipRegisterState();
 		this.virtualChannelMixer = new VirtualChannelMixer();
 		this.virtualChannelMap = {};
+		this.virtualChannelRoles = {};
 		this.hwChannelCount = 3;
 	}
 
@@ -70,15 +71,22 @@ export class Ay8910WorkletSlot extends TrackerWorkletSlot {
 		disableAllChannelTimerEffects(ensureChannelTimerEffects(registerState.channels[channelIndex]));
 	}
 
-	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount }) {
+	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount, virtualChannelRoles }) {
 		const nextMap = virtualChannelMap || {};
+		const nextRoles = virtualChannelRoles || {};
 		const nextHw = hwChannelCount || 3;
 		const configUnchanged =
 			this.hwChannelCount === nextHw &&
-			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap);
+			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap) &&
+			JSON.stringify(this.virtualChannelRoles ?? {}) === JSON.stringify(nextRoles);
 		this.virtualChannelMap = nextMap;
+		this.virtualChannelRoles = nextRoles;
 		this.hwChannelCount = nextHw;
-		this.virtualChannelMixer.configure(this.virtualChannelMap, this.hwChannelCount);
+		this.virtualChannelMixer.configure(
+			this.virtualChannelMap,
+			this.hwChannelCount,
+			this.virtualChannelRoles
+		);
 
 		const totalChannels = this.virtualChannelMixer.getTotalVirtualChannelCount();
 		this.state.resizeChannels(totalChannels);

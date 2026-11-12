@@ -9,7 +9,11 @@ import {
 	hasVirtualChannels,
 	MAX_VIRTUAL_CHANNELS_PER_HARDWARE_CHANNEL,
 	normalizeVirtualChannelMap,
-	selectChannelsWithinVirtualLimit
+	normalizeVirtualChannelRoles,
+	selectChannelsWithinVirtualLimit,
+	shiftVirtualChannelRolesForRemoval,
+	toggleVirtualChannelRole,
+	virtualChannelRoleMarks
 } from '../../../src/lib/models/virtual-channels';
 
 const HW_LABELS = ['A', 'B', 'C'];
@@ -163,5 +167,41 @@ describe('hasVirtualChannels', () => {
 
 	it('should return true when any count exceeds 1', () => {
 		expect(hasVirtualChannels({ 0: 1, 1: 2 })).toBe(true);
+	});
+});
+
+describe('virtual channel roles', () => {
+	it('keeps one column per role and toggles it off', () => {
+		const on = toggleVirtualChannelRole({}, 0, 1, 'timer');
+		expect(on).toEqual({ 0: { 1: 'timer' } });
+		const moved = toggleVirtualChannelRole(on, 0, 0, 'timer');
+		expect(moved).toEqual({ 0: { 0: 'timer' } });
+		expect(toggleVirtualChannelRole(moved, 0, 0, 'timer')).toEqual({});
+	});
+
+	it('shifts roles when a column is removed and clears them when one column remains', () => {
+		expect(shiftVirtualChannelRolesForRemoval({ 1: { 2: 'timer' } }, 1, 1, 2)).toEqual({
+			1: { 1: 'timer' }
+		});
+		expect(shiftVirtualChannelRolesForRemoval({ 0: { 1: 'timer' } }, 0, 1, 1)).toEqual({});
+	});
+
+	it('drops unknown roles and a lone hardware channel', () => {
+		expect(
+			normalizeVirtualChannelRoles(
+				{ 0: { 0: 'nope', 1: 'timer' }, 1: { 0: 'timer' } },
+				{ 0: 2 },
+				3,
+				['timer']
+			)
+		).toEqual({ 0: { 1: 'timer' } });
+	});
+
+	it('marks the header of the column that owns a role', () => {
+		expect(
+			virtualChannelRoleMarks(4, HW_LABELS, { 0: 2 }, { 0: { 1: 'timer' } }, [
+				{ id: 'timer', headerMark: 'Timer' }
+			])
+		).toEqual([null, 'Timer', null, null]);
 	});
 });

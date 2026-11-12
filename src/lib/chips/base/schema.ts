@@ -73,10 +73,17 @@ export interface GlobalAnchor {
 	beforeChannel: number;
 }
 
+export interface VirtualChannelRoleDefinition {
+	id: string;
+	label: string;
+	headerMark: string;
+}
+
 export interface ChipSchema {
 	chipType: string;
 	template: string;
 	fields: Record<string, ChipField>;
+	virtualChannelRoles?: VirtualChannelRoleDefinition[];
 	globalTemplate?: string;
 	globalFields?: Record<string, ChipField>;
 	globalAnchors?: GlobalAnchor[];

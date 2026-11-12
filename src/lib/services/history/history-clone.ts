@@ -11,6 +11,7 @@ import {
 	Row,
 	Song
 } from '../../models/song';
+import { cloneVirtualChannelRoles } from '../../models/virtual-channels';
 
 export class HistoryClone {
 	static value<T>(value: T): T {
@@ -56,6 +57,7 @@ export class HistoryClone {
 		cloned.tuningTableIndex = song.tuningTableIndex;
 		cloned.a4TuningHz = song.a4TuningHz;
 		cloned.virtualChannelMap = { ...song.virtualChannelMap };
+		cloned.virtualChannelRoles = cloneVirtualChannelRoles(song.virtualChannelRoles);
 
 		for (const [key, value] of Object.entries(song as unknown as Record<string, unknown>)) {
 			if (key in cloned) continue;

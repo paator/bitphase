@@ -26,6 +26,7 @@ import type { ChipSchema } from '../../../chips/base/schema';
 import {
 	computeEffectiveChannelLabels,
 	normalizeVirtualChannelMap,
+	normalizeVirtualChannelRoles,
 	selectChannelsWithinVirtualLimit,
 	storedVirtualChannelTotal
 } from '../../../models/virtual-channels';
@@ -101,6 +102,12 @@ function reconstructSong(data: any, getChip: (chipType: string) => Chip | null):
 	const hwLabels = schema?.channelLabels ?? ['A', 'B', 'C'];
 	const virtualChannelMap = normalizeVirtualChannelMap(rawVirtualChannelMap, hwLabels.length);
 	song.virtualChannelMap = virtualChannelMap;
+	song.virtualChannelRoles = normalizeVirtualChannelRoles(
+		data.virtualChannelRoles,
+		virtualChannelMap,
+		hwLabels.length,
+		schema?.virtualChannelRoles?.map((role) => role.id) ?? []
+	);
 
 	const effectiveLabels = computeEffectiveChannelLabels(hwLabels, virtualChannelMap);
 	const storedChannelCount = storedVirtualChannelTotal(hwLabels.length, rawVirtualChannelMap);

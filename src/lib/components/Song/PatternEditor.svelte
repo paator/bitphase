@@ -4,7 +4,8 @@
 		ChipProcessor,
 		TuningTableSupport,
 		InstrumentSupport,
-		PreviewNoteSupport
+		PreviewNoteSupport,
+		VirtualChannelSupport
 	} from '../../chips/base/processor';
 	import type { AudioService } from '../../services/audio/audio-service';
 	import type { Chip } from '../../chips/types';
@@ -123,7 +124,11 @@
 		computeEffectiveChannelLabels,
 		getTotalVirtualChannelCount,
 		clampVirtualChannelCount,
-		MAX_VIRTUAL_CHANNELS_PER_HARDWARE_CHANNEL
+		cloneVirtualChannelRoles,
+		toggleVirtualChannelRole,
+		virtualChannelRoleMarks,
+		MAX_VIRTUAL_CHANNELS_PER_HARDWARE_CHANNEL,
+		type VirtualChannelRoleMap
 	} from '../../models/virtual-channels';
 	import { VirtualChannelService } from '../../services/pattern/virtual-channel-service';
 	import { midiService } from '../../services/midi/midi-service';
@@ -207,6 +212,7 @@
 		channelLabels: string[];
 		channelMuted: boolean[];
 		vcGroups: ReturnType<typeof getVirtualChannelGroups> | undefined;
+		channelRoleMarks?: (string | null)[];
 	} | null = null;
 
 	const services: { audioService: AudioService } = getContext('container');
@@ -1329,18 +1335,24 @@
 		channelLabels: string[];
 		channelMuted: boolean[];
 		vcGroups: ReturnType<typeof getVirtualChannelGroups> | undefined;
+		channelRoleMarks?: (string | null)[];
 	} | null {
 		if (patternToDraw.length <= 0) return null;
 
 		const song = projectStore.songs[songIndex];
+		const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
 		return {
 			rowString: getPatternRowData(patternToDraw, 0),
 			channelLabels: patternToDraw.channels.map((ch) => ch.label),
 			channelMuted: getChannelMutedState(patternToDraw),
-			vcGroups: song
-				? getVirtualChannelGroups(
-						schema.channelLabels ?? ['A', 'B', 'C'],
-						song.virtualChannelMap ?? {}
+			vcGroups: song ? getVirtualChannelGroups(hwLabels, song.virtualChannelMap ?? {}) : undefined,
+			channelRoleMarks: song
+				? virtualChannelRoleMarks(
+						patternToDraw.channels.length,
+						hwLabels,
+						song.virtualChannelMap,
+						song.virtualChannelRoles,
+						schema.virtualChannelRoles
 					)
 				: undefined
 		};
@@ -1468,6 +1480,7 @@
 			channelLabels: header.channelLabels,
 			channelMuted: header.channelMuted,
 			virtualChannelGroups: header.vcGroups,
+			channelRoleMarks: header.channelRoleMarks,
 			effectColumnControlsEnabled: !playbackStore.isPlaying
 		});
 		drawChannelLevelStripOverlay();
@@ -2442,12 +2455,15 @@
 	function applyVirtualChannelChange(result: {
 		updatedMap: Record<number, number>;
 		updatedPatterns: Pattern[];
+		updatedRoles: VirtualChannelRoleMap;
 	}): void {
 		const song = projectStore.songs[songIndex]!;
 		const oldMap = { ...song.virtualChannelMap };
+		const oldRoles = cloneVirtualChannelRoles(song.virtualChannelRoles);
 		const oldPatterns = patterns;
 
 		song.virtualChannelMap = result.updatedMap;
+		song.virtualChannelRoles = result.updatedRoles;
 		updatePatterns(result.updatedPatterns);
 		projectStore.recordHistory(
 			{
@@ -2462,6 +2478,11 @@
 					['songs', songIndex, 'virtualChannelMap'],
 					oldMap,
 					result.updatedMap
+				),
+				projectStore.createSetDiff(
+					['songs', songIndex, 'virtualChannelRoles'],
+					oldRoles,
+					result.updatedRoles
 				),
 				projectStore.createSetDiff(
 					['patterns', songIndex],
@@ -2595,6 +2616,10 @@
 			if (result) {
 				applyVirtualChannelChange(result);
 			}
+		} else if (data.action.startsWith('toggle_virtual_role:')) {
+			if (isPlaying || !supportsVirtualChannels()) return;
+			const roleId = data.action.slice('toggle_virtual_role:'.length);
+			toggleVirtualChannelRoleOnSong(roleId);
 		} else if (data.action === 'play_solo') {
 			executePlaySolo(getChipIndex(), channelContextMenuVirtualIndex);
 		} else if (data.action === 'unmute_all') {
@@ -2642,9 +2667,58 @@
 					action: 'remove_virtual_channel',
 					disabled: isPlaying
 				});
+				const indexInGroup = virtualIndexInClickedGroup(hwIndex, channelContextMenuVirtualIndex);
+				const groupRoles = song?.virtualChannelRoles?.[hwIndex] ?? {};
+				for (const role of schema.virtualChannelRoles ?? []) {
+					const active = groupRoles[indexInGroup] === role.id;
+					items.push({
+						label: active
+							? `Stop using ${clickedLabel} for ${role.label.toLowerCase()}`
+							: `Use ${clickedLabel} for ${role.label.toLowerCase()}`,
+						action: `toggle_virtual_role:${role.id}`,
+						disabled: isPlaying || indexInGroup < 0
+					});
+				}
 			}
 		}
 		return items;
+	}
+
+	function virtualIndexInClickedGroup(hwIndex: number, flatIndex: number): number {
+		const song = projectStore.songs[songIndex];
+		const groups = getVirtualChannelGroups(
+			schema.channelLabels ?? ['A', 'B', 'C'],
+			song?.virtualChannelMap ?? {}
+		);
+		return groups[hwIndex]?.virtualChannelIndices.indexOf(flatIndex) ?? -1;
+	}
+
+	function toggleVirtualChannelRoleOnSong(roleId: string): void {
+		const song = projectStore.songs[songIndex];
+		if (!song) return;
+		if (!schema.virtualChannelRoles?.some((role) => role.id === roleId)) return;
+		const hwIndex = channelContextMenuHwIndex;
+		const indexInGroup = virtualIndexInClickedGroup(hwIndex, channelContextMenuVirtualIndex);
+		if (indexInGroup < 0) return;
+		const oldRoles = cloneVirtualChannelRoles(song.virtualChannelRoles);
+		const nextRoles = toggleVirtualChannelRole(oldRoles, hwIndex, indexInGroup, roleId);
+		song.virtualChannelRoles = nextRoles;
+		projectStore.recordHistory(
+			{
+				type: 'virtualChannels.update',
+				label: 'Update virtual channel role',
+				affectedDomains: ['virtualChannels', 'songs']
+			},
+			[
+				projectStore.createSetDiff(
+					['songs', songIndex, 'virtualChannelRoles'],
+					oldRoles,
+					nextRoles
+				)
+			]
+		);
+		sendVirtualChannelConfigToProcessor();
+		draw();
 	}
 
 	function sendVirtualChannelConfigToProcessor(): void {
@@ -2652,16 +2726,25 @@
 		if (!song) return;
 		const hwLabels = schema.channelLabels ?? ['A', 'B', 'C'];
 		if (chipProcessor && 'sendVirtualChannelConfig' in chipProcessor) {
-			(
-				chipProcessor as ChipProcessor & {
-					sendVirtualChannelConfig: (
-						virtualChannelMap: Record<number, number>,
-						hwChannelCount: number
-					) => void;
-				}
-			).sendVirtualChannelConfig(song.virtualChannelMap, hwLabels.length);
+			(chipProcessor as ChipProcessor & VirtualChannelSupport).sendVirtualChannelConfig(
+				song.virtualChannelMap,
+				hwLabels.length,
+				song.virtualChannelRoles ?? {}
+			);
 		}
 	}
+
+	$effect(() => {
+		const song = projectStore.songs[songIndex];
+		void song?.virtualChannelMap;
+		void song?.virtualChannelRoles;
+		void projectStore.songs;
+		void chipProcessor;
+		untrack(() => {
+			sendVirtualChannelConfigToProcessor();
+			if (canvas && ctx && fontReady && !document.hidden) draw();
+		});
+	});
 
 	function createClipboardContext(): ClipboardContext {
 		const patternId = patternOrder[currentPatternOrderIndex];

@@ -159,3 +159,128 @@ export function getTotalVirtualChannelCount(
 export function hasVirtualChannels(virtualChannelMap: Record<number, number>): boolean {
 	return Object.values(virtualChannelMap).some((count) => count > 1);
 }
+
+export type VirtualChannelRoleMap = Record<number, Record<number, string>>;
+
+export interface VirtualChannelRoleMarkSource {
+	id: string;
+	headerMark: string;
+}
+
+export function cloneVirtualChannelRoles(
+	roles: VirtualChannelRoleMap | undefined
+): VirtualChannelRoleMap {
+	const cloned: VirtualChannelRoleMap = {};
+	if (!roles) return cloned;
+	for (const [hwKey, group] of Object.entries(roles)) {
+		const hw = Number(hwKey);
+		if (!Number.isInteger(hw) || !group) continue;
+		const nextGroup: Record<number, string> = {};
+		for (const [indexKey, roleId] of Object.entries(group)) {
+			const index = Number(indexKey);
+			if (!Number.isInteger(index) || typeof roleId !== 'string' || roleId.length === 0) continue;
+			nextGroup[index] = roleId;
+		}
+		if (Object.keys(nextGroup).length > 0) cloned[hw] = nextGroup;
+	}
+	return cloned;
+}
+
+export function normalizeVirtualChannelRoles(
+	raw: unknown,
+	virtualChannelMap: Record<number, number> | undefined,
+	hwChannelCount: number,
+	allowedRoleIds: readonly string[]
+): VirtualChannelRoleMap {
+	if (!raw || typeof raw !== 'object' || allowedRoleIds.length === 0) return {};
+	const allowed = new Set(allowedRoleIds);
+	const source = raw as Record<string, unknown>;
+	const normalized: VirtualChannelRoleMap = {};
+	for (let hw = 0; hw < hwChannelCount; hw++) {
+		const count = clampVirtualChannelCount(virtualChannelMap?.[hw]);
+		if (count <= 1) continue;
+		const groupRaw = source[hw] ?? source[String(hw)];
+		if (!groupRaw || typeof groupRaw !== 'object') continue;
+		const groupSource = groupRaw as Record<string, unknown>;
+		const group: Record<number, string> = {};
+		const usedRoles = new Set<string>();
+		for (let index = 0; index < count; index++) {
+			const roleId = groupSource[index] ?? groupSource[String(index)];
+			if (typeof roleId !== 'string' || !allowed.has(roleId) || usedRoles.has(roleId)) continue;
+			usedRoles.add(roleId);
+			group[index] = roleId;
+		}
+		if (Object.keys(group).length > 0) normalized[hw] = group;
+	}
+	return normalized;
+}
+
+export function toggleVirtualChannelRole(
+	roles: VirtualChannelRoleMap | undefined,
+	hwIndex: number,
+	indexInGroup: number,
+	roleId: string
+): VirtualChannelRoleMap {
+	const next = cloneVirtualChannelRoles(roles);
+	const group = { ...(next[hwIndex] ?? {}) };
+	if (group[indexInGroup] === roleId) {
+		delete group[indexInGroup];
+	} else {
+		for (const key of Object.keys(group)) {
+			if (group[Number(key)] === roleId) delete group[Number(key)];
+		}
+		group[indexInGroup] = roleId;
+	}
+	if (Object.keys(group).length === 0) delete next[hwIndex];
+	else next[hwIndex] = group;
+	return next;
+}
+
+export function shiftVirtualChannelRolesForRemoval(
+	roles: VirtualChannelRoleMap | undefined,
+	hwIndex: number,
+	removedIndexInGroup: number,
+	remainingCount: number
+): VirtualChannelRoleMap {
+	const next = cloneVirtualChannelRoles(roles);
+	if (remainingCount <= 1) {
+		delete next[hwIndex];
+		return next;
+	}
+	const group = next[hwIndex];
+	if (!group) return next;
+	const shifted: Record<number, string> = {};
+	for (const [key, roleId] of Object.entries(group)) {
+		const index = Number(key);
+		if (!Number.isInteger(index) || index === removedIndexInGroup) continue;
+		const nextIndex = index > removedIndexInGroup ? index - 1 : index;
+		if (nextIndex < 0 || nextIndex >= remainingCount) continue;
+		shifted[nextIndex] = roleId;
+	}
+	if (Object.keys(shifted).length === 0) delete next[hwIndex];
+	else next[hwIndex] = shifted;
+	return next;
+}
+
+export function virtualChannelRoleMarks(
+	channelCount: number,
+	hwLabels: string[],
+	virtualChannelMap: Record<number, number> | undefined,
+	virtualChannelRoles: VirtualChannelRoleMap | undefined,
+	roleDefinitions: readonly VirtualChannelRoleMarkSource[] | undefined
+): (string | null)[] {
+	const marks = Array.from({ length: channelCount }, () => null as string | null);
+	if (!roleDefinitions || roleDefinitions.length === 0) return marks;
+	const groups = getVirtualChannelGroups(hwLabels, virtualChannelMap ?? {});
+	for (const group of groups) {
+		const groupRoles = virtualChannelRoles?.[group.hardwareChannelIndex];
+		if (!groupRoles) continue;
+		group.virtualChannelIndices.forEach((flatIndex, indexInGroup) => {
+			if (flatIndex < 0 || flatIndex >= marks.length) return;
+			const roleId = groupRoles[indexInGroup];
+			const definition = roleDefinitions.find((role) => role.id === roleId);
+			if (definition) marks[flatIndex] = definition.headerMark;
+		});
+	}
+	return marks;
+}

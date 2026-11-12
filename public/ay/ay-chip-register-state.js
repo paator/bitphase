@@ -31,6 +31,7 @@ class AYChipRegisterState {
 			this.channels[i].volume = 0;
 			this.channels[i].mixer = { tone: false, noise: false, envelope: false };
 			this.channels[i].timerEffects = createDefaultChannelTimerEffects();
+			this.channels[i].timerPeriodDetune = undefined;
 		}
 		this.noise = 0;
 		this.envelopePeriod = 0;
@@ -64,6 +65,9 @@ class AYChipRegisterState {
 				envelope: this.channels[i].mixer.envelope
 			};
 			copy.channels[i].timerEffects = copyChannelTimerEffects(this.channels[i].timerEffects);
+			copy.channels[i].timerPeriodDetune = this.channels[i].timerPeriodDetune
+				? { ...this.channels[i].timerPeriodDetune }
+				: undefined;
 		}
 		copy.noise = this.noise;
 		copy.envelopePeriod = this.envelopePeriod;

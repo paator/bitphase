@@ -44,6 +44,7 @@ export const AY_CHIP_SCHEMA: ChipSchema = {
 		}
 	},
 	channelLabels: ['A', 'B', 'C'],
+	virtualChannelRoles: [{ id: 'timer', label: 'Timer notes', headerMark: 'Timer' }],
 	globalColumnLabels: {
 		envelopeValue: 'Env',
 		envelopeEffect: 'Efx',

@@ -25,6 +25,7 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		this.registerState = new NesChipRegisterState(NES_CHANNEL_COUNT);
 		this.virtualChannelMixer = new NesVirtualChannelMixer();
 		this.virtualChannelMap = {};
+		this.virtualChannelRoles = {};
 		this.hwChannelCount = NES_CHANNEL_COUNT;
 		this.channelWaveformBuf = Array.from(
 			{ length: NES_CHANNEL_COUNT },
@@ -95,15 +96,22 @@ export class NesWorkletSlot extends TrackerWorkletSlot {
 		this._ensureChannelCapacity(channelCount);
 	}
 
-	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount }) {
+	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount, virtualChannelRoles }) {
 		const nextMap = virtualChannelMap || {};
+		const nextRoles = virtualChannelRoles || {};
 		const nextHw = hwChannelCount || NES_CHANNEL_COUNT;
 		const configUnchanged =
 			this.hwChannelCount === nextHw &&
-			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap);
+			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap) &&
+			JSON.stringify(this.virtualChannelRoles ?? {}) === JSON.stringify(nextRoles);
 		this.virtualChannelMap = nextMap;
+		this.virtualChannelRoles = nextRoles;
 		this.hwChannelCount = nextHw;
-		this.virtualChannelMixer.configure(this.virtualChannelMap, this.hwChannelCount);
+		this.virtualChannelMixer.configure(
+			this.virtualChannelMap,
+			this.hwChannelCount,
+			this.virtualChannelRoles
+		);
 
 		const totalChannels = this.virtualChannelMixer.getTotalVirtualChannelCount();
 		this.state.resizeChannels(totalChannels);

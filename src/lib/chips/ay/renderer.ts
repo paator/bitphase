@@ -621,7 +621,7 @@ export class AYChipRenderer implements ChipRenderer {
 				const registerState = new AYChipRegisterState(totalChannelCount);
 				const mixer = new VirtualChannelMixer();
 				if (hasVirtual) {
-					mixer.configure(virtualChannelMap, TONE_CHANNELS);
+					mixer.configure(virtualChannelMap, TONE_CHANNELS, song.virtualChannelRoles ?? {});
 				}
 				const patternProcessor = new TrackerPatternProcessor(state, audioDriver, {
 					postMessage: () => {}
@@ -751,7 +751,7 @@ export class AYChipRenderer implements ChipRenderer {
 		const registerState = new AYChipRegisterState(totalChannelCount);
 		const mixer = new VirtualChannelMixer();
 		if (hasVirtual) {
-			mixer.configure(virtualChannelMap, TONE_CHANNELS);
+			mixer.configure(virtualChannelMap, TONE_CHANNELS, song.virtualChannelRoles ?? {});
 		}
 		const patternProcessor = new TrackerPatternProcessor(state, audioDriver, {
 			postMessage: () => {}

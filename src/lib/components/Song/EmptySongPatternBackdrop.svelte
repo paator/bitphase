@@ -13,7 +13,7 @@
 		type CellPosition,
 		type FieldSegment
 	} from '../../ui-rendering/pattern-editor-text-parser';
-	import { getVirtualChannelGroups } from '../../models/virtual-channels';
+	import { getVirtualChannelGroups, virtualChannelRoleMarks } from '../../models/virtual-channels';
 	import { settingsStore } from '../../stores/settings.svelte';
 	import { getColors } from '../../utils/colors';
 	import { getFonts } from '../../utils/fonts';
@@ -182,7 +182,14 @@
 			rowString: labelRowString,
 			channelLabels: pattern.channels.map((channel) => channel.label),
 			channelMuted: muted,
-			virtualChannelGroups: vcGroups
+			virtualChannelGroups: vcGroups,
+			channelRoleMarks: virtualChannelRoleMarks(
+				pattern.channels.length,
+				chip.schema.channelLabels ?? ['A', 'B', 'C'],
+				song.virtualChannelMap,
+				song.virtualChannelRoles,
+				chip.schema.virtualChannelRoles
+			)
 		});
 	}
 

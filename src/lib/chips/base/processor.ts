@@ -74,6 +74,7 @@ export interface PreviewNoteSupport {
 export interface VirtualChannelSupport {
 	sendVirtualChannelConfig(
 		virtualChannelMap: Record<number, number>,
-		hwChannelCount: number
+		hwChannelCount: number,
+		virtualChannelRoles?: Record<number, Record<number, string>>
 	): void;
 }

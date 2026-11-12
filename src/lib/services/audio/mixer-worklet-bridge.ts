@@ -89,6 +89,7 @@ export type MixerSlotCommand =
 			type: 'set_virtual_channel_config';
 			virtualChannelMap: Record<number, number>;
 			hwChannelCount: number;
+			virtualChannelRoles?: Record<number, Record<number, string>>;
 	  };
 
 export class MixerWorkletBridge {

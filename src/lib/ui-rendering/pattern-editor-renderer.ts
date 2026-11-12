@@ -65,6 +65,7 @@ export interface ChannelLabelData {
 	channelLabels: string[];
 	channelMuted: boolean[];
 	virtualChannelGroups?: VirtualChannelGroup[];
+	channelRoleMarks?: (string | null)[];
 	channelLevels?: number[];
 	effectColumnControlsEnabled?: boolean;
 }
@@ -165,7 +166,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		} else {
 			for (let i = 0; i < data.channelLabels.length && i < channelPositions.length; i++) {
 				this.drawSingleChannelLabel(
-					this.formatChannelHeaderLabel(data.channelLabels[i]),
+					this.channelHeaderText(this.formatChannelHeaderLabel(data.channelLabels[i]), i, data),
 					i,
 					channelPositions,
 					separatorMargin,
@@ -213,7 +214,11 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 				const idx = indices[0];
 				if (idx < channelPositions.length) {
 					this.drawSingleChannelLabel(
-						this.formatChannelHeaderLabel(group.hardwareLabel),
+						this.channelHeaderText(
+							this.formatChannelHeaderLabel(group.hardwareLabel),
+							idx,
+							data
+						),
 						idx,
 						channelPositions,
 						separatorMargin,
@@ -236,8 +241,9 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 					? virtualLabel.slice(group.hardwareLabel.length)
 					: virtualLabel;
 				suffix = suffix.replace(/^[:\-\s]+/, '');
+				const virtualText = suffix ? `${group.hardwareLabel}:${suffix}` : group.hardwareLabel;
 				this.drawSingleChannelLabel(
-					suffix ? `${group.hardwareLabel}:${suffix}` : group.hardwareLabel,
+					this.channelHeaderText(virtualText, vchIdx, data),
 					vchIdx,
 					channelPositions,
 					separatorMargin,
@@ -266,6 +272,11 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			this.ctx.strokeRect(groupX, buttonY, groupWidth, buttonHeight);
 			this.restore();
 		}
+	}
+
+	private channelHeaderText(label: string, index: number, data: ChannelLabelData): string {
+		const mark = data.channelRoleMarks?.[index];
+		return mark ? `${label} ${mark}` : label;
 	}
 
 	private formatChannelHeaderLabel(label: string): string {

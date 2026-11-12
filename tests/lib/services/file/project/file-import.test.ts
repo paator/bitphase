@@ -79,9 +79,38 @@ describe('FileImportService', () => {
 		const pattern = project.songs[0].patterns[0];
 
 		expect(project.songs[0].virtualChannelMap).toEqual({ 0: 3 });
+		expect(project.songs[0].virtualChannelRoles).toEqual({});
 		expect(pattern.channels.map((item) => item.label)).toEqual(['A1', 'A2', 'A3', 'B', 'C']);
 		expect(pattern.channels[0].rows[0].note.name).toBe(NoteName.C);
 		expect(pattern.channels[3].rows[0].note.name).toBe(NoteName.D);
+	});
+
+	it('keeps an AY timer role and drops roles the chip does not declare', async () => {
+		const json = JSON.stringify({
+			name: 'roles',
+			songs: [
+				{
+					chipType: 'ay',
+					virtualChannelMap: { 0: 2 },
+					virtualChannelRoles: { 0: { 0: 'nope', 1: 'timer' } },
+					patterns: []
+				},
+				{
+					chipType: 'nes',
+					virtualChannelMap: { 0: 2 },
+					virtualChannelRoles: { 0: { 1: 'timer' } },
+					patterns: []
+				}
+			],
+			patternOrder: [0],
+			tables: [],
+			instruments: []
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+
+		expect(project.songs[0].virtualChannelRoles).toEqual({ 0: { 1: 'timer' } });
+		expect(project.songs[1].virtualChannelRoles).toEqual({});
 	});
 
 	it('preserves projects with zero songs', async () => {

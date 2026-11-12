@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import VirtualChannelMixer from '../../public/ay/virtual-channel-mixer.js';
 import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
+import {
+	createToneTimerEffect,
+	createVolumeTimerEffect
+} from '../../public/ay/ay-timer-effect-constants.js';
 
 function createState(channelCount: number) {
 	return {
@@ -182,6 +186,129 @@ describe('VirtualChannelMixer', () => {
 			registerState.channels[1].volume = 0;
 
 			expect(mixer.getAudibleVirtualChannelIndices(registerState)).toEqual([]);
+		});
+
+		it('skips a column whose role feeds the timer', () => {
+			mixer.configure({ 0: 2 }, 3, { 0: { 1: 'timer' } });
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].volume = 15;
+			registerState.channels[1].volume = 15;
+			registerState.channels[2].volume = 8;
+
+			expect(mixer.getAudibleVirtualChannelIndices(registerState)).toEqual([0, 2]);
+		});
+	});
+
+	describe('timer note role', () => {
+		it('keeps the voice on the audible column and steps its timer from the role column', () => {
+			mixer.configure({ 0: 2 }, 3, { 0: { 1: 'timer' } });
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].tone = 100;
+			registerState.channels[0].volume = 15;
+			registerState.channels[0].timerPeriodDetune = { semitone: 0, detune: 1 };
+			registerState.channels[0].timerEffects.sid = createVolumeTimerEffect({
+				enabled: true,
+				period: 50,
+				periodLow: 50
+			});
+			registerState.channels[1].tone = 400;
+			registerState.channels[1].volume = 12;
+
+			const result = mixer.merge(registerState, createState(4));
+
+			expect(result.channels[0].tone).toBe(100);
+			expect(result.channels[0].volume).toBe(15);
+			expect(result.channels[0].timerEffects.sid.period).toBe(401);
+			expect(result.channels[0].timerEffects.sid.periodLow).toBe(401);
+		});
+
+		it('lets a left-hand timer column supply the period while the voice stays on the right', () => {
+			mixer.configure({ 0: 2 }, 3, { 0: { 0: 'timer' } });
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].tone = 111;
+			registerState.channels[0].volume = 15;
+			registerState.channels[1].tone = 222;
+			registerState.channels[1].volume = 10;
+			registerState.channels[1].timerPeriodDetune = { semitone: 12, detune: 0 };
+			registerState.channels[1].timerEffects.sid = createVolumeTimerEffect({
+				enabled: true,
+				period: 10,
+				periodLow: 10
+			});
+			registerState.channels[1].timerEffects.fm = createToneTimerEffect({
+				enabled: true,
+				period: 10,
+				periodLow: 10,
+				baseTonePeriod: 222
+			});
+
+			const result = mixer.merge(registerState, createState(4));
+
+			expect(result.channels[0].tone).toBe(222);
+			expect(result.channels[0].timerEffects.sid.period).toBe(56);
+			expect(result.channels[0].timerEffects.fm.period).toBe(56);
+			expect(result.channels[0].timerEffects.fm.baseTonePeriod).toBe(222);
+		});
+
+		it('rebuilds pwm periods from the timer note', () => {
+			mixer.configure({ 0: 2 }, 3, { 0: { 1: 'timer' } });
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].tone = 100;
+			registerState.channels[0].volume = 15;
+			registerState.channels[0].timerPeriodDetune = { semitone: 0, detune: 0 };
+			registerState.channels[0].timerEffects.sid = createVolumeTimerEffect({
+				enabled: true,
+				pwm: true,
+				pwmByDutyIndex: true,
+				period: 80,
+				periodLow: 20
+			});
+			registerState.channels[1].tone = 200;
+			registerState.channels[1].volume = 15;
+
+			const result = mixer.merge(registerState, createState(4));
+			const sid = result.channels[0].timerEffects.sid;
+
+			expect(sid.period).toBe(320);
+			expect(sid.periodLow).toBe(80);
+		});
+
+		it('leaves the timer on the voice note when the role column is silent', () => {
+			mixer.configure({ 0: 2 }, 3, { 0: { 1: 'timer' } });
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].tone = 100;
+			registerState.channels[0].volume = 15;
+			registerState.channels[0].timerEffects.sid = createVolumeTimerEffect({
+				enabled: true,
+				period: 55,
+				periodLow: 55
+			});
+			registerState.channels[1].tone = 400;
+			registerState.channels[1].volume = 0;
+
+			const result = mixer.merge(registerState, createState(4));
+
+			expect(result.channels[0].tone).toBe(100);
+			expect(result.channels[0].timerEffects.sid.period).toBe(55);
+		});
+
+		it('treats a role the chip does not claim as a normal voice', () => {
+			mixer.configure({ 0: 2 }, 3, { 0: { 1: 'drone' } });
+			const registerState = new AYChipRegisterState(4);
+			registerState.channels[0].tone = 100;
+			registerState.channels[0].volume = 15;
+			registerState.channels[0].timerEffects.sid = createVolumeTimerEffect({
+				enabled: true,
+				period: 40,
+				periodLow: 40
+			});
+			registerState.channels[1].tone = 300;
+			registerState.channels[1].volume = 15;
+
+			const result = mixer.merge(registerState, createState(4));
+
+			expect(result.channels[0].tone).toBe(100);
+			expect(result.channels[0].timerEffects.sid.period).toBe(40);
 		});
 	});
 });

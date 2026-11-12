@@ -18,6 +18,8 @@ import {
 	getAySidBaseVolume,
 	computeTimerEffectPeriod,
 	computeTimerPwmPeriods,
+	effectiveRowDetune,
+	effectiveRowToneDetune,
 	effectiveRowTimerWaveform,
 	effectiveRowFmWaveform,
 	effectiveRowFmWaveformLoop,
@@ -1215,6 +1217,10 @@ class AYAudioDriver {
 					state.channelEnvelopeEnabled[channelIndex] &&
 					!envelopeDisabledByOnOff;
 				const timerEffectPeriod = computeTimerEffectPeriod(finalTone, timerRow);
+				registerState.channels[channelIndex].timerPeriodDetune = {
+					semitone: effectiveRowToneDetune(timerRow),
+					detune: effectiveRowDetune(timerRow)
+				};
 				const sidPwmSupported = sidActive && rowSupportsSidTimerPwm(timerRow);
 				const syncbuzzerPwmSupported =
 					syncbuzzerActive && rowSupportsSyncbuzzerTimerPwm(timerRow);

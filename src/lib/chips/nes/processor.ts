@@ -301,12 +301,14 @@ export class NESProcessor
 
 	sendVirtualChannelConfig(
 		virtualChannelMap: Record<number, number>,
-		hwChannelCount: number
+		hwChannelCount: number,
+		virtualChannelRoles?: Record<number, Record<number, string>>
 	): void {
 		this.bridge.sendCommand({
 			type: 'set_virtual_channel_config',
 			virtualChannelMap,
-			hwChannelCount
+			hwChannelCount,
+			virtualChannelRoles: virtualChannelRoles ?? {}
 		});
 	}
 }

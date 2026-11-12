@@ -4,7 +4,7 @@ import {
 	applySharedEffectColumnCounts,
 	getSharedEffectColumnCounts
 } from '../chips/base/channel-effect-columns';
-import { computeEffectiveChannelLabels } from './virtual-channels';
+import { computeEffectiveChannelLabels, type VirtualChannelRoleMap } from './virtual-channels';
 
 enum NoteName {
 	None = 0,
@@ -184,6 +184,7 @@ class Song {
 	public tuningTableIndex?: number;
 	public a4TuningHz?: number;
 	public virtualChannelMap: Record<number, number> = {};
+	public virtualChannelRoles: VirtualChannelRoleMap = {};
 	#schema?: ChipSchema;
 
 	constructor(schema?: ChipSchema) {

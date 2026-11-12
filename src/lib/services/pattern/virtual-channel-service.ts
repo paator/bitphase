@@ -2,9 +2,12 @@ import { Pattern, Channel, Row, type Song } from '../../models/song';
 import type { ChipSchema } from '../../chips/base/schema';
 import {
 	clampVirtualChannelCount,
+	cloneVirtualChannelRoles,
 	computeEffectiveChannelLabels,
 	formatVirtualChannelLabel,
-	MAX_VIRTUAL_CHANNELS_PER_HARDWARE_CHANNEL
+	MAX_VIRTUAL_CHANNELS_PER_HARDWARE_CHANNEL,
+	shiftVirtualChannelRolesForRemoval,
+	type VirtualChannelRoleMap
 } from '../../models/virtual-channels';
 
 export class VirtualChannelService {
@@ -12,7 +15,11 @@ export class VirtualChannelService {
 		song: Song,
 		hwChannelIndex: number,
 		patterns: Pattern[]
-	): { updatedMap: Record<number, number>; updatedPatterns: Pattern[] } | null {
+	): {
+		updatedMap: Record<number, number>;
+		updatedPatterns: Pattern[];
+		updatedRoles: VirtualChannelRoleMap;
+	} | null {
 		const schema = song.getSchema();
 		const hwLabels = schema?.channelLabels ?? ['A', 'B', 'C'];
 		const currentMap = { ...song.virtualChannelMap };
@@ -41,7 +48,11 @@ export class VirtualChannelService {
 			return this.rebuildPattern(pattern, newChannels, schema, newChannels.map((c) => c.label));
 		});
 
-		return { updatedMap: currentMap, updatedPatterns };
+		return {
+			updatedMap: currentMap,
+			updatedPatterns,
+			updatedRoles: cloneVirtualChannelRoles(song.virtualChannelRoles)
+		};
 	}
 
 	static removeVirtualChannel(
@@ -49,7 +60,11 @@ export class VirtualChannelService {
 		hwChannelIndex: number,
 		patterns: Pattern[],
 		effectiveChannelIndex?: number
-	): { updatedMap: Record<number, number>; updatedPatterns: Pattern[] } | null {
+	): {
+		updatedMap: Record<number, number>;
+		updatedPatterns: Pattern[];
+		updatedRoles: VirtualChannelRoleMap;
+	} | null {
 		const schema = song.getSchema();
 		const hwLabels = schema?.channelLabels ?? ['A', 'B', 'C'];
 		const currentMap = { ...song.virtualChannelMap };
@@ -64,12 +79,18 @@ export class VirtualChannelService {
 
 		const groupStart = this.getGroupStartIndex(hwChannelIndex, song.virtualChannelMap);
 		const groupEnd = this.getGroupEndIndex(hwChannelIndex, song.virtualChannelMap);
-		let removeIndex: number;
-		if (effectiveChannelIndex !== undefined && effectiveChannelIndex >= groupStart && effectiveChannelIndex <= groupEnd) {
-			removeIndex = effectiveChannelIndex;
-		} else {
-			removeIndex = groupEnd;
-		}
+		const removeIndex =
+			effectiveChannelIndex !== undefined &&
+			effectiveChannelIndex >= groupStart &&
+			effectiveChannelIndex <= groupEnd
+				? effectiveChannelIndex
+				: groupEnd;
+		const updatedRoles = shiftVirtualChannelRolesForRemoval(
+			song.virtualChannelRoles,
+			hwChannelIndex,
+			removeIndex - groupStart,
+			currentCount - 1
+		);
 
 		const updatedPatterns = patterns.map((pattern) => {
 			const newChannels = [...pattern.channels];
@@ -92,7 +113,7 @@ export class VirtualChannelService {
 			return this.rebuildPattern(pattern, newChannels, schema, effectiveLabels);
 		});
 
-		return { updatedMap: currentMap, updatedPatterns };
+		return { updatedMap: currentMap, updatedPatterns, updatedRoles };
 	}
 
 	private static rebuildPattern(
