@@ -245,10 +245,8 @@ function parsePT3(data: Uint8Array): VTM {
 
 			const b2 = readU8(data, off);
 			const b3 = readU8(data, off + 1);
-			let addToEnvelopeOrNoise = (b2 >> 1) & 15;
-			if (addToEnvelopeOrNoise & 0x10) addToEnvelopeOrNoise |= 0xf0;
-			else addToEnvelopeOrNoise &= 15;
-			if (addToEnvelopeOrNoise > 127) addToEnvelopeOrNoise -= 256;
+			let addToEnvelopeOrNoise = (b2 >> 1) & 0x1f;
+			if (addToEnvelopeOrNoise & 0x10) addToEnvelopeOrNoise -= 0x20;
 
 			items.push({
 				addToTon: readS16LE(data, off + 2),
