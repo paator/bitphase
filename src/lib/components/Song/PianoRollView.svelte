@@ -139,6 +139,7 @@
 	import { autoEnvStore } from '../../stores/auto-env.svelte';
 	import { settingsStore } from '../../stores/settings.svelte';
 	import IconLucideGhost from '~icons/lucide/ghost';
+	import PianoRollScrollbar from './PianoRollScrollbar.svelte';
 	import { keybindingsStore } from '../../stores/keybindings.svelte';
 	import { themeService } from '../../services/theme/theme-service';
 	import { midiService } from '../../services/midi/midi-service';
@@ -246,6 +247,7 @@
 		ontoggleplayback?: () => void;
 		onseekplayback?: (orderIndex: number, row: number) => void;
 	} = $props();
+	const gridId = $props.id();
 
 	let rowWidth = $state(16);
 	let keyHeight = $state(16);
@@ -846,7 +848,12 @@
 			});
 			const label = ghostChannelLabel(channelIndex);
 			for (const block of blocks) {
-				ghosts.push({ ...block, ghostChannel: channelIndex, ghostLabel: label, gestures: [] });
+				ghosts.push({
+					...block,
+					ghostChannel: channelIndex,
+					ghostLabel: label,
+					gestures: []
+				});
 			}
 		}
 		return ghosts;
@@ -857,7 +864,8 @@
 		return (
 			channels.find(
 				(channel) =>
-					channel.songIndex === selected.songIndex && channel.channelIndex === channelIndex
+					channel.songIndex === selected.songIndex &&
+					channel.channelIndex === channelIndex
 			)?.label ?? String(channelIndex + 1)
 		);
 	}
@@ -950,6 +958,17 @@
 		if (scroller.scrollLeft === left) return;
 		lockOrderSync = true;
 		scroller.scrollLeft = left;
+	}
+
+	function scrollGridTo(axis: 'x' | 'y', value: number): void {
+		const scroller = gridScroller;
+		if (!scroller) return;
+		if (axis === 'x') scroller.scrollLeft = value;
+		else scroller.scrollTop = value;
+		const left = scroller.scrollLeft;
+		const top = scroller.scrollTop;
+		if (left !== scrollX) scrollX = left;
+		if (top !== scrollY) scrollY = top;
 	}
 
 	function syncOrderToScroll(scrollLeft: number): void {
@@ -2785,31 +2804,56 @@
 				<div class="min-h-0 flex-1 overflow-hidden" bind:this={keyboardViewport}>
 					<canvas bind:this={keyboardCanvas} class="block"></canvas>
 				</div>
+				<div class="h-2.5 shrink-0 bg-[var(--color-app-background)]"></div>
 			</div>
-			<div class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-				<div
-					class="absolute inset-0 overflow-auto overscroll-x-none"
-					bind:this={gridScroller}
-					onscroll={onGridScroll}>
-					<div
-						class="pointer-events-none"
-						style:width="{content.width}px"
-						style:height="{content.height + RULER_HEIGHT}px">
+			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+				<div class="flex min-h-0 min-w-0 flex-1">
+					<div class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+						<div
+							class="piano-roll-scroller absolute inset-0 overflow-auto overscroll-x-none"
+							bind:this={gridScroller}
+							onscroll={onGridScroll}>
+							<div
+								class="pointer-events-none"
+								style:width="{content.width}px"
+								style:height="{content.height + RULER_HEIGHT}px">
+							</div>
+						</div>
+						<canvas
+							bind:this={gridCanvas}
+							id={gridId}
+							tabindex="0"
+							aria-label="Piano roll"
+							class="absolute top-0 left-0 z-10 block outline-none"
+							style:width="{gridWidth}px"
+							style:height="{gridHeight}px"
+							onmousedown={onGridMouseDown}
+							onmousemove={onGridMouseMove}
+							onkeydown={onGridKeyDown}
+							onkeyup={() => notePreview.stop()}
+							oncontextmenu={onGridContextMenu}>
+						</canvas>
 					</div>
+					<PianoRollScrollbar
+						orientation="vertical"
+						class="w-2 shrink-0 self-stretch"
+						viewport={gridHeight}
+						extent={content.height + RULER_HEIGHT}
+						scroll={scrollY}
+						controls={gridId}
+						onScroll={(value) => scrollGridTo('y', value)} />
 				</div>
-				<canvas
-					bind:this={gridCanvas}
-					tabindex="0"
-					aria-label="Piano roll"
-					class="absolute top-0 left-0 z-10 block outline-none"
-					style:width="{gridWidth}px"
-					style:height="{gridHeight}px"
-					onmousedown={onGridMouseDown}
-					onmousemove={onGridMouseMove}
-					onkeydown={onGridKeyDown}
-					onkeyup={() => notePreview.stop()}
-					oncontextmenu={onGridContextMenu}>
-				</canvas>
+				<div class="flex h-2.5 shrink-0">
+					<PianoRollScrollbar
+						orientation="horizontal"
+						class="h-2.5 min-w-0 flex-1"
+						viewport={gridWidth}
+						extent={content.width}
+						scroll={scrollX}
+						controls={gridId}
+						onScroll={(value) => scrollGridTo('x', value)} />
+					<div class="w-2 shrink-0 bg-[var(--color-app-background)]"></div>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -2938,3 +2982,15 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.piano-roll-scroller {
+		scrollbar-width: none;
+	}
+
+	.piano-roll-scroller::-webkit-scrollbar {
+		display: none;
+		width: 0;
+		height: 0;
+	}
+</style>

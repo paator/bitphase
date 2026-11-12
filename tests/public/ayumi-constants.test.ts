@@ -27,6 +27,45 @@ describe('ayumi-constants', () => {
 			expect(instance.exports.ayumi_struct_size()).toBe(AYUMI_STRUCT_SIZE);
 		});
 
+		it('syncbuzzer F turns the envelope off without writing R13', async () => {
+			const { instance } = await instantiateAyumiWasm();
+			const wasm = instance.exports as any;
+			const ay = wasm.malloc(AYUMI_STRUCT_SIZE);
+			const regs = wasm.malloc(14);
+			const waveform = wasm.malloc(8);
+			try {
+				const steps = new Int32Array(wasm.memory.buffer, waveform, 2);
+				steps[0] = 15;
+				steps[1] = 15;
+				wasm.ayumi_configure(ay, 0, DEFAULT_AYM_FREQUENCY, 44100, 0);
+				wasm.ayumi_set_volume(ay, 0, 15);
+				wasm.ayumi_set_mixer(ay, 0, 0, 1, 1);
+				wasm.ayumi_set_envelope_shape(ay, 8);
+				wasm.ayumi_set_timer_effect(ay, 0, 1, 2, 0, 100, 100, 0, 1, 0);
+				wasm.ayumi_set_timer_effect_waveform(ay, 0, 1, waveform, 2, 0);
+				wasm.ayumi_timer_effect_reset(ay, 0, 1);
+				wasm.ayumi_set_mixer(ay, 0, 0, 1, 1);
+				wasm.ayumi_get_registers(ay, regs);
+
+				const off = new Uint8Array(wasm.memory.buffer, regs, 14);
+				expect(off[8]).toBe(0x0f);
+				expect(off[13]).toBe(8);
+
+				steps[0] = 8;
+				steps[1] = 15;
+				wasm.ayumi_set_timer_effect_waveform(ay, 0, 1, waveform, 2, 0);
+				wasm.ayumi_timer_effect_reset(ay, 0, 1);
+				wasm.ayumi_get_registers(ay, regs);
+				const on = new Uint8Array(wasm.memory.buffer, regs, 14);
+				expect(on[8]).toBe(0x1f);
+				expect(on[13]).toBe(8);
+			} finally {
+				wasm.free(waveform);
+				wasm.free(regs);
+				wasm.free(ay);
+			}
+		});
+
 		it('native SID timer volume uses DAC-space scaling', async () => {
 			const { instance } = await instantiateAyumiWasm();
 			const wasm = instance.exports as any;

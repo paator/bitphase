@@ -311,7 +311,7 @@
 					</th>
 					<th
 						class={isExpanded ? 'w-12 min-w-12 px-1' : 'w-8 px-0.5 text-[0.65rem]'}
-						title="Envelope shape. 0 uses the shape column. 1-F match the shape column.">
+						title="Envelope shape. 0 uses the shape column. 1-E write that shape. F turns the envelope off.">
 						<div class="flex items-center justify-center gap-0.5">
 							<IconCarbonActivity class={isExpanded ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
 							<span>S</span>

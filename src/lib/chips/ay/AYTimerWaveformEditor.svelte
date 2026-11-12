@@ -90,7 +90,7 @@
 			: usesFmSemitones
 				? 'Signed semitone offsets'
 				: usesEnvelopeShapes
-					? 'R13 values (0–15)'
+					? '0–E write R13. F turns the envelope off'
 					: `${chipVariant} DAC curve`
 	);
 	const stepCountLabel = $derived(
@@ -403,7 +403,7 @@
 		: usesFmSemitones
 			? `FM semitone offsets (signed). Y axis spans ${AY_FM_SEMITONE_MIN} to +${AY_FM_SEMITONE_MAX} semitones.`
 			: usesEnvelopeShapes
-				? 'Envelope shapes (0–15 hex R13 values)'
+				? 'Envelope shapes. 0 uses the mixer shape, then the pattern digit. F turns the envelope off.'
 				: `SID steps (0–15). Y axis uses ${chipVariant} DAC curve.`}
 	{canvasHeight}
 	onclose={() => onclose?.()}

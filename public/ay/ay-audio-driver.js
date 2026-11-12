@@ -1005,7 +1005,10 @@ class AYAudioDriver {
 			registerState.channels[channelIndex].mixer.envelope = false;
 			return;
 		}
-		if (this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)) return;
+		if (this.isSyncbuzzerEnvelopeShapeSource(state, channelIndex)) {
+			state.channelEnvelopeEnabled[channelIndex] = true;
+			return;
+		}
 		registerState.envelopeShape = shape & 0xf;
 		state.channelEnvelopeEnabled[channelIndex] = true;
 	}
