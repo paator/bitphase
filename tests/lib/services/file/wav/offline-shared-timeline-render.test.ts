@@ -92,4 +92,43 @@ describe('offline shared timeline render', () => {
 
 		expect(buffers[0]![0]!.length).toBeGreaterThan(300);
 	});
+
+	it('reports a new playback position only when the row changes', async () => {
+		const timeline = new SongTimeline();
+		timeline.setPatternOrder([0]);
+		timeline.setIntFrequency(10, 10);
+		timeline.tickAccumulator = 1;
+		timeline.currentSpeed = 2;
+
+		const changes: { sampleIndex: number; orderIndex: number; row: number }[] = [];
+		const lane = {
+			songIndex: 0,
+			audioSlotKind: 'ayumi',
+			separateChannels: false,
+			getLeaderPatternRowCount() {
+				return 2;
+			},
+			runSharedPlaybackQuantum() {},
+			onPatternOrderAdvanced() {},
+			captureSample() {
+				return { left: 0, right: 0 };
+			},
+			release() {}
+		};
+
+		const buffers = await renderOfflineSharedTimeline({
+			lanes: [lane],
+			timeline,
+			sampleRate: 10,
+			loopCount: 1,
+			totalRows: 2,
+			onPositionChange: (position) => changes.push(position)
+		});
+
+		expect(buffers[0]![0]!.length).toBe(3);
+		expect(changes).toEqual([
+			{ sampleIndex: 0, orderIndex: 0, row: 0 },
+			{ sampleIndex: 1, orderIndex: 0, row: 1 }
+		]);
+	});
 });

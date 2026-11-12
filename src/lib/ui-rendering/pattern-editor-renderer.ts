@@ -68,6 +68,8 @@ export interface ChannelLabelData {
 	channelRoleMarks?: (string | null)[];
 	channelLevels?: number[];
 	effectColumnControlsEnabled?: boolean;
+	showEffectColumnControls?: boolean;
+	showGlobalColumnLabels?: boolean;
 }
 
 export interface RoleDriveLink {
@@ -120,6 +122,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	private anchorSeparatorXs: number[] = [];
 	private effectColumnCounts: number[] = [];
 	private effectColumnControlsEnabled = true;
+	private showEffectColumnControls = true;
+	private showGlobalColumnLabels = true;
 
 	constructor(options: PatternEditorRenderOptions) {
 		super(options);
@@ -135,6 +139,10 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.effectColumnCounts = counts;
 	}
 
+	setDrawingContext(ctx: CanvasRenderingContext2D): void {
+		this.ctx = ctx;
+	}
+
 	drawRow(data: RowRenderData): void {
 		this.drawRowBackground(data);
 		this.drawRowText(data);
@@ -143,6 +151,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 
 	drawChannelLabels(data: ChannelLabelData): void {
 		this.effectColumnControlsEnabled = data.effectColumnControlsEnabled !== false;
+		this.showEffectColumnControls = data.showEffectColumnControls !== false;
+		this.showGlobalColumnLabels = data.showGlobalColumnLabels !== false;
 		const channelPositions = this.calculateChannelPositions(data.rowString);
 		const centerY = this.lineHeight / 2;
 		const borderWidth = 1;
@@ -159,7 +169,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		this.setFont(boldFont);
 		this.setTextBaseline('middle');
 
-		if (this.schema.globalColumnLabels) {
+		if (this.showGlobalColumnLabels && this.schema.globalColumnLabels) {
 			const globalPositions = this.calculateGlobalColumnPositions(data.rowString);
 			const textColor = this.patternColors.patternRowNum || this.patternColors.patternText;
 			for (const { fieldKey, x, width } of globalPositions) {
@@ -336,7 +346,8 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		const buttonY = (this.lineHeight - buttonHeight) / 2;
 		const centerY = buttonY + buttonHeight / 2;
 		const labelWidth = this.measureText(label);
-		const showEffectControls = schemaHasChannelEffects(this.schema);
+		const showEffectControls =
+			schemaHasChannelEffects(this.schema) && this.showEffectColumnControls;
 		const controlLayout = this.getEffectColumnControlLayout(buttonHeight);
 		const controlsWidth = showEffectControls
 			? controlLayout.width * 2 + controlLayout.gap + controlLayout.margin * 2
@@ -861,6 +872,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 
 		if (
 			data.isSelected &&
+			data.selectedColumn >= 0 &&
 			data.selectedColumn < data.cellPositions.length &&
 			(data.selectionStartCol === null || data.selectionStartCol === undefined)
 		) {

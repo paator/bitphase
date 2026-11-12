@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import Icons from 'unplugin-icons/vite';
 import { execSync } from 'child_process';
 import { createReadStream, existsSync, readFileSync, writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
 import { isAbsolute, join, relative, resolve } from 'path';
 
 function getGitCommitHash() {
@@ -79,6 +80,8 @@ function servePublicModuleImportsInDev() {
 	};
 }
 
+const projectRoot = fileURLToPath(new URL('.', import.meta.url));
+
 // https://vite.dev/config/
 export default defineConfig({
 	base: '/',
@@ -86,6 +89,10 @@ export default defineConfig({
 	build: {
 		target: 'esnext',
 		rollupOptions: {
+			input: {
+				main: resolve(projectRoot, 'index.html'),
+				visualize: resolve(projectRoot, 'visualize/index.html')
+			},
 			external: (id) =>
 				id === 'ayumi-constants.js' ||
 				id.endsWith('/ayumi-constants.js') ||

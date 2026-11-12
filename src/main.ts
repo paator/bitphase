@@ -1,9 +1,16 @@
-import { mount } from 'svelte'
-import './app.css'
-import App from './App.svelte'
+import { mount } from 'svelte';
+import './app.css';
+import App from './App.svelte';
 
-const app = mount(App, {
-  target: document.getElementById('app')!,
-})
+const visualizePath = window.location.pathname === '/visualize';
+if (visualizePath) {
+	window.location.replace('/visualize/');
+}
 
-export default app
+const app = visualizePath
+	? null
+	: mount(App, {
+			target: document.getElementById('app')!
+		});
+
+export default app;

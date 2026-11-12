@@ -18,10 +18,11 @@ import { createNesSharedTimelineExportLane } from '../../../chips/nes/shared-tim
 import { createSaaSharedTimelineExportLane } from '../../../chips/saa/shared-timeline-export-lane';
 import {
 	renderOfflineSharedTimeline,
-	type OfflineSharedTimeline
+	type OfflineSharedTimeline,
+	type SharedTimelinePosition
 } from './offline-shared-timeline-render';
 
-const SAMPLE_RATE = 44100;
+export const PLAYBACK_SAMPLE_RATE = 44100;
 
 function calculateTotalRows(song: { patterns: Pattern[] }, patternOrder: number[]): number {
 	let totalRows = 0;
@@ -172,7 +173,7 @@ export async function renderMixedChipSharedTimelineSlots(
 		const buffers = await renderOfflineSharedTimeline({
 			lanes,
 			timeline,
-			sampleRate: SAMPLE_RATE,
+			sampleRate: PLAYBACK_SAMPLE_RATE,
 			loopCount,
 			totalRows,
 			onProgress,
@@ -183,6 +184,85 @@ export async function renderMixedChipSharedTimelineSlots(
 			songIndex: lane.songIndex,
 			channels: buffers[index]!
 		}));
+	} finally {
+		for (const lane of lanes) {
+			lane.release();
+		}
+	}
+}
+
+export async function renderProjectPlaybackAudio(
+	project: Project,
+	options: {
+		loopCount?: number;
+		resourceLoader?: ResourceLoader;
+		getChip: (chipType: string) => Chip | null;
+		onProgress?: (progress: number, message: string) => void;
+		onPositionChange?: (position: SharedTimelinePosition) => void;
+		abortSignal?: AbortSignal;
+	}
+): Promise<{ buffers: Float32Array[][]; leaderSongIndex: number }> {
+	const songs: { songIndex: number; chip: Chip }[] = [];
+	for (let songIndex = 0; songIndex < project.songs.length; songIndex++) {
+		const song = project.songs[songIndex];
+		if (!song?.patterns?.length || !song.chipType) continue;
+		const chip = options.getChip(song.chipType);
+		if (!chip) {
+			throw new Error(`No chip available for song ${songIndex + 1}`);
+		}
+		songs.push({ songIndex, chip });
+	}
+	if (songs.length === 0) {
+		throw new Error('Song is empty');
+	}
+
+	const loopCount = Math.max(1, options.loopCount ?? 1);
+	const patternOrder = project.patternOrder || [0];
+	const session = {
+		patternOrder,
+		startOrderIndex: 0,
+		sharedTimeline: null as unknown | null,
+		separateChannels: false,
+		resourceCache: new Map<string, unknown>()
+	};
+
+	const lanes = [];
+	try {
+		for (const entry of songs) {
+			if (options.abortSignal?.aborted) {
+				throw new Error('Export cancelled');
+			}
+			lanes.push(
+				await createLaneForSlot(
+					project,
+					{ songIndex: entry.songIndex, audioSlotKind: entry.chip.audioSlotKind },
+					entry.chip,
+					session,
+					options.resourceLoader,
+					options.onProgress
+				)
+			);
+		}
+
+		if (!session.sharedTimeline) {
+			throw new Error('Shared timeline was not initialized');
+		}
+
+		const leaderSongIndex = songs[0]!.songIndex;
+		const leader = project.songs[leaderSongIndex]!;
+		const timeline = session.sharedTimeline as OfflineSharedTimeline;
+		const buffers = await renderOfflineSharedTimeline({
+			lanes,
+			timeline,
+			sampleRate: PLAYBACK_SAMPLE_RATE,
+			loopCount,
+			totalRows: calculateTotalRows(leader, patternOrder),
+			onProgress: options.onProgress,
+			onPositionChange: options.onPositionChange,
+			abortSignal: options.abortSignal,
+			calculateCurrentRow: () => calculateCurrentRow(timeline, leader)
+		});
+		return { buffers, leaderSongIndex };
 	} finally {
 		for (const lane of lanes) {
 			lane.release();

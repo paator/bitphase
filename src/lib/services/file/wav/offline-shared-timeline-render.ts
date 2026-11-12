@@ -21,6 +21,12 @@ export type OfflineSharedTimeline = {
 	songEnded: boolean;
 };
 
+export type SharedTimelinePosition = {
+	sampleIndex: number;
+	orderIndex: number;
+	row: number;
+};
+
 export type OfflineSharedTimelineRenderOptions = {
 	lanes: SharedTimelineExportLaneHandle[];
 	timeline: OfflineSharedTimeline;
@@ -28,6 +34,8 @@ export type OfflineSharedTimelineRenderOptions = {
 	loopCount: number;
 	totalRows: number;
 	onProgress?: (progress: number, message: string) => void;
+	onPositionChange?: (position: SharedTimelinePosition) => void;
+	abortSignal?: AbortSignal;
 	calculateCurrentRow?: () => number;
 };
 
@@ -37,6 +45,8 @@ export async function renderOfflineSharedTimeline({
 	sampleRate,
 	loopCount,
 	onProgress,
+	onPositionChange,
+	abortSignal,
 	calculateCurrentRow,
 	totalRows
 }: OfflineSharedTimelineRenderOptions): Promise<Float32Array[][]> {
@@ -53,8 +63,13 @@ export async function renderOfflineSharedTimeline({
 	const progressUpdateInterval = sampleRate * 0.1;
 	let lastProgressTime = Date.now();
 	const minProgressUpdateMs = 100;
+	let tracedOrder = Number.NaN;
+	let tracedRow = Number.NaN;
 
 	while (totalSamples < maxSamples) {
+		if (abortSignal?.aborted) {
+			throw new Error('Export cancelled');
+		}
 		const now = Date.now();
 		if (
 			onProgress &&
@@ -91,6 +106,16 @@ export async function renderOfflineSharedTimeline({
 			}
 
 			timeline.tickAccumulator -= 1.0;
+		}
+
+		if (onPositionChange) {
+			const orderIndex = timeline.currentPatternOrderIndex;
+			const row = timeline.currentRow;
+			if (orderIndex !== tracedOrder || row !== tracedRow) {
+				tracedOrder = orderIndex;
+				tracedRow = row;
+				onPositionChange({ sampleIndex: totalSamples, orderIndex, row });
+			}
 		}
 
 		for (let laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
