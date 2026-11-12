@@ -70,6 +70,32 @@ export interface ChannelLabelData {
 	effectColumnControlsEnabled?: boolean;
 }
 
+export interface RoleDriveLink {
+	sourceIndex: number;
+	voiceIndex: number;
+}
+
+export function roleDriveLinks(
+	groups: readonly { virtualChannelIndices: readonly number[] }[] | undefined,
+	marks: readonly (string | null)[] | undefined
+): RoleDriveLink[] {
+	if (!groups || !marks) return [];
+	const links: RoleDriveLink[] = [];
+	for (const group of groups) {
+		const indices = group.virtualChannelIndices;
+		if (indices.length < 2) continue;
+		const sources = indices.filter((index) => Boolean(marks[index]));
+		const voices = indices.filter((index) => !marks[index]);
+		if (sources.length === 0 || voices.length === 0) continue;
+		for (const sourceIndex of sources) {
+			for (const voiceIndex of voices) {
+				links.push({ sourceIndex, voiceIndex });
+			}
+		}
+	}
+	return links;
+}
+
 export type ChannelEffectColumnControlAction = 'add' | 'remove';
 
 export interface ChannelEffectColumnControlHit {
@@ -271,6 +297,12 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			const buttonY = (this.lineHeight - buttonHeight) / 2;
 			this.ctx.strokeRect(groupX, buttonY, groupWidth, buttonHeight);
 			this.restore();
+			this.drawRoleHeaderLinks(
+				roleDriveLinks([group], data.channelRoleMarks),
+				data,
+				channelPositions,
+				separatorMargin
+			);
 		}
 	}
 
@@ -619,6 +651,91 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 
 		this.ctx.setLineDash([]);
 		this.restore();
+	}
+
+	private roleSignalColor(isMuted: boolean): string {
+		if (isMuted) return this.patternColors.patternEmpty;
+		return this.patternColors.patternNote || this.patternColors.patternText;
+	}
+
+	private channelHeaderButton(
+		index: number,
+		channelPositions: number[],
+		separatorMargin: number
+	): { x: number; y: number; width: number; height: number } | null {
+		if (index < 0 || index >= channelPositions.length) return null;
+		const channelStart = channelPositions[index];
+		const channelEnd = this.channelColumnEnd(index, channelPositions);
+		const x = Math.max(0, channelStart - separatorMargin);
+		const end = channelEnd < this.canvasWidth ? channelEnd - separatorMargin : this.canvasWidth;
+		const width = end - x;
+		const height = this.lineHeight - 4;
+		const y = (this.lineHeight - height) / 2;
+		if (width <= 0) return null;
+		return { x, y, width, height };
+	}
+
+	private drawRoleHeaderLinks(
+		links: RoleDriveLink[],
+		data: ChannelLabelData,
+		channelPositions: number[],
+		separatorMargin: number
+	): void {
+		if (links.length === 0) return;
+		this.save();
+		this.ctx.lineCap = 'butt';
+		this.ctx.lineJoin = 'miter';
+		this.ctx.setLineDash([]);
+		for (const link of links) {
+			const source = this.channelHeaderButton(link.sourceIndex, channelPositions, separatorMargin);
+			const voice = this.channelHeaderButton(link.voiceIndex, channelPositions, separatorMargin);
+			if (!source || !voice) continue;
+			this.drawCurvedHeaderArrow(
+				source,
+				voice,
+				this.roleSignalColor(data.channelMuted[link.sourceIndex] ?? false),
+				Math.abs(link.voiceIndex - link.sourceIndex)
+			);
+		}
+		this.restore();
+	}
+
+	private drawCurvedHeaderArrow(
+		source: { x: number; y: number; width: number; height: number },
+		voice: { x: number; y: number; width: number; height: number },
+		color: string,
+		separation: number
+	): void {
+		const fromX = source.x + source.width / 2;
+		const toX = voice.x + voice.width / 2;
+		const span = Math.abs(toX - fromX);
+		if (span < 4) return;
+		const fromY = this.lineHeight;
+		const floorY = this.lineHeight + CHANNEL_LEVEL_STRIP_HEIGHT + 4 + Math.max(1, separation) * 5;
+		const arrowLength = 7;
+		this.beginPath();
+		this.moveTo(fromX, fromY);
+		this.lineTo(fromX, floorY);
+		this.lineTo(toX, floorY);
+		this.lineTo(toX, fromY + arrowLength);
+		this.stroke(color, 1.5);
+		this.fillArrowHead(toX, fromY, 0, -1, color);
+	}
+
+	private fillArrowHead(x: number, y: number, ux: number, uy: number, color: string): void {
+		const length = 7;
+		const wing = 3.5;
+		const px = -uy;
+		const py = ux;
+		const baseX = x - ux * length;
+		const baseY = y - uy * length;
+		this.beginPath();
+		this.moveTo(x, y);
+		this.lineTo(baseX + px * wing, baseY + py * wing);
+		this.lineTo(baseX - px * wing, baseY - py * wing);
+		this.ctx.closePath();
+		this.ctx.fillStyle = color;
+		this.ctx.fill();
 	}
 
 	calculateGlobalColumnPositions(

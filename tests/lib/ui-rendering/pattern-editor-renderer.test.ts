@@ -4,7 +4,8 @@ import { PATTERN_EDITOR_COLOR_KEYS } from '../../../src/lib/config/theme-colors'
 import {
 	CHANNEL_LEVEL_STRIP_HEIGHT,
 	getChannelLevelStripDeviceRect,
-	PatternEditorRenderer
+	PatternEditorRenderer,
+	roleDriveLinks
 } from '../../../src/lib/ui-rendering/pattern-editor-renderer';
 import type { getColors } from '../../../src/lib/utils/colors';
 
@@ -105,3 +106,29 @@ function patternExpectedBarX(charWidth: number): number {
 	const barX = buttonX + (buttonWidth - barWidth) / 2;
 	return barX;
 }
+
+describe('roleDriveLinks', () => {
+	it('points a timer column at the voice beside it', () => {
+		expect(roleDriveLinks([{ virtualChannelIndices: [0, 1] }], [null, 'Timer'])).toEqual([
+			{ sourceIndex: 1, voiceIndex: 0 }
+		]);
+	});
+
+	it('points a timer column at every voice in the group', () => {
+		expect(roleDriveLinks([{ virtualChannelIndices: [0, 1, 2] }], [null, null, 'Timer'])).toEqual([
+			{ sourceIndex: 2, voiceIndex: 0 },
+			{ sourceIndex: 2, voiceIndex: 1 }
+		]);
+	});
+
+	it('sends a middle timer column both ways', () => {
+		expect(roleDriveLinks([{ virtualChannelIndices: [0, 1, 2] }], [null, 'Timer', null])).toEqual([
+			{ sourceIndex: 1, voiceIndex: 0 },
+			{ sourceIndex: 1, voiceIndex: 2 }
+		]);
+	});
+
+	it('ignores a group with no timer column', () => {
+		expect(roleDriveLinks([{ virtualChannelIndices: [0, 1] }], [null, null])).toEqual([]);
+	});
+});

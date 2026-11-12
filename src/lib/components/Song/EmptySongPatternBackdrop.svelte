@@ -177,19 +177,20 @@
 			chip.schema.channelLabels ?? ['A', 'B', 'C'],
 			song.virtualChannelMap ?? {}
 		);
+		const channelRoleMarks = virtualChannelRoleMarks(
+			pattern.channels.length,
+			chip.schema.channelLabels ?? ['A', 'B', 'C'],
+			song.virtualChannelMap,
+			song.virtualChannelRoles,
+			chip.schema.virtualChannelRoles
+		);
 		renderer.drawChannelSeparators(labelRowString, canvasHeight, vcGroups);
 		renderer.drawChannelLabels({
 			rowString: labelRowString,
 			channelLabels: pattern.channels.map((channel) => channel.label),
 			channelMuted: muted,
 			virtualChannelGroups: vcGroups,
-			channelRoleMarks: virtualChannelRoleMarks(
-				pattern.channels.length,
-				chip.schema.channelLabels ?? ['A', 'B', 'C'],
-				song.virtualChannelMap,
-				song.virtualChannelRoles,
-				chip.schema.virtualChannelRoles
-			)
+			channelRoleMarks
 		});
 	}
 

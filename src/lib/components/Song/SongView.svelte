@@ -824,9 +824,6 @@
 									title={`${chipProcessor.chip.name} - (${i + 1})`}
 									fullHeight={true}
 									icon={IconCarbonChip}
-									headerClass={i === 0 && settingsStore.experimentalFeatures
-										? 'pl-[var(--view-switch-width)]'
-										: ''}
 									class="flex shrink-0 flex-col p-0">
 									{#snippet headerContent()}
 										<div class="flex items-center gap-1">
