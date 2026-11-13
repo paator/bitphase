@@ -11,7 +11,10 @@ import {
 	SAA_REG_NOISE_CLOCK,
 	SAA_REG_TONE_MIXER
 } from '../../../../../public/saa/saa-constants.js';
-import SaaAudioDriver from '../../../../../public/saa/saa-audio-driver.js';
+import SaaAudioDriver, {
+	resolveSaaHardwareState
+} from '../../../../../public/saa/saa-audio-driver.js';
+import SaaVirtualChannelMixer from '../../../../../public/saa/saa-virtual-channel-mixer.js';
 import SaaRegisterState from '../../../../../public/saa/saa-register-state.js';
 import SaaState from '../../../../../public/saa/saa-state.js';
 import { saaPeriodFromCode } from '../../../../../public/saa/saa-levels.js';
@@ -27,6 +30,8 @@ function saaModules() {
 		TrackerPatternProcessor,
 		SaaAudioDriver,
 		SaaRegisterState,
+		SaaVirtualChannelMixer,
+		resolveSaaHardwareState,
 		saaPeriodFromCode
 	};
 }

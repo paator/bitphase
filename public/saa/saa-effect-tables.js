@@ -67,9 +67,15 @@ export function applySaaMixerCommand(state, channelIndex, effect, applyParameter
 	applyParameter(effect.parameter | 0);
 }
 
-export function applySaaAutoEnvelopeCommand(state, channelIndex, effect, applyParameter) {
+export function applySaaAutoEnvelopeCommand(
+	state,
+	channelIndex,
+	effect,
+	applyParameter,
+	hardwareIndex = channelIndex
+) {
 	ensureAutoEnvelopeTables(state);
-	const group = channelIndex < 3 ? 0 : 1;
+	const group = hardwareIndex < 3 ? 0 : 1;
 	if (usesTable(effect)) {
 		state.autoEnvelopeTableIndex[group] = effect.tableIndex;
 		state.autoEnvelopeTablePosition[group] = 0;

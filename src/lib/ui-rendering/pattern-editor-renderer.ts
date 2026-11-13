@@ -119,6 +119,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 	};
 	private anchorSeparatorXs: number[] = [];
 	private effectColumnCounts: number[] = [];
+	private virtualChannelMap: Record<number, number> | undefined;
 	private effectColumnControlsEnabled = true;
 
 	constructor(options: PatternEditorRenderOptions) {
@@ -133,6 +134,11 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 
 	setChannelEffectColumnCounts(counts: number[]): void {
 		this.effectColumnCounts = counts;
+	}
+
+	setVirtualChannelMap(map: Record<number, number> | undefined): void {
+		this.virtualChannelMap = map;
+		this.layoutCacheKey = '';
 	}
 
 	drawRow(data: RowRenderData): void {
@@ -748,8 +754,18 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		return this.getRowLayout(rowString).channelPositions;
 	}
 
+	private virtualMapKey(): string {
+		const map = this.virtualChannelMap;
+		if (!map) return '';
+		return Object.keys(map)
+			.map((key) => Number(key))
+			.sort((a, b) => a - b)
+			.map((key) => `${key}:${map[key]}`)
+			.join(',');
+	}
+
 	private getRowLayout(rowString: string): RowLayoutPixels {
-		const cacheKey = `${this.ctx.font}\0${rowString}\0${this.effectColumnCounts.join(',')}`;
+		const cacheKey = `${this.ctx.font}\0${rowString}\0${this.effectColumnCounts.join(',')}\0${this.virtualMapKey()}`;
 		if (cacheKey === this.layoutCacheKey) {
 			this.anchorSeparatorXs = this.layoutCache.anchorSeparatorXs;
 			return this.layoutCache;
@@ -761,14 +777,20 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			fieldKey?: string;
 			length?: number;
 		}> = [];
-		PatternTemplateParser.walkRow(rowString, this.schema, this.effectColumnCounts, {
-			onGlobalField(key, field, pos) {
-				marks.push({ kind: 'global', pos, fieldKey: key, length: field.length });
+		PatternTemplateParser.walkRow(
+			rowString,
+			this.schema,
+			this.effectColumnCounts,
+			{
+				onGlobalField(key, field, pos) {
+					marks.push({ kind: 'global', pos, fieldKey: key, length: field.length });
+				},
+				onChannelStart(_index, pos) {
+					marks.push({ kind: 'channel', pos });
+				}
 			},
-			onChannelStart(_index, pos) {
-				marks.push({ kind: 'channel', pos });
-			}
-		});
+			this.virtualChannelMap
+		);
 
 		const xAt: number[] = [10];
 		for (let i = 0; i < rowString.length; i++) {
@@ -960,14 +982,20 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		const indices = new Int16Array(rowString.length);
 		indices.fill(-1);
 
-		PatternTemplateParser.walkRow(rowString, this.schema, this.effectColumnCounts, {
-			onChannelField(channelIndex, _key, field, pos) {
-				const end = Math.min(pos + field.length, rowString.length);
-				for (let i = pos; i < end; i++) {
-					indices[i] = channelIndex;
+		PatternTemplateParser.walkRow(
+			rowString,
+			this.schema,
+			this.effectColumnCounts,
+			{
+				onChannelField(channelIndex, _key, field, pos) {
+					const end = Math.min(pos + field.length, rowString.length);
+					for (let i = pos; i < end; i++) {
+						indices[i] = channelIndex;
+					}
 				}
-			}
-		});
+			},
+			this.virtualChannelMap
+		);
 
 		return indices;
 	}

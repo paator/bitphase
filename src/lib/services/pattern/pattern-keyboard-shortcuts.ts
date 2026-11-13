@@ -181,7 +181,8 @@ function dispatchCommandAction(
 					ctx.selectionEndColumn,
 					ctx.navigationContext.getCellPositions,
 					ctx.getPatternRowData,
-					ctx.navigationContext.schema
+					ctx.navigationContext.schema,
+					ctx.navigationContext.formatter.virtualChannelMap
 				);
 				ctx.onSelectProgressive(
 					result.startRow,

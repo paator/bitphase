@@ -5,6 +5,7 @@ import { AY_CHIP_SCHEMA } from '../../../../src/lib/chips/ay/schema';
 import { NES_CHIP_SCHEMA } from '../../../../src/lib/chips/nes/schema';
 import { SAA_CHIP_SCHEMA } from '../../../../src/lib/chips/saa/schema';
 import { collectPlaybackCarry } from '../../../../src/lib/services/audio/play-from-position';
+import { getHardwareChannelIndex } from '../../../../src/lib/models/virtual-channels';
 
 const schema: ChipSchema = {
 	chipType: 'test',
@@ -473,6 +474,37 @@ describe('SAA playback carry', () => {
 		]);
 		expect(carry?.channelStickyEffects?.[2]).toEqual([]);
 		expect(carry?.channelStickyEffects?.[5]).toEqual([
+			{ effect: CHIP_EFFECT, delay: 0x0a, parameter: 0x21 }
+		]);
+	});
+
+	it('groups auto-envelope by hardware channel when a column is virtual', () => {
+		const pattern = saaPattern(0, 2);
+		pattern.channels.splice(2, 0, {
+			label: 'C2',
+			effectColumnCount: 1,
+			rows: Array.from({ length: 2 }, () => ({
+				note: { name: 0, octave: 0 },
+				effects: [null]
+			}))
+		});
+		saaEffect(3, pattern, 0, 0x32);
+		saaEffect(6, pattern, 0, 0x21);
+
+		const carry = collectPlaybackCarry(
+			[0],
+			() => pattern,
+			0,
+			1,
+			SAA_CHIP_SCHEMA,
+			undefined,
+			(logicalIndex) =>
+				getHardwareChannelIndex(logicalIndex, ['A', 'B', 'C', 'D', 'E', 'F'], { 2: 2 })
+		);
+		expect(carry?.channelStickyEffects?.[3]).toEqual([
+			{ effect: CHIP_EFFECT, delay: 0x0a, parameter: 0x32 }
+		]);
+		expect(carry?.channelStickyEffects?.[6]).toEqual([
 			{ effect: CHIP_EFFECT, delay: 0x0a, parameter: 0x21 }
 		]);
 	});

@@ -124,7 +124,8 @@ export function collectPlaybackCarry(
 	targetOrderIndex: number,
 	targetRow: number,
 	schema: ChipSchema,
-	tables?: Table[]
+	tables?: Table[],
+	hardwareChannelIndex?: (channelIndex: number) => number
 ): PlaybackCarryState | null {
 	if (targetOrderIndex < 0) return null;
 	const targetPatternId = patternOrder[targetOrderIndex];
@@ -231,7 +232,11 @@ export function collectPlaybackCarry(
 				}
 				const foundGroups = channelStickyFound[ch];
 				if (!foundGroups) continue;
-				const stickyOnRow = readStickyGroupsOnRow(row.effects, schema, ch);
+				const stickyOnRow = readStickyGroupsOnRow(
+					row.effects,
+					schema,
+					hardwareChannelIndex?.(ch) ?? ch
+				);
 				const rowKey = `${orderIndex}:${rowIndex}`;
 				for (const [group, command] of stickyOnRow) {
 					if (schema.stickyChannelEffectIsShared?.(group)) {

@@ -6,7 +6,8 @@ import type {
 	SettingsSubscriber,
 	TuningTableSupport,
 	InstrumentSupport,
-	PreviewNoteSupport
+	PreviewNoteSupport,
+	VirtualChannelSupport
 } from '../base/processor';
 import type { ChipSettings } from '../../services/audio/chip-settings';
 import type { PlaybackCarryState } from '../../services/audio/play-from-position';
@@ -40,7 +41,8 @@ export class SAAProcessor
 		SettingsSubscriber,
 		TuningTableSupport,
 		InstrumentSupport,
-		PreviewNoteSupport
+		PreviewNoteSupport,
+		VirtualChannelSupport
 {
 	chip: Chip;
 	private readonly bridge: MixerWorkletBridge;
@@ -227,6 +229,19 @@ export class SAAProcessor
 
 	releasePreviewNote(channel?: number): void {
 		this.bridge.sendCommand({ type: 'release_preview', channel });
+	}
+
+	sendVirtualChannelConfig(
+		virtualChannelMap: Record<number, number>,
+		hwChannelCount: number,
+		virtualChannelRoles?: Record<number, Record<number, string>>
+	): void {
+		this.bridge.sendCommand({
+			type: 'set_virtual_channel_config',
+			virtualChannelMap,
+			hwChannelCount,
+			virtualChannelRoles: virtualChannelRoles ?? {}
+		});
 	}
 
 	sendUpdateClockRate(clockRate: number): void {

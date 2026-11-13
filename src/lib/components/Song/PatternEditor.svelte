@@ -217,7 +217,11 @@
 
 	const services: { audioService: AudioService } = getContext('container');
 
-	const formatter = $derived.by(() => getFormatter(chip));
+	const formatter = $derived.by(() => {
+		const next = getFormatter(chip);
+		next.virtualChannelMap = projectStore.songs[songIndex]?.virtualChannelMap ?? {};
+		return next;
+	});
 	const converter = $derived.by(() => getConverter(chip));
 	const schema = $derived(chip.schema);
 	const previewService = new PreviewService();
@@ -374,7 +378,7 @@
 	let isEnterKeyHeld = $state(false);
 
 	const rowStringCache = new Cache<string, string>(500);
-	const patternGenericCache = new Cache<number, ReturnType<typeof converter.toGeneric>>(100);
+	const patternGenericCache = new Cache<string, ReturnType<typeof converter.toGeneric>>(100);
 	const cellPositionsCache = new Cache<
 		string,
 		ReturnType<PatternEditorTextParser['getCellPositions']>
@@ -434,6 +438,26 @@
 		lastVisibleRowsCache = null;
 	}
 
+	function bindVirtualChannelLayout(): void {
+		const map = projectStore.songs[songIndex]?.virtualChannelMap ?? {};
+		formatter.virtualChannelMap = map;
+		textParser?.setVirtualChannelMap(map);
+		renderer?.setVirtualChannelMap(map);
+	}
+
+	let appliedVirtualChannelMapKey = '';
+	$effect(() => {
+		const key = JSON.stringify(projectStore.songs[songIndex]?.virtualChannelMap ?? {});
+		bindVirtualChannelLayout();
+		if (key === appliedVirtualChannelMapKey) return;
+		appliedVirtualChannelMapKey = key;
+		clearAllCaches();
+		untrack(() => {
+			if (!ctx || !renderer || !textParser || !patternEditorIsShown()) return;
+			draw();
+		});
+	});
+
 	$effect(() => {
 		patterns;
 		patternOrder;
@@ -490,13 +514,9 @@
 
 	function updatePatternInArray(updatedPattern: Pattern): void {
 		updatePatterns(PatternService.updatePatternInArray(patterns, updatedPattern));
-		patternGenericCache.delete(updatedPattern.id);
-		rowStringCache.invalidate((key) => {
-			if (typeof key === 'string') {
-				return key.startsWith(`${updatedPattern.id}:`);
-			}
-			return false;
-		});
+		const patternCachePrefix = `${updatedPattern.id}:`;
+		patternGenericCache.invalidate((key) => key.startsWith(patternCachePrefix));
+		rowStringCache.invalidate((key) => key.startsWith(patternCachePrefix));
 		lastVisibleRowsCache = null;
 	}
 
@@ -957,7 +977,13 @@
 							orderIndex,
 							startRow,
 							schema,
-							tables
+							tables,
+							(logicalIndex) =>
+								getHardwareChannelIndex(
+									logicalIndex,
+									schema.channelLabels ?? [],
+									projectStore.songs[chipIndex]?.virtualChannelMap ?? {}
+								)
 						),
 						orderIndex,
 						startRow,
@@ -975,7 +1001,13 @@
 							orderIndex,
 							startRow,
 							chip.schema,
-							tables
+							tables,
+							(logicalIndex) =>
+								getHardwareChannelIndex(
+									logicalIndex,
+									chip.schema.channelLabels ?? [],
+									projectStore.songs[songIndex]?.virtualChannelMap ?? {}
+								)
 						),
 						orderIndex,
 						startRow,
@@ -1189,6 +1221,7 @@
 				selectionStyle,
 				emptyNoteAlignment
 			});
+			bindVirtualChannelLayout();
 
 			if (fontFamily && fontFamily !== 'monospace') {
 				const fontSpec = `${fontSize}px "${fontFamily}"`;
@@ -1253,6 +1286,7 @@
 						selectionStyle,
 						emptyNoteAlignment
 					});
+					bindVirtualChannelLayout();
 					draw();
 				}
 			});
@@ -1315,6 +1349,7 @@
 		rowIndex: number,
 		options?: { debug?: boolean }
 	): string {
+		bindVirtualChannelLayout();
 		applyChannelEffectColumnCounts(pattern);
 		return PatternRowDataService.getRowData(
 			{
@@ -1345,7 +1380,9 @@
 			rowString: getPatternRowData(patternToDraw, 0),
 			channelLabels: patternToDraw.channels.map((ch) => ch.label),
 			channelMuted: getChannelMutedState(patternToDraw),
-			vcGroups: song ? getVirtualChannelGroups(hwLabels, song.virtualChannelMap ?? {}) : undefined,
+			vcGroups: song
+				? getVirtualChannelGroups(hwLabels, song.virtualChannelMap ?? {})
+				: undefined,
 			channelRoleMarks: song
 				? virtualChannelRoleMarks(
 						patternToDraw.channels.length,
@@ -1520,6 +1557,7 @@
 	}
 
 	function draw() {
+		bindVirtualChannelLayout();
 		drawPatternGrid();
 		drawHeaderOverlay();
 	}
@@ -2667,7 +2705,10 @@
 					action: 'remove_virtual_channel',
 					disabled: isPlaying
 				});
-				const indexInGroup = virtualIndexInClickedGroup(hwIndex, channelContextMenuVirtualIndex);
+				const indexInGroup = virtualIndexInClickedGroup(
+					hwIndex,
+					channelContextMenuVirtualIndex
+				);
 				const groupRoles = song?.virtualChannelRoles?.[hwIndex] ?? {};
 				for (const role of schema.virtualChannelRoles ?? []) {
 					const active = groupRoles[indexInGroup] === role.id;

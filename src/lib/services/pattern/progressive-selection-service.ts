@@ -21,7 +21,8 @@ export class ProgressiveSelectionService {
 		selectionEndColumn: number | null,
 		getCellPositions: (rowString: string, rowIndex: number) => any[],
 		getPatternRowData: (pattern: Pattern, rowIndex: number) => string,
-		schema: Chip['schema']
+		schema: Chip['schema'],
+		virtualChannelMap?: Record<number, number>
 	): ProgressiveSelectionResult {
 		const hasSelection =
 			selectionStartRow !== null &&
@@ -45,7 +46,8 @@ export class ProgressiveSelectionService {
 				maxCol,
 				getCellPositions,
 				getPatternRowData,
-				schema
+				schema,
+				virtualChannelMap
 			);
 			if (boundsUnion) {
 				const isFullWidth =
@@ -78,7 +80,8 @@ export class ProgressiveSelectionService {
 				minCol,
 				getCellPositions,
 				getPatternRowData,
-				schema
+				schema,
+				virtualChannelMap
 			);
 			if (channelBounds) {
 				const isEntireChannel = this.isEntireChannelSelected(
@@ -130,7 +133,8 @@ export class ProgressiveSelectionService {
 				minCol,
 				getCellPositions,
 				getPatternRowData,
-				schema
+				schema,
+				virtualChannelMap
 			);
 			if (channelBounds) {
 				const isEntireChannel = this.isEntireChannelSelected(
@@ -237,7 +241,8 @@ export class ProgressiveSelectionService {
 		maxCol: number,
 		getCellPositions: (rowString: string, rowIndex: number) => any[],
 		getPatternRowData: (pattern: Pattern, rowIndex: number) => string,
-		schema: Chip['schema']
+		schema: Chip['schema'],
+		virtualChannelMap?: Record<number, number>
 	): { startColumn: number; endColumn: number } | null {
 		let startColumn: number | null = null;
 		let endColumn: number | null = null;
@@ -248,7 +253,8 @@ export class ProgressiveSelectionService {
 				col,
 				getCellPositions,
 				getPatternRowData,
-				schema
+				schema,
+				virtualChannelMap
 			);
 			const bounds =
 				channelBounds ??
@@ -307,7 +313,8 @@ export class ProgressiveSelectionService {
 		columnIndex: number,
 		getCellPositions: (rowString: string, rowIndex: number) => any[],
 		getPatternRowData: (pattern: Pattern, rowIndex: number) => string,
-		schema: Chip['schema']
+		schema: Chip['schema'],
+		virtualChannelMap?: Record<number, number>
 	): { startColumn: number; endColumn: number } | null {
 		if (pattern.length === 0) return null;
 
@@ -330,7 +337,8 @@ export class ProgressiveSelectionService {
 			cell.charIndex,
 			rowString,
 			schema,
-			effectColumnCounts
+			effectColumnCounts,
+			virtualChannelMap
 		);
 
 		let startColumn = -1;
@@ -348,7 +356,8 @@ export class ProgressiveSelectionService {
 				currentCell.charIndex,
 				rowString,
 				schema,
-				effectColumnCounts
+				effectColumnCounts,
+				virtualChannelMap
 			);
 
 			if (currentChannelIndex === channelIndex) {

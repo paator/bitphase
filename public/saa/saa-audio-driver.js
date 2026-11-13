@@ -59,25 +59,34 @@ function applyEnvelopeMode(state, byteKey, raw) {
 	state[byteKey] = ENVELOPE_BYTES[index];
 }
 
-function envelopeCommandByte(state, channelIndex) {
-	if (channelIndex === ENVELOPE_CHANNEL_0) return state.envelopeCommand0;
-	if (channelIndex === ENVELOPE_CHANNEL_1) return state.envelopeCommand1;
+function envelopeCommandByte(state, hardwareIndex) {
+	if (hardwareIndex === ENVELOPE_CHANNEL_0) return state.envelopeCommand0;
+	if (hardwareIndex === ENVELOPE_CHANNEL_1) return state.envelopeCommand1;
 	return undefined;
 }
 
-function clearEnvelope(state, registerState, channelIndex) {
-	if (channelIndex !== ENVELOPE_CHANNEL_0 && channelIndex !== ENVELOPE_CHANNEL_1) return;
-	writeEnvelope(state, registerState, channelIndex);
-}
-
-function writeEnvelope(state, registerState, channelIndex, shape) {
-	if (channelIndex !== ENVELOPE_CHANNEL_0 && channelIndex !== ENVELOPE_CHANNEL_1) return;
+function envelopeByte(state, hardwareIndex, shape) {
 	const index = shape | 0;
 	const override = index > 0 && index < ENVELOPE_BYTES.length ? ENVELOPE_BYTES[index] : null;
-	const commanded = override != null ? override : envelopeCommandByte(state, channelIndex);
-	const byte = commanded == null ? 0 : commanded & 0xff;
-	if (channelIndex === ENVELOPE_CHANNEL_0) registerState.envelope0 = byte;
+	const commanded = override != null ? override : envelopeCommandByte(state, hardwareIndex);
+	return commanded == null ? 0 : commanded & 0xff;
+}
+
+function publishEnvelope(driver, registerState, state, channelIndex, hardwareIndex, shape) {
+	if (hardwareIndex !== ENVELOPE_CHANNEL_0 && hardwareIndex !== ENVELOPE_CHANNEL_1) return;
+	const group = hardwareIndex === ENVELOPE_CHANNEL_0 ? 0 : 1;
+	const byte = envelopeByte(state, hardwareIndex, shape);
+	if (driver._defer(channelIndex, { envelope: { group, byte } })) return;
+	if (group === 0) registerState.envelope0 = byte;
 	else registerState.envelope1 = byte;
+}
+
+function publishRetrigger(driver, registerState, channelIndex, hardwareIndex) {
+	if (hardwareIndex !== ENVELOPE_CHANNEL_0 && hardwareIndex !== ENVELOPE_CHANNEL_1) return;
+	const group = hardwareIndex === ENVELOPE_CHANNEL_0 ? 0 : 1;
+	if (driver._defer(channelIndex, { retrigger: group })) return;
+	if (group === 0) registerState.envelopeRetrigger0 = true;
+	else registerState.envelopeRetrigger1 = true;
 }
 
 function storeSourceMask(state, channelIndex, parameter) {
@@ -93,7 +102,7 @@ function applySourceMask(channel, state, channelIndex) {
 	channel.noise = (mask & 2) !== 0;
 }
 
-function processSaaEffects(state, channelIndex, row) {
+function processSaaEffects(state, channelIndex, row, hardwareIndex = channelIndex) {
 	const effects = row?.effects;
 	if (!effects) return;
 	for (const effect of effects) {
@@ -104,15 +113,19 @@ function processSaaEffects(state, channelIndex, row) {
 				state.channelStereoInvert[channelIndex] = (parameter & 1) !== 0;
 			}
 		} else if (effect.delay === NOISE_LOCK_SUBCOMMAND) {
-			if (channelIndex < 3) state.noiseLock0 = (parameter & 1) !== 0;
+			if (hardwareIndex < 3) state.noiseLock0 = (parameter & 1) !== 0;
 			else state.noiseLock1 = (parameter & 1) !== 0;
 		} else if (effect.delay === MIXER_SUBCOMMAND) {
 			applySaaMixerCommand(state, channelIndex, effect, (value) =>
 				storeSourceMask(state, channelIndex, value)
 			);
 		} else if (effect.delay === AUTO_ENVELOPE_SUBCOMMAND) {
-			applySaaAutoEnvelopeCommand(state, channelIndex, effect, (source, value) =>
-				storeAutoEnvelope(state, source, value)
+			applySaaAutoEnvelopeCommand(
+				state,
+				channelIndex,
+				effect,
+				(source, value) => storeAutoEnvelope(state, source, value, hardwareIndex),
+				hardwareIndex
 			);
 		}
 	}
@@ -126,9 +139,9 @@ function ensureAutoEnvelope(state) {
 	state.autoEnvelopeSource = [-1, -1];
 }
 
-function storeAutoEnvelope(state, channelIndex, parameter) {
+function storeAutoEnvelope(state, channelIndex, parameter, hardwareIndex = channelIndex) {
 	ensureAutoEnvelope(state);
-	const group = channelIndex < 3 ? 0 : 1;
+	const group = hardwareIndex < 3 ? 0 : 1;
 	const numerator = (parameter >> 4) & 0xf;
 	const denominator = parameter & 0xf;
 	if (numerator > 0 && denominator > 0) {
@@ -231,19 +244,71 @@ function packedTone(state, channelIndex, toneOffset) {
 	};
 }
 
-function applyInstrumentNoise(registerState, state, channelIndex, row) {
-	if (row.noise !== true && channelIndex % 3 !== 0) return;
+function applyInstrumentNoise(driver, registerState, state, channelIndex, hardwareIndex, row) {
+	if (row.noise !== true && hardwareIndex % 3 !== 0) return;
 	let offset = (state.channelNoiseAccumulator?.[channelIndex] ?? 0) + (row.noiseAdd | 0);
 	if (row.noiseAccumulation && state.channelNoiseAccumulator) {
 		state.channelNoiseAccumulator[channelIndex] = offset & 3;
 	}
-	const base = channelIndex < 3 ? (state.noiseClock0 ?? 0) : (state.noiseClock1 ?? 0);
+	const group = hardwareIndex < 3 ? 0 : 1;
+	const base = group === 0 ? (state.noiseClock0 ?? 0) : (state.noiseClock1 ?? 0);
 	const value = (base + offset) & 3;
-	if (channelIndex < 3) registerState.noise0 = value;
+	if (driver._defer(channelIndex, { noise: { group, value } })) return;
+	if (group === 0) registerState.noise0 = value;
 	else registerState.noise1 = value;
 }
 
 class SaaAudioDriver {
+	constructor() {
+		this.resolveHardwareChannel = null;
+		this.deferSharedWrites = false;
+		this._pendingShared = [];
+	}
+
+	setVirtualChannelMode(resolver) {
+		this.resolveHardwareChannel = resolver;
+		this.deferSharedWrites = typeof resolver === 'function';
+	}
+
+	_hardwareIndex(channelIndex) {
+		if (typeof this.resolveHardwareChannel === 'function') {
+			const resolved = this.resolveHardwareChannel(channelIndex);
+			if (typeof resolved === 'number' && resolved >= 0) return resolved;
+		}
+		return channelIndex;
+	}
+
+	_defer(channelIndex, patch) {
+		if (!this.deferSharedWrites) return false;
+		const current = this._pendingShared[channelIndex] ?? {};
+		this._pendingShared[channelIndex] = { ...current, ...patch };
+		return true;
+	}
+
+	applyDeferredHardware(state, hardwareState, selectedLogical) {
+		const selected = selectedLogical ?? [];
+		for (let hardware = 0; hardware < selected.length; hardware++) {
+			const logical = selected[hardware];
+			if (typeof logical !== 'number' || logical < 0) continue;
+			const pending = this._pendingShared?.[logical];
+			if (!pending) continue;
+			if (pending.noise) {
+				if (pending.noise.group === 0) hardwareState.noise0 = pending.noise.value;
+				else hardwareState.noise1 = pending.noise.value;
+			}
+			if (pending.envelope) {
+				if (pending.envelope.group === 0) hardwareState.envelope0 = pending.envelope.byte;
+				else hardwareState.envelope1 = pending.envelope.byte;
+			}
+			if (pending.retrigger === 0) hardwareState.envelopeRetrigger0 = true;
+			else if (pending.retrigger === 1) hardwareState.envelopeRetrigger1 = true;
+			if (pending.retrigger !== undefined) pending.retrigger = undefined;
+		}
+		if (state.noiseLock0) hardwareState.noise0 = 3;
+		if (state.noiseLock1) hardwareState.noise1 = 3;
+		applyAutoEnvelope(state, hardwareState);
+	}
+
 	processPatternRow(state, pattern, rowIndex, patternRow) {
 		applyNoiseClock(state, 'noiseClock0', patternRow?.noise0);
 		applyNoiseClock(state, 'noiseClock1', patternRow?.noise1);
@@ -252,7 +317,7 @@ class SaaAudioDriver {
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const row = pattern.channels[channelIndex]?.rows?.[rowIndex];
 			if (!row) continue;
-			processSaaEffects(state, channelIndex, row);
+			processSaaEffects(state, channelIndex, row, this._hardwareIndex(channelIndex));
 			if (state.channelMuted?.[channelIndex]) continue;
 			applyPatternSide(state, channelIndex, 'left', row.left);
 			applyPatternSide(state, channelIndex, 'right', row.right);
@@ -275,6 +340,7 @@ class SaaAudioDriver {
 	}
 
 	processInstruments(state, registerState) {
+		this._pendingShared = [];
 		registerState.noise0 = (state.noiseClock0 ?? 0) & 3;
 		registerState.noise1 = (state.noiseClock1 ?? 0) & 3;
 		registerState.envelopeRetrigger0 = Boolean(state.envelopeRetrigger0);
@@ -285,15 +351,16 @@ class SaaAudioDriver {
 		for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
 			const channel = registerState.channels[channelIndex];
 			if (!channel) continue;
+			const hardwareIndex = this._hardwareIndex(channelIndex);
 			if (state.channelMuted?.[channelIndex] || !state.channelSoundEnabled?.[channelIndex]) {
 				silenceChannel(registerState, channelIndex);
-				clearEnvelope(state, registerState, channelIndex);
+				publishEnvelope(this, registerState, state, channelIndex, hardwareIndex);
 				continue;
 			}
 			const { instrument } = getChannelInstrument(state, channelIndex);
 			if (!instrument) {
 				silenceChannel(registerState, channelIndex);
-				clearEnvelope(state, registerState, channelIndex);
+				publishEnvelope(this, registerState, state, channelIndex, hardwareIndex);
 				continue;
 			}
 			const row =
@@ -303,9 +370,7 @@ class SaaAudioDriver {
 					channelInstrumentReleaseTick(state, channelIndex)
 				) ?? {};
 			if (row.retriggerEnvelope) {
-				if (channelIndex === ENVELOPE_CHANNEL_0) registerState.envelopeRetrigger0 = true;
-				else if (channelIndex === ENVELOPE_CHANNEL_1)
-					registerState.envelopeRetrigger1 = true;
+				publishRetrigger(this, registerState, channelIndex, hardwareIndex);
 			}
 			if (row.amplitudeSliding) {
 				const slide = state.channelAmplitudeSliding[channelIndex] | 0;
@@ -329,14 +394,21 @@ class SaaAudioDriver {
 			);
 			if (!tone) {
 				silenceChannel(registerState, channelIndex);
-				writeEnvelope(state, registerState, channelIndex, row.envelopeShape);
+				publishEnvelope(
+					this,
+					registerState,
+					state,
+					channelIndex,
+					hardwareIndex,
+					row.envelopeShape
+				);
 			} else {
 				channel.octave = tone.octave;
 				channel.freq = tone.freq;
 				channel.tone = row.tone !== false;
 				channel.noise = row.noise === true;
 				applySourceMask(channel, state, channelIndex);
-				applyInstrumentNoise(registerState, state, channelIndex, row);
+				applyInstrumentNoise(this, registerState, state, channelIndex, hardwareIndex, row);
 				let left = combineSaaLevel(
 					state.channelPatternLeft[channelIndex],
 					row.left ?? SAA_LEVEL_MAX,
@@ -354,7 +426,14 @@ class SaaAudioDriver {
 				}
 				channel.left = left;
 				channel.right = right;
-				writeEnvelope(state, registerState, channelIndex, row.envelopeShape);
+				publishEnvelope(
+					this,
+					registerState,
+					state,
+					channelIndex,
+					hardwareIndex,
+					row.envelopeShape
+				);
 			}
 			state.instrumentPositions[channelIndex] =
 				(state.instrumentPositions[channelIndex] | 0) + 1;
@@ -362,11 +441,12 @@ class SaaAudioDriver {
 		if (state.noiseLock0) registerState.noise0 = 3;
 		if (state.noiseLock1) registerState.noise1 = 3;
 		processChannelOnOffCounters(state, channelCount);
-		applyAutoEnvelope(state, registerState);
+		if (!this.deferSharedWrites) applyAutoEnvelope(state, registerState);
 		advanceSaaEffectTables(
 			state,
 			(channelIndex, value) => storeSourceMask(state, channelIndex, value),
-			(channelIndex, value) => storeAutoEnvelope(state, channelIndex, value)
+			(channelIndex, value) =>
+				storeAutoEnvelope(state, channelIndex, value, this._hardwareIndex(channelIndex))
 		);
 	}
 
@@ -378,6 +458,17 @@ class SaaAudioDriver {
 	}
 
 	resizeChannels(_channelCount) {}
+}
+
+export function resolveSaaHardwareState(driver, mixer, virtualState, playbackState) {
+	if (!mixer?.hasVirtualChannels?.() || !driver) return virtualState;
+	const hardware = mixer.merge(virtualState, playbackState);
+	driver.applyDeferredHardware(
+		playbackState,
+		hardware,
+		mixer.getMergedVirtualChannelIndices(virtualState)
+	);
+	return hardware;
 }
 
 export default SaaAudioDriver;

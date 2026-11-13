@@ -1,9 +1,34 @@
 import type { Pattern } from '../../models/song';
 import type { PatternFormatter } from '../../chips/base/formatter-interface';
 import type { PatternConverter } from '../../chips/base/adapter';
+import { getPatternEffectColumnCounts } from '../../chips/base/channel-effect-columns';
 import type { ChipSchema } from '../../chips/base/schema';
 import type { Cache } from '../../utils/memoize';
 import type { GenericPattern } from '../../models/song/generic';
+
+export function virtualChannelMapCacheKey(
+	virtualChannelMap: Record<number, number> | undefined
+): string {
+	if (!virtualChannelMap) return '';
+	return Object.keys(virtualChannelMap)
+		.map((key) => Number(key))
+		.sort((a, b) => a - b)
+		.map((key) => `${key}:${virtualChannelMap[key]}`)
+		.join(',');
+}
+
+export function patternGenericCacheKey(pattern: Pattern): string {
+	const counts = getPatternEffectColumnCounts(pattern).join(',');
+	return `${pattern.id}:${pattern.channels.length}:${counts}`;
+}
+
+export function patternRowStringCacheKey(
+	pattern: Pattern,
+	rowIndex: number,
+	virtualChannelMap: Record<number, number> | undefined
+): string {
+	return `${patternGenericCacheKey(pattern)}:${virtualChannelMapCacheKey(virtualChannelMap)}:${rowIndex}`;
+}
 
 export interface RowDataContext {
 	pattern: Pattern;
@@ -11,7 +36,7 @@ export interface RowDataContext {
 	converter: PatternConverter;
 	formatter: PatternFormatter;
 	schema: ChipSchema;
-	patternGenericCache: Cache<number, GenericPattern>;
+	patternGenericCache: Cache<string, GenericPattern>;
 	rowStringCache: Cache<string, string>;
 }
 
@@ -21,14 +46,16 @@ export interface GetRowDataOptions {
 
 export class PatternRowDataService {
 	static getRowData(context: RowDataContext, options?: GetRowDataOptions): string {
-		let genericPattern = context.patternGenericCache.get(context.pattern.id);
+		const genericKey = patternGenericCacheKey(context.pattern);
+		let genericPattern = context.patternGenericCache.get(genericKey);
 		if (!genericPattern) {
 			genericPattern = context.converter.toGeneric(context.pattern);
-			context.patternGenericCache.set(context.pattern.id, genericPattern);
+			context.patternGenericCache.set(genericKey, genericPattern);
 		}
 
 		const genericPatternRow = genericPattern.patternRows[context.rowIndex];
 		const genericChannels = genericPattern.channels.map((ch) => ch.rows[context.rowIndex]);
+		const virtualChannelMap = context.formatter.virtualChannelMap;
 
 		if (options?.debug) {
 			return context.formatter.formatRow(
@@ -36,18 +63,23 @@ export class PatternRowDataService {
 				genericChannels,
 				context.rowIndex,
 				context.schema,
-				{ debug: true }
+				{ debug: true, virtualChannelMap }
 			);
 		}
 
-		const rowCacheKey = `${context.pattern.id}:${context.rowIndex}`;
+		const rowCacheKey = patternRowStringCacheKey(
+			context.pattern,
+			context.rowIndex,
+			virtualChannelMap
+		);
 		let rowString = context.rowStringCache.get(rowCacheKey);
 		if (!rowString) {
 			rowString = context.formatter.formatRow(
 				genericPatternRow,
 				genericChannels,
 				context.rowIndex,
-				context.schema
+				context.schema,
+				{ virtualChannelMap }
 			);
 			context.rowStringCache.set(rowCacheKey, rowString);
 		}
@@ -57,7 +89,7 @@ export class PatternRowDataService {
 
 	static clearAllCaches(
 		rowStringCache: Cache<string, string>,
-		patternGenericCache: Cache<number, GenericPattern>,
+		patternGenericCache: Cache<string, GenericPattern>,
 		cellPositionsCache: Cache<string, unknown>,
 		rowSegmentsCache: Cache<string, unknown>
 	): void {

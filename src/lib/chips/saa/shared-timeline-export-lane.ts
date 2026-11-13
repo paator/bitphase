@@ -5,6 +5,7 @@ import type {
 	SharedTimelineExportLaneHandle
 } from '../base/renderer';
 import { SAA_AUDIO_SLOT_KIND } from './audio-slot-kind';
+import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
 import { SAA_SAM_CLOCK, SAA_CHIP_SCHEMA } from './schema';
 import type {
 	SaaExportEngine,
@@ -36,6 +37,16 @@ type SaaExportLaneContext = {
 	patternProcessor: SaaPatternProcessor;
 	engine: SaaExportEngine;
 	registerState: unknown;
+	audioDriver: unknown;
+	mixer: {
+		hasVirtualChannels: () => boolean;
+	};
+	resolveHardwareState: (
+		driver: unknown,
+		mixer: unknown,
+		virtualState: unknown,
+		playbackState: unknown
+	) => unknown;
 	patterns: Pattern[];
 	separateChannels: boolean;
 };
@@ -65,6 +76,9 @@ function createSaaLaneHandle(context: SaaExportLaneContext): SharedTimelineExpor
 		patternProcessor,
 		engine,
 		registerState,
+		audioDriver,
+		mixer,
+		resolveHardwareState,
 		patterns,
 		separateChannels
 	} = context;
@@ -90,7 +104,7 @@ function createSaaLaneHandle(context: SaaExportLaneContext): SharedTimelineExpor
 				patternProcessor.processSpeedTable();
 			}
 			patternProcessor.processTrackerTick(registerState);
-			engine.apply(registerState);
+			engine.apply(resolveHardwareState(audioDriver, mixer, registerState, state));
 		},
 		onPatternOrderAdvanced(needsChange) {
 			if (!needsChange) return;
@@ -135,8 +149,15 @@ export async function createSaaSharedTimelineExportLane(
 		SaaAudioDriver,
 		createSaaSoundEngine,
 		SaaRegisterState,
-		saaPeriodFromCode
+		saaPeriodFromCode,
+		SaaVirtualChannelMixer,
+		resolveSaaHardwareState
 	} = modules;
+	const virtualChannelMap: Record<number, number> = song.virtualChannelMap ?? {};
+	const hasVirtual = Object.values(virtualChannelMap).some((count) => count > 1);
+	const totalChannelCount = hasVirtual
+		? getTotalVirtualChannelCount(EXPORT_CHANNEL_COUNT, virtualChannelMap)
+		: EXPORT_CHANNEL_COUNT;
 	const clockRate = saaExportClockRate(song);
 	const engine = createSaaSoundEngine(wasm, clockRate, SAMPLE_RATE);
 
@@ -158,7 +179,15 @@ export async function createSaaSharedTimelineExportLane(
 		);
 
 		const audioDriver = new SaaAudioDriver();
-		const registerState = new SaaRegisterState();
+		const registerState = new SaaRegisterState(totalChannelCount);
+		const mixer = new SaaVirtualChannelMixer();
+		if (hasVirtual) {
+			state.resizeChannels(totalChannelCount);
+			mixer.configure(virtualChannelMap, EXPORT_CHANNEL_COUNT, song.virtualChannelRoles ?? {});
+			audioDriver.setVirtualChannelMode((index: number) =>
+				mixer.getHardwareChannelIndex(index)
+			);
+		}
 		const patternProcessor = new TrackerPatternProcessor(state, audioDriver, {
 			postMessage: () => {}
 		});
@@ -179,6 +208,9 @@ export async function createSaaSharedTimelineExportLane(
 			patternProcessor,
 			engine,
 			registerState,
+			audioDriver,
+			mixer,
+			resolveHardwareState: resolveSaaHardwareState,
 			patterns,
 			separateChannels: session.separateChannels
 		});

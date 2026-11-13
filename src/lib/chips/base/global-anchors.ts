@@ -1,3 +1,4 @@
+import { logicalColumnForHardwareChannel } from '../../models/virtual-channels';
 import type { ChipField, ChipSchema } from './schema';
 
 export interface AnchoredGlobalField {
@@ -11,12 +12,17 @@ export function usesAnchoredGlobals(schema: ChipSchema): boolean {
 
 export function anchorsBeforeChannel(
 	schema: ChipSchema,
-	channelIndex: number
+	channelIndex: number,
+	virtualChannelMap?: Record<number, number>
 ): AnchoredGlobalField[] {
 	if (!schema.globalAnchors || !schema.globalFields) return [];
+	const hardwareCount = schema.channelLabels?.length ?? 0;
 	const anchors: AnchoredGlobalField[] = [];
 	for (const anchor of schema.globalAnchors) {
-		if (anchor.beforeChannel !== channelIndex) continue;
+		const column = virtualChannelMap
+			? logicalColumnForHardwareChannel(anchor.beforeChannel, virtualChannelMap, hardwareCount)
+			: anchor.beforeChannel;
+		if (column !== channelIndex) continue;
 		const definition = schema.globalFields[anchor.field];
 		if (!definition) continue;
 		anchors.push({ field: anchor.field, definition });
@@ -29,11 +35,15 @@ export type RowSlot =
 	| { kind: 'global'; field: string }
 	| { kind: 'channel'; index: number };
 
-export function rowSlots(schema: ChipSchema, channelCount: number): RowSlot[] {
+export function rowSlots(
+	schema: ChipSchema,
+	channelCount: number,
+	virtualChannelMap?: Record<number, number>
+): RowSlot[] {
 	if (usesAnchoredGlobals(schema)) {
 		const slots: RowSlot[] = [];
 		for (let index = 0; index < channelCount; index++) {
-			for (const anchor of anchorsBeforeChannel(schema, index)) {
+			for (const anchor of anchorsBeforeChannel(schema, index, virtualChannelMap)) {
 				slots.push({ kind: 'global', field: anchor.field });
 			}
 			slots.push({ kind: 'channel', index });

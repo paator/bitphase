@@ -35,16 +35,27 @@ function formatPatternRow(
 	);
 }
 
-function fieldCellsForRow(rowString: string, schema: ChipSchema, pattern: Pattern): FieldCell[] {
+function fieldCellsForRow(
+	rowString: string,
+	schema: ChipSchema,
+	pattern: Pattern,
+	virtualChannelMap?: Record<number, number>
+): FieldCell[] {
 	const cells: FieldCell[] = [];
-	PatternTemplateParser.walkRow(rowString, schema, getPatternEffectColumnCounts(pattern), {
-		onGlobalField(key, field, pos) {
-			cells.push({ x: 0, width: field.length, charIndex: pos, fieldKey: key });
+	PatternTemplateParser.walkRow(
+		rowString,
+		schema,
+		getPatternEffectColumnCounts(pattern),
+		{
+			onGlobalField(key, field, pos) {
+				cells.push({ x: 0, width: field.length, charIndex: pos, fieldKey: key });
+			},
+			onChannelField(_channelIndex, key, field, pos) {
+				cells.push({ x: 0, width: field.length, charIndex: pos, fieldKey: key });
+			}
 		},
-		onChannelField(_channelIndex, key, field, pos) {
-			cells.push({ x: 0, width: field.length, charIndex: pos, fieldKey: key });
-		}
-	});
+		virtualChannelMap
+	);
 	return cells;
 }
 
@@ -54,11 +65,13 @@ function createClipboardContext(
 	formatter: PatternFormatter,
 	schema: ChipSchema,
 	selectedColumn: number,
-	selection?: { minCol: number; maxCol: number }
+	selection?: { minCol: number; maxCol: number },
+	virtualChannelMap?: Record<number, number>
 ): ClipboardContext {
 	const getPatternRowData = (nextPattern: Pattern) =>
 		formatPatternRow(nextPattern, converter, formatter, schema);
-	const getCellPositions = (rowString: string) => fieldCellsForRow(rowString, schema, pattern);
+	const getCellPositions = (rowString: string) =>
+		fieldCellsForRow(rowString, schema, pattern, virtualChannelMap);
 
 	return {
 		pattern,
@@ -347,6 +360,142 @@ describe('ClipboardService cross-chip paste', () => {
 		expect(updated.channels[4].rows[0].note.name).toBe(NoteName.None);
 		expect(updated.patternRows[0].env0).toBe(3);
 		expect(updated.patternRows[0].env1).toBe(0);
+	});
+
+	it('pastes a note from SAA A:1 onto A:2', async () => {
+		const converter = new SAAConverter();
+		const formatter = new SAAFormatter();
+		const map = { 0: 2 };
+		formatter.virtualChannelMap = map;
+		const labels = ['A:1', 'A:2', 'B', 'C', 'D', 'E', 'F'];
+		const pattern = new Pattern(0, 1, SAA_CHIP_SCHEMA, labels);
+		pattern.channels[0].rows[0].note = new Note(NoteName.C, 4);
+		pattern.channels[1].rows[0].note = new Note(NoteName.D, 4);
+		pattern.channels[2].rows[0].note = new Note(NoteName.E, 4);
+
+		const row = formatPatternRow(pattern, converter, formatter, SAA_CHIP_SCHEMA);
+		const noteColumns = fieldCellsForRow(row, SAA_CHIP_SCHEMA, pattern, map).flatMap(
+			(cell, index) => (cell.fieldKey === 'note' ? [index] : [])
+		);
+
+		ClipboardService.copySelection(
+			createClipboardContext(
+				pattern,
+				converter,
+				formatter,
+				SAA_CHIP_SCHEMA,
+				noteColumns[0],
+				undefined,
+				map
+			)
+		);
+
+		const target = new Pattern(1, 1, SAA_CHIP_SCHEMA, labels);
+		let updated = target;
+		await ClipboardService.pasteSelection(
+			createClipboardContext(
+				target,
+				converter,
+				formatter,
+				SAA_CHIP_SCHEMA,
+				noteColumns[1],
+				undefined,
+				map
+			),
+			(next) => {
+				updated = next;
+			}
+		);
+
+		expect(updated.channels[1].rows[0].note).toEqual(
+			expect.objectContaining({ name: NoteName.C, octave: 4 })
+		);
+		expect(updated.channels[0].rows[0].note.name).toBe(NoteName.None);
+
+		ClipboardService.copySelection(
+			createClipboardContext(
+				pattern,
+				converter,
+				formatter,
+				SAA_CHIP_SCHEMA,
+				noteColumns[2],
+				undefined,
+				map
+			)
+		);
+		const afterB = new Pattern(2, 1, SAA_CHIP_SCHEMA, labels);
+		afterB.channels[1].rows[0].note = new Note(NoteName.D, 4);
+		let pastedOnB = afterB;
+		await ClipboardService.pasteSelection(
+			createClipboardContext(
+				afterB,
+				converter,
+				formatter,
+				SAA_CHIP_SCHEMA,
+				noteColumns[2],
+				undefined,
+				map
+			),
+			(next) => {
+				pastedOnB = next;
+			}
+		);
+
+		expect(pastedOnB.channels[2].rows[0].note).toEqual(
+			expect.objectContaining({ name: NoteName.E, octave: 4 })
+		);
+		expect(pastedOnB.channels[1].rows[0].note).toEqual(
+			expect.objectContaining({ name: NoteName.D, octave: 4 })
+		);
+	});
+
+	it('pastes a note from SAA B:1 onto B:2', async () => {
+		const converter = new SAAConverter();
+		const formatter = new SAAFormatter();
+		const map = { 1: 2 };
+		formatter.virtualChannelMap = map;
+		const labels = ['A', 'B:1', 'B:2', 'C', 'D', 'E', 'F'];
+		const pattern = new Pattern(0, 1, SAA_CHIP_SCHEMA, labels);
+		pattern.channels[1].rows[0].note = new Note(NoteName.C, 4);
+
+		const row = formatPatternRow(pattern, converter, formatter, SAA_CHIP_SCHEMA);
+		const noteColumns = fieldCellsForRow(row, SAA_CHIP_SCHEMA, pattern, map).flatMap(
+			(cell, index) => (cell.fieldKey === 'note' ? [index] : [])
+		);
+
+		ClipboardService.copySelection(
+			createClipboardContext(
+				pattern,
+				converter,
+				formatter,
+				SAA_CHIP_SCHEMA,
+				noteColumns[1],
+				undefined,
+				map
+			)
+		);
+
+		const target = new Pattern(1, 1, SAA_CHIP_SCHEMA, labels);
+		let updated = target;
+		await ClipboardService.pasteSelection(
+			createClipboardContext(
+				target,
+				converter,
+				formatter,
+				SAA_CHIP_SCHEMA,
+				noteColumns[2],
+				undefined,
+				map
+			),
+			(next) => {
+				updated = next;
+			}
+		);
+
+		expect(updated.channels[2].rows[0].note).toEqual(
+			expect.objectContaining({ name: NoteName.C, octave: 4 })
+		);
+		expect(updated.channels[1].rows[0].note.name).toBe(NoteName.None);
 	});
 });
 

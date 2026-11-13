@@ -214,7 +214,8 @@ export class PatternNavigationService {
 		);
 		const cellPositions = getCellPositions(rowString, state.selectedRow);
 		const channelCount = genericPattern.channels.length;
-		const slots = rowSlots(schema, channelCount);
+		const virtualChannelMap = formatter.virtualChannelMap;
+		const slots = rowSlots(schema, channelCount, virtualChannelMap);
 		const totalSlots = slots.length;
 		if (totalSlots <= 1) return { ...state, wrapped: true };
 
@@ -234,7 +235,8 @@ export class PatternNavigationService {
 						cell.charIndex,
 						rowString,
 						schema,
-						effectColumnCounts
+						effectColumnCounts,
+						virtualChannelMap
 					);
 			slotForColumn[col] = slotIndexForCell(slots, cell.fieldKey, isGlobal, channelIndex);
 		}

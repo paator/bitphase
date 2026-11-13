@@ -1,5 +1,6 @@
 import SaaState from './saa-state.js';
-import SaaAudioDriver from './saa-audio-driver.js';
+import SaaAudioDriver, { resolveSaaHardwareState } from './saa-audio-driver.js';
+import SaaVirtualChannelMixer from './saa-virtual-channel-mixer.js';
 import SaaRegisterState from './saa-register-state.js';
 import { createSaaSoundEngine } from './saa-engine.js';
 import { saaPeriodFromCode, saaToneFrequency } from './saa-levels.js';
@@ -18,6 +19,10 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		this.patternProcessor = null;
 		this.engine = null;
 		this.registerState = new SaaRegisterState(SAA_CHANNEL_COUNT);
+		this.virtualChannelMixer = new SaaVirtualChannelMixer();
+		this.virtualChannelMap = {};
+		this.virtualChannelRoles = {};
+		this.hwChannelCount = SAA_CHANNEL_COUNT;
 		this.waveformCapture = new SaaWaveformCapture(SAA_CHANNEL_COUNT);
 		this.waveformPostCounter = 0;
 		this.waveformPostInterval = 6;
@@ -55,8 +60,23 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		this._silencePlaybackOutput();
 	}
 
+	_engineRegisterState() {
+		return resolveSaaHardwareState(
+			this.audioDriver,
+			this.virtualChannelMixer,
+			this.registerState,
+			this.state
+		);
+	}
+
 	_applyRegisterStateToEngine() {
-		this.engine?.apply(this.registerState);
+		this.engine?.apply(this._engineRegisterState());
+	}
+
+	_dispatchChipPortMessage(type, data) {
+		if (type !== 'set_virtual_channel_config') return false;
+		this.handleSetVirtualChannelConfig(data);
+		return true;
 	}
 
 	_resetEnginesForPreview() {
@@ -110,6 +130,8 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 				this.audioDriver,
 				this.port
 			);
+			this._applyVirtualChannelResize();
+			this._bindVirtualChannelMode();
 			this.registerState.reset();
 			this.initialized = true;
 			this._applyRegisterStateToEngine();
@@ -133,6 +155,44 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 
 	handleUpdateIntFrequency({ intFrequency }) {
 		this.state.setIntFrequency(intFrequency, sampleRate);
+	}
+
+	handleSetVirtualChannelConfig({ virtualChannelMap, hwChannelCount, virtualChannelRoles }) {
+		const nextMap = virtualChannelMap || {};
+		const nextRoles = virtualChannelRoles || {};
+		const nextHw = hwChannelCount || SAA_CHANNEL_COUNT;
+		const configUnchanged =
+			this.hwChannelCount === nextHw &&
+			JSON.stringify(this.virtualChannelMap) === JSON.stringify(nextMap) &&
+			JSON.stringify(this.virtualChannelRoles ?? {}) === JSON.stringify(nextRoles);
+		this.virtualChannelMap = nextMap;
+		this.virtualChannelRoles = nextRoles;
+		this.hwChannelCount = nextHw;
+		this.virtualChannelMixer.configure(this.virtualChannelMap, this.hwChannelCount, nextRoles);
+		this._applyVirtualChannelResize();
+		this._bindVirtualChannelMode();
+		if (this.engine && !configUnchanged) {
+			this._silencePlaybackOutput();
+		}
+	}
+
+	_bindVirtualChannelMode() {
+		if (!this.audioDriver) return;
+		if (this.virtualChannelMixer.hasVirtualChannels()) {
+			this.audioDriver.setVirtualChannelMode((logicalIndex) =>
+				this.virtualChannelMixer.getHardwareChannelIndex(logicalIndex)
+			);
+			return;
+		}
+		this.audioDriver.setVirtualChannelMode(null);
+	}
+
+	_applyVirtualChannelResize() {
+		if (!this.virtualChannelMixer.hasVirtualChannels()) return;
+		const totalChannels = this.virtualChannelMixer.getTotalVirtualChannelCount();
+		this.state.resizeChannels(totalChannels);
+		this.registerState.resize(totalChannels);
+		this.audioDriver?.resizeChannels(totalChannels);
 	}
 
 	handleSetChannelMute({ channelIndex, muted }) {
@@ -167,6 +227,8 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 				this.audioDriver,
 				this.port
 			);
+			this._applyVirtualChannelResize();
+			this._bindVirtualChannelMode();
 		}
 	}
 
@@ -179,7 +241,7 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		const sample = this.engine.generate();
 		mix.l += sample.left;
 		mix.r += sample.right;
-		this.waveformCapture.writeSample(sampleIndex, sample.channels, this.state.channelMuted);
+		this.waveformCapture.writeSample(sampleIndex, sample.channels, this._waveformMuted());
 	}
 
 	handlePreviewRow(data) {
@@ -196,9 +258,23 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 		super.handleStopPreview(channel);
 	}
 
+	_waveformMuted() {
+		if (!this.virtualChannelMixer.hasVirtualChannels()) return this.state.channelMuted;
+		return this.virtualChannelMixer.groups.map((group) =>
+			group.virtualIndices.every((index) => this.state.channelMuted[index])
+		);
+	}
+
 	_collectChannelLevels() {
+		const audible = this.virtualChannelMixer.hasVirtualChannels()
+			? new Set(this.virtualChannelMixer.getAudibleVirtualChannelIndices(this.registerState))
+			: null;
 		const levels = [];
 		for (let channel = 0; channel < this.registerState.channelCount; channel++) {
+			if (audible && !audible.has(channel)) {
+				levels.push(0);
+				continue;
+			}
 			const source = this.registerState.channels[channel];
 			if (!(source?.tone || source?.noise) || this.state.channelMuted[channel]) {
 				levels.push(0);

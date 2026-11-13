@@ -36,6 +36,7 @@ export class PatternFieldDetection {
 		);
 		const effectColumnCounts = getPatternEffectColumnCounts(context.pattern);
 
+		const virtualChannelMap = context.formatter.virtualChannelMap;
 		const channelIndex = isGlobal
 			? -1
 			: PatternTemplateParser.calculateChannelIndexForField(
@@ -43,7 +44,8 @@ export class PatternFieldDetection {
 					cell.charIndex,
 					rowString,
 					schema,
-					effectColumnCounts
+					effectColumnCounts,
+					virtualChannelMap
 				);
 
 		const fieldStart = context.segments
@@ -53,7 +55,8 @@ export class PatternFieldDetection {
 					cell.fieldKey,
 					cell.charIndex,
 					schema,
-					effectColumnCounts
+					effectColumnCounts,
+					virtualChannelMap
 				);
 		const charOffset = cell.charIndex - fieldStart;
 

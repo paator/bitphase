@@ -68,6 +68,82 @@ describe('SAA pattern layout', () => {
 		]);
 	});
 
+	it('keeps noise and envelope on the hardware channel when A is split', () => {
+		const formatter = new RowFormatter();
+		formatter.virtualChannelMap = { 0: 2 };
+		const row = formatter.formatRow(
+			{ noise0: 1, env0: 4, noise1: 3, env1: 2 },
+			Array.from({ length: 7 }, () => ({ ...CHANNEL })),
+			0,
+			SAA_CHIP_SCHEMA
+		);
+		const order: string[] = [];
+		PatternTemplateParser.walkRow(
+			row,
+			SAA_CHIP_SCHEMA,
+			[1, 1, 1, 1, 1, 1, 1],
+			{
+				onGlobalField(key) {
+					order.push(key);
+				},
+				onChannelStart(index) {
+					order.push(`ch${index}`);
+				}
+			},
+			{ 0: 2 }
+		);
+		expect(order).toEqual([
+			'noise0',
+			'ch0',
+			'ch1',
+			'ch2',
+			'env0',
+			'ch3',
+			'noise1',
+			'ch4',
+			'ch5',
+			'env1',
+			'ch6'
+		]);
+	});
+
+	it('keeps each note at its channel start when D is split', () => {
+		const notes = ['C-4', 'D-4', 'E-4', 'F-4', 'G-4', 'A-4', 'B-4'];
+		const formatter = new RowFormatter();
+		formatter.virtualChannelMap = { 3: 2 };
+		const row = formatter.formatRow(
+			{ noise0: 1, env0: 4, noise1: 3, env1: 2 },
+			notes.map((note) => ({ ...CHANNEL, note })),
+			0,
+			SAA_CHIP_SCHEMA
+		);
+		const starts: number[] = [];
+		let end = 0;
+		PatternTemplateParser.walkRow(
+			row,
+			SAA_CHIP_SCHEMA,
+			[1, 1, 1, 1, 1, 1, 1],
+			{
+				onChannelStart(_index, pos) {
+					starts.push(pos);
+				},
+				onChannelField(_index, _key, field, pos) {
+					end = Math.max(end, pos + field.length);
+				},
+				onGlobalField(_key, field, pos) {
+					end = Math.max(end, pos + field.length);
+				}
+			},
+			{ 3: 2 }
+		);
+		expect(starts).toHaveLength(7);
+		starts.forEach((pos, index) => {
+			expect(row.slice(pos, pos + 3)).toBe(notes[index]);
+		});
+		expect(end).toBe(row.length);
+		expect(row.slice(starts[6] - 2, starts[6])).toBe('2 ');
+	});
+
 	it('parses anchored noise and envelope shapes back onto the pattern row', () => {
 		const parsed = new RowFormatter().parseRow(saaRow(), SAA_CHIP_SCHEMA);
 		expect(parsed.patternRow.noise0).toBe(1);

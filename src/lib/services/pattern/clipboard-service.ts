@@ -1,6 +1,5 @@
 import type { Pattern } from '../../models/song';
-import { PatternFieldDetection } from './editing/pattern-field-detection';
-import { PatternValueUpdates } from './editing/pattern-value-updates';
+import { PatternValueUpdates, type GenericFieldUpdate } from './editing/pattern-value-updates';
 import { PatternDeleteHandler } from './editing/pattern-delete-handler';
 import type { EditingContext, FieldInfo } from './editing/editing-context';
 import {
@@ -82,7 +81,13 @@ export class ClipboardService {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
-				const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
+				const fieldInfo = this.detectFieldDirect(
+					cell,
+					rowString,
+					schema,
+					pattern,
+					formatter.virtualChannelMap
+				);
 				if (!fieldInfo) continue;
 
 				const field = this.getFieldDef(schema, cell.fieldKey);
@@ -122,7 +127,13 @@ export class ClipboardService {
 		const cell = cellPositions[col];
 		if (!cell.fieldKey) return;
 
-		const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
+		const fieldInfo = this.detectFieldDirect(
+			cell,
+			rowString,
+			schema,
+			pattern,
+			formatter.virtualChannelMap
+		);
 		if (!fieldInfo) return;
 
 		const field = this.getFieldDef(schema, cell.fieldKey);
@@ -184,7 +195,13 @@ export class ClipboardService {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
-				const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
+				const fieldInfo = this.detectFieldDirect(
+					cell,
+					rowString,
+					schema,
+					pattern,
+					formatter.virtualChannelMap
+				);
 				if (!fieldInfo) continue;
 
 				const field = this.getFieldDef(schema, cell.fieldKey);
@@ -245,7 +262,13 @@ export class ClipboardService {
 				const cell = cellPositions[col];
 				if (!cell.fieldKey) continue;
 
-				const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
+				const fieldInfo = this.detectFieldDirect(
+					cell,
+					rowString,
+					schema,
+					pattern,
+					formatter.virtualChannelMap
+				);
 				if (!fieldInfo) continue;
 
 				const field = this.getFieldDef(schema, cell.fieldKey);
@@ -281,7 +304,8 @@ export class ClipboardService {
 		cell: { fieldKey?: string; charIndex: number },
 		rowString: string,
 		schema: ChipSchema,
-		pattern: Pattern
+		pattern: Pattern,
+		virtualChannelMap?: Record<number, number>
 	): FieldInfo | null {
 		if (!cell.fieldKey) return null;
 
@@ -297,7 +321,8 @@ export class ClipboardService {
 					cell.charIndex,
 					rowString,
 					schema,
-					effectColumnCounts
+					effectColumnCounts,
+					virtualChannelMap
 				);
 
 		const fieldStart = PatternTemplateParser.findFieldStartPositionInRowString(
@@ -305,7 +330,8 @@ export class ClipboardService {
 			cell.fieldKey,
 			cell.charIndex,
 			schema,
-			effectColumnCounts
+			effectColumnCounts,
+			virtualChannelMap
 		);
 		const charOffset = cell.charIndex - fieldStart;
 
@@ -392,12 +418,19 @@ export class ClipboardService {
 		pattern: Pattern,
 		rowString: string,
 		cellPositions: Array<{ fieldKey?: string; charIndex: number }>,
-		schema: ClipboardContext['schema']
+		schema: ClipboardContext['schema'],
+		virtualChannelMap?: Record<number, number>
 	): number | null {
 		for (let col = 0; col < cellPositions.length; col++) {
 			const cell = cellPositions[col];
 			if (cell.fieldKey !== fieldKey) continue;
-			const fieldInfo = this.detectFieldDirect(cell, rowString, schema, pattern);
+			const fieldInfo = this.detectFieldDirect(
+				cell,
+				rowString,
+				schema,
+				pattern,
+				virtualChannelMap
+			);
 			if (!fieldInfo) continue;
 			if (destChannelIndex < 0) {
 				if (fieldInfo.isGlobal) return col;
@@ -441,7 +474,8 @@ export class ClipboardService {
 			pattern,
 			rowString,
 			cellPositions,
-			context.schema
+			context.schema,
+			context.formatter.virtualChannelMap
 		);
 		if (matchedCol !== null) return matchedCol;
 		if (!allowNoteEnvelopeConversion) return null;
@@ -455,7 +489,8 @@ export class ClipboardService {
 			pattern,
 			rowString,
 			cellPositions,
-			context.schema
+			context.schema,
+			context.formatter.virtualChannelMap
 		);
 	}
 
@@ -510,10 +545,8 @@ export class ClipboardService {
 			selectedRow,
 			selectedColumn,
 			getCellPositions,
-			getPatternRowData,
-			createEditingContext
+			getPatternRowData
 		} = context;
-		let pattern = originalPattern;
 		const allowNoteEnvelopeConversion = clipboardAllowsNoteEnvelopeConversion(
 			clipboardData.cells.map((cell) => cell.fieldKey)
 		);
@@ -521,6 +554,17 @@ export class ClipboardService {
 		const minSourceChannelIndex = minClipboardChannelIndex(
 			clipboardData.cells.map((cell) => cell.channelIndex)
 		);
+		const virtualChannelMap = context.formatter.virtualChannelMap;
+		const rows = new Map<
+			number,
+			{
+				rowString: string;
+				cellPositions: Array<{ fieldKey?: string; charIndex: number }>;
+				originChannelIndex: number;
+				originFieldKey: string | undefined;
+			}
+		>();
+		const updates: GenericFieldUpdate[] = [];
 
 		for (const clipCell of clipboardData.cells) {
 			if (
@@ -531,30 +575,46 @@ export class ClipboardService {
 			}
 
 			const targetRow = selectedRow + clipCell.row;
-			if (targetRow < 0 || targetRow >= pattern.length) continue;
+			if (targetRow < 0 || targetRow >= originalPattern.length) continue;
 
-			const rowString = getPatternRowData(pattern, targetRow);
-			const cellPositions = getCellPositions(rowString, targetRow);
-			const originCell = cellPositions[selectedColumn];
-			const originInfo = originCell
-				? this.detectFieldDirect(originCell, rowString, context.schema, pattern)
-				: null;
-			const originChannelIndex = originInfo?.channelIndex ?? 0;
+			let row = rows.get(targetRow);
+			if (!row) {
+				const rowString = getPatternRowData(originalPattern, targetRow);
+				const cellPositions = getCellPositions(rowString, targetRow);
+				const originCell = cellPositions[selectedColumn];
+				const originInfo = originCell
+					? this.detectFieldDirect(
+							originCell,
+							rowString,
+							context.schema,
+							originalPattern,
+							virtualChannelMap
+						)
+					: null;
+				row = {
+					rowString,
+					cellPositions,
+					originChannelIndex: originInfo?.channelIndex ?? 0,
+					originFieldKey: originInfo?.fieldKey
+				};
+				rows.set(targetRow, row);
+			}
+
 			const resolvedCol = this.resolvePasteColumn(
 				clipCell,
 				context,
-				pattern,
-				rowString,
-				cellPositions,
-				originChannelIndex,
-				originInfo?.fieldKey,
+				originalPattern,
+				row.rowString,
+				row.cellPositions,
+				row.originChannelIndex,
+				row.originFieldKey,
 				minSourceChannelIndex,
 				sourceFieldKeys,
 				allowNoteEnvelopeConversion
 			);
 			if (resolvedCol === null) continue;
 
-			const cell = cellPositions[resolvedCol];
+			const cell = row.cellPositions[resolvedCol];
 			if (!cell?.fieldKey) continue;
 
 			const pasteValue = this.getPasteValue(
@@ -572,20 +632,23 @@ export class ClipboardService {
 				continue;
 			}
 
-			const editingContext = createEditingContext(pattern, targetRow, resolvedCol);
-			const fieldInfo = PatternFieldDetection.detectFieldAtCursor(editingContext);
+			const fieldInfo = this.detectFieldDirect(
+				cell,
+				row.rowString,
+				context.schema,
+				originalPattern,
+				virtualChannelMap
+			);
 			if (!fieldInfo) continue;
 
-			pattern = PatternValueUpdates.updateFieldValue(
-				{ ...editingContext, pattern },
-				fieldInfo,
-				pasteValue
-			);
+			updates.push({ row: targetRow, fieldInfo, newValue: pasteValue });
 		}
 
-		if (pattern !== originalPattern) {
-			onPatternUpdate(pattern);
-		}
+		if (updates.length === 0) return;
+
+		const generic = context.converter.toGeneric(originalPattern);
+		PatternValueUpdates.applyUpdatesToGeneric(generic, updates);
+		onPatternUpdate(context.converter.fromGeneric(generic));
 	}
 
 	private static copyToStoreAndSystem(
@@ -609,12 +672,13 @@ export class ClipboardService {
 	}
 
 	private static async getClipboardData(): Promise<ClipboardData | null> {
+		if (clipboardStore.hasData) return clipboardStore.clipboardData;
 		const systemData = await this.readSystemClipboard();
 		if (systemData) {
 			clipboardStore.set(systemData);
 			return systemData;
 		}
-		return clipboardStore.clipboardData;
+		return null;
 	}
 
 	private static async readSystemClipboard(): Promise<ClipboardData | null> {

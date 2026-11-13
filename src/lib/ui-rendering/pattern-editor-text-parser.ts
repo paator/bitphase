@@ -27,6 +27,7 @@ export class PatternEditorTextParser {
 	private rowSegmentsCache: Cache<string, FieldSegment[]>;
 	private cellPositionsCache: Cache<string, CellPosition[]>;
 	private effectColumnCounts: number[] = [];
+	private virtualChannelMap: Record<number, number> | undefined;
 
 	constructor(
 		schema: Chip['schema'],
@@ -48,8 +49,12 @@ export class PatternEditorTextParser {
 		this.effectColumnCounts = counts;
 	}
 
+	setVirtualChannelMap(map: Record<number, number> | undefined): void {
+		this.virtualChannelMap = map;
+	}
+
 	parseRowString(rowString: string, rowIndex: number): FieldSegment[] {
-		const cacheKey = `${rowString}:${rowIndex}:${this.effectColumnCounts.join(',')}`;
+		const cacheKey = `${rowString}:${rowIndex}:${this.effectColumnCounts.join(',')}:${this.virtualMapKey()}`;
 		const cached = this.rowSegmentsCache.get(cacheKey);
 		if (cached) return cached;
 
@@ -90,17 +95,23 @@ export class PatternEditorTextParser {
 			});
 		};
 
-		PatternTemplateParser.walkRow(rowString, this.schema, this.effectColumnCounts, {
-			onGlobalField: pushField,
-			onChannelField: (_channelIndex, key, field, start) => pushField(key, field, start)
-		});
+		PatternTemplateParser.walkRow(
+			rowString,
+			this.schema,
+			this.effectColumnCounts,
+			{
+				onGlobalField: pushField,
+				onChannelField: (_channelIndex, key, field, start) => pushField(key, field, start)
+			},
+			this.virtualChannelMap
+		);
 		this.rowSegmentsCache.set(cacheKey, segments);
 		return segments;
 	}
 
 	getCellPositions(rowString: string, rowIndex: number): CellPosition[] {
 		const fontInfo = this.ctx.font;
-		const cacheKey = `${rowString}:${rowIndex}:${fontInfo}:${this.effectColumnCounts.join(',')}`;
+		const cacheKey = `${rowString}:${rowIndex}:${fontInfo}:${this.effectColumnCounts.join(',')}:${this.virtualMapKey()}`;
 		const cached = this.cellPositionsCache.get(cacheKey);
 		if (cached) return cached;
 
@@ -169,5 +180,15 @@ export class PatternEditorTextParser {
 
 		this.cellPositionsCache.set(cacheKey, positions);
 		return positions;
+	}
+
+	private virtualMapKey(): string {
+		const map = this.virtualChannelMap;
+		if (!map) return '';
+		return Object.keys(map)
+			.map((key) => Number(key))
+			.sort((a, b) => a - b)
+			.map((key) => `${key}:${map[key]}`)
+			.join(',');
 	}
 }

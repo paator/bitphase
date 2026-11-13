@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { describeSaaEffect, saaStickyChannelEffectGroup } from '@/lib/chips/saa/effects';
 import { SAA_SAM_CLOCK, resolveSaaTuningTable, saaToneFrequency } from '@/lib/chips/saa/schema';
-import SaaAudioDriver from '../../../../public/saa/saa-audio-driver.js';
+import SaaAudioDriver, {
+	resolveSaaHardwareState
+} from '../../../../public/saa/saa-audio-driver.js';
+import SaaVirtualChannelMixer from '../../../../public/saa/saa-virtual-channel-mixer.js';
 import SaaRegisterState from '../../../../public/saa/saa-register-state.js';
 import SaaState from '../../../../public/saa/saa-state.js';
 import TrackerPatternProcessor from '../../../../public/tracker/tracker-pattern-processor.js';
@@ -903,5 +906,100 @@ describe('SAA auto-envelope', () => {
 		expect(state.autoEnvelopeNumerator[0]).toBe(2);
 		expect(state.autoEnvelopeNumerator[1]).toBe(1);
 		expect(state.autoEnvelopeDenominator[1]).toBe(2);
+	});
+});
+
+describe('SAA virtual channels', () => {
+	const toneTable = toneCodes.map((code) => saaPeriodFromCode(code));
+
+	function columnState(notes: number[]) {
+		const state = playbackState(notes[0] ?? 0);
+		state.channelMuted = Array(notes.length).fill(false);
+		state.channelSoundEnabled = notes.map((note) => note >= 0);
+		state.channelPatternLeft = Array(notes.length).fill(15);
+		state.channelPatternRight = Array(notes.length).fill(15);
+		state.channelAmplitudeSliding = Array(notes.length).fill(0);
+		state.channelInstruments = Array(notes.length).fill(0);
+		state.instrumentPositions = Array(notes.length).fill(0);
+		state.channelCurrentNotes = notes.map((note) => (note < 0 ? 0 : note));
+		state.channelBaseNotes = state.channelCurrentNotes.slice();
+		state.currentTuningTable = toneTable;
+		state.noiseClock0 = 0;
+		state.instruments[0].macros.tone = { values: [true], loop: 0 };
+		state.instruments[0].macros.noise = { values: [false], loop: 0 };
+		state.instruments[0].macros.noiseAdd = { values: [1], loop: 0 };
+		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
+		return state;
+	}
+
+	function mix(notes: number[], map: Record<number, number>) {
+		const driver = new SaaAudioDriver();
+		const mixer = new SaaVirtualChannelMixer();
+		mixer.configure(map, 6);
+		driver.setVirtualChannelMode((index: number) => mixer.getHardwareChannelIndex(index));
+		const state = columnState(notes);
+		const registers = new SaaRegisterState(notes.length);
+		driver.processInstruments(state, registers);
+		return resolveSaaHardwareState(driver, mixer, registers, state);
+	}
+
+	it('keeps the first audible column on a split generator', () => {
+		const hardware = mix([12, 45, 20, 30, 8, 16, 48], { 0: 2 });
+		expect(toneCode(hardware.channels[0])).toBe(toneCodes[12]);
+		expect(hardware.channels[0].tone).toBe(true);
+		expect(hardware.noise0).toBe(1);
+		expect(hardware.channelCount).toBe(6);
+	});
+
+	it('falls through to the next column and uses that note as the noise clock', () => {
+		const hardware = mix([-1, 45, 20, 30, 8, 16, 48], { 0: 2 });
+		expect(toneCode(hardware.channels[0])).toBe(toneCodes[45]);
+		expect(hardware.noise0).toBe(1);
+	});
+
+	it('takes the envelope from the audible column of C', () => {
+		const driver = new SaaAudioDriver();
+		const mixer = new SaaVirtualChannelMixer();
+		mixer.configure({ 2: 2 }, 6);
+		driver.setVirtualChannelMode((index: number) => mixer.getHardwareChannelIndex(index));
+		const notes = [12, 20, -1, 40, 8, 16, 48];
+		const state = columnState(notes);
+		state.instruments[0].macros.envelopeShape = { values: [4], loop: 0 };
+		const registers = new SaaRegisterState(notes.length);
+		driver.processInstruments(state, registers);
+		const hardware = resolveSaaHardwareState(driver, mixer, registers, state);
+		expect(hardware.envelope0).toBe(0x86);
+		expect(toneCode(hardware.channels[2])).toBe(toneCodes[40]);
+	});
+
+	it('writes auto-envelope onto hardware B from a virtual column in the first group', () => {
+		const driver = new SaaAudioDriver();
+		const mixer = new SaaVirtualChannelMixer();
+		mixer.configure({ 2: 2 }, 6);
+		driver.setVirtualChannelMode((index: number) => mixer.getHardwareChannelIndex(index));
+		const notes = [12, 20, 24, 40, 8, 16, 48];
+		const state = columnState(notes);
+		const pattern = {
+			channels: notes.map((_, index) => ({
+				rows: [
+					{
+						note: { name: 0, octave: 0 },
+						instrument: 0,
+						effects:
+							index === 3
+								? [{ effect: 'E'.charCodeAt(0), delay: 0x0a, parameter: 0x11 }]
+								: [null]
+					}
+				]
+			}))
+		};
+		driver.processPatternRow(state, pattern, 0, { env0: 4 });
+		const registers = new SaaRegisterState(notes.length);
+		driver.processInstruments(state, registers);
+		const hardware = resolveSaaHardwareState(driver, mixer, registers, state);
+		expect(state.autoEnvelopeSource[0]).toBe(3);
+		expect(toneCode(hardware.channels[1])).toBe(saaPitchCode(toneTable[40], 0));
+		expect(hardware.channels[1].tone).toBe(false);
+		expect(toneCode(hardware.channels[2])).toBe(toneCodes[24]);
 	});
 });

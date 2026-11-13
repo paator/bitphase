@@ -38,6 +38,7 @@ export type SaaExportState = {
 	setSpeed: (speed: number) => void;
 	setTempo: (tempo: number) => void;
 	updateSamplesPerTick: (sampleRate: number) => void;
+	resizeChannels: (count: number) => void;
 	timeline: OfflineSharedTimeline;
 };
 
@@ -54,8 +55,25 @@ export type SaaExportEngine = {
 
 export type SaaProcessorModules = {
 	SaaState: new (sharedTimeline?: unknown) => SaaExportState;
-	SaaAudioDriver: new () => unknown;
-	SaaRegisterState: new (channelCount?: number) => unknown;
+	SaaAudioDriver: new () => {
+		setVirtualChannelMode: (resolver: ((index: number) => number) | null) => void;
+	};
+	SaaRegisterState: new (channelCount?: number) => { resize: (count: number) => void };
+	SaaVirtualChannelMixer: new () => {
+		configure: (
+			virtualChannelMap: Record<number, number>,
+			hwChannelCount: number,
+			virtualChannelRoles?: Record<number, Record<number, string>>
+		) => void;
+		hasVirtualChannels: () => boolean;
+		getHardwareChannelIndex: (index: number) => number;
+	};
+	resolveSaaHardwareState: (
+		driver: unknown,
+		mixer: unknown,
+		virtualState: unknown,
+		playbackState: unknown
+	) => unknown;
 	TrackerPatternProcessor: new (
 		state: unknown,
 		driver: unknown,
@@ -107,10 +125,11 @@ export class SAAChipRenderer implements ChipRenderer {
 		const [
 			{ default: SaaState },
 			{ default: TrackerPatternProcessor },
-			{ default: SaaAudioDriver },
+			{ default: SaaAudioDriver, resolveSaaHardwareState },
 			{ createSaaSoundEngine },
 			{ default: SaaRegisterState },
-			{ saaPeriodFromCode }
+			{ saaPeriodFromCode },
+			{ default: SaaVirtualChannelMixer }
 		] = await Promise.all([
 			this.loader.loadModule<{ default: SaaProcessorModules['SaaState'] }>(
 				'saa/saa-state.js'
@@ -118,9 +137,10 @@ export class SAAChipRenderer implements ChipRenderer {
 			this.loader.loadModule<{ default: SaaProcessorModules['TrackerPatternProcessor'] }>(
 				'tracker/tracker-pattern-processor.js'
 			),
-			this.loader.loadModule<{ default: SaaProcessorModules['SaaAudioDriver'] }>(
-				'saa/saa-audio-driver.js'
-			),
+			this.loader.loadModule<{
+				default: SaaProcessorModules['SaaAudioDriver'];
+				resolveSaaHardwareState: SaaProcessorModules['resolveSaaHardwareState'];
+			}>('saa/saa-audio-driver.js'),
 			this.loader.loadModule<{
 				createSaaSoundEngine: SaaProcessorModules['createSaaSoundEngine'];
 			}>('saa/saa-engine.js'),
@@ -129,6 +149,9 @@ export class SAAChipRenderer implements ChipRenderer {
 			),
 			this.loader.loadModule<{ saaPeriodFromCode: SaaProcessorModules['saaPeriodFromCode'] }>(
 				'saa/saa-levels.js'
+			),
+			this.loader.loadModule<{ default: SaaProcessorModules['SaaVirtualChannelMixer'] }>(
+				'saa/saa-virtual-channel-mixer.js'
 			)
 		]);
 		onProgress?.(40, 'Preparing SAA renderer...');
@@ -138,7 +161,9 @@ export class SAAChipRenderer implements ChipRenderer {
 			SaaAudioDriver,
 			createSaaSoundEngine,
 			SaaRegisterState,
-			saaPeriodFromCode
+			saaPeriodFromCode,
+			SaaVirtualChannelMixer,
+			resolveSaaHardwareState
 		};
 	}
 

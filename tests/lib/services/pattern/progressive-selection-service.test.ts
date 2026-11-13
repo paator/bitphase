@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { ProgressiveSelectionService } from '../../../../src/lib/services/pattern/progressive-selection-service';
 import { Pattern } from '../../../../src/lib/models/song';
 import { AY_CHIP_SCHEMA } from '../../../../src/lib/chips/ay/schema';
+import { SAA_CHIP_SCHEMA } from '../../../../src/lib/chips/saa/schema';
+import { BaseFormatter } from '../../../../src/lib/chips/base/formatter';
+import { PatternTemplateParser } from '../../../../src/lib/services/pattern/editing/pattern-template-parsing';
 
 describe('ProgressiveSelectionService', () => {
 	const schema = AY_CHIP_SCHEMA;
@@ -223,5 +226,115 @@ describe('ProgressiveSelectionService', () => {
 		expect(result.endRow).toBe(63);
 		expect(result.startColumn).toBe(3);
 		expect(result.endColumn).toBe(6);
+	});
+
+	it('selects one virtual column when SAA channel B is split', () => {
+		const map = { 1: 2 };
+		const pattern = new Pattern(1, 4, SAA_CHIP_SCHEMA, ['A', 'B:1', 'B:2', 'C', 'D', 'E', 'F']);
+		const formatter = new BaseFormatter();
+		formatter.virtualChannelMap = map;
+		const row = formatter.formatRow(
+			{ noise0: 1, env0: 4, noise1: 3, env1: 2 },
+			Array.from({ length: 7 }, () => ({
+				note: 'C-4',
+				instrument: 1,
+				table: 0,
+				left: 15,
+				right: 8,
+				effect: null
+			})),
+			0,
+			SAA_CHIP_SCHEMA
+		);
+		const counts = [1, 1, 1, 1, 1, 1, 1];
+		const cells: {
+			x: number;
+			width: number;
+			charIndex: number;
+			fieldKey: string;
+			channelIndex: number;
+		}[] = [];
+		const push = (channelIndex: number, key: string, length: number, pos: number) => {
+			const field = SAA_CHIP_SCHEMA.fields[key] ?? SAA_CHIP_SCHEMA.globalFields?.[key];
+			if (field?.selectable === 'atomic') {
+				cells.push({ x: pos, width: length, charIndex: pos, fieldKey: key, channelIndex });
+				return;
+			}
+			for (let i = 0; i < length; i++) {
+				cells.push({
+					x: pos + i,
+					width: 1,
+					charIndex: pos + i,
+					fieldKey: key,
+					channelIndex
+				});
+			}
+		};
+		PatternTemplateParser.walkRow(
+			row,
+			SAA_CHIP_SCHEMA,
+			counts,
+			{
+				onGlobalField: (key, field, pos) => push(-1, key, field.length, pos),
+				onChannelField: (index, key, field, pos) => push(index, key, field.length, pos)
+			},
+			map
+		);
+
+		const b1Note = cells.findIndex(
+			(cell) => cell.fieldKey === 'note' && cell.channelIndex === 1
+		);
+		const b2Note = cells.findIndex(
+			(cell) => cell.fieldKey === 'note' && cell.channelIndex === 2
+		);
+		const channel = ProgressiveSelectionService.selectAll(
+			pattern,
+			b1Note,
+			0,
+			b1Note,
+			pattern.length - 1,
+			b1Note,
+			() => cells,
+			() => row,
+			SAA_CHIP_SCHEMA,
+			map
+		);
+		const selected = cells.slice(channel.startColumn, channel.endColumn + 1);
+		expect(selected.length).toBeGreaterThan(0);
+		expect(selected.every((cell) => cell.channelIndex === 1)).toBe(true);
+		expect(channel.startColumn).toBe(cells.findIndex((cell) => cell.channelIndex === 1));
+		expect(channel.endColumn).toBe(cells.findLastIndex((cell) => cell.channelIndex === 1));
+		expect(channel.endColumn).toBeLessThan(b2Note);
+
+		const other = ProgressiveSelectionService.selectAll(
+			pattern,
+			b2Note,
+			0,
+			b2Note,
+			pattern.length - 1,
+			b2Note,
+			() => cells,
+			() => row,
+			SAA_CHIP_SCHEMA,
+			map
+		);
+		const selectedOther = cells.slice(other.startColumn, other.endColumn + 1);
+		expect(selectedOther.every((cell) => cell.channelIndex === 2)).toBe(true);
+		expect(other.startColumn).toBeGreaterThan(channel.endColumn);
+
+		const entire = ProgressiveSelectionService.selectAll(
+			pattern,
+			b1Note,
+			0,
+			channel.startColumn,
+			pattern.length - 1,
+			channel.endColumn,
+			() => cells,
+			() => row,
+			SAA_CHIP_SCHEMA,
+			map
+		);
+		expect(entire.startColumn).toBe(0);
+		expect(entire.endColumn).toBe(cells.length - 1);
 	});
 });

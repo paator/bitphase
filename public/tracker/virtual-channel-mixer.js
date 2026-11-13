@@ -69,6 +69,19 @@ export class VirtualChannelMixer {
 		return audible;
 	}
 
+	getMergedVirtualChannelIndices(virtualRegisterState) {
+		const selected = [];
+		for (const group of this.groups) {
+			const { voiceIndices } = this._partitionGroup(group);
+			if (voiceIndices.length === 0) {
+				selected.push(-1);
+				continue;
+			}
+			selected.push(this._selectVoice(voiceIndices, virtualRegisterState));
+		}
+		return selected;
+	}
+
 	merge(virtualRegisterState, state) {
 		this.adapters.resetHardwareState(this.hardwareRegisterState);
 		this.adapters.copyGlobals?.(virtualRegisterState, this.hardwareRegisterState, state);

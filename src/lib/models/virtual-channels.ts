@@ -90,6 +90,20 @@ export function computeEffectiveChannelLabels(
 	return labels;
 }
 
+export function logicalColumnForHardwareChannel(
+	hardwareIndex: number,
+	virtualChannelMap: Record<number, number> | undefined,
+	hardwareCount: number
+): number {
+	if (!virtualChannelMap) return hardwareIndex;
+	let offset = 0;
+	const limit = Math.min(Math.max(hardwareIndex, 0), hardwareCount);
+	for (let hardware = 0; hardware < limit; hardware++) {
+		offset += clampVirtualChannelCount(virtualChannelMap[hardware]);
+	}
+	return offset;
+}
+
 export function getHardwareChannelIndex(
 	virtualChannelIndex: number,
 	hwLabels: string[],

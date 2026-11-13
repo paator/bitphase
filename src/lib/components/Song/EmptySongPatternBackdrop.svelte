@@ -5,15 +5,16 @@
 	import { loadEmptyStateDemoProject } from '../../config/demo-songs';
 	import { PatternRowDataService } from '../../services/pattern/pattern-row-data-service';
 	import { themeService } from '../../services/theme/theme-service';
-	import {
-		PatternEditorRenderer
-	} from '../../ui-rendering/pattern-editor-renderer';
+	import { PatternEditorRenderer } from '../../ui-rendering/pattern-editor-renderer';
 	import {
 		PatternEditorTextParser,
 		type CellPosition,
 		type FieldSegment
 	} from '../../ui-rendering/pattern-editor-text-parser';
-	import { getVirtualChannelGroups, virtualChannelRoleMarks } from '../../models/virtual-channels';
+	import {
+		getVirtualChannelGroups,
+		virtualChannelRoleMarks
+	} from '../../models/virtual-channels';
 	import { settingsStore } from '../../stores/settings.svelte';
 	import { getColors } from '../../utils/colors';
 	import { getFonts } from '../../utils/fonts';
@@ -35,7 +36,7 @@
 	const emptyNoteAlignment = $derived(settingsStore.emptyNoteAlignment);
 
 	const rowStringCache = new Cache<string, string>();
-	const patternGenericCache = new Cache<number, GenericPattern>();
+	const patternGenericCache = new Cache<string, GenericPattern>();
 	const cellPositionsCache = new Cache<string, CellPosition[]>();
 	const rowSegmentsCache = new Cache<string, FieldSegment[]>();
 

@@ -15,6 +15,7 @@ import { anchorsBeforeChannel, usesAnchoredGlobals } from './global-anchors';
 
 export abstract class BaseFormatter implements PatternFormatter {
 	decimalRowNumbers?: boolean;
+	virtualChannelMap?: Record<number, number>;
 	protected _debugFormat = false;
 
 	formatRow(
@@ -35,10 +36,11 @@ export abstract class BaseFormatter implements PatternFormatter {
 					' ';
 			}
 
+			const virtualChannelMap = options?.virtualChannelMap ?? this.virtualChannelMap;
 			for (let channelIndex = 0; channelIndex < channels.length; channelIndex++) {
 				const channel = channels[channelIndex];
 				if (anchored) {
-					for (const anchor of anchorsBeforeChannel(schema, channelIndex)) {
+					for (const anchor of anchorsBeforeChannel(schema, channelIndex, virtualChannelMap)) {
 						const value = patternRow[anchor.field];
 						result +=
 							this.formatField(isPrimitive(value) ? value : null, anchor.definition) +

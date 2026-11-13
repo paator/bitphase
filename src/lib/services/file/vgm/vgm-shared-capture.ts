@@ -29,6 +29,7 @@ const DEFAULT_SPEED = 6;
 const MAX_TICKS = 1_000_000;
 const CAPTURE_OUTPUT_SAMPLE_RATE = 44100;
 const NES_HW_CHANNEL_COUNT = 5;
+const SAA_HW_CHANNEL_COUNT = 6;
 
 type CaptureSlot = {
 	songIndex: number;
@@ -47,6 +48,13 @@ export type SaaVgmModules = {
 	) => any;
 	SaaAudioDriver: new () => any;
 	SaaRegisterState: new (channelCount?: number) => any;
+	SaaVirtualChannelMixer: new () => any;
+	resolveSaaHardwareState: (
+		driver: any,
+		mixer: any,
+		virtualState: any,
+		playbackState: any
+	) => any;
 	saaPeriodFromCode: (code: number) => number;
 };
 
@@ -234,14 +242,21 @@ async function loadSaaModules(): Promise<SaaVgmModules> {
 	const { default: TrackerPatternProcessor } = await import(
 		`${baseUrl}tracker/tracker-pattern-processor.js`
 	);
-	const { default: SaaAudioDriver } = await import(`${baseUrl}saa/saa-audio-driver.js`);
+	const { default: SaaAudioDriver, resolveSaaHardwareState } = await import(
+		`${baseUrl}saa/saa-audio-driver.js`
+	);
 	const { default: SaaRegisterState } = await import(`${baseUrl}saa/saa-register-state.js`);
+	const { default: SaaVirtualChannelMixer } = await import(
+		`${baseUrl}saa/saa-virtual-channel-mixer.js`
+	);
 	const { saaPeriodFromCode } = await import(`${baseUrl}saa/saa-levels.js`);
 	return {
 		SaaState,
 		TrackerPatternProcessor,
 		SaaAudioDriver,
 		SaaRegisterState,
+		SaaVirtualChannelMixer,
+		resolveSaaHardwareState,
 		saaPeriodFromCode
 	};
 }
@@ -568,8 +583,21 @@ function createSaaCaptureSlot(
 		timeline.intFrequency = interruptFrequency;
 	}
 
+	const virtualChannelMap: Record<number, number> = song.virtualChannelMap ?? {};
+	const hasVirtual = Object.values(virtualChannelMap).some((count) => count > 1);
+	const totalChannelCount = hasVirtual
+		? getTotalVirtualChannelCount(SAA_HW_CHANNEL_COUNT, virtualChannelMap)
+		: SAA_HW_CHANNEL_COUNT;
+	if (hasVirtual && typeof state.resizeChannels === 'function') {
+		state.resizeChannels(totalChannelCount);
+	}
 	const audioDriver = new modules.SaaAudioDriver();
-	const registerState = new modules.SaaRegisterState();
+	const registerState = new modules.SaaRegisterState(totalChannelCount);
+	const mixer = new modules.SaaVirtualChannelMixer();
+	if (hasVirtual) {
+		mixer.configure(virtualChannelMap, SAA_HW_CHANNEL_COUNT, song.virtualChannelRoles ?? {});
+		audioDriver.setVirtualChannelMode((index: number) => mixer.getHardwareChannelIndex(index));
+	}
 	const patternProcessor = new modules.TrackerPatternProcessor(state, audioDriver, {
 		postMessage: () => {}
 	});
@@ -606,7 +634,11 @@ function createSaaCaptureSlot(
 				patternProcessor.processSpeedTable();
 			}
 			patternProcessor.processTrackerTick(registerState);
-			framesOut.push(saaRegistersFromState(registerState));
+			framesOut.push(
+				saaRegistersFromState(
+					modules.resolveSaaHardwareState(audioDriver, mixer, registerState, state)
+				)
+			);
 		},
 		onPatternOrderAdvanced(needsChange) {
 			if (!needsChange) return;
