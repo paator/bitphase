@@ -7,29 +7,40 @@ const CHANNEL_EFFECT_COMMAND: Record<string, string> = {
 	S: 'B'
 };
 
-const ENVELOPE_EFFECT_COMMAND: Record<string, string> = {
-	'1': '9',
-	'2': 'A'
-};
+export function pt3RecorderSchema(schema: ChipSchema): ChipSchema {
+	if (!schema.globalFields?.envelopeEffect) return schema;
+	const globalFields = { ...schema.globalFields };
+	delete globalFields.envelopeEffect;
+	const globalColumnLabels = schema.globalColumnLabels
+		? { ...schema.globalColumnLabels }
+		: undefined;
+	if (globalColumnLabels) delete globalColumnLabels.envelopeEffect;
+	const globalTemplate = (schema.globalTemplate ?? '')
+		.replace(/\{envelopeEffect\}/g, '')
+		.replace(/[ \t]{2,}/g, ' ')
+		.trim();
+	return { ...schema, globalFields, globalColumnLabels, globalTemplate };
+}
 
 export function displayPt3Effects(
 	row: string,
 	schema: ChipSchema,
-	effectColumnCounts: number[]
+	effectColumnCounts: number[],
+	channelCommands?: readonly (string | undefined)[]
 ): string {
 	if (!row) return row;
 	const chars = Array.from(row);
 	let changed = false;
 	PatternTemplateParser.walkRow(row, schema, effectColumnCounts, {
-		onGlobalField(key, _field, pos) {
-			if (key !== 'envelopeEffect') return;
-			const next = ENVELOPE_EFFECT_COMMAND[chars[pos] ?? ''];
-			if (!next) return;
-			chars[pos] = next;
-			changed = true;
-		},
-		onChannelField(_index, key, _field, pos) {
+		onChannelField(index, key, field, pos) {
 			if (!isChannelEffectFieldKey(key)) return;
+			const command = key === 'effect' ? channelCommands?.[index] : undefined;
+			if (command) {
+				const text = command.padEnd(field.length, '.').slice(0, field.length);
+				for (let i = 0; i < field.length; i++) chars[pos + i] = text[i] ?? '.';
+				changed = true;
+				return;
+			}
 			const next = CHANNEL_EFFECT_COMMAND[chars[pos] ?? ''];
 			if (!next) return;
 			chars[pos] = next;

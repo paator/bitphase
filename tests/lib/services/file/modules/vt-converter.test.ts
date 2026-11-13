@@ -2,6 +2,34 @@ import { describe, it, expect } from 'vitest';
 import { convertVT2String } from '@/lib/services/file/modules/vt-converter';
 
 describe('VT2Converter', () => {
+	it('keeps envelope slides on the channel that played them', () => {
+		const vt2 = `[Module]
+Title=Envelope
+Author=Test
+Speed=3
+PlayOrder=0
+NoteTable=0
+ChipFreq=1773400
+IntFreq=50
+
+[Pattern0]
+0000 00 | C-4 1000 9210 | --- .... A010 | --- ....
+`;
+		const project = convertVT2String(vt2);
+		const pattern = project.songs[0].patterns[0];
+		const row = pattern.channels.map((channel) => channel.rows[0]);
+
+		expect(row[0]?.pt3EffectCommand).toBe('9210');
+		expect(row[1]?.pt3EffectCommand).toBe('A010');
+		expect(row[0]?.effects[0]).toBeNull();
+		expect(row[1]?.effects[0]).toBeNull();
+		expect(pattern.patternRows[0].envelopeEffect).toMatchObject({
+			effect: 2,
+			delay: 0,
+			parameter: 0x10
+		});
+	});
+
 	it('translates VT2 sample rows into mixer macros', () => {
 		const vt2 = `[Module]
 Title=Sample Macros

@@ -936,10 +936,11 @@ class VT2Converter {
 				row.table = tableValue;
 				row.envelopeShape = vt2ChannelData.envelopeShape ?? 0;
 
-				const { channelEffect, envelopeEffect } = this.parseEffects(
+				const { channelEffect, envelopeEffect, channelCommand } = this.parseEffects(
 					vt2ChannelData.effects || ''
 				);
 				row.effects = channelEffect;
+				if (channelCommand) row.pt3EffectCommand = channelCommand;
 
 				if (envelopeEffect && rowIndex < pattern.patternRows.length) {
 					pattern.patternRows[rowIndex].envelopeEffect = envelopeEffect;
@@ -987,17 +988,18 @@ class VT2Converter {
 	private parseEffects(effectsStr: string): {
 		channelEffect: (Effect | null)[];
 		envelopeEffect: Effect | null;
+		channelCommand: string | null;
 	} {
 		const trimmed = effectsStr.trim();
 
 		if (!trimmed || trimmed.length < 1 || trimmed.length > 4) {
-			return { channelEffect: [null], envelopeEffect: null };
+			return { channelEffect: [null], envelopeEffect: null, channelCommand: null };
 		}
 
 		const effectTypeChar = trimmed[0];
 
 		if (effectTypeChar === '.') {
-			return { channelEffect: [null], envelopeEffect: null };
+			return { channelEffect: [null], envelopeEffect: null, channelCommand: null };
 		}
 
 		let delay = 0;
@@ -1015,21 +1017,21 @@ class VT2Converter {
 			parameter = (param1 << 4) | param2;
 		}
 
-		if (effectTypeChar === '9') {
+		if (effectTypeChar === '9' || effectTypeChar === 'A') {
+			const slide = effectTypeChar === '9' ? EffectType.SlideUp : EffectType.SlideDown;
 			return {
 				channelEffect: [null],
-				envelopeEffect: new Effect(EffectType.SlideUp, delay, parameter)
-			};
-		} else if (effectTypeChar === 'A') {
-			return {
-				channelEffect: [null],
-				envelopeEffect: new Effect(EffectType.SlideDown, delay, parameter)
+				envelopeEffect: new Effect(slide, delay, parameter),
+				channelCommand:
+					effectTypeChar +
+					(delay & 0xf).toString(16).toUpperCase() +
+					(parameter & 0xff).toString(16).toUpperCase().padStart(2, '0')
 			};
 		}
 
 		const effectType = this.effectTypeMap[effectTypeChar];
 		if (!effectType) {
-			return { channelEffect: [null], envelopeEffect: null };
+			return { channelEffect: [null], envelopeEffect: null, channelCommand: null };
 		}
 
 		const effectiveDelay =
@@ -1042,7 +1044,8 @@ class VT2Converter {
 
 		return {
 			channelEffect: [new Effect(effectType, effectiveDelay, parameter)],
-			envelopeEffect: null
+			envelopeEffect: null,
+			channelCommand: null
 		};
 	}
 

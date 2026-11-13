@@ -22,7 +22,7 @@ import type { EmptyNoteAlignment } from '../../ui-rendering/empty-note-alignment
 import { getColors } from '../../utils/colors';
 import { Cache } from '../../utils/memoize';
 import type { RowMotion } from './playback-position';
-import { displayPt3Effects } from './pt3-effect-display';
+import { displayPt3Effects, pt3RecorderSchema } from './pt3-effect-display';
 import {
 	choosePatternFontSize,
 	patternContentWidth,
@@ -103,7 +103,7 @@ class PatternRollFrame {
 		if (!chip) {
 			throw new Error(`No chip available for ${song.chipType}`);
 		}
-		this.schema = chip.schema;
+		this.schema = pt3RecorderSchema(chip.schema);
 		this.converter = chip.createConverter();
 		this.formatter = chip.createFormatter();
 		let family = this.fontFamily;
@@ -339,7 +339,11 @@ class PatternRollFrame {
 			patternGenericCache: this.patternCache,
 			rowStringCache: this.rowCache
 		});
-		return displayPt3Effects(row, this.schema, counts);
+		const commands = pattern.channels.map((channel) => {
+			const command = channel.rows[rowIndex]?.pt3EffectCommand;
+			return typeof command === 'string' ? command : undefined;
+		});
+		return displayPt3Effects(row, this.schema, counts, commands);
 	}
 
 	private measuredTextEnd(row: string): number {

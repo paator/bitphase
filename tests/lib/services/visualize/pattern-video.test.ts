@@ -6,7 +6,7 @@ import { Effect, EffectType } from '@/lib/models/song';
 import type { GenericRow } from '@/lib/models/song/generic';
 import { rowMotionAtSample, rowSpansFromChanges } from '@/lib/services/visualize/playback-position';
 import { choosePatternFontSize, patternContentWidth } from '@/lib/services/visualize/pattern-layout';
-import { displayPt3Effects } from '@/lib/services/visualize/pt3-effect-display';
+import { displayPt3Effects, pt3RecorderSchema } from '@/lib/services/visualize/pt3-effect-display';
 import {
 	selectYoutubeAudioBitrate,
 	selectYoutubeVideoProfile
@@ -49,28 +49,29 @@ describe('pattern video layout', () => {
 describe('pt3 effect display', () => {
 	it('uses the PT3 command for portamento, speed, and envelope slides', () => {
 		const formatter = new AYFormatter();
+		const schema = pt3RecorderSchema(AY_CHIP_SCHEMA);
 		const portamento: GenericRow = { note: 'C-4', instrument: 1, volume: 15 };
-		const slide: GenericRow = { note: 'D-4', instrument: 1, volume: 15 };
+		const envelope: GenericRow = { note: 'D-4', instrument: 1, volume: 15 };
 		const speed: GenericRow = { note: 'E-4', instrument: 1, volume: 15 };
 		assignEffectsToGenericRow(portamento, [new Effect(EffectType.Portamento, 1, 0x23)], 1);
-		assignEffectsToGenericRow(slide, [new Effect(EffectType.SlideDown, 1, 0x05)], 1);
+		assignEffectsToGenericRow(envelope, [null], 1);
 		assignEffectsToGenericRow(speed, [new Effect(EffectType.Speed, 0, 0x06)], 1);
 		const row = formatter.formatRow(
-			{ envelopeEffect: new Effect(EffectType.SlideUp, 2, 0x10) },
-			[portamento, slide, speed],
+			{ envelopeValue: 0x10, noiseValue: 1 },
+			[portamento, envelope, speed],
 			0,
-			AY_CHIP_SCHEMA
+			schema
 		);
-		const shown = displayPt3Effects(row, AY_CHIP_SCHEMA, [1, 1, 1]);
+		const shown = displayPt3Effects(row, schema, [1, 1, 1], [undefined, '9210']);
 
+		expect(schema.globalTemplate).toBe('{envelopeValue} {noiseValue}');
 		expect(row).toContain('P123');
+		expect(row).not.toContain('9210');
 		expect(shown).toContain('3123');
+		expect(shown).toContain('9210');
 		expect(shown).not.toContain('P');
-		expect(shown).toContain('2105');
 		expect(row).toContain('S.06');
 		expect(shown).toContain('B.06');
-		expect(row).toContain('1210');
-		expect(shown).toContain('9210');
 	});
 });
 
