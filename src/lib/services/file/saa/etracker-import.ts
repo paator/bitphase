@@ -1,6 +1,6 @@
 import { syncSharedEffectColumnLayout } from '../../../chips/base/channel-effect-columns';
 import { applySchemaDefaults } from '../../../chips/base/schema';
-import { SAA_CHIP_SCHEMA, SAA_SAM_CLOCK } from '../../../chips/saa/schema';
+import { resolveSaaTuningTable, SAA_CHIP_SCHEMA, SAA_SAM_CLOCK } from '../../../chips/saa/schema';
 import { Project, Table } from '../../../models/project';
 import { Effect, EffectType, Instrument, Note, NoteName, Pattern, Song } from '../../../models/song';
 import { numberToInstrumentId } from '../../../utils/instrument-id';
@@ -10,8 +10,6 @@ const SIGNATURE = 'ETracker (C) BY ESI.';
 const EDITOR_SIZE = 78626;
 const MAX_ROWS = 64;
 const CHANNELS = 6;
-const ETRACKER_A4_HZ = 415;
-const ETRACKER_NOTE_PERIODS = [0x05, 0x21, 0x3c, 0x55, 0x6d, 0x84, 0x99, 0xad, 0xc0, 0xd2, 0xe3, 0xf3];
 
 function ornamentSemitone(value: number): number {
 	let offset = value & 255;
@@ -19,15 +17,6 @@ function ornamentSemitone(value: number): number {
 	if (offset >= 48) offset -= 96;
 	else if (offset < -48) offset += 96;
 	return offset;
-}
-
-function etrackerTuningTable(): number[] {
-	const table: number[] = [];
-	for (let note = 0; note < 96; note++) {
-		const octave = Math.floor(note / 12);
-		table.push((octave << 8) | ETRACKER_NOTE_PERIODS[note % 12]);
-	}
-	return table;
 }
 
 type Step = {
@@ -428,7 +417,7 @@ function parseCompiledOrder(data: Uint8Array, offset: number): { entries: OrderE
 			continue;
 		}
 		if (value >= 0x60) {
-			transpose = value - 0x60;
+			transpose = value - 0x61;
 			continue;
 		}
 		if (value % 3 !== 0) {
@@ -732,8 +721,8 @@ function buildProject(
 	applySchemaDefaults(song, SAA_CHIP_SCHEMA);
 	song.chipFrequency = SAA_SAM_CLOCK;
 	song.interruptFrequency = 50;
-	song.a4TuningHz = ETRACKER_A4_HZ;
-	song.tuningTable = etrackerTuningTable();
+	song.a4TuningHz = 440;
+	song.tuningTable = resolveSaaTuningTable(SAA_SAM_CLOCK, song.a4TuningHz);
 	song.patterns = [...built.values()];
 	syncSharedEffectColumnLayout(song.patterns);
 	song.defaultPatternLength = song.patterns[0]?.length ?? MAX_ROWS;

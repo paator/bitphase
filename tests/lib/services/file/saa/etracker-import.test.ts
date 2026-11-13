@@ -41,9 +41,11 @@ describe('E-Tracker import', () => {
 		expect(project.name).toBe('demo.cop');
 		expect(project.initialSpeed).toBe(6);
 		expect(project.songs[0]?.chipType).toBe('saa');
-		expect(project.songs[0]?.a4TuningHz).toBe(415);
-		expect(project.songs[0]?.tuningTable[0]).toBe(0x05);
-		expect(project.songs[0]?.tuningTable[45]).toBe(0x03d2);
+		expect(project.songs[0]?.a4TuningHz).toBe(440);
+		expect(project.songs[0]?.tuningTable[0]).toBe(0x21);
+		expect(project.songs[0]?.tuningTable[11]).toBe(0x0105);
+		expect(project.songs[0]?.tuningTable[45]).toBe(0x03e3);
+		expect(project.songs[0]?.tuningTable[95]).toBe(0x07ff);
 		const instrument = project.instruments[0];
 		expect(instrument?.macros?.tone?.values).toEqual([true, false]);
 		expect(instrument?.macros?.toneAdd?.values).toEqual([-16, 0]);
@@ -64,6 +66,23 @@ describe('E-Tracker import', () => {
 			[EffectType.Speed, 0, 6]
 		]);
 		expect(instrument?.macros?.envelope).toBeUndefined();
+	});
+
+	it('keeps written notes when the order transpose byte is 0x61', () => {
+		const bytes = new Uint8Array(compiledModule());
+		const orderAt = bytes.length;
+		const patternsAt = orderAt + 3;
+		const extended = new Uint8Array(patternsAt + 12);
+		extended.set(bytes);
+		extended.set([0x61, 0x00, 0xff], orderAt);
+		extended.set(bytes.subarray(51, 63), patternsAt);
+		const view = new DataView(extended.buffer);
+		view.setUint16(0, orderAt, true);
+		view.setUint16(2, patternsAt, true);
+		const { project } = importEtrackerBuffer(extended.buffer, 'neutral.cop');
+		const row = project.songs[0]?.patterns[0]?.channels[0]?.rows[0];
+		expect(row?.note?.name).toBe(NoteName.C);
+		expect(row?.note?.octave).toBe(1);
 	});
 
 	it('turns wrapped ornament steps into downward semitone offsets', () => {
