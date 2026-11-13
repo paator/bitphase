@@ -5,6 +5,7 @@ export interface WavExportSettings {
 	bitDepth: 16 | 24 | 32;
 	loops: number;
 	channelMode: WavChannelMode;
+	stereo: boolean;
 	title?: string;
 	artist?: string;
 	album?: string;
@@ -17,6 +18,7 @@ export const defaultWavExportSettings: WavExportSettings = {
 	bitDepth: 16,
 	loops: 1,
 	channelMode: 'mixed',
+	stereo: true,
 	title: '',
 	artist: '',
 	album: '',
@@ -38,6 +40,6 @@ export const bitDepthOptions = [
 ];
 
 export const channelModeOptions = [
-	{ label: 'Mixed (one stereo file)', value: 'mixed' as WavChannelMode },
+	{ label: 'Mixed (one file)', value: 'mixed' as WavChannelMode },
 	{ label: 'Separate (one WAV per channel)', value: 'separateFiles' as WavChannelMode }
 ];

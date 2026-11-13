@@ -49,6 +49,8 @@ export type SaaExportEngine = {
 		left: number;
 		right: number;
 		exportChannels: ArrayLike<number>;
+		exportLeft: ArrayLike<number>;
+		exportRight: ArrayLike<number>;
 	};
 	dispose: () => void;
 };
@@ -260,6 +262,7 @@ export class SAAChipRenderer implements ChipRenderer {
 			startOrderIndex,
 			sharedTimeline: null,
 			separateChannels,
+			stereo: options?.stereo === true,
 			resourceCache: new Map()
 		};
 	}

@@ -44,3 +44,15 @@ export function getPanSettingsForLayout(layout) {
 		{ channel: 2, pan: panC, isEqp: 1 }
 	];
 }
+
+export function channelPanGains(pan, isEqp) {
+	if (isEqp) {
+		return { left: Math.sqrt(1 - pan), right: Math.sqrt(pan) };
+	}
+	return { left: 1 - pan, right: pan };
+}
+
+export function panGainsForSong(song) {
+	const layout = song?.stMixing ? 'mono' : song?.stereoLayout || 'ABC';
+	return getPanSettingsForLayout(layout).map(({ pan, isEqp }) => channelPanGains(pan, isEqp));
+}

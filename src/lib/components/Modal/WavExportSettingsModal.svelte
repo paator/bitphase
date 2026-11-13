@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Button from '../Button/Button.svelte';
+	import Checkbox from '../Checkbox/Checkbox.svelte';
 	import FormField from '../FormField/FormField.svelte';
 	import Select from '../AppLayout/Select.svelte';
 	import { NativeSelect } from '../NativeSelect';
@@ -15,11 +16,7 @@
 	} from '../../services/file/wav/wav-export-settings';
 	import type { Project } from '../../models/project';
 
-	let {
-		project,
-		resolve,
-		dismiss
-	} = $props<{
+	let { project, resolve, dismiss } = $props<{
 		project: Project;
 		resolve?: (value?: WavExportSettings) => void;
 		dismiss?: (error?: any) => void;
@@ -62,12 +59,19 @@
 		<FormField
 			id="channel-mode"
 			label="Channels"
-			description="Mixed: one stereo WAV. Separate: one WAV file per chip channel (e.g. AY A/B/C). Supports multiple chips (1xAY, 2xAY, etc.).">
+			description="Mixed writes one WAV. Separate writes one WAV per chip channel (for example AY A/B/C). Multiple chips are included.">
 			<NativeSelect
 				id="channel-mode"
 				bind:value={settings.channelMode}
 				class="w-full"
-				options={channelModeOptions.map((opt) => ({ label: opt.label, value: opt.value }))} />
+				options={channelModeOptions.map((opt) => ({
+					label: opt.label,
+					value: opt.value
+				}))} />
+		</FormField>
+
+		<FormField id="wav-stereo" label="Stereo">
+			<Checkbox id="wav-stereo" bind:checked={settings.stereo} />
 		</FormField>
 
 		<div class="mb-4 border-t border-[var(--color-app-border)] pt-4">
@@ -118,7 +122,8 @@
 					bind:value={settings.comment}
 					placeholder="Additional comments"
 					rows="3"
-					class="w-full resize-none rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-2 py-1 text-xs text-[var(--color-app-text-secondary)] placeholder-[var(--color-app-text-muted)] focus:border-[var(--color-app-primary)] focus:outline-none"></textarea>
+					class="w-full resize-none rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-2 py-1 text-xs text-[var(--color-app-text-secondary)] placeholder-[var(--color-app-text-muted)] focus:border-[var(--color-app-primary)] focus:outline-none"
+				></textarea>
 			</FormField>
 		</div>
 	{/snippet}

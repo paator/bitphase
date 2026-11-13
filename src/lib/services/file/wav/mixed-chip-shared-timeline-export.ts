@@ -63,6 +63,7 @@ async function createLaneForSlot(
 		startOrderIndex: number;
 		sharedTimeline: unknown | null;
 		separateChannels: boolean;
+		stereo?: boolean;
 		resourceCache: Map<string, unknown>;
 	},
 	resourceLoader: ResourceLoader | undefined,
@@ -133,6 +134,7 @@ export async function renderMixedChipSharedTimelineSlots(
 		startOrderIndex,
 		sharedTimeline: null as unknown | null,
 		separateChannels,
+		stereo: options?.stereo === true,
 		resourceCache: new Map<string, unknown>()
 	};
 

@@ -11,6 +11,7 @@ import {
 	AYUMI_STRUCT_RIGHT_OFFSET
 } from './ayumi-constants';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
+import { appendStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type { AYChipRenderer } from './renderer';
 
 const SAMPLE_RATE = 44100;
@@ -29,6 +30,7 @@ type AyExportLaneContext = {
 	patterns: Pattern[];
 	wasm: any;
 	separateChannels: boolean;
+	panGains: { left: number; right: number }[] | null;
 };
 
 type AyWasmBundle = {
@@ -36,6 +38,10 @@ type AyWasmBundle = {
 	wasmBuffer: ArrayBuffer;
 	modules: Awaited<ReturnType<AYChipRenderer['loadProcessorModules']>>;
 	getPanSettingsForLayout: (layout: string) => { channel: number; pan: number; isEqp: number }[];
+	panGainsForSong: (song: { stMixing?: boolean; stereoLayout?: string }) => {
+		left: number;
+		right: number;
+	}[];
 };
 
 async function loadAyWasmBundle(
@@ -47,7 +53,7 @@ async function loadAyWasmBundle(
 	if (cached) return cached;
 
 	const wasmBundle = await (renderer as any).loadWasmModule(onProgress);
-	const { getPanSettingsForLayout } = await (renderer as any).loader.loadModule(
+	const { getPanSettingsForLayout, panGainsForSong } = await (renderer as any).loader.loadModule(
 		'ay/ayumi-constants.js'
 	);
 	const modules = await (renderer as any).loadProcessorModules(onProgress);
@@ -55,13 +61,17 @@ async function loadAyWasmBundle(
 		wasm: wasmBundle.wasm,
 		wasmBuffer: wasmBundle.wasmBuffer,
 		modules,
-		getPanSettingsForLayout
+		getPanSettingsForLayout,
+		panGainsForSong
 	};
 	session.resourceCache?.set(AYUMI_AUDIO_SLOT_KIND, bundle);
 	return bundle;
 }
 
-function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRenderer): SharedTimelineExportLaneHandle {
+function createAyLaneHandle(
+	context: AyExportLaneContext,
+	renderer: AYChipRenderer
+): SharedTimelineExportLaneHandle {
 	const {
 		songIndex,
 		song,
@@ -74,8 +84,10 @@ function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRender
 		ayumiPtr,
 		patterns,
 		wasm,
-		separateChannels
+		separateChannels,
+		panGains
 	} = context;
+	const stereo = panGains != null;
 
 	return {
 		songIndex,
@@ -88,7 +100,11 @@ function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRender
 			if (!state.currentPattern?.length) return;
 			const tl = state.timeline;
 			if (tl.currentTick === 0) {
-				patternProcessor.parsePatternRow(state.currentPattern, tl.currentRow, registerState);
+				patternProcessor.parsePatternRow(
+					state.currentPattern,
+					tl.currentRow,
+					registerState
+				);
 				patternProcessor.processSpeedTable();
 			}
 			patternProcessor.processTrackerTick(registerState);
@@ -107,7 +123,10 @@ function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRender
 			}
 		},
 		createChannelBuffers() {
-			return Array.from({ length: TONE_CHANNELS }, () => [] as number[]);
+			return Array.from(
+				{ length: stemBufferCount(TONE_CHANNELS, stereo) },
+				() => [] as number[]
+			);
 		},
 		captureSample() {
 			audioDriver.updateSamplePlayback(
@@ -115,7 +134,8 @@ function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRender
 				registerState,
 				ayumiEngine,
 				SAMPLE_RATE,
-				(channelIndex: number) => (renderer as any).resolveSampleAyumiChannel(mixer, channelIndex)
+				(channelIndex: number) =>
+					(renderer as any).resolveSampleAyumiChannel(mixer, channelIndex)
 			);
 			ayumiEngine.process();
 			ayumiEngine.removeDC();
@@ -129,7 +149,15 @@ function createAyLaneHandle(context: AyExportLaneContext, renderer: AYChipRender
 				const channels: number[] = [];
 				for (let ch = 0; ch < TONE_CHANNELS; ch++) {
 					const offset = ayumiPtr + AYUMI_STRUCT_CHANNEL_OUT_OFFSET + ch * 8;
-					channels.push(new Float64Array(wasm.memory.buffer, offset, 1)[0]);
+					const value = new Float64Array(wasm.memory.buffer, offset, 1)[0];
+					const gain = panGains?.[ch] ?? { left: 1, right: 1 };
+					appendStemSample(
+						channels,
+						stereo,
+						value,
+						value * gain.left,
+						value * gain.right
+					);
 				}
 				return { left, right, channels };
 			}
@@ -154,11 +182,8 @@ export async function createAySharedTimelineExportLane(
 		throw new Error('Song is empty');
 	}
 
-	const { wasm, wasmBuffer, modules, getPanSettingsForLayout } = await loadAyWasmBundle(
-		renderer,
-		session,
-		onProgress
-	);
+	const { wasm, wasmBuffer, modules, getPanSettingsForLayout, panGainsForSong } =
+		await loadAyWasmBundle(renderer, session, onProgress);
 	const {
 		AyumiState,
 		TrackerPatternProcessor,
@@ -237,7 +262,9 @@ export async function createAySharedTimelineExportLane(
 			ayumiPtr,
 			patterns,
 			wasm,
-			separateChannels: session.separateChannels
+			separateChannels: session.separateChannels,
+			panGains:
+				session.separateChannels && session.stereo === true ? panGainsForSong(song) : null
 		},
 		renderer
 	);

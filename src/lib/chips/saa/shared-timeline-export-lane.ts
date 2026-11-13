@@ -7,6 +7,7 @@ import type {
 import { SAA_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
 import { SAA_SAM_CLOCK, SAA_CHIP_SCHEMA } from './schema';
+import { appendStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type {
 	SaaExportEngine,
 	SaaExportState,
@@ -49,6 +50,7 @@ type SaaExportLaneContext = {
 	) => unknown;
 	patterns: Pattern[];
 	separateChannels: boolean;
+	stereo: boolean;
 };
 
 async function loadSaaWasmBundle(
@@ -80,7 +82,8 @@ function createSaaLaneHandle(context: SaaExportLaneContext): SharedTimelineExpor
 		mixer,
 		resolveHardwareState,
 		patterns,
-		separateChannels
+		separateChannels,
+		stereo
 	} = context;
 
 	return {
@@ -113,7 +116,10 @@ function createSaaLaneHandle(context: SaaExportLaneContext): SharedTimelineExpor
 			if (pattern) state.currentPattern = pattern;
 		},
 		createChannelBuffers() {
-			return Array.from({ length: EXPORT_CHANNEL_COUNT }, () => [] as number[]);
+			return Array.from(
+				{ length: stemBufferCount(EXPORT_CHANNEL_COUNT, stereo) },
+				() => [] as number[]
+			);
 		},
 		captureSample() {
 			const sample = engine.generate();
@@ -122,7 +128,13 @@ function createSaaLaneHandle(context: SaaExportLaneContext): SharedTimelineExpor
 			}
 			const channels: number[] = [];
 			for (let channel = 0; channel < EXPORT_CHANNEL_COUNT; channel++) {
-				channels.push(sample.exportChannels[channel] ?? 0);
+				appendStemSample(
+					channels,
+					stereo,
+					sample.exportChannels[channel] ?? 0,
+					sample.exportLeft[channel] ?? 0,
+					sample.exportRight[channel] ?? 0
+				);
 			}
 			return { left: sample.left, right: sample.right, channels };
 		},
@@ -183,7 +195,11 @@ export async function createSaaSharedTimelineExportLane(
 		const mixer = new SaaVirtualChannelMixer();
 		if (hasVirtual) {
 			state.resizeChannels(totalChannelCount);
-			mixer.configure(virtualChannelMap, EXPORT_CHANNEL_COUNT, song.virtualChannelRoles ?? {});
+			mixer.configure(
+				virtualChannelMap,
+				EXPORT_CHANNEL_COUNT,
+				song.virtualChannelRoles ?? {}
+			);
 			audioDriver.setVirtualChannelMode((index: number) =>
 				mixer.getHardwareChannelIndex(index)
 			);
@@ -212,7 +228,8 @@ export async function createSaaSharedTimelineExportLane(
 			mixer,
 			resolveHardwareState: resolveSaaHardwareState,
 			patterns,
-			separateChannels: session.separateChannels
+			separateChannels: session.separateChannels,
+			stereo: session.separateChannels && session.stereo === true
 		});
 	} catch (error) {
 		engine.dispose();

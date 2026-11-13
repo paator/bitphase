@@ -28,8 +28,24 @@ type ExportChannelDescriptor = {
 	chipType: string;
 	channelIndex: number;
 	label: string;
-	samples: Float32Array;
+	samples: Float32Array[];
 };
+
+function downmixMono(left: Float32Array, right: Float32Array): Float32Array {
+	const length = Math.max(left.length, right.length);
+	const mono = new Float32Array(length);
+	for (let i = 0; i < length; i++) {
+		mono[i] = ((left[i] ?? 0) + (right[i] ?? 0)) * 0.5;
+	}
+	return mono;
+}
+
+function padSamples(src: Float32Array, length: number): Float32Array {
+	if (src.length >= length) return src;
+	const samples = new Float32Array(length);
+	samples.set(src);
+	return samples;
+}
 
 const RENDERER_SAMPLE_RATE = 44100;
 const RENDERING_PROGRESS_MAX = 90;
@@ -194,6 +210,7 @@ class WavExportService {
 		project: Project,
 		nonempty: number[],
 		separateChannels: boolean,
+		stereo: boolean,
 		loops: number,
 		resourceLoader: ResourceLoader | undefined,
 		getChip: ((chipType: string) => Chip | null) | undefined,
@@ -215,7 +232,7 @@ class WavExportService {
 				project,
 				sharedSlots,
 				resolveChip,
-				{ separateChannels, loopCount: loops },
+				{ separateChannels, stereo, loopCount: loops },
 				resourceLoader,
 				onProgress
 			);
@@ -231,6 +248,7 @@ class WavExportService {
 		onProgress?.(2, 'Rendering songs with shared project playback timeline...');
 		const parts = await renderShared.call(renderer, project, sharedSlots, onProgress, {
 			separateChannels,
+			stereo,
 			loopCount: loops,
 			disableDcFilter: this.disableDcFilter
 		});
@@ -307,6 +325,7 @@ class WavExportService {
 		loops: number,
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels?: boolean,
+		stereo?: boolean,
 		resourceLoader?: ResourceLoader,
 		getChipOverride?: (chipType: string) => Chip | null
 	): Promise<Float32Array[]> {
@@ -350,6 +369,7 @@ class WavExportService {
 			},
 			{
 				separateChannels: separateChannels ?? false,
+				stereo: stereo === true,
 				loopCount: loops,
 				disableDcFilter: this.disableDcFilter
 			}
@@ -359,6 +379,7 @@ class WavExportService {
 	private async buildSeparateChannels(
 		project: Project,
 		renderedBySongIndex: Map<number, Float32Array[]>,
+		stereo: boolean,
 		getChipOverride?: (chipType: string) => Chip | null
 	): Promise<ExportChannelDescriptor[]> {
 		const resolveChip = getChipOverride ?? (await getRegistry()).getChipByType;
@@ -378,20 +399,18 @@ class WavExportService {
 			const channels = renderedBySongIndex.get(songIndex)!;
 			const chipType = song?.chipType ?? 'unknown';
 
-			for (let ch = 0; ch < channels.length; ch++) {
-				const label = labels[ch] ?? `Ch${ch}`;
-				const src = channels[ch];
-				let samples: Float32Array;
-				if (src.length < maxLength) {
-					samples = new Float32Array(maxLength);
-					samples.set(src);
-				} else {
-					samples = src;
+			const stride = stereo ? 2 : 1;
+			for (let ch = 0; ch < channels.length; ch += stride) {
+				const stemIndex = ch / stride;
+				const label = labels[stemIndex] ?? `Ch${stemIndex}`;
+				const samples: Float32Array[] = [];
+				for (let part = 0; part < stride; part++) {
+					samples.push(padSamples(channels[ch + part] ?? new Float32Array(), maxLength));
 				}
 				descriptors.push({
 					songIndex,
 					chipType,
-					channelIndex: ch,
+					channelIndex: stemIndex,
 					label,
 					samples
 				});
@@ -422,6 +441,7 @@ class WavExportService {
 
 		const totalSongs = project.songs.length;
 		const separateFiles = settings.channelMode === 'separateFiles';
+		const stereo = settings.stereo !== false;
 
 		if (separateFiles) {
 			const renderedBySongIndex = new Map<number, Float32Array[]>();
@@ -431,6 +451,7 @@ class WavExportService {
 				project,
 				nonempty,
 				true,
+				stereo,
 				settings.loops,
 				resourceLoader,
 				getChip,
@@ -458,6 +479,7 @@ class WavExportService {
 							settings.loops,
 							onProgress,
 							true,
+							stereo,
 							resourceLoader,
 							getChip
 						);
@@ -482,21 +504,11 @@ class WavExportService {
 			const descriptors = await this.buildSeparateChannels(
 				project,
 				renderedBySongIndex,
+				stereo,
 				getChip
 			);
-			const allSamples = descriptors.map((d) => d.samples);
-			let samplesToEncode = allSamples;
-
 			if (settings.sampleRate !== RENDERER_SAMPLE_RATE) {
 				onProgress?.(RESAMPLING_PROGRESS, `Resampling to ${settings.sampleRate} Hz...`);
-				samplesToEncode = resampleAudio(
-					allSamples,
-					RENDERER_SAMPLE_RATE,
-					settings.sampleRate
-				);
-				if (abortSignal?.aborted) {
-					throw new Error('Export cancelled');
-				}
 			}
 
 			const baseFilename = settings.title || project.name || 'export';
@@ -510,7 +522,11 @@ class WavExportService {
 				}
 				const d = descriptors[i]!;
 				const channelFilename = `${sanitizedBase}_song${d.songIndex + 1}_${d.chipType}_${d.label}.wav`;
-				const wavBuffer = encodeWAV([samplesToEncode[i]!], settings.sampleRate, settings);
+				const samples =
+					settings.sampleRate === RENDERER_SAMPLE_RATE
+						? d.samples
+						: resampleAudio(d.samples, RENDERER_SAMPLE_RATE, settings.sampleRate);
+				const wavBuffer = encodeWAV(samples, settings.sampleRate, settings);
 				zip.file(channelFilename, wavBuffer);
 			}
 
@@ -538,6 +554,7 @@ class WavExportService {
 			project,
 			nonempty,
 			false,
+			stereo,
 			settings.loops,
 			resourceLoader,
 			getChip,
@@ -568,6 +585,7 @@ class WavExportService {
 						settings.loops,
 						onProgress,
 						false,
+						false,
 						resourceLoader,
 						getChip
 					);
@@ -590,7 +608,10 @@ class WavExportService {
 		}
 
 		onProgress?.(RENDERING_PROGRESS_MAX, 'Mixing songs...');
-		let [mixedLeft, mixedRight] = mixAudioChannels(renderedSongs);
+		const [mixedLeft, mixedRight] = mixAudioChannels(renderedSongs);
+		let outputChannels = stereo
+			? [mixedLeft, mixedRight]
+			: [downmixMono(mixedLeft, mixedRight)];
 
 		if (abortSignal?.aborted) {
 			throw new Error('Export cancelled');
@@ -598,8 +619,8 @@ class WavExportService {
 
 		if (settings.sampleRate !== RENDERER_SAMPLE_RATE) {
 			onProgress?.(RESAMPLING_PROGRESS, `Resampling to ${settings.sampleRate} Hz...`);
-			[mixedLeft, mixedRight] = resampleAudio(
-				[mixedLeft, mixedRight],
+			outputChannels = resampleAudio(
+				outputChannels,
 				RENDERER_SAMPLE_RATE,
 				settings.sampleRate
 			);
@@ -610,7 +631,7 @@ class WavExportService {
 		}
 
 		onProgress?.(ENCODING_PROGRESS, 'Encoding WAV file...');
-		const wavBuffer = encodeWAV([mixedLeft, mixedRight], settings.sampleRate, settings);
+		const wavBuffer = encodeWAV(outputChannels, settings.sampleRate, settings);
 		const filename = settings.title || project.name || 'export';
 		const sanitizedFilename = sanitizeFilename(filename);
 

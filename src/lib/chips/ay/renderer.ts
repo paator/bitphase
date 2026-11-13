@@ -10,6 +10,7 @@ import {
 } from '../base/renderer';
 import { AYUMI_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { renderRowProgress, renderSampleLimit } from '../../services/file/wav/render-sample-limit';
+import { pushStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
 import { getTotalVirtualChannelCount } from '../../models/virtual-channels';
@@ -27,7 +28,9 @@ const DEFAULT_SPEED = 6;
 const TONE_CHANNELS = 3;
 
 type PanSetting = { channel: number; pan: number; isEqp: number };
+type PanGain = { left: number; right: number };
 type GetPanSettingsForLayout = (layout: string) => PanSetting[];
+type PanGainsForSong = (song: { stMixing?: boolean; stereoLayout?: string }) => PanGain[];
 
 type AyumiSlotLane = {
 	songIndex: number;
@@ -40,6 +43,7 @@ type AyumiSlotLane = {
 	mixer: any;
 	ayumiPtr: number;
 	patterns: Pattern[];
+	panGains: PanGain[] | null;
 };
 
 export class AYChipRenderer implements ChipRenderer {
@@ -174,7 +178,10 @@ export class AYChipRenderer implements ChipRenderer {
 	}
 
 	private resolveSampleAyumiChannel(
-		mixer: { hasVirtualChannels?: () => boolean; getHardwareChannelIndex?: (i: number) => number },
+		mixer: {
+			hasVirtualChannels?: () => boolean;
+			getHardwareChannelIndex?: (i: number) => number;
+		},
 		channelIndex: number
 	): number {
 		if (mixer?.hasVirtualChannels?.()) {
@@ -260,12 +267,14 @@ export class AYChipRenderer implements ChipRenderer {
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels?: boolean,
-		disableDcFilter?: boolean
+		disableDcFilter?: boolean,
+		panGains: PanGain[] | null = null
 	): Promise<Float32Array[]> {
+		const stereo = panGains != null;
 		const leftSamples: number[] = [];
 		const rightSamples: number[] = [];
 		const channelSamples: number[][] = separateChannels
-			? Array.from({ length: TONE_CHANNELS }, () => [])
+			? Array.from({ length: stemBufferCount(TONE_CHANNELS, stereo) }, () => [])
 			: [];
 		let totalSamples = 0;
 		const maxSamples = renderSampleLimit(
@@ -369,7 +378,15 @@ export class AYChipRenderer implements ChipRenderer {
 				for (let ch = 0; ch < TONE_CHANNELS; ch++) {
 					const offset = ayumiPtr + AYUMI_STRUCT_CHANNEL_OUT_OFFSET + ch * 8;
 					const value = new Float64Array(wasm.memory.buffer, offset, 1)[0];
-					channelSamples[ch].push(value);
+					const gain = panGains?.[ch] ?? { left: 1, right: 1 };
+					pushStemSample(
+						channelSamples,
+						ch,
+						stereo,
+						value,
+						value * gain.left,
+						value * gain.right
+					);
 				}
 			} else {
 				const leftOffset = ayumiPtr + AYUMI_STRUCT_LEFT_OFFSET;
@@ -416,7 +433,12 @@ export class AYChipRenderer implements ChipRenderer {
 		const leftByChip: number[][] = contexts.map(() => []);
 		const rightByChip: number[][] = contexts.map(() => []);
 		const chanByChip: number[][][] | null = separateChannels
-			? contexts.map(() => Array.from({ length: TONE_CHANNELS }, () => [] as number[]))
+			? contexts.map((context) =>
+					Array.from(
+						{ length: stemBufferCount(TONE_CHANNELS, context.panGains != null) },
+						() => [] as number[]
+					)
+				)
 			: null;
 
 		let totalSamples = 0;
@@ -516,7 +538,8 @@ export class AYChipRenderer implements ChipRenderer {
 					ctx.registerState,
 					ctx.ayumiEngine,
 					SAMPLE_RATE,
-					(channelIndex: number) => this.resolveSampleAyumiChannel(ctx.mixer, channelIndex)
+					(channelIndex: number) =>
+						this.resolveSampleAyumiChannel(ctx.mixer, channelIndex)
 				);
 				ctx.ayumiEngine.process();
 				if (!disableDcFilter) {
@@ -527,10 +550,20 @@ export class AYChipRenderer implements ChipRenderer {
 			for (let ci = 0; ci < contexts.length; ci++) {
 				const ptr = contexts[ci]!.ayumiPtr;
 				if (separateChannels && chanByChip) {
+					const panGains = contexts[ci]!.panGains;
+					const stereo = panGains != null;
 					for (let ch = 0; ch < TONE_CHANNELS; ch++) {
 						const offset = ptr + AYUMI_STRUCT_CHANNEL_OUT_OFFSET + ch * 8;
 						const value = new Float64Array(wasm.memory.buffer, offset, 1)[0];
-						chanByChip[ci][ch].push(value);
+						const gain = panGains?.[ch] ?? { left: 1, right: 1 };
+						pushStemSample(
+							chanByChip[ci]!,
+							ch,
+							stereo,
+							value,
+							value * gain.left,
+							value * gain.right
+						);
 					}
 				} else {
 					const leftOffset = ptr + AYUMI_STRUCT_LEFT_OFFSET;
@@ -570,8 +603,9 @@ export class AYChipRenderer implements ChipRenderer {
 				: 0;
 
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
-		const { getPanSettingsForLayout } = await this.loader.loadModule<{
+		const { getPanSettingsForLayout, panGainsForSong } = await this.loader.loadModule<{
 			getPanSettingsForLayout: GetPanSettingsForLayout;
+			panGainsForSong: PanGainsForSong;
 		}>('ay/ayumi-constants.js');
 		const {
 			AyumiState,
@@ -621,7 +655,11 @@ export class AYChipRenderer implements ChipRenderer {
 				const registerState = new AYChipRegisterState(totalChannelCount);
 				const mixer = new VirtualChannelMixer();
 				if (hasVirtual) {
-					mixer.configure(virtualChannelMap, TONE_CHANNELS, song.virtualChannelRoles ?? {});
+					mixer.configure(
+						virtualChannelMap,
+						TONE_CHANNELS,
+						song.virtualChannelRoles ?? {}
+					);
 				}
 				const patternProcessor = new TrackerPatternProcessor(state, audioDriver, {
 					postMessage: () => {}
@@ -656,7 +694,9 @@ export class AYChipRenderer implements ChipRenderer {
 					registerState,
 					mixer,
 					ayumiPtr,
-					patterns
+					patterns,
+					panGains:
+						separateChannels && options?.stereo === true ? panGainsForSong(song) : null
 				});
 			}
 
@@ -724,8 +764,9 @@ export class AYChipRenderer implements ChipRenderer {
 				: 0;
 
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
-		const { getPanSettingsForLayout } = await this.loader.loadModule<{
+		const { getPanSettingsForLayout, panGainsForSong } = await this.loader.loadModule<{
 			getPanSettingsForLayout: GetPanSettingsForLayout;
+			panGainsForSong: PanGainsForSong;
 		}>('ay/ayumi-constants.js');
 		const ayumiPtr = this.initializeAyumi(wasm, song, getPanSettingsForLayout);
 		const {
@@ -797,7 +838,8 @@ export class AYChipRenderer implements ChipRenderer {
 				loopCount,
 				onProgress,
 				separateChannels,
-				options?.disableDcFilter ?? false
+				options?.disableDcFilter ?? false,
+				separateChannels && options?.stereo === true ? panGainsForSong(song) : null
 			);
 
 			wasm.free(ayumiPtr);

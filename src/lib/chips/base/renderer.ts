@@ -2,6 +2,7 @@ import type { Project } from '../../models/project';
 
 export interface RenderOptions {
 	separateChannels?: boolean;
+	stereo?: boolean;
 	startPatternOrderIndex?: number;
 	loopCount?: number;
 	disableDcFilter?: boolean;
@@ -27,6 +28,7 @@ export type SharedTimelineExportBuildSession = {
 	startOrderIndex: number;
 	sharedTimeline: unknown | null;
 	separateChannels: boolean;
+	stereo?: boolean;
 	resourceCache?: Map<string, unknown>;
 };
 

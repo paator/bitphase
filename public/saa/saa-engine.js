@@ -37,13 +37,20 @@ class SaaSoundEngine {
 			this.channelPtrs.push(ptr);
 		}
 		this.pointerTable = this.malloc(SAA_CHANNEL_COUNT * 4);
-		if (!this.pointerTable) throw new Error('SAA wasm did not allocate the channel pointer table');
-		const pointers = new DataView(wasmModule.memory.buffer, this.pointerTable, SAA_CHANNEL_COUNT * 4);
+		if (!this.pointerTable)
+			throw new Error('SAA wasm did not allocate the channel pointer table');
+		const pointers = new DataView(
+			wasmModule.memory.buffer,
+			this.pointerTable,
+			SAA_CHANNEL_COUNT * 4
+		);
 		for (let channel = 0; channel < SAA_CHANNEL_COUNT; channel++) {
 			pointers.setUint32(channel * 4, this.channelPtrs[channel], true);
 		}
 		this.channelSamples = new Float32Array(SAA_CHANNEL_COUNT);
 		this.exportChannels = new Float32Array(SAA_CHANNEL_COUNT);
+		this.exportLeft = new Float32Array(SAA_CHANNEL_COUNT);
+		this.exportRight = new Float32Array(SAA_CHANNEL_COUNT);
 		this.shadow = new Int16Array(32);
 		this.shadow.fill(-1);
 		this.clockRate = 0;
@@ -163,8 +170,10 @@ class SaaSoundEngine {
 	}
 
 	generate() {
-		if (this.envelopeExternal0) this.advanceFixedEnvelope('fixedEnvelopePhase0', SAA_REG_ENVELOPE_0);
-		if (this.envelopeExternal1) this.advanceFixedEnvelope('fixedEnvelopePhase1', SAA_REG_ENVELOPE_1);
+		if (this.envelopeExternal0)
+			this.advanceFixedEnvelope('fixedEnvelopePhase0', SAA_REG_ENVELOPE_0);
+		if (this.envelopeExternal1)
+			this.advanceFixedEnvelope('fixedEnvelopePhase1', SAA_REG_ENVELOPE_1);
 		this.generateManySeparate(this.chipPtr, this.pointerTable, 1);
 		const memory = this.wasmModule.memory.buffer;
 		let left = 0;
@@ -173,16 +182,22 @@ class SaaSoundEngine {
 			const view = new DataView(memory, this.channelPtrs[channel], 4);
 			const channelLeft = view.getInt16(0, true) / 32768;
 			const channelRight = view.getInt16(2, true) / 32768;
-			left += channelLeft * SAA_OUTPUT_GAIN;
-			right += channelRight * SAA_OUTPUT_GAIN;
+			const gainedLeft = channelLeft * SAA_OUTPUT_GAIN;
+			const gainedRight = channelRight * SAA_OUTPUT_GAIN;
+			left += gainedLeft;
+			right += gainedRight;
 			this.channelSamples[channel] = (channelLeft + channelRight) * SAA_SCOPE_SCALE;
-			this.exportChannels[channel] = (channelLeft + channelRight) * SAA_OUTPUT_GAIN;
+			this.exportLeft[channel] = gainedLeft;
+			this.exportRight[channel] = gainedRight;
+			this.exportChannels[channel] = gainedLeft + gainedRight;
 		}
 		return {
 			left,
 			right,
 			channels: this.channelSamples,
-			exportChannels: this.exportChannels
+			exportChannels: this.exportChannels,
+			exportLeft: this.exportLeft,
+			exportRight: this.exportRight
 		};
 	}
 

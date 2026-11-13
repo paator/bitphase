@@ -10,6 +10,7 @@ import {
 } from '../base/renderer';
 import { NES_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { renderRowProgress, renderSampleLimit } from '../../services/file/wav/render-sample-limit';
+import { pushStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
 import { filterInstrumentsForChip } from '../../services/instrument/instrument-filter';
@@ -21,7 +22,14 @@ const DEFAULT_INTERRUPT_FREQUENCY = 50;
 
 type NesSlotLane = {
 	songIndex: number;
-	song: { patterns: Pattern[]; chipType?: string; chipVariant?: string; chipFrequency?: number; interruptFrequency?: number; tuningTable: number[] };
+	song: {
+		patterns: Pattern[];
+		chipType?: string;
+		chipVariant?: string;
+		chipFrequency?: number;
+		interruptFrequency?: number;
+		tuningTable: number[];
+	};
 	state: {
 		currentPattern: Pattern | null;
 		timeline: {
@@ -100,15 +108,17 @@ export class NESChipRenderer implements ChipRenderer {
 			port: { postMessage?: (...args: unknown[]) => void }
 		) => NesSlotLane['patternProcessor'];
 		NesAudioDriver: new () => NesSlotLane['audioDriver'];
-		createNesApuEngine: (
-			wasm: Record<string, unknown>
-		) => { engine: NesSlotLane['apuEngine']; apuPtr: number; dmcPtr: number };
+		createNesApuEngine: (wasm: Record<string, unknown>) => {
+			engine: NesSlotLane['apuEngine'];
+			apuPtr: number;
+			dmcPtr: number;
+		};
 		NesChipRegisterState: new (channelCount?: number) => unknown;
 	}> {
 		onProgress?.(20, 'Loading processor modules...');
-		const { default: NesState } = await this.loader.loadModule<{ default: new (...args: unknown[]) => unknown }>(
-			'nes/nes-state.js'
-		);
+		const { default: NesState } = await this.loader.loadModule<{
+			default: new (...args: unknown[]) => unknown;
+		}>('nes/nes-state.js');
 		onProgress?.(30, 'Loading pattern processor...');
 		const { default: TrackerPatternProcessor } = await this.loader.loadModule<{
 			default: new (...args: unknown[]) => unknown;
@@ -143,7 +153,12 @@ export class NESChipRenderer implements ChipRenderer {
 
 	private setupExportState(
 		state: NesSlotLane['state'] & {
-			setWasmModule: (wasm: unknown, apuPtr: number, dmcPtr: number, wasmBuffer: ArrayBuffer) => void;
+			setWasmModule: (
+				wasm: unknown,
+				apuPtr: number,
+				dmcPtr: number,
+				wasmBuffer: ArrayBuffer
+			) => void;
 			setCpuFrequency: (frequency: number) => void;
 			setChipVariant: (variant: string) => void;
 			setTuningTable: (table: number[]) => void;
@@ -170,7 +185,10 @@ export class NESChipRenderer implements ChipRenderer {
 		state.setInstruments(filterInstrumentsForChip(project.instruments, song.chipType ?? 'nes'));
 		state.setTables(project.tables);
 		if (ownsSharedPlaybackTimeline) {
-			state.setIntFrequency(song.interruptFrequency ?? DEFAULT_INTERRUPT_FREQUENCY, SAMPLE_RATE);
+			state.setIntFrequency(
+				song.interruptFrequency ?? DEFAULT_INTERRUPT_FREQUENCY,
+				SAMPLE_RATE
+			);
 			state.setPatternOrder(project.patternOrder || [0], project.loopPointId || 0);
 			state.setSpeed(project.initialSpeed || DEFAULT_SPEED);
 			state.setTempo(project.tempo ?? 0);
@@ -233,12 +251,13 @@ export class NESChipRenderer implements ChipRenderer {
 		patterns: Pattern[],
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
-		separateChannels = false
+		separateChannels = false,
+		stereo = false
 	): Promise<Float32Array[]> {
 		const leftSamples: number[] = [];
 		const rightSamples: number[] = [];
 		const channelSamples: number[][] | null = separateChannels
-			? Array.from({ length: 5 }, () => [])
+			? Array.from({ length: stemBufferCount(5, stereo) }, () => [])
 			: null;
 		let totalSamples = 0;
 		const maxSamples = renderSampleLimit(
@@ -291,8 +310,7 @@ export class NESChipRenderer implements ChipRenderer {
 				lane.audioDriver.syncSweepTableRegisterState(lane.state, lane.registerState);
 				lane.apuEngine.applyRegisterState(lane.registerState);
 
-				const isLastPattern =
-					tl.currentPatternOrderIndex >= tl.patternOrder.length - 1;
+				const isLastPattern = tl.currentPatternOrderIndex >= tl.patternOrder.length - 1;
 				const isLastRow =
 					lane.state.currentPattern != null &&
 					tl.currentRow >= lane.state.currentPattern.length - 1;
@@ -323,8 +341,9 @@ export class NESChipRenderer implements ChipRenderer {
 			const { left, right } = lane.apuEngine.process(SAMPLE_RATE);
 			if (channelSamples) {
 				const samples = lane.apuEngine.getExportChannelSamples();
-				for (let ch = 0; ch < channelSamples.length; ch++) {
-					channelSamples[ch]!.push(samples[ch] ?? 0);
+				for (let ch = 0; ch < 5; ch++) {
+					const sample = samples[ch] ?? 0;
+					pushStemSample(channelSamples, ch, stereo, sample, sample, sample);
 				}
 			} else {
 				leftSamples.push(left);
@@ -345,12 +364,13 @@ export class NESChipRenderer implements ChipRenderer {
 		totalRows: number,
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
-		separateChannels = false
+		separateChannels = false,
+		stereo = false
 	): Promise<Float32Array[][]> {
 		const leftByChip: number[][] = contexts.map(() => []);
 		const rightByChip: number[][] = contexts.map(() => []);
 		const channelsByChip: number[][][] | null = separateChannels
-			? contexts.map(() => Array.from({ length: 5 }, () => []))
+			? contexts.map(() => Array.from({ length: stemBufferCount(5, stereo) }, () => []))
 			: null;
 		let totalSamples = 0;
 		const maxSamples = renderSampleLimit(
@@ -437,7 +457,8 @@ export class NESChipRenderer implements ChipRenderer {
 				if (channelsByChip) {
 					const samples = contexts[ci]!.apuEngine.getExportChannelSamples();
 					for (let ch = 0; ch < 5; ch++) {
-						channelsByChip[ci]![ch]!.push(samples[ch] ?? 0);
+						const sample = samples[ch] ?? 0;
+						pushStemSample(channelsByChip[ci]!, ch, stereo, sample, sample, sample);
 					}
 				} else {
 					leftByChip[ci]!.push(left);
@@ -448,7 +469,9 @@ export class NESChipRenderer implements ChipRenderer {
 		}
 
 		if (channelsByChip) {
-			return channelsByChip.map((channels) => channels.map((samples) => new Float32Array(samples)));
+			return channelsByChip.map((channels) =>
+				channels.map((samples) => new Float32Array(samples))
+			);
 		}
 		return contexts.map((_, ci) => [
 			new Float32Array(leftByChip[ci]),
@@ -466,6 +489,7 @@ export class NESChipRenderer implements ChipRenderer {
 		const songIndices = slots.map((s) => s.songIndex);
 		const loopCount = Math.max(1, options?.loopCount ?? 1);
 		const separateChannels = options?.separateChannels ?? false;
+		const stereo = separateChannels && options?.stereo === true;
 		const patternOrder = project.patternOrder || [0];
 		const requestedStartOrderIndex = options?.startPatternOrderIndex ?? 0;
 		const startOrderIndex =
@@ -474,8 +498,13 @@ export class NESChipRenderer implements ChipRenderer {
 				: 0;
 
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
-		const { NesState, TrackerPatternProcessor, NesAudioDriver, createNesApuEngine, NesChipRegisterState } =
-			await this.loadProcessorModules(onProgress);
+		const {
+			NesState,
+			TrackerPatternProcessor,
+			NesAudioDriver,
+			createNesApuEngine,
+			NesChipRegisterState
+		} = await this.loadProcessorModules(onProgress);
 
 		const contexts: NesSlotLane[] = [];
 		const ptrPairs: Array<{ apuPtr: number; dmcPtr: number }> = [];
@@ -571,7 +600,8 @@ export class NESChipRenderer implements ChipRenderer {
 				totalRows,
 				loopCount,
 				onProgress,
-				separateChannels
+				separateChannels,
+				stereo
 			);
 
 			for (const ctx of contexts) {
@@ -613,6 +643,7 @@ export class NESChipRenderer implements ChipRenderer {
 
 		const loopCount = Math.max(1, options?.loopCount ?? 1);
 		const separateChannels = options?.separateChannels ?? false;
+		const stereo = separateChannels && options?.stereo === true;
 		const patternOrder = project.patternOrder || [0];
 		const requestedStartOrderIndex = options?.startPatternOrderIndex ?? 0;
 		const startOrderIndex =
@@ -621,8 +652,13 @@ export class NESChipRenderer implements ChipRenderer {
 				: 0;
 
 		const { wasm, wasmBuffer } = await this.loadWasmModule(onProgress);
-		const { NesState, TrackerPatternProcessor, NesAudioDriver, createNesApuEngine, NesChipRegisterState } =
-			await this.loadProcessorModules(onProgress);
+		const {
+			NesState,
+			TrackerPatternProcessor,
+			NesAudioDriver,
+			createNesApuEngine,
+			NesChipRegisterState
+		} = await this.loadProcessorModules(onProgress);
 
 		const { engine, apuPtr, dmcPtr } = createNesApuEngine(wasm);
 
@@ -672,13 +708,19 @@ export class NESChipRenderer implements ChipRenderer {
 			state.timeline.tickAccumulator = 1.0;
 
 			onProgress?.(50, 'Initializing renderer...');
-			const firstPassRows = this.calculateTotalRows(song as NesSlotLane['song'], patternOrder);
+			const firstPassRows = this.calculateTotalRows(
+				song as NesSlotLane['song'],
+				patternOrder
+			);
 			const validLoopPointId =
 				project.loopPointId >= 0 && project.loopPointId < patternOrder.length
 					? project.loopPointId
 					: 0;
 			const loopOrderSegment = patternOrder.slice(validLoopPointId);
-			const loopSegmentRows = this.calculateTotalRows(song as NesSlotLane['song'], loopOrderSegment);
+			const loopSegmentRows = this.calculateTotalRows(
+				song as NesSlotLane['song'],
+				loopOrderSegment
+			);
 			const totalRows =
 				loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
 
@@ -702,7 +744,8 @@ export class NESChipRenderer implements ChipRenderer {
 				patterns,
 				loopCount,
 				onProgress,
-				separateChannels
+				separateChannels,
+				stereo
 			);
 
 			engine.dispose();

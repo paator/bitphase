@@ -6,6 +6,7 @@ import type {
 } from '../base/renderer';
 import { NES_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { NES_NTSC_CPU_FREQUENCY } from './schema';
+import { appendStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type { NESChipRenderer } from './renderer';
 
 const SAMPLE_RATE = 44100;
@@ -23,6 +24,7 @@ type NesExportLaneContext = {
 	apuPtr: number;
 	dmcPtr: number;
 	separateChannels: boolean;
+	stereo: boolean;
 };
 
 type NesWasmBundle = {
@@ -65,7 +67,8 @@ function createNesLaneHandle(
 		wasm,
 		apuPtr,
 		dmcPtr,
-		separateChannels
+		separateChannels,
+		stereo
 	} = context;
 
 	return {
@@ -79,7 +82,11 @@ function createNesLaneHandle(
 			if (!state.currentPattern?.length) return;
 			const tl = state.timeline;
 			if (tl.currentTick === 0) {
-				patternProcessor.parsePatternRow(state.currentPattern, tl.currentRow, registerState);
+				patternProcessor.parsePatternRow(
+					state.currentPattern,
+					tl.currentRow,
+					registerState
+				);
 				patternProcessor.processSpeedTable();
 			}
 			patternProcessor.processTrackerTick(registerState);
@@ -97,7 +104,7 @@ function createNesLaneHandle(
 			}
 		},
 		createChannelBuffers() {
-			return Array.from({ length: 5 }, () => [] as number[]);
+			return Array.from({ length: stemBufferCount(5, stereo) }, () => [] as number[]);
 		},
 		captureSample() {
 			const { left, right } = apuEngine.process(SAMPLE_RATE);
@@ -105,11 +112,12 @@ function createNesLaneHandle(
 				return { left, right };
 			}
 			const samples = apuEngine.getExportChannelSamples();
-			return {
-				left,
-				right,
-				channels: [samples[0]!, samples[1]!, samples[2]!, samples[3]!, samples[4]!]
-			};
+			const channels: number[] = [];
+			for (let channel = 0; channel < 5; channel++) {
+				const sample = samples[channel] ?? 0;
+				appendStemSample(channels, stereo, sample, sample, sample);
+			}
+			return { left, right, channels };
 		},
 		release() {
 			apuEngine.dispose();
@@ -131,8 +139,13 @@ export async function createNesSharedTimelineExportLane(
 	}
 
 	const { wasm, wasmBuffer, modules } = await loadNesWasmBundle(renderer, session, onProgress);
-	const { NesState, TrackerPatternProcessor, NesAudioDriver, createNesApuEngine, NesChipRegisterState } =
-		modules;
+	const {
+		NesState,
+		TrackerPatternProcessor,
+		NesAudioDriver,
+		createNesApuEngine,
+		NesChipRegisterState
+	} = modules;
 
 	const { engine, apuPtr, dmcPtr } = createNesApuEngine(wasm);
 	const ownsTimeline = session.sharedTimeline == null;
@@ -188,7 +201,8 @@ export async function createNesSharedTimelineExportLane(
 			wasm,
 			apuPtr,
 			dmcPtr,
-			separateChannels: session.separateChannels
+			separateChannels: session.separateChannels,
+			stereo: session.separateChannels && session.stereo === true
 		},
 		renderer
 	);

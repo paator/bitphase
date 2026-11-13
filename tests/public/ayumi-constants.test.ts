@@ -7,7 +7,9 @@ import {
 	DEFAULT_SPEED,
 	DEFAULT_CHANNEL_VOLUMES,
 	DEFAULT_AYM_FREQUENCY,
-	getPanSettingsForLayout
+	getPanSettingsForLayout,
+	channelPanGains,
+	panGainsForSong
 } from '../../public/ay/ayumi-constants.js';
 
 async function instantiateAyumiWasm() {
@@ -154,6 +156,24 @@ describe('ayumi-constants', () => {
 			expect(result[0].pan).toBe(0.5);
 			expect(result[1].pan).toBe(0.5);
 			expect(result[2].pan).toBe(0.5);
+		});
+
+		it('equal-power pan matches the ayumi mix gains', () => {
+			const pan = 0.2;
+			expect(channelPanGains(pan, 1)).toEqual({
+				left: Math.sqrt(1 - pan),
+				right: Math.sqrt(pan)
+			});
+			expect(channelPanGains(pan, 0)).toEqual({ left: 1 - pan, right: pan });
+		});
+
+		it('places ABC channels left, center, and right, and centers a mono layout', () => {
+			const abc = panGainsForSong({ stereoLayout: 'ABC' });
+			expect(abc[0]!.left).toBeGreaterThan(abc[0]!.right);
+			expect(abc[1]!.left).toBeCloseTo(abc[1]!.right);
+			expect(abc[2]!.right).toBeGreaterThan(abc[2]!.left);
+			const centered = panGainsForSong({ stMixing: true, stereoLayout: 'ABC' });
+			expect(centered[0]!.left).toBeCloseTo(centered[0]!.right);
 		});
 
 		it('unknown layout defaults to ABC', () => {

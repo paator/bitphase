@@ -39,11 +39,14 @@ function createSaaSong(): Song {
 	return song;
 }
 
-function createSaaProject(songs: Song[] = [createSaaSong()]): Project {
+function createSaaProject(
+	songs: Song[] = [createSaaSong()],
+	levels: { left: number; right: number } = { left: 15, right: 15 }
+): Project {
 	const instrument = new Instrument('01', 'Square', 'saa');
 	instrument.macros = {
-		left: { values: [15], loop: 0 },
-		right: { values: [15], loop: 0 },
+		left: { values: [levels.left], loop: 0 },
+		right: { values: [levels.right], loop: 0 },
 		tone: { values: [true], loop: 0 }
 	};
 	return new Project('SAA export test', '', songs, 0, [0], [], {}, [instrument], SPEED);
@@ -73,6 +76,24 @@ describe('SAA wav export', () => {
 		expect(twice[0]!.length).toBeGreaterThan(once[0]!.length);
 		expect(twice[0]!.length).toBeLessThan(once[0]!.length * 3);
 		expect(peakOf(twice[0]!)).toBeGreaterThan(0.05);
+	});
+
+	it('renders each SAA channel in stereo when stereo export is on', async () => {
+		const renderer = new SAAChipRenderer(new FileSystemResourceLoader(PUBLIC_DIR));
+		const channels = await renderer.render(
+			createSaaProject([createSaaSong()], { left: 15, right: 0 }),
+			0,
+			undefined,
+			{ separateChannels: true, stereo: true }
+		);
+
+		expect(channels).toHaveLength(SAA_CHIP_SCHEMA.channelLabels.length * 2);
+		expect(channels[0]!.length).toBe(expectedPassLength());
+		expect(peakOf(channels[0]!)).toBeGreaterThan(0.05);
+		expect(peakOf(channels[1]!)).toBe(0);
+		for (let channel = 2; channel < channels.length; channel++) {
+			expect(peakOf(channels[channel]!)).toBe(0);
+		}
 	});
 
 	it('renders one stem per SAA channel', async () => {
