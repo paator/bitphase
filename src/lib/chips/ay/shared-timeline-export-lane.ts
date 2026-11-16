@@ -264,7 +264,9 @@ export async function createAySharedTimelineExportLane(
 			wasm,
 			separateChannels: session.separateChannels,
 			panGains:
-				session.separateChannels && session.stereo === true ? panGainsForSong(song) : null
+				session.separateChannels && session.stereo === true
+					? panGainsForSong(song as { stMixing?: boolean; stereoLayout?: string })
+					: null
 		},
 		renderer
 	);

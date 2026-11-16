@@ -696,7 +696,9 @@ export class AYChipRenderer implements ChipRenderer {
 					ayumiPtr,
 					patterns,
 					panGains:
-						separateChannels && options?.stereo === true ? panGainsForSong(song) : null
+						separateChannels && options?.stereo === true
+							? panGainsForSong(song as { stMixing?: boolean; stereoLayout?: string })
+							: null
 				});
 			}
 
@@ -839,7 +841,9 @@ export class AYChipRenderer implements ChipRenderer {
 				onProgress,
 				separateChannels,
 				options?.disableDcFilter ?? false,
-				separateChannels && options?.stereo === true ? panGainsForSong(song) : null
+				separateChannels && options?.stereo === true
+					? panGainsForSong(song as { stMixing?: boolean; stereoLayout?: string })
+					: null
 			);
 
 			wasm.free(ayumiPtr);

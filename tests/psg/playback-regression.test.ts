@@ -17,9 +17,10 @@ import {
 	advanceSamplePosition
 } from '../../public/ay/ay-sample-playback.js';
 import {
-	TIMER_EFFECTS_DEMO,
+	TIMER_EFFECTS_DEMOS,
 	aySongIndices,
 	demoStem,
+	isTimerEffectsDemo,
 	psgReferenceFilenames
 } from './demo-dump-cases';
 
@@ -92,13 +93,15 @@ const demoTracks = listDemoTracks();
 describe('demo track reference dumps', () => {
 	it('covers every demo track', () => {
 		expect(demoTracks.length).toBeGreaterThan(0);
-		expect(demoTracks).toContain(TIMER_EFFECTS_DEMO);
+		for (const demo of TIMER_EFFECTS_DEMOS) {
+			expect(demoTracks).toContain(demo);
+		}
 	});
 
 	for (const btpFilename of demoTracks) {
 		const stem = demoStem(btpFilename);
 
-		if (btpFilename === TIMER_EFFECTS_DEMO) {
+		if (isTimerEffectsDemo(btpFilename)) {
 			it(`${stem}: dynamically generated TAYM matches reference dump`, async () => {
 				const project = await loadDemoProject(btpFilename);
 				await assertTAYMMatchesReference(project, `${stem}.taym`);
