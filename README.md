@@ -198,7 +198,7 @@ bitphase/
 
 ## AI assistance disclaimer
 
-I (Pator) use AI tools as a coding assistant on Bitphase. I design the features, review the changes, and understand the code that ships. This project is not vibe-coded.
+Bitphase is NOT vibe coded. I (Pator) use AI tools as a coding assistant. I design the features, review the changes, and understand all the code that ships. Hand crafted code is still there.
 
 ## License
 
