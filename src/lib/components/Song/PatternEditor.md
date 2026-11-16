@@ -216,7 +216,7 @@ Performance optimization through memoization:
 
 ## Wheel Input
 
-**handleWheel(event)** - Scrolls pattern vertically by moving selected row
+**handleWheel(event)** - Scrolls pattern vertically by the configured mouse-wheel row count
 
 ## Selection Utilities
 

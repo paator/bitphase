@@ -6,6 +6,7 @@ import type {
 	PatternEditorLanding
 } from './pattern-navigation';
 import { PatternNavigationService } from './pattern-navigation';
+import { patternEditorPageDelta } from './pattern-editor-steps';
 import { ProgressiveSelectionService } from './progressive-selection-service';
 import { ShortcutString } from '../../utils/shortcut-string';
 import { keybindingsStore } from '../../stores/keybindings.svelte';
@@ -278,12 +279,12 @@ function dispatchCommandAction(
 			return true;
 		case ACTION_PAGE_UP:
 			if (!ctx.isPlaying) {
-				moveRowOrLeaveEditor(ctx, -16, !!event?.shiftKey);
+				moveRowOrLeaveEditor(ctx, patternEditorPageDelta(-1), !!event?.shiftKey);
 			}
 			return true;
 		case ACTION_PAGE_DOWN:
 			if (!ctx.isPlaying) {
-				moveRowOrLeaveEditor(ctx, 16, !!event?.shiftKey);
+				moveRowOrLeaveEditor(ctx, patternEditorPageDelta(1), !!event?.shiftKey);
 			}
 			return true;
 		case ACTION_HOME:

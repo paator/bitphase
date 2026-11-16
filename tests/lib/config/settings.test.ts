@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { appearanceSettings, settingsItems } from '../../../src/lib/config/settings';
+import {
+	appearanceSettings,
+	PATTERN_EDITOR_PAGE_STEP_DEFAULT,
+	PATTERN_EDITOR_SCROLL_ROWS_DEFAULT,
+	settingsItems
+} from '../../../src/lib/config/settings';
 
 describe('settings', () => {
 	it('shares hex numerals between instrument and table editors', () => {
@@ -21,6 +26,27 @@ describe('settings', () => {
 				type: 'toggle',
 				defaultValue: false,
 				category: 'appearance'
+			})
+		);
+	});
+
+	it('exposes pattern editor page and wheel steps', () => {
+		expect(settingsItems.find((setting) => setting.setting === 'patternEditorPageStep')).toEqual(
+			expect.objectContaining({
+				type: 'number',
+				defaultValue: PATTERN_EDITOR_PAGE_STEP_DEFAULT,
+				category: 'general',
+				min: 1,
+				max: 256
+			})
+		);
+		expect(settingsItems.find((setting) => setting.setting === 'patternEditorScrollRows')).toEqual(
+			expect.objectContaining({
+				type: 'number',
+				defaultValue: PATTERN_EDITOR_SCROLL_ROWS_DEFAULT,
+				category: 'general',
+				min: 1,
+				max: 64
 			})
 		);
 	});

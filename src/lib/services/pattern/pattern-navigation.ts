@@ -40,38 +40,54 @@ export class PatternNavigationService {
 		context: NavigationContext,
 		delta: number
 	): NavigationState {
-		const { currentPattern, patternOrder, patterns } = context;
-		const newRow = state.selectedRow + delta;
+		if (delta === 0) return state;
 
-		if (newRow >= 0 && newRow < currentPattern.length) {
-			return {
-				...state,
-				selectedRow: newRow
-			};
-		}
+		let orderIndex = state.currentPatternOrderIndex;
+		let row = state.selectedRow;
+		let remaining = delta;
 
-		if (delta < 0 && state.currentPatternOrderIndex > 0) {
-			const newOrderIndex = state.currentPatternOrderIndex - 1;
-			const prevPatternId = patternOrder[newOrderIndex];
-			const prevPattern = patterns.find((p) => p.id === prevPatternId);
-			if (prevPattern) {
-				return {
-					...state,
-					currentPatternOrderIndex: newOrderIndex,
-					selectedRow: prevPattern.length - 1
-				};
+		while (remaining !== 0) {
+			const pattern = PatternNavigationService.patternAtOrder(context, orderIndex);
+			if (!pattern || pattern.length <= 0) return state;
+			if (row < 0) row = 0;
+			if (row >= pattern.length) row = pattern.length - 1;
+
+			if (remaining > 0) {
+				const room = pattern.length - 1 - row;
+				if (remaining <= room) {
+					row += remaining;
+					break;
+				}
+				const next = PatternNavigationService.patternAtOrder(context, orderIndex + 1);
+				if (!next || next.length <= 0) {
+					row = pattern.length - 1;
+					break;
+				}
+				remaining -= room + 1;
+				orderIndex += 1;
+				row = 0;
+				continue;
 			}
+
+			if (-remaining <= row) {
+				row += remaining;
+				break;
+			}
+			const previous = PatternNavigationService.patternAtOrder(context, orderIndex - 1);
+			if (!previous || previous.length <= 0) {
+				row = 0;
+				break;
+			}
+			remaining += row + 1;
+			orderIndex -= 1;
+			row = previous.length - 1;
 		}
 
-		if (delta > 0 && state.currentPatternOrderIndex < patternOrder.length - 1) {
-			return {
-				...state,
-				currentPatternOrderIndex: state.currentPatternOrderIndex + 1,
-				selectedRow: 0
-			};
-		}
-
-		return state;
+		return {
+			...state,
+			currentPatternOrderIndex: orderIndex,
+			selectedRow: row
+		};
 	}
 
 	static moveColumn(state: NavigationState, context: NavigationContext): NavigationState {
@@ -177,6 +193,15 @@ export class PatternNavigationService {
 		context: NavigationContext
 	): ChannelMoveResult {
 		return PatternNavigationService.moveToAdjacentChannel(state, context, -1);
+	}
+
+	private static patternAtOrder(
+		context: NavigationContext,
+		orderIndex: number
+	): Pattern | undefined {
+		if (orderIndex < 0 || orderIndex >= context.patternOrder.length) return undefined;
+		const patternId = context.patternOrder[orderIndex];
+		return context.patterns.find((pattern) => pattern.id === patternId);
 	}
 
 	private static cellCount(state: NavigationState, context: NavigationContext): number {

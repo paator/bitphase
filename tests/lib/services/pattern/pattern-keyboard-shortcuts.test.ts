@@ -3,6 +3,7 @@ import { PatternKeyboardShortcutsService } from '../../../../src/lib/services/pa
 import type { PatternKeyboardShortcutsContext } from '../../../../src/lib/services/pattern/pattern-keyboard-shortcuts';
 import { Pattern } from '../../../../src/lib/models/song';
 import { keybindingsStore } from '../../../../src/lib/stores/keybindings.svelte';
+import { settingsStore } from '../../../../src/lib/stores/settings.svelte';
 
 function createContext(
 	overrides: Partial<PatternKeyboardShortcutsContext> = {}
@@ -138,6 +139,21 @@ describe('PatternKeyboardShortcutsService selection navigation', () => {
 
 		expect(ctx.onInsertPatternRow).not.toHaveBeenCalled();
 		expect(ctx.onRemovePatternRow).not.toHaveBeenCalled();
+	});
+
+	it('moves by the configured page step', () => {
+		const previous = settingsStore.patternEditorPageStep;
+		settingsStore.patternEditorPageStep = 4;
+		try {
+			const ctx = createContext();
+			PatternKeyboardShortcutsService.handleKeyDown(keyEvent('PageDown'), ctx);
+			PatternKeyboardShortcutsService.handleKeyDown(keyEvent('PageUp'), ctx);
+
+			expect(ctx.onMoveRow).toHaveBeenNthCalledWith(1, 4);
+			expect(ctx.onMoveRow).toHaveBeenNthCalledWith(2, -4);
+		} finally {
+			settingsStore.patternEditorPageStep = previous;
+		}
 	});
 
 	it('moves within the pattern when page down still has rows left', () => {

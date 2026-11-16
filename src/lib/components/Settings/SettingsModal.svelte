@@ -33,6 +33,8 @@
 		autoEnterInstrument: settingsStore.autoEnterInstrument,
 		midiInputDeviceId: settingsStore.midiInputDeviceId,
 		patternEditorFontSize: settingsStore.patternEditorFontSize,
+		patternEditorPageStep: settingsStore.patternEditorPageStep,
+		patternEditorScrollRows: settingsStore.patternEditorScrollRows,
 		patternEditorFontFamily: settingsStore.patternEditorFontFamily,
 		uiFontFamily: settingsStore.uiFontFamily,
 		channelSeparatorWidth: settingsStore.channelSeparatorWidth,

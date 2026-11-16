@@ -4,6 +4,8 @@ export interface Settings {
 	autoEnterInstrument: boolean;
 	midiInputDeviceId: string;
 	patternEditorFontSize: number;
+	patternEditorPageStep: number;
+	patternEditorScrollRows: number;
 	patternEditorFontFamily: string;
 	uiFontFamily: string;
 	channelSeparatorWidth: number;

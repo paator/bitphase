@@ -1,5 +1,14 @@
 import type { Settings } from '../components/Settings/types';
-import { settingsItems } from '../config/settings';
+import {
+	clampIntegerSetting,
+	PATTERN_EDITOR_PAGE_STEP_DEFAULT,
+	PATTERN_EDITOR_PAGE_STEP_MAX,
+	PATTERN_EDITOR_PAGE_STEP_MIN,
+	PATTERN_EDITOR_SCROLL_ROWS_DEFAULT,
+	PATTERN_EDITOR_SCROLL_ROWS_MAX,
+	PATTERN_EDITOR_SCROLL_ROWS_MIN,
+	settingsItems
+} from '../config/settings';
 
 const STORAGE_KEY = 'settings';
 
@@ -9,6 +18,8 @@ class SettingsStore {
 	autoEnterInstrument = $state(true);
 	midiInputDeviceId = $state('');
 	patternEditorFontSize = $state(14);
+	patternEditorPageStep = $state(PATTERN_EDITOR_PAGE_STEP_DEFAULT);
+	patternEditorScrollRows = $state(PATTERN_EDITOR_SCROLL_ROWS_DEFAULT);
 	patternEditorFontFamily = $state('JetBrains Mono');
 	uiFontFamily = $state('Fira Code');
 	channelSeparatorWidth = $state(1);
@@ -35,15 +46,37 @@ class SettingsStore {
 			: defaults;
 
 		for (const item of settingsItems) {
-			(this as Record<string, unknown>)[item.setting] =
-				merged[item.setting as keyof typeof merged];
+			(this as Record<string, unknown>)[item.setting] = this.normalize(
+				item.setting,
+				merged[item.setting as keyof typeof merged]
+			);
 		}
 		this.save();
 	}
 
 	set<K extends keyof Settings>(key: K, value: Settings[K]): void {
-		(this as Record<string, unknown>)[key] = value;
+		(this as Record<string, unknown>)[key] = this.normalize(key, value);
 		this.save();
+	}
+
+	private normalize(key: keyof Settings, value: unknown): unknown {
+		if (key === 'patternEditorPageStep') {
+			return clampIntegerSetting(
+				value,
+				PATTERN_EDITOR_PAGE_STEP_MIN,
+				PATTERN_EDITOR_PAGE_STEP_MAX,
+				PATTERN_EDITOR_PAGE_STEP_DEFAULT
+			);
+		}
+		if (key === 'patternEditorScrollRows') {
+			return clampIntegerSetting(
+				value,
+				PATTERN_EDITOR_SCROLL_ROWS_MIN,
+				PATTERN_EDITOR_SCROLL_ROWS_MAX,
+				PATTERN_EDITOR_SCROLL_ROWS_DEFAULT
+			);
+		}
+		return value;
 	}
 
 	private save(): void {

@@ -77,6 +77,7 @@
 		PatternKeyboardShortcutsService,
 		type PatternKeyboardShortcutsContext
 	} from '../../services/pattern/pattern-keyboard-shortcuts';
+	import { patternEditorScrollDelta } from '../../services/pattern/pattern-editor-steps';
 	import { autoEnvStore } from '../../stores/auto-env.svelte';
 	import { AutoEnvService } from '../../services/pattern/auto-env-service';
 	import { EnvelopeModeService } from '../../services/pattern/envelope-mode-service';
@@ -2096,7 +2097,8 @@
 		}
 
 		event.preventDefault();
-		moveRow(Math.sign(event.deltaY));
+		const delta = patternEditorScrollDelta(event.deltaY);
+		if (delta !== 0) moveRow(delta);
 	}
 
 	function startAutoScroll(direction: number): void {

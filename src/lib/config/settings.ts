@@ -1,5 +1,24 @@
 import type { SettingsItem } from '../components/Settings/types';
 
+export const PATTERN_EDITOR_PAGE_STEP_MIN = 1;
+export const PATTERN_EDITOR_PAGE_STEP_MAX = 256;
+export const PATTERN_EDITOR_PAGE_STEP_DEFAULT = 16;
+
+export const PATTERN_EDITOR_SCROLL_ROWS_MIN = 1;
+export const PATTERN_EDITOR_SCROLL_ROWS_MAX = 64;
+export const PATTERN_EDITOR_SCROLL_ROWS_DEFAULT = 1;
+
+export function clampIntegerSetting(
+	value: unknown,
+	min: number,
+	max: number,
+	fallback: number
+): number {
+	const parsed = typeof value === 'number' ? value : Number(value);
+	if (!Number.isFinite(parsed)) return fallback;
+	return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
 const MONOSPACE_FONTS = [
 	{ value: 'monospace', label: 'System Default' },
 	{ value: 'Fira Code', label: 'Fira Code' },
@@ -49,6 +68,28 @@ export const settingsItems: SettingsItem[] = [
 		defaultValue: true,
 		setting: 'autoEnterInstrument',
 		category: 'general'
+	},
+	{
+		label: 'Page Up/Down rows',
+		description: 'How many rows Page Up and Page Down move in the pattern editor',
+		type: 'number',
+		defaultValue: PATTERN_EDITOR_PAGE_STEP_DEFAULT,
+		setting: 'patternEditorPageStep',
+		category: 'general',
+		min: PATTERN_EDITOR_PAGE_STEP_MIN,
+		max: PATTERN_EDITOR_PAGE_STEP_MAX,
+		step: 1
+	},
+	{
+		label: 'Mouse wheel rows',
+		description: 'How many rows each mouse-wheel notch moves in the pattern editor',
+		type: 'number',
+		defaultValue: PATTERN_EDITOR_SCROLL_ROWS_DEFAULT,
+		setting: 'patternEditorScrollRows',
+		category: 'general',
+		min: PATTERN_EDITOR_SCROLL_ROWS_MIN,
+		max: PATTERN_EDITOR_SCROLL_ROWS_MAX,
+		step: 1
 	},
 	{
 		label: 'MIDI device',
