@@ -23,7 +23,7 @@ import {
 	VGM_CMD_WAIT_882,
 	VGM_DUAL_CHIP_CLOCK_BIT,
 	VGM_HEADER_SIZE,
-	VGM_VERSION_1_61
+	VGM_VERSION_1_71
 } from '@/lib/services/file/vgm/vgm-encoder';
 import { convertNesRegisterStateToApuRegs } from '@/lib/services/file/nes/nes-register-export';
 
@@ -48,7 +48,7 @@ describe('vgm-encoder', () => {
 		const view = new DataView(buffer);
 		const bytes = new Uint8Array(buffer);
 		expect(String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3])).toBe('Vgm ');
-		expect(view.getUint32(0x08, true)).toBe(VGM_VERSION_1_61);
+		expect(view.getUint32(0x08, true)).toBe(VGM_VERSION_1_71);
 		expect(view.getUint32(0x74, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(1773400);
 		expect(view.getUint32(0x74, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
 		expect(bytes[0x78]).toBe(VGM_AY_TYPE_YM2149);
@@ -74,6 +74,7 @@ describe('vgm-encoder', () => {
 			commands: Uint8Array.from(commands)
 		});
 		const view = new DataView(buffer);
+		expect(view.getUint32(0x08, true)).toBe(VGM_VERSION_1_71);
 		expect(view.getUint32(0xc8, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(8_000_000);
 		expect(view.getUint32(0xc8, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
 	});
@@ -394,6 +395,7 @@ describe('appendNesDpcmTrigger', () => {
 		};
 		const bytes = new Uint8Array(encodeCapturedVgm(new Project('Mix'), captured, [0, 1]));
 		const view = new DataView(bytes.buffer);
+		expect(view.getUint32(0x08, true)).toBe(VGM_VERSION_1_71);
 		expect(view.getUint32(0x74, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(1_773_400);
 		expect(view.getUint32(0x74, true) & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
 		expect(view.getUint32(0x84, true) & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(1_789_773);

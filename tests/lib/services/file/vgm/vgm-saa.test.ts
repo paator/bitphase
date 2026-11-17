@@ -19,7 +19,11 @@ import SaaRegisterState from '../../../../../public/saa/saa-register-state.js';
 import SaaState from '../../../../../public/saa/saa-state.js';
 import { saaPeriodFromCode } from '../../../../../public/saa/saa-levels.js';
 import TrackerPatternProcessor from '../../../../../public/tracker/tracker-pattern-processor.js';
-import { VGM_CMD_SAA1099, VGM_HEADER_SIZE } from '@/lib/services/file/vgm/vgm-encoder';
+import {
+	VGM_CMD_SAA1099,
+	VGM_HEADER_SIZE,
+	VGM_VERSION_1_71
+} from '@/lib/services/file/vgm/vgm-encoder';
 
 const ROWS = 4;
 const SPEED = 1;
@@ -138,6 +142,7 @@ describe('saa vgm capture', () => {
 		const buffer = encodeCapturedVgm(project, captured, []);
 		const bytes = new Uint8Array(buffer);
 		const view = new DataView(buffer);
+		expect(view.getUint32(0x08, true)).toBe(VGM_VERSION_1_71);
 		expect(view.getUint32(0xc8, true)).toBe(SAA_SAM_CLOCK);
 		expect(view.getUint32(0x18, true)).toBe(ROWS * 882);
 		expect(bytes[VGM_HEADER_SIZE]).toBe(VGM_CMD_SAA1099);

@@ -1,4 +1,4 @@
-export const VGM_VERSION_1_61 = 0x00000161;
+export const VGM_VERSION_1_71 = 0x00000171;
 export const VGM_HEADER_SIZE = 0x100;
 export const VGM_DUAL_CHIP_CLOCK_BIT = 0x40000000;
 export const VGM_CMD_AY8910 = 0xa0;
@@ -272,7 +272,7 @@ export function encodeVgm(options: EncodeVgmOptions): ArrayBuffer {
 	bytes[3] = 0x20;
 
 	writeU32LE(view, 0x04, eofAbsolute - 0x04);
-	writeU32LE(view, 0x08, VGM_VERSION_1_61);
+	writeU32LE(view, 0x08, VGM_VERSION_1_71);
 
 	if (gd3) {
 		writeU32LE(view, 0x14, gd3OffsetAbsolute - 0x14);
