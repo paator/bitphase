@@ -2,7 +2,6 @@ import { computeEnvFmEnvelopePeriod, computeFmTonePeriod } from '../../../chips/
 import {
 	ENVELOPE_SHAPE_REGISTER,
 	sidVolumeLevel,
-	timerPwmStepPeriod,
 	TONE_CHANNELS,
 	volumeRegisterIndex,
 	writeEnvelopePeriodToPsgData,
@@ -220,13 +219,12 @@ function writesAtEnvFmStep(envFm: HardwareEnvFmState, stepIndex: number) {
 
 function stepPeriodForSlot(slot: TimerSlotRuntime): number {
 	if (slot.kind === 'sid' && slot.sid) {
-		return Math.max(
-			1,
-			timerPwmStepPeriod(
-				slot.sid.waveform[slot.position] ?? 0,
-				slot.sid.period,
-				slot.sid.periodLow
-			)
+		return dutyIndexStepPeriod(
+			slot.position,
+			slot.sid.pwm,
+			slot.sid.period,
+			slot.sid.periodLow,
+			slot.sid.waveform.length
 		);
 	}
 	if (slot.kind === 'syncbuzzer' && slot.syncbuzzer) {
@@ -273,6 +271,43 @@ function writesAtCurrentStep(slot: TimerSlotRuntime): { register: number; value:
 		return writesAtEnvFmStep(slot.envFm, slot.position);
 	}
 	return [];
+}
+
+function usesDutyIndexPwm(slot: TimerSlotRuntime): boolean {
+	if (slot.kind === 'sid' && slot.sid) {
+		return (
+			isPwmActive(slot.sid.pwm, slot.sid.period, slot.sid.periodLow) &&
+			slot.sid.waveform.length >= 2
+		);
+	}
+	if (slot.kind === 'syncbuzzer' && slot.syncbuzzer) {
+		return (
+			isPwmActive(slot.syncbuzzer.pwm, slot.syncbuzzer.period, slot.syncbuzzer.periodLow) &&
+			slot.syncbuzzer.waveform.length >= 2
+		);
+	}
+	if (slot.kind === 'fm' && slot.fm) {
+		return (
+			isPwmActive(slot.fm.pwm, slot.fm.period, slot.fm.periodLow) && slot.fm.waveform.length >= 2
+		);
+	}
+	if (slot.kind === 'envFm' && slot.envFm) {
+		return (
+			isPwmActive(slot.envFm.pwm, slot.envFm.period, slot.envFm.periodLow) &&
+			slot.envFm.waveform.length >= 2
+		);
+	}
+	return false;
+}
+
+function advanceWaveformPosition(slot: TimerSlotRuntime): void {
+	const meta = waveformMeta(slot);
+	if (usesDutyIndexPwm(slot)) {
+		const position = slot.position < 0 || slot.position > 1 ? 0 : slot.position;
+		slot.position = (position + 1) % 2;
+		return;
+	}
+	slot.position = resolveNextWaveformIndex(slot.position, meta.length, meta.loop);
 }
 
 function waveformMeta(slot: TimerSlotRuntime): { length: number; loop: number } {
@@ -475,7 +510,7 @@ function advanceSlot(
 	let remaining = slot.samplesUntilStep;
 	while (cursor + remaining < frameEnd) {
 		cursor += remaining;
-		slot.position = resolveNextWaveformIndex(slot.position, meta.length, meta.loop);
+		advanceWaveformPosition(slot);
 		pushWrites(out, cursor, writesAtCurrentStep(slot));
 		remaining = takeIntegerStepSamples(slot, stepPeriodForSlot(slot), chipFrequency);
 	}

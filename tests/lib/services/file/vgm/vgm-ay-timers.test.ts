@@ -135,6 +135,61 @@ describe('vgm-ay-timers', () => {
 		expect(mid[0]?.sample).toBe(Math.round(stepSamples));
 	});
 
+	it('times SID PWM by duty index when neither waveform step is zero', () => {
+		const runtime = createAyTimerRuntime();
+		const frame = emptyFrame({
+			sid: [
+				{
+					enabled: true,
+					pwm: true,
+					period: 200,
+					periodLow: 600,
+					baseVolume: 10,
+					waveform: [2, 15],
+					waveformLoop: 0
+				},
+				{
+					enabled: false,
+					pwm: false,
+					period: 0,
+					periodLow: 0,
+					baseVolume: 0,
+					waveform: [],
+					waveformLoop: 0
+				},
+				{
+					enabled: false,
+					pwm: false,
+					period: 0,
+					periodLow: 0,
+					baseVolume: 0,
+					waveform: [],
+					waveformLoop: 0
+				}
+			]
+		});
+
+		const high = samplesForTimerPeriod(200, CHIP_HZ);
+		const low = samplesForTimerPeriod(600, CHIP_HZ);
+		const writes = expandAyFrameTimerWrites(
+			frame,
+			runtime,
+			CHIP_HZ,
+			0,
+			Math.ceil(high + low + high)
+		);
+		const volumes = writes.filter((write) => write.register === 8);
+
+		expect(volumes[0]?.sample).toBe(0);
+		const firstGap = (volumes[1]?.sample ?? 0) - (volumes[0]?.sample ?? 0);
+		const secondGap = (volumes[2]?.sample ?? 0) - (volumes[1]?.sample ?? 0);
+		expect(firstGap).toBe(Math.round(high));
+		expect(secondGap).toBeGreaterThan(firstGap * 2);
+		expect(Math.abs(secondGap - low)).toBeLessThan(1.5);
+		expect(volumes[1]?.value).not.toBe(volumes[0]?.value);
+		expect(volumes[2]?.value).toBe(volumes[0]?.value);
+	});
+
 	it('keeps SID phase across frames', () => {
 		const runtime = createAyTimerRuntime();
 		const sid = {
