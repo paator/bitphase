@@ -2,26 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Project } from '../../../../../src/lib/models/project';
 import {
 	exportToNSF,
-	resolveNsfLoopFrame,
 	resolveNsfSongs,
 	scaleAyRegistersForNsf,
 	sunsoft5bClock
 } from '../../../../../src/lib/services/file/nes/nsf-export';
-
-describe('resolveNsfLoopFrame', () => {
-	it('stops instead of looping when the song ended', () => {
-		expect(resolveNsfLoopFrame([0, 1, 0], 0, 2, true)).toBeNull();
-	});
-
-	it('uses the first frame of the loop point', () => {
-		expect(resolveNsfLoopFrame([0, 0, 1, 1], 1, 2, false)).toBe(2);
-	});
-
-	it('loops from the start when the loop point is not in the song', () => {
-		expect(resolveNsfLoopFrame([0, 1], 5, 2, false)).toBe(0);
-		expect(resolveNsfLoopFrame([0, 1], 1, 2, false)).toBe(1);
-	});
-});
 
 describe('resolveNsfSongs', () => {
 	it('accepts one NES, one AY, or one of each', () => {

@@ -206,4 +206,34 @@ describe('buildTaymTimerTables', () => {
 		const lane = taym.lanes[taym.actions[0].operand];
 		expect(taym.vu08.slice(lane.valueOffset, lane.valueOffset + lane.length)).toEqual([2]);
 	});
+
+	it('restates every timer at the loop frame: START while it plays, STOP while idle', () => {
+		const frames = [
+			syncBuzzerFrame(1, 869, 803),
+			syncBuzzerFrame(1, 869, 803),
+			syncBuzzerFrame(1, 869, 803),
+			syncBuzzerFrame(1, 869, 803)
+		];
+		frames[0]!.sid[2] = {
+			enabled: true,
+			pwm: false,
+			period: 500,
+			periodLow: 500,
+			baseVolume: 15,
+			waveform: [15, 0],
+			waveformLoop: 0,
+			resetPhase: false
+		};
+		const tables = buildTaymTimerTables(frames, { loopFrame: 2 });
+
+		expect(tables.timers).toHaveLength(2);
+		expect(tables.mods[2 * 2].command).toBe(spec.CMD_START);
+		expect(tables.mods[2 * 2 + 1].command).toBe(spec.CMD_STOP);
+		expect(tables.mods[3 * 2].command).toBe(spec.CMD_EMPTY);
+		expect(tables.mods[3 * 2 + 1].command).toBe(spec.CMD_EMPTY);
+
+		const taym = buildTaymFromCapture(capture(frames), { loopFrame: 2 });
+		expect(taym.trak.loopFrame).toBe(2);
+		expect(() => check(taym)).not.toThrow();
+	});
 });

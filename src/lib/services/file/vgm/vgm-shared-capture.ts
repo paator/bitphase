@@ -427,6 +427,8 @@ function createAyCaptureSlot(
 		result: {
 			frames: framesOut,
 			orderIndices: [],
+			rowStarts: [],
+			songEnded: false,
 			instruments: filteredInstruments as CapturedAySampleInstrument[],
 			chipFrequency,
 			interruptFrequency,
@@ -803,6 +805,7 @@ async function captureSharedProject(
 	const leaderSong = project.songs[leaderSongIndex]!;
 	const totalRows = Math.max(1, calculateTotalRows(leaderSong, patternOrder));
 	const orderIndices: number[] = [];
+	const rowStarts: number[] = [];
 
 	options?.onProgress?.(50, 'Capturing shared timeline...');
 	let totalTicks = 0;
@@ -847,6 +850,9 @@ async function captureSharedProject(
 			return 1;
 		})();
 
+		if (timeline.currentTick === 0) {
+			rowStarts.push(orderIndices.length);
+		}
 		for (const slot of slots) {
 			slot.runSharedPlaybackQuantum();
 		}
@@ -872,6 +878,8 @@ async function captureSharedProject(
 
 	for (const result of ayResults) {
 		result.orderIndices = [...orderIndices];
+		result.rowStarts = [...rowStarts];
+		result.songEnded = timeline.songEnded;
 	}
 	for (const result of nesResults) {
 		result.orderIndices = [...orderIndices];

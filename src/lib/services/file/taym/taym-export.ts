@@ -9,6 +9,7 @@ import {
 import { buildTaymFromCapture } from './taym-builder';
 import { buildTaymMetadata } from './taym-metadata';
 import { writeTaym } from './codec';
+import { resolveLoopFrame } from '../loop-frame';
 import type { TaymTimerMode } from './taym-export-timers';
 
 export interface TaymExportOptions extends GenerateCaptureOptions {
@@ -71,7 +72,19 @@ export async function generateTaymFile(
 	});
 	const song = project.songs[songIndex];
 	const metadata = song ? buildTaymMetadata(project, song) : undefined;
-	return writeTaym(buildTaymFromCapture(capture, { metadata, timerMode: options?.timerMode }));
+	const loopFrame = resolveLoopFrame(
+		capture.orderIndices,
+		project.loopPointId,
+		(project.patternOrder || [0]).length,
+		capture.songEnded
+	);
+	return writeTaym(
+		buildTaymFromCapture(capture, {
+			metadata,
+			timerMode: options?.timerMode,
+			loopFrame: loopFrame ?? undefined
+		})
+	);
 }
 
 export async function exportToTaym(

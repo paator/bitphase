@@ -267,4 +267,20 @@ describe('buildTaymFromCapture with samples', () => {
 		const lane = taym.lanes[ampltd.operand];
 		expect(taym.vu08.slice(lane.valueOffset, lane.valueOffset + lane.length)).toEqual([255, 0]);
 	});
+
+	it('restarts a playing sample and stops an idle slot at the loop frame', () => {
+		const frames = [
+			sampleFrame(0, { instanceId: 1 }),
+			sampleFrame(0, { instanceId: 1 }),
+			sampleFrame(0, { instanceId: 1 })
+		];
+		frames[0]!.samples![1] = { ...frames[0]!.samples![0]!, instanceId: 2 };
+		const tables = buildTaymSampleTables(frames, { loopFrame: 1 });
+
+		expect(tables.timers).toHaveLength(2);
+		expect(tables.mods[1 * 2].command).toBe(spec.CMD_START);
+		expect(tables.mods[1 * 2 + 1].command).toBe(spec.CMD_STOP);
+		expect(tables.mods[2 * 2].command).toBe(spec.CMD_EMPTY);
+		expect(() => check(buildTaymFromCapture(capture(frames), { loopFrame: 1 }))).not.toThrow();
+	});
 });

@@ -38,6 +38,7 @@ export interface TaymTimerOptions {
 	timerMode?: TaymTimerMode;
 	chipClockHz?: number;
 	chipVariant?: AyChipVariant;
+	loopFrame?: number;
 }
 
 export type TaymTimerTables = {
@@ -319,9 +320,10 @@ export function buildTaymTimerTables(
 		for (let frame = 0; frame < frameCount; frame++) {
 			const config = configs[frame];
 			const modsIndex = frame * timerCount + timerIndex;
+			const atLoop = frame === options.loopFrame;
 
 			if (!config) {
-				mods[modsIndex] = makeMods(prevShapeKey !== undefined ? CMD_STOP : CMD_EMPTY);
+				mods[modsIndex] = makeMods(prevShapeKey !== undefined || atLoop ? CMD_STOP : CMD_EMPTY);
 				prevSetKey = undefined;
 				prevPeriodKey = undefined;
 				prevShapeKey = undefined;
@@ -333,7 +335,10 @@ export function buildTaymTimerTables(
 			}
 
 			const retrigger =
-				prevShapeKey === undefined || prevShapeKey !== config.shapeKey || config.resetPhase;
+				atLoop ||
+				prevShapeKey === undefined ||
+				prevShapeKey !== config.shapeKey ||
+				config.resetPhase;
 			const setChanged = prevSetKey !== config.setKey;
 			const periodChanged = prevPeriodKey !== config.periodKey;
 
