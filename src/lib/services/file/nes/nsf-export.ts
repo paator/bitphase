@@ -5,27 +5,10 @@ import { downloadFile, sanitizeFilename } from '../../../utils/file-download';
 import { captureVgmProject } from '../vgm/vgm-shared-capture';
 import { captureNesRegisterFrames } from './nes-register-export';
 import { encodeNsf, type NsfFrame } from './nsf-encoder';
+import { resolveLoopFrame } from '../loop-frame';
 
 const NSF_CHIP_ERROR = 'NSF export supports one NES chip and one AY chip';
 const AY_REGISTER_COUNT = 14;
-
-export function resolveNsfLoopFrame(
-	orderIndices: readonly number[],
-	loopPointId: number,
-	patternOrderLength: number,
-	songEnded: boolean
-): number | null {
-	if (songEnded) return null;
-	if (
-		orderIndices.length === 0 ||
-		loopPointId < 0 ||
-		loopPointId >= patternOrderLength
-	) {
-		return 0;
-	}
-	const index = orderIndices.findIndex((orderIndex) => orderIndex === loopPointId);
-	return index >= 0 ? index : 0;
-}
 
 export function resolveNsfSongs(project: Project): {
 	nesIndex: number | null;
@@ -177,7 +160,7 @@ export async function exportToNSF(
 			interruptFrequency: interruptFrequency > 0 ? interruptFrequency : 50,
 			pal,
 			frames,
-			loopFrame: resolveNsfLoopFrame(
+			loopFrame: resolveLoopFrame(
 				orderIndices,
 				project.loopPointId,
 				patternOrder.length,

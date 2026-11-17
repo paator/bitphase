@@ -30,6 +30,7 @@ export const DEFAULT_TAYM_SAMPLE_TIMER_MODE: TaymTimerMode = 'abs-rate-hz';
 export type TaymSampleOptions = {
 	timerMode?: TaymTimerMode;
 	chipClockHz?: number;
+	loopFrame?: number;
 };
 
 export type TaymSampleTables = {
@@ -176,9 +177,10 @@ export function buildTaymSampleTables(
 		for (let frame = 0; frame < frameCount; frame++) {
 			const sample = frames[frame]!.samples?.[channelIndex];
 			const modsIndex = frame * timerCount + timerIndex;
+			const atLoop = frame === options.loopFrame;
 
 			if (!sample?.enabled) {
-				mods[modsIndex] = makeMods(activeInstanceId !== 0 ? CMD_STOP : CMD_EMPTY);
+				mods[modsIndex] = makeMods(activeInstanceId !== 0 || atLoop ? CMD_STOP : CMD_EMPTY);
 				activeInstanceId = 0;
 				prevTimerValue = -1;
 				prevVolume = -1;
@@ -191,7 +193,7 @@ export function buildTaymSampleTables(
 			const pitchChanged = timerValue !== prevTimerValue;
 			const volumeChanged = sample.volume !== prevVolume;
 
-			if (sample.instanceId !== activeInstanceId) {
+			if (atLoop || sample.instanceId !== activeInstanceId) {
 				mods[modsIndex] = sampleSlotMods(pools, CMD_START, channelIndex, sample, true);
 			} else if (pitchChanged || volumeChanged) {
 				mods[modsIndex] = sampleSlotMods(pools, CMD_MODULATE, channelIndex, sample, pitchChanged);

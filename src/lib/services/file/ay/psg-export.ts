@@ -29,6 +29,8 @@ const CAPTURE_OUTPUT_SAMPLE_RATE = 44100;
 export type SongCaptureResult = {
 	frames: SongCaptureFrame[];
 	orderIndices: number[];
+	rowStarts: number[];
+	songEnded: boolean;
 	instruments: CapturedAySampleInstrument[];
 	chipFrequency: number;
 	interruptFrequency: number;
@@ -69,6 +71,7 @@ type AyCaptureTick = {
 	chipFrequency: number;
 	frames: SongCaptureFrame[];
 	orderIndices: number[];
+	rowStarts: number[];
 	taymSampleTracker: TaymSampleCaptureTracker;
 	captureDigiSamples: boolean;
 	samplesPerInterrupt: number;
@@ -187,6 +190,7 @@ class PsgExportService {
 			chipFrequency,
 			frames,
 			orderIndices,
+			rowStarts,
 			taymSampleTracker,
 			captureDigiSamples,
 			samplesPerInterrupt,
@@ -194,6 +198,9 @@ class PsgExportService {
 			advanceSamplePosition
 		} = tick;
 
+		if (state.timeline.currentTick === 0) {
+			rowStarts.push(frames.length);
+		}
 		if (state.timeline.currentTick === 0 && state.currentPattern) {
 			patternProcessor.parsePatternRow(
 				state.currentPattern,
@@ -291,7 +298,7 @@ class PsgExportService {
 		totalRows: number,
 		onProgress?: (progress: number, message: string) => void,
 		abortSignal?: AbortSignal
-	): Promise<void> {
+	): Promise<boolean> {
 		const leader = ticks[0]!;
 		const timeline = leader.state.timeline;
 		let totalTicks = 0;
@@ -373,6 +380,7 @@ class PsgExportService {
 
 			totalTicks++;
 		}
+		return timeline.songEnded === true;
 	}
 
 	async captureSongFrames(
@@ -393,7 +401,13 @@ class PsgExportService {
 		);
 		const song = project.songs[songIndex]!;
 		const totalRows = this.calculateTotalRows(song, project.patternOrder || [0]);
-		await this.captureTicks([created.tick], song, totalRows, onProgress, abortSignal);
+		created.result.songEnded = await this.captureTicks(
+			[created.tick],
+			song,
+			totalRows,
+			onProgress,
+			abortSignal
+		);
 		return created.result;
 	}
 
@@ -488,6 +502,7 @@ class PsgExportService {
 
 		const frames: SongCaptureFrame[] = [];
 		const orderIndices: number[] = [];
+		const rowStarts: number[] = [];
 		const tick: AyCaptureTick = {
 			state,
 			patternProcessor,
@@ -498,6 +513,7 @@ class PsgExportService {
 			chipFrequency,
 			frames,
 			orderIndices,
+			rowStarts,
 			taymSampleTracker: createTaymSampleCaptureTracker(),
 			captureDigiSamples: captureOptions.captureDigiSamples === true,
 			samplesPerInterrupt: Math.max(
@@ -514,6 +530,8 @@ class PsgExportService {
 			result: {
 				frames,
 				orderIndices,
+				rowStarts,
+				songEnded: false,
 				instruments: filteredInstruments as CapturedAySampleInstrument[],
 				chipFrequency,
 				interruptFrequency,
@@ -579,8 +597,14 @@ class PsgExportService {
 		const ticks = created.map((entry) => entry.tick);
 		const leaderSong = project.songs[songIndices[0]!]!;
 		const totalRows = Math.max(1, this.calculateTotalRows(leaderSong, patternOrder));
-		await this.captureTicks(ticks, leaderSong, totalRows, onProgress, abortSignal);
-		return created.map((entry) => entry.result);
+		const songEnded = await this.captureTicks(
+			ticks,
+			leaderSong,
+			totalRows,
+			onProgress,
+			abortSignal
+		);
+		return created.map((entry) => ({ ...entry.result, songEnded }));
 	}
 
 	async runCaptureWithModules(

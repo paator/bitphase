@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildTaymFromCapture, ST_MONO_LAYOUT } from '@/lib/services/file/taym/taym-builder';
+import {
+	buildTaymFromCapture,
+	mainRowCycle,
+	ST_MONO_LAYOUT
+} from '@/lib/services/file/taym/taym-builder';
 import { readTaym, writeTaym } from '@/lib/services/file/taym/codec';
 import { readTaymFile } from '@/lib/services/file/taym/taym-reader';
 import { check } from '@/lib/services/file/taym/validate';
@@ -61,33 +65,46 @@ describe('buildTaymFromCapture', () => {
 	it('maps the stereo layout into CHIP.config', () => {
 		expect(buildTaymFromCapture(capture(frames)).chips[0].config).toBe(spec.AY_LAYOUT_ABC);
 		expect(
-			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: 'ACB' } }).chips[0].config
+			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: 'ACB' } }).chips[0]
+				.config
 		).toBe(spec.AY_LAYOUT_ACB);
 		expect(
-			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: 'CAB' } }).chips[0].config
+			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: 'CAB' } }).chips[0]
+				.config
 		).toBe(spec.AY_LAYOUT_CAB);
 		expect(
-			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: 'mono' } }).chips[0].config
+			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: 'mono' } }).chips[0]
+				.config
 		).toBe(spec.AY_LAYOUT_MONO);
 		expect(
-			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: ST_MONO_LAYOUT } }).chips[0]
-				.config
+			buildTaymFromCapture(capture(frames), { metadata: { stereoLayout: ST_MONO_LAYOUT } })
+				.chips[0].config
 		).toBe(spec.AY_LAYOUT_ST_MONO);
 	});
 
-	it('writes title, author, tuning table and instrument names into an INFO chunk', () => {
+	it('writes title, author, tracker, tuning, timing and instrument names into an INFO chunk', () => {
 		const taym = buildTaymFromCapture(capture(frames), {
 			metadata: {
 				title: 'My Song',
 				author: 'Me',
-				tuningTable: 'ProTracker 3.3',
+				tracker: 'Bitphase',
+				tuningTable: 'Custom (2.00 MHz)',
+				a4Hz: 441,
+				speed: 3,
+				tempo: 150,
+				patternLength: 64,
 				instruments: ['Lead', 'Bass', '']
 			}
 		});
 		expect(taym.info).toEqual({
 			title: 'My Song',
 			author: 'Me',
-			tuning: 'ProTracker 3.3',
+			tracker: 'Bitphase',
+			tuning: 'Custom (2.00 MHz)',
+			a4: '441',
+			speed: '3',
+			tempo: '150',
+			pattern_length: '64',
 			instruments: 'Lead, Bass'
 		});
 		expect(() => check(taym)).not.toThrow();
@@ -100,5 +117,23 @@ describe('buildTaymFromCapture', () => {
 			metadata: { title: '', author: undefined, instruments: ['', ''] }
 		});
 		expect(taym.info).toEqual({});
+	});
+
+	it('writes the row lengths the tune mostly repeats', () => {
+		expect(mainRowCycle([0, 3, 6, 9])).toBe('3');
+		expect(mainRowCycle([0, 2, 5, 7, 10, 12, 15])).toBe('2,3');
+		const swingAfterIntro = [0, 3, 6, 9];
+		for (let i = 0; i < 40; i++) {
+			swingAfterIntro.push(
+				swingAfterIntro[swingAfterIntro.length - 1]! + (i % 2 === 0 ? 2 : 3)
+			);
+		}
+		expect(mainRowCycle(swingAfterIntro)).toBe('3,2');
+		expect(mainRowCycle([0])).toBeUndefined();
+		const taym = buildTaymFromCapture(
+			{ ...capture(frames), rowStarts: [0, 1] },
+			{ metadata: { title: 'Rows' } }
+		);
+		expect(taym.info.row_frames).toBe('1');
 	});
 });

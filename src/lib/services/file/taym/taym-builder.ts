@@ -36,8 +36,13 @@ export function ayStereoConfig(stereoLayout: string | undefined): number {
 export interface TaymMetadata {
 	title?: string;
 	author?: string;
+	tracker?: string;
 	stereoLayout?: string;
 	tuningTable?: string;
+	a4Hz?: number;
+	speed?: number;
+	tempo?: number;
+	patternLength?: number;
 	instruments?: string[];
 }
 
@@ -45,16 +50,49 @@ export interface BuildTaymOptions {
 	chipName?: string;
 	metadata?: TaymMetadata;
 	timerMode?: TaymTimerMode;
+	loopFrame?: number;
 }
 
-function buildInfo(metadata: TaymMetadata | undefined): Record<string, string> {
+export function mainRowCycle(rowStarts: readonly number[]): string | undefined {
+	const lengths = rowStarts.slice(1).map((start, index) => start - rowStarts[index]!);
+	if (lengths.length === 0) {
+		return undefined;
+	}
+	const commonest = (period: number, phase: number): number => {
+		const counts = new Map<number, number>();
+		for (let i = phase; i < lengths.length; i += period) {
+			counts.set(lengths[i]!, (counts.get(lengths[i]!) ?? 0) + 1);
+		}
+		return [...counts].reduce((best, entry) => (entry[1] > best[1] ? entry : best))[0];
+	};
+	for (const period of [1, 2, 4, 8]) {
+		if (lengths.length < period) break;
+		const cycle = Array.from({ length: period }, (_, phase) => commonest(period, phase));
+		const follow = lengths.filter((length, index) => length === cycle[index % period]).length;
+		if (follow >= 0.9 * lengths.length) {
+			return cycle.join(',');
+		}
+	}
+	return String(commonest(1, 0));
+}
+
+function buildInfo(
+	metadata: TaymMetadata | undefined,
+	rowFrames: string | undefined
+): Record<string, string> {
 	const info: Record<string, string> = {};
 	if (!metadata) {
 		return info;
 	}
 	if (metadata.title) info.title = metadata.title;
 	if (metadata.author) info.author = metadata.author;
+	if (metadata.tracker) info.tracker = metadata.tracker;
 	if (metadata.tuningTable) info.tuning = metadata.tuningTable;
+	if (metadata.a4Hz) info.a4 = String(metadata.a4Hz);
+	if (metadata.speed) info.speed = String(metadata.speed);
+	if (metadata.tempo) info.tempo = String(metadata.tempo);
+	if (metadata.patternLength) info.pattern_length = String(metadata.patternLength);
+	if (rowFrames) info.row_frames = rowFrames;
 	const instruments = (metadata.instruments ?? []).filter((name) => name.length > 0);
 	if (instruments.length > 0) {
 		info.instruments = instruments.join(', ');
@@ -177,11 +215,13 @@ export function buildTaymFromCapture(
 	const effectTables = buildTaymTimerTables(capture.frames, {
 		timerMode: options.timerMode,
 		chipClockHz: capture.chipFrequency,
-		chipVariant: capture.isYm ? 'YM' : 'AY'
+		chipVariant: capture.isYm ? 'YM' : 'AY',
+		loopFrame: options.loopFrame
 	});
 	const sampleTables = buildTaymSampleTables(capture.frames, {
 		timerMode: options.timerMode,
-		chipClockHz: capture.chipFrequency
+		chipClockHz: capture.chipFrequency,
+		loopFrame: options.loopFrame
 	});
 	const timerTables = mergeTimerTables(frameCount, effectTables, sampleTables);
 	const psg = new Uint8Array(
@@ -191,7 +231,7 @@ export function buildTaymFromCapture(
 		)
 	);
 
-	return makeTaym(makeTrak(capture.interruptFrequency, frameCount), {
+	return makeTaym(makeTrak(capture.interruptFrequency, frameCount, options.loopFrame), {
 		chips: [
 			makeChip(capture.chipFrequency, {
 				chipTypeId: CHIP_TYPE_AY,
@@ -208,7 +248,7 @@ export function buildTaymFromCapture(
 		tlanes: timerTables.tlanes,
 		vu08: timerTables.vu08,
 		vu32: timerTables.vu32,
-		info: buildInfo(options.metadata),
+		info: buildInfo(options.metadata, mainRowCycle(capture.rowStarts ?? [])),
 		frameData: { [FRAME_DATA_TAG]: psg }
 	});
 }
