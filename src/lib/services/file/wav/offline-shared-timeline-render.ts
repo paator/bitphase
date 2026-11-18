@@ -4,7 +4,7 @@ import {
 	runSharedTimelineQuantum,
 	sortPlaySlotsForQuantum
 } from '../../../../../public/tracker/shared-playback-orchestrator.js';
-import { renderRowProgress, renderSampleLimit } from './render-sample-limit';
+import { describeWavRender, renderSampleLimit, type WavRenderRowSpan } from './render-sample-limit';
 
 export type OfflineSharedTimeline = {
 	intFrequency: number;
@@ -27,6 +27,7 @@ export type OfflineSharedTimelineRenderOptions = {
 	sampleRate: number;
 	loopCount: number;
 	totalRows: number;
+	rowSpan?: WavRenderRowSpan;
 	onProgress?: (progress: number, message: string) => void;
 	calculateCurrentRow?: () => number;
 };
@@ -38,7 +39,8 @@ export async function renderOfflineSharedTimeline({
 	loopCount,
 	onProgress,
 	calculateCurrentRow,
-	totalRows
+	totalRows,
+	rowSpan
 }: OfflineSharedTimelineRenderOptions): Promise<Float32Array[][]> {
 	const leftByLane = lanes.map(() => [] as number[]);
 	const rightByLane = lanes.map(() => [] as number[]);
@@ -62,9 +64,14 @@ export async function renderOfflineSharedTimeline({
 				now - lastProgressTime >= minProgressUpdateMs) &&
 			totalSamples > 0
 		) {
-			const currentRow = calculateCurrentRow ? calculateCurrentRow() : 0;
-			const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
-			onProgress(progress, `Rendering... ${currentRow}/${totalRows} rows`);
+			const position = calculateCurrentRow ? calculateCurrentRow() : 0;
+			const described = describeWavRender(
+				position,
+				completedLoops,
+				totalRows,
+				rowSpan ?? { firstPassRows: totalRows, loopSegmentRows: 0 }
+			);
+			onProgress(described.value, described.message);
 			lastProgressUpdate = totalSamples;
 			lastProgressTime = now;
 			await new Promise((resolve) => setTimeout(resolve, 0));

@@ -9,7 +9,12 @@ import {
 	type SharedTimelineExportSlot
 } from '../base/renderer';
 import { NES_AUDIO_SLOT_KIND } from './audio-slot-kind';
-import { renderRowProgress, renderSampleLimit } from '../../services/file/wav/render-sample-limit';
+import {
+	describeWavRender,
+	exportRowTotal,
+	renderSampleLimit,
+	type WavRenderRowSpan
+} from '../../services/file/wav/render-sample-limit';
 import { pushStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
@@ -252,7 +257,8 @@ export class NESChipRenderer implements ChipRenderer {
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels = false,
-		stereo = false
+		stereo = false,
+		rowSpan: WavRenderRowSpan = { firstPassRows: totalRows, loopSegmentRows: 0 }
 	): Promise<Float32Array[]> {
 		const leftSamples: number[] = [];
 		const rightSamples: number[] = [];
@@ -281,9 +287,13 @@ export class NESChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const currentRow = this.calculateCurrentRow(lane.state, song);
-				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
-				onProgress?.(progress, `Rendering... ${currentRow}/${totalRows} rows`);
+				const described = describeWavRender(
+					this.calculateCurrentRow(lane.state, song),
+					completedLoops,
+					totalRows,
+					rowSpan
+				);
+				onProgress?.(described.value, described.message);
 				lastProgressUpdate = totalSamples;
 				lastProgressTime = now;
 				await new Promise((resolve) => setTimeout(resolve, 0));
@@ -365,7 +375,8 @@ export class NESChipRenderer implements ChipRenderer {
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels = false,
-		stereo = false
+		stereo = false,
+		rowSpan: WavRenderRowSpan = { firstPassRows: totalRows, loopSegmentRows: 0 }
 	): Promise<Float32Array[][]> {
 		const leftByChip: number[][] = contexts.map(() => []);
 		const rightByChip: number[][] = contexts.map(() => []);
@@ -393,9 +404,13 @@ export class NESChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const currentRow = this.calculateCurrentRow(leader.state, leaderSong);
-				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
-				onProgress?.(progress, `Rendering... ${currentRow}/${totalRows} rows`);
+				const described = describeWavRender(
+					this.calculateCurrentRow(leader.state, leaderSong),
+					completedLoops,
+					totalRows,
+					rowSpan
+				);
+				onProgress?.(described.value, described.message);
 				lastProgressUpdate = totalSamples;
 				lastProgressTime = now;
 				await new Promise((resolve) => setTimeout(resolve, 0));
@@ -591,8 +606,7 @@ export class NESChipRenderer implements ChipRenderer {
 					: 0;
 			const loopOrderSegment = patternOrder.slice(validLoopPointId);
 			const loopSegmentRows = this.calculateTotalRows(leaderSong, loopOrderSegment);
-			const totalRows =
-				loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
+			const totalRows = exportRowTotal(firstPassRows, loopSegmentRows, loopCount);
 
 			const buffers = await this.renderAudioLoopSharedTimeline(
 				contexts,
@@ -601,7 +615,8 @@ export class NESChipRenderer implements ChipRenderer {
 				loopCount,
 				onProgress,
 				separateChannels,
-				stereo
+				stereo,
+				{ firstPassRows, loopSegmentRows }
 			);
 
 			for (const ctx of contexts) {
@@ -721,8 +736,7 @@ export class NESChipRenderer implements ChipRenderer {
 				song as NesSlotLane['song'],
 				loopOrderSegment
 			);
-			const totalRows =
-				loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
+			const totalRows = exportRowTotal(firstPassRows, loopSegmentRows, loopCount);
 
 			const lane: NesSlotLane = {
 				songIndex,
@@ -745,7 +759,8 @@ export class NESChipRenderer implements ChipRenderer {
 				loopCount,
 				onProgress,
 				separateChannels,
-				stereo
+				stereo,
+				{ firstPassRows, loopSegmentRows }
 			);
 
 			engine.dispose();

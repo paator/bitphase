@@ -9,7 +9,12 @@ import {
 	type SharedTimelineExportSlot
 } from '../base/renderer';
 import { AYUMI_AUDIO_SLOT_KIND } from './audio-slot-kind';
-import { renderRowProgress, renderSampleLimit } from '../../services/file/wav/render-sample-limit';
+import {
+	describeWavRender,
+	exportRowTotal,
+	renderSampleLimit,
+	type WavRenderRowSpan
+} from '../../services/file/wav/render-sample-limit';
 import { pushStemSample, stemBufferCount } from '../../services/file/wav/stem-samples';
 import type { ResourceLoader } from '../base/resource-loader';
 import { BrowserResourceLoader } from '../base/resource-loader';
@@ -268,7 +273,8 @@ export class AYChipRenderer implements ChipRenderer {
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels?: boolean,
 		disableDcFilter?: boolean,
-		panGains: PanGain[] | null = null
+		panGains: PanGain[] | null = null,
+		rowSpan: WavRenderRowSpan = { firstPassRows: totalRows, loopSegmentRows: 0 }
 	): Promise<Float32Array[]> {
 		const stereo = panGains != null;
 		const leftSamples: number[] = [];
@@ -299,10 +305,13 @@ export class AYChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const currentRow = this.calculateCurrentRow(state, song);
-				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
-				const message = `Rendering... ${currentRow}/${totalRows} rows`;
-				onProgress?.(progress, message);
+				const described = describeWavRender(
+					this.calculateCurrentRow(state, song),
+					completedLoops,
+					totalRows,
+					rowSpan
+				);
+				onProgress?.(described.value, described.message);
 				lastProgressUpdate = totalSamples;
 				lastProgressTime = now;
 				await new Promise((resolve) => setTimeout(resolve, 0));
@@ -428,7 +437,8 @@ export class AYChipRenderer implements ChipRenderer {
 		loopCount: number,
 		onProgress?: (progress: number, message: string) => void,
 		separateChannels?: boolean,
-		disableDcFilter?: boolean
+		disableDcFilter?: boolean,
+		rowSpan: WavRenderRowSpan = { firstPassRows: totalRows, loopSegmentRows: 0 }
 	): Promise<Float32Array[][]> {
 		const leftByChip: number[][] = contexts.map(() => []);
 		const rightByChip: number[][] = contexts.map(() => []);
@@ -463,10 +473,13 @@ export class AYChipRenderer implements ChipRenderer {
 					now - lastProgressTime >= minProgressUpdateMs) &&
 				totalSamples > 0
 			) {
-				const currentRow = this.calculateCurrentRow(leader.state, leaderSong);
-				const progress = 50 + renderRowProgress(currentRow, totalRows) * 50;
-				const message = `Rendering... ${currentRow}/${totalRows} rows`;
-				onProgress?.(progress, message);
+				const described = describeWavRender(
+					this.calculateCurrentRow(leader.state, leaderSong),
+					completedLoops,
+					totalRows,
+					rowSpan
+				);
+				onProgress?.(described.value, described.message);
 				lastProgressUpdate = totalSamples;
 				lastProgressTime = now;
 				await new Promise((resolve) => setTimeout(resolve, 0));
@@ -710,8 +723,7 @@ export class AYChipRenderer implements ChipRenderer {
 					: 0;
 			const loopOrderSegment = patternOrder.slice(validLoopPointId);
 			const loopSegmentRows = this.calculateTotalRows(leaderSong, loopOrderSegment);
-			const totalRows =
-				loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
+			const totalRows = exportRowTotal(firstPassRows, loopSegmentRows, loopCount);
 
 			const buffers = await this.renderAudioLoopAySharedTimelineExport(
 				contexts,
@@ -722,7 +734,8 @@ export class AYChipRenderer implements ChipRenderer {
 				loopCount,
 				onProgress,
 				separateChannels,
-				options?.disableDcFilter ?? false
+				options?.disableDcFilter ?? false,
+				{ firstPassRows, loopSegmentRows }
 			);
 
 			for (const p of ptrs) {
@@ -821,8 +834,7 @@ export class AYChipRenderer implements ChipRenderer {
 				: 0;
 		const loopOrderSegment = patternOrder.slice(validLoopPointId);
 		const loopSegmentRows = this.calculateTotalRows(song, loopOrderSegment);
-		const totalRows =
-			loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
+		const totalRows = exportRowTotal(firstPassRows, loopSegmentRows, loopCount);
 
 		try {
 			const channels = await this.renderAudioLoop(
@@ -843,7 +855,8 @@ export class AYChipRenderer implements ChipRenderer {
 				options?.disableDcFilter ?? false,
 				separateChannels && options?.stereo === true
 					? panGainsForSong(song as { stMixing?: boolean; stereoLayout?: string })
-					: null
+					: null,
+				{ firstPassRows, loopSegmentRows }
 			);
 
 			wasm.free(ayumiPtr);

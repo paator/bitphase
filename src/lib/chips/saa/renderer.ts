@@ -19,6 +19,7 @@ import {
 	renderOfflineSharedTimeline,
 	type OfflineSharedTimeline
 } from '../../services/file/wav/offline-shared-timeline-render';
+import { exportRowTotal } from '../../services/file/wav/render-sample-limit';
 
 const SAMPLE_RATE = 44100;
 const DEFAULT_SPEED = 3;
@@ -224,19 +225,6 @@ export class SAAChipRenderer implements ChipRenderer {
 		return totalRows;
 	}
 
-	private totalRowsForExport(
-		song: Song,
-		patternOrder: number[],
-		loopCount: number,
-		loopPointId: number
-	): number {
-		const firstPassRows = this.countRows(song, patternOrder);
-		const validLoopPointId =
-			loopPointId >= 0 && loopPointId < patternOrder.length ? loopPointId : 0;
-		const loopSegmentRows = this.countRows(song, patternOrder.slice(validLoopPointId));
-		return loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
-	}
-
 	private calculateCurrentRow(timeline: OfflineSharedTimeline, song: Song): number {
 		let currentRow = 0;
 		for (let i = 0; i < timeline.currentPatternOrderIndex; i++) {
@@ -278,17 +266,22 @@ export class SAAChipRenderer implements ChipRenderer {
 		const timeline = session.sharedTimeline as OfflineSharedTimeline | null;
 		if (!timeline) throw new Error('Shared timeline was not initialized');
 		onProgress?.(50, 'Initializing renderer...');
+		const firstPassRows = this.countRows(leaderSong, session.patternOrder);
+		const validLoopPointId =
+			project.loopPointId >= 0 && project.loopPointId < session.patternOrder.length
+				? project.loopPointId
+				: 0;
+		const loopSegmentRows = this.countRows(
+			leaderSong,
+			session.patternOrder.slice(validLoopPointId)
+		);
 		const buffers = await renderOfflineSharedTimeline({
 			lanes,
 			timeline,
 			sampleRate: SAMPLE_RATE,
 			loopCount,
-			totalRows: this.totalRowsForExport(
-				leaderSong,
-				session.patternOrder,
-				loopCount,
-				project.loopPointId || 0
-			),
+			totalRows: exportRowTotal(firstPassRows, loopSegmentRows, loopCount),
+			rowSpan: { firstPassRows, loopSegmentRows },
 			onProgress,
 			calculateCurrentRow: () => this.calculateCurrentRow(timeline, leaderSong)
 		});

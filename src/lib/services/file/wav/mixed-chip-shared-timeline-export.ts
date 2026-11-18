@@ -20,6 +20,7 @@ import {
 	renderOfflineSharedTimeline,
 	type OfflineSharedTimeline
 } from './offline-shared-timeline-render';
+import { exportRowTotal } from './render-sample-limit';
 
 const SAMPLE_RATE = 44100;
 
@@ -166,8 +167,7 @@ export async function renderMixedChipSharedTimelineSlots(
 				: 0;
 		const loopOrderSegment = patternOrder.slice(validLoopPointId);
 		const loopSegmentRows = calculateTotalRows(leaderSong, loopOrderSegment);
-		const totalRows =
-			loopCount <= 1 ? firstPassRows : firstPassRows + loopSegmentRows * (loopCount - 1);
+		const totalRows = exportRowTotal(firstPassRows, loopSegmentRows, loopCount);
 
 		const timeline = session.sharedTimeline as OfflineSharedTimeline;
 
@@ -177,6 +177,7 @@ export async function renderMixedChipSharedTimelineSlots(
 			sampleRate: SAMPLE_RATE,
 			loopCount,
 			totalRows,
+			rowSpan: { firstPassRows, loopSegmentRows },
 			onProgress,
 			calculateCurrentRow: () => calculateCurrentRow(timeline, leaderSong)
 		});
