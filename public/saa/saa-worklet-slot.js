@@ -316,7 +316,7 @@ export class SaaWorkletSlot extends TrackerWorkletSlot {
 				frequencies,
 				sidTimerHz: frequencies.map(() => null),
 				syncbuzzerTimerHz: frequencies.map(() => null),
-				registers: []
+				registers: this.engine?.getRegisters() ?? []
 			});
 		}
 		this.finishAudioBlockFlushTransport(numSamples, this.paused);

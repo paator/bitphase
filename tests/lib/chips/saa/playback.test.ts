@@ -12,8 +12,14 @@ import TrackerPatternProcessor from '../../../../public/tracker/tracker-pattern-
 import { createSaaSoundEngine } from '../../../../public/saa/saa-engine.js';
 import {
 	SAA_CHANNEL_COUNT,
+	SAA_ENABLE_OUTPUT,
 	SAA_FULL_SIDE_PEAK,
-	SAA_OUTPUT_GAIN
+	SAA_OUTPUT_GAIN,
+	SAA_REG_ENABLE,
+	SAA_REG_ENVELOPE_0,
+	SAA_REG_NOISE_CLOCK,
+	SAA_REG_NOISE_MIXER,
+	SAA_REG_TONE_MIXER
 } from '../../../../public/saa/saa-constants.js';
 import { saaWasmImports } from '../../../../public/saa/saa-wasm-imports.js';
 import {
@@ -349,7 +355,20 @@ describe('SAA tone playback', () => {
 			freq: 0
 		};
 		registers.envelope0 = 0x96;
+		registers.noise0 = 2;
 		engine.apply(registers);
+		const written = engine.getRegisters();
+		expect(written).toHaveLength(32);
+		expect(written[1]).toBe(0x00);
+		expect(written[2]).toBe(0xff);
+		expect(written[8]).toBe(0);
+		expect(written[9]).toBe(255);
+		expect(written[16]).toBe(0x50);
+		expect(written[SAA_REG_TONE_MIXER]).toBe(0);
+		expect(written[SAA_REG_NOISE_MIXER]).toBe(0);
+		expect(written[SAA_REG_NOISE_CLOCK]).toBe(saaNoiseClockByte(2, 0));
+		expect(written[SAA_REG_ENVELOPE_0]).toBe(0x96);
+		expect(written[SAA_REG_ENABLE]).toBe(SAA_ENABLE_OUTPUT);
 		let energy = 0;
 		for (let i = 0; i < 4000; i++) {
 			const sample = engine.generate();

@@ -5,6 +5,7 @@ import { SAAChipRenderer } from './renderer';
 import { SAA_CHIP_SCHEMA } from './schema';
 import { SAA_AUDIO_SLOT_KIND } from './audio-slot-kind';
 import { describeSaaEffect, listSaaEffectStatusHints } from './effects';
+import { SAA_PLAYBACK_DEBUG } from './playback-debug';
 import type { Chip } from '../types';
 
 export const SAA_CHIP: Chip = {
@@ -17,6 +18,7 @@ export const SAA_CHIP: Chip = {
 	createConverter: () => new SAAConverter(),
 	createFormatter: () => new SAAFormatter(),
 	createRenderer: (loader, binding) => new SAAChipRenderer(loader, binding),
+	playbackDebug: SAA_PLAYBACK_DEBUG,
 	describeEffect: describeSaaEffect,
 	listEffectStatusHints: listSaaEffectStatusHints
 };

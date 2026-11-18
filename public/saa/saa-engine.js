@@ -87,6 +87,15 @@ class SaaSoundEngine {
 		this.writeAddressData(this.chipPtr, reg, byte);
 	}
 
+	getRegisters() {
+		const registers = new Array(this.shadow.length);
+		for (let index = 0; index < this.shadow.length; index++) {
+			const value = this.shadow[index];
+			registers[index] = value < 0 ? 0 : value & 255;
+		}
+		return registers;
+	}
+
 	forceWrite(register, value) {
 		const reg = register & 31;
 		const byte = value & 255;
