@@ -876,6 +876,29 @@
 		);
 	}
 
+	export function clearSelection(): void {
+		if (
+			selectionStartRow === null &&
+			selectionStartColumn === null &&
+			selectionEndRow === null &&
+			selectionEndColumn === null &&
+			!isSelecting
+		) {
+			return;
+		}
+		selectionStartRow = null;
+		selectionStartColumn = null;
+		selectionEndRow = null;
+		selectionEndColumn = null;
+		isSelecting = false;
+		mouseDownCell = null;
+		pressOnInactiveEditor = false;
+		stopAutoScroll();
+		window.removeEventListener('mousemove', handleGlobalMouseMove);
+		window.removeEventListener('mouseup', handleCanvasMouseUp);
+		scheduleDraw();
+	}
+
 	export async function applyScript(script: UserScript): Promise<void> {
 		const bounds = getSelectionBounds();
 		if (!bounds) return;

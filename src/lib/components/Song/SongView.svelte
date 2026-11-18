@@ -126,6 +126,9 @@
 	});
 
 	export function resetEditorState(): void {
+		for (const editor of patternEditors) {
+			editor?.clearSelection();
+		}
 		activeEditorIndex = 0;
 		sharedPatternOrderIndex = 0;
 		sharedSelectedRow = 0;
@@ -223,6 +226,19 @@
 		return -1;
 	}
 
+	function activateEditor(index: number): void {
+		for (let editorIndex = 0; editorIndex < patternEditors.length; editorIndex++) {
+			if (editorIndex !== index) {
+				patternEditors[editorIndex]?.clearSelection();
+			}
+		}
+		activeEditorIndex = index;
+		const editor = patternEditors[index];
+		if (editor) {
+			patternEditor = editor;
+		}
+	}
+
 	function focusAdjacentEditor(
 		fromIndex: number,
 		direction: PatternEditorDirection,
@@ -245,8 +261,7 @@
 		const target = patternEditors[targetIndex];
 		if (!target) return false;
 		target.placeCursor(landing);
-		activeEditorIndex = targetIndex;
-		patternEditor = target;
+		activateEditor(targetIndex);
 		target.focusCanvas();
 		target.scrollCursorIntoView();
 		return true;
@@ -757,10 +772,9 @@
 						bind:currentPatternOrderIndex={sharedPatternOrderIndex}
 						bind:selectedRow={sharedSelectedRow}
 						onchannelchange={(songIndex, channelIndex, fieldKey) => {
-							activeEditorIndex = songIndex;
+							activateEditor(songIndex);
 							selectedChannelIndex = channelIndex;
 							selectedFieldKey = fieldKey;
-							patternEditor = patternEditors[songIndex] ?? null;
 						}}
 						ontoggleplayback={togglePlaybackFromPiano}
 						onseekplayback={(orderIndex, row) => {
@@ -842,8 +856,7 @@
 													class="h-5 w-10 border-0 bg-transparent px-1 py-0 text-center font-mono text-xs leading-none focus:ring-0 disabled:cursor-not-allowed"
 													onfocus={() => {
 														if (!playbackStore.isPlaying) {
-															activeEditorIndex = i;
-															patternEditor = patternEditors[i];
+															activateEditor(i);
 														}
 													}}
 													oninput={(e) => {
@@ -877,8 +890,7 @@
 														class="flex h-2.5 w-3.5 cursor-pointer items-center justify-center border-b border-[var(--color-app-border)] transition-colors hover:bg-[var(--color-app-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
 														onclick={() => {
 															if (!playbackStore.isPlaying) {
-																activeEditorIndex = i;
-																patternEditor = patternEditors[i];
+																activateEditor(i);
 																incrementPatternLength();
 															}
 														}}
@@ -892,8 +904,7 @@
 														class="flex h-2.5 w-3.5 cursor-pointer items-center justify-center transition-colors hover:bg-[var(--color-app-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
 														onclick={() => {
 															if (!playbackStore.isPlaying) {
-																activeEditorIndex = i;
-																patternEditor = patternEditors[i];
+																activateEditor(i);
 																decrementPatternLength();
 															}
 														}}
@@ -929,8 +940,7 @@
 												isActive={activeEditorIndex === i}
 												isPlaybackMaster={i === 0}
 												onfocus={() => {
-													activeEditorIndex = i;
-													patternEditor = patternEditors[i];
+													activateEditor(i);
 												}}
 												onLeaveEditor={(direction, landing, wrap) =>
 													focusAdjacentEditor(
