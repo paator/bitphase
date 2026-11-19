@@ -1,7 +1,8 @@
 import type { Chip } from '../../../chips/types';
 import {
 	getChannelLayout,
-	MIN_CHANNEL_EFFECT_COLUMNS
+	MIN_CHANNEL_EFFECT_COLUMNS,
+	patternHardwareChannelIndex
 } from '../../../chips/base/channel-effect-columns';
 import { anchorsBeforeChannel, usesAnchoredGlobals } from '../../../chips/base/global-anchors';
 
@@ -107,7 +108,11 @@ export class PatternTemplateParser {
 			if (counts.length > 0 && channelIndex >= counts.length) break;
 
 			if (anchored) {
-				for (const anchor of anchorsBeforeChannel(schema, channelIndex, virtualChannelMap)) {
+				for (const anchor of anchorsBeforeChannel(
+					schema,
+					channelIndex,
+					virtualChannelMap
+				)) {
 					pos = this.skipSpaces(rowString, pos);
 					if (pos >= rowString.length) return;
 					handlers.onGlobalField?.(anchor.field, anchor.definition, pos);
@@ -120,7 +125,8 @@ export class PatternTemplateParser {
 
 			const layout = getChannelLayout(
 				schema,
-				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS
+				counts[channelIndex] ?? MIN_CHANNEL_EFFECT_COLUMNS,
+				patternHardwareChannelIndex(schema, channelIndex, virtualChannelMap)
 			);
 			const channelStart = pos;
 			let consumedField = false;
@@ -176,14 +182,20 @@ export class PatternTemplateParser {
 		virtualChannelMap?: Record<number, number>
 	): number {
 		const segments: Array<{ start: number; end: number; fieldKey: string }> = [];
-		this.walkRow(rowString, schema, effectColumnCounts, {
-			onGlobalField(key, field, pos) {
-				segments.push({ start: pos, end: pos + field.length, fieldKey: key });
+		this.walkRow(
+			rowString,
+			schema,
+			effectColumnCounts,
+			{
+				onGlobalField(key, field, pos) {
+					segments.push({ start: pos, end: pos + field.length, fieldKey: key });
+				},
+				onChannelField(_channelIndex, key, field, pos) {
+					segments.push({ start: pos, end: pos + field.length, fieldKey: key });
+				}
 			},
-			onChannelField(_channelIndex, key, field, pos) {
-				segments.push({ start: pos, end: pos + field.length, fieldKey: key });
-			}
-		}, virtualChannelMap);
+			virtualChannelMap
+		);
 
 		const segment = segments.find(
 			(s) => charIndex >= s.start && charIndex < s.end && s.fieldKey === fieldKey

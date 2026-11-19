@@ -1,4 +1,5 @@
 import { Effect } from '../../models/song';
+import { getHardwareChannelIndex } from '../../models/virtual-channels';
 import type { ChipField, ChipSchema } from './schema';
 import type { GenericChannel, GenericRow } from '../../models/song/generic';
 import { isEffectLike } from '../../utils/type-guards';
@@ -127,6 +128,21 @@ export function schemaHasChannelEffects(schema: Pick<ChipSchema, 'fields' | 'tem
 	return Boolean(schema.fields.effect) && schema.template.includes('{effect}');
 }
 
+export function patternHardwareChannelIndex(
+	schema: Pick<ChipSchema, 'channelLabels'>,
+	patternChannelIndex: number,
+	virtualChannelMap?: Record<number, number>
+): number {
+	const labels = schema.channelLabels;
+	if (!labels || labels.length === 0 || !virtualChannelMap) return patternChannelIndex;
+	return getHardwareChannelIndex(patternChannelIndex, labels, virtualChannelMap);
+}
+
+export function resolveChannelTemplate(schema: ChipSchema, hardwareChannelIndex?: number): string {
+	if (hardwareChannelIndex === undefined) return schema.template;
+	return schema.channelTemplates?.[hardwareChannelIndex] ?? schema.template;
+}
+
 export function expandChannelTemplate(baseTemplate: string, effectCount: number): string {
 	const count = clampChannelEffectColumnCount(effectCount);
 	if (count <= 1 || !baseTemplate.includes('{effect}')) {
@@ -171,13 +187,15 @@ export function resolveSchemaField(schema: ChipSchema, fieldKey: string): ChipFi
 
 export function getChannelLayout(
 	schema: ChipSchema,
-	effectCount: number
+	effectCount: number,
+	hardwareChannelIndex?: number
 ): { template: string; fields: Record<string, ChipField> } {
-	const count = schemaHasChannelEffects(schema)
+	const template = resolveChannelTemplate(schema, hardwareChannelIndex);
+	const count = schemaHasChannelEffects({ ...schema, template })
 		? clampChannelEffectColumnCount(effectCount)
 		: MIN_CHANNEL_EFFECT_COLUMNS;
 	return {
-		template: expandChannelTemplate(schema.template, count),
+		template: expandChannelTemplate(template, count),
 		fields: getExpandedChannelFields(schema.fields, count)
 	};
 }

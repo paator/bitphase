@@ -100,15 +100,32 @@ export function listPianoRollChannels(
 	return options;
 }
 
-export function listPianoRollLanes(schema: ChipSchema, effectColumnCount: number): PianoRollLane[] {
-	const layout = getChannelLayout(schema, effectColumnCount);
+export function listPianoRollLanes(
+	schema: ChipSchema,
+	effectColumnCount: number,
+	hardwareChannelIndex?: number
+): PianoRollLane[] {
+	const layout = getChannelLayout(schema, effectColumnCount, hardwareChannelIndex);
+	const channelFields = templateFields(layout.template, layout.fields);
 	const lanes = [
-		...lanesFromFields(layout.template, layout.fields, false, schema),
+		...lanesFromFields(layout.template, channelFields, false, schema),
 		...(schema.globalFields
 			? lanesFromFields(schema.globalTemplate ?? '', schema.globalFields, true, schema)
 			: [])
 	];
 	return disambiguateLabels(lanes);
+}
+
+function templateFields(
+	template: string,
+	fields: Record<string, ChipField>
+): Record<string, ChipField> {
+	const present: Record<string, ChipField> = {};
+	for (const match of template.matchAll(/\{([^}]+)\}/g)) {
+		const key = match[1];
+		if (key && fields[key]) present[key] = fields[key];
+	}
+	return present;
 }
 
 export function readPianoFieldValue(

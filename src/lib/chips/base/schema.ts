@@ -82,6 +82,7 @@ export interface VirtualChannelRoleDefinition {
 export interface ChipSchema {
 	chipType: string;
 	template: string;
+	channelTemplates?: Record<number, string>;
 	fields: Record<string, ChipField>;
 	virtualChannelRoles?: VirtualChannelRoleDefinition[];
 	globalTemplate?: string;

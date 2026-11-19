@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Chip } from '../types';
+	import { resolveChannelTemplate } from '../base/channel-effect-columns';
 	import { createChipPreviewPlayground } from '../base/preview-playground.svelte';
 	import IconCarbonPlay from '~icons/carbon/play';
 	import IconCarbonPauseFilled from '~icons/carbon/pause-filled';
@@ -17,6 +18,22 @@
 		channelIndex?: number;
 		channelLabels?: string[];
 	} = $props();
+
+	const showsVolume = $derived.by(() => {
+		const hardwareLabels = chip.schema.channelLabels ?? [];
+		const label = channelLabels?.[channelIndex];
+		let hardware = channelIndex;
+		if (label) {
+			const exact = hardwareLabels.indexOf(label);
+			if (exact >= 0) {
+				hardware = exact;
+			} else {
+				const prefixed = hardwareLabels.findIndex((name) => label.startsWith(`${name}:`));
+				if (prefixed >= 0) hardware = prefixed;
+			}
+		}
+		return resolveChannelTemplate(chip.schema, hardware).includes('{volume}');
+	});
 
 	const playground = createChipPreviewPlayground({
 		getChip: () => chip,
@@ -66,18 +83,20 @@
 				onblur={playground.clampTable}
 				oninput={playground.handleTableInput} />
 		</label>
-		<label class="flex flex-col gap-0.5">
-			<span class="text-[var(--color-app-text-muted)]">Volume</span>
-			<input
-				type="text"
-				class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
-				maxlength={1}
-				placeholder="F"
-				disabled={playground.isDisabled}
-				bind:value={playground.volume}
-				onblur={playground.clampVolume}
-				oninput={playground.handleVolumeInput} />
-		</label>
+		{#if showsVolume}
+			<label class="flex flex-col gap-0.5">
+				<span class="text-[var(--color-app-text-muted)]">Volume</span>
+				<input
+					type="text"
+					class="h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50"
+					maxlength={1}
+					placeholder="F"
+					disabled={playground.isDisabled}
+					bind:value={playground.volume}
+					onblur={playground.clampVolume}
+					oninput={playground.handleVolumeInput} />
+			</label>
+		{/if}
 		<div class="flex flex-col gap-0.5">
 			<span class="text-[var(--color-app-text-muted)]">Note</span>
 			<div

@@ -38,13 +38,20 @@ export function resolveNesTuningTable(cpuFrequencyHz: number, a4TuningHz: number
 
 export const NES_DEFAULT_TUNING_TABLE = resolveNesTuningTable(NES_NTSC_CPU_FREQUENCY, 440);
 
+export const NES_DPCM_CHANNEL_INDEX = 4;
+export const NES_CHANNEL_TEMPLATE = '{note} {instrument}{table}{volume} {effect}';
+export const NES_DPCM_CHANNEL_TEMPLATE = '{note} {instrument}{table} {effect}';
+
 export const NES_CHIP_SCHEMA: ChipSchema = {
 	chipType: 'nes',
 	defaultTuningTable: NES_DEFAULT_TUNING_TABLE,
 	defaultChipVariant: 'NTSC',
 	stickyChannelEffectGroup: nesStickyChannelEffectGroup,
 	channelLabels: ['Pulse 1', 'Pulse 2', 'Triangle', 'Noise', 'DPCM'],
-	template: '{note} {instrument}{table}{volume} {effect}',
+	template: NES_CHANNEL_TEMPLATE,
+	channelTemplates: {
+		[NES_DPCM_CHANNEL_INDEX]: NES_DPCM_CHANNEL_TEMPLATE
+	},
 	fields: {
 		note: {
 			key: 'note',

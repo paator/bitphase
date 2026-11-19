@@ -2,6 +2,7 @@
 	import { getContext, tick } from 'svelte';
 	import { CSS_VAR_MAP, type ThemeColorKey } from '../../config/theme-colors';
 	import type { ChipProcessor } from '../../chips/base/processor';
+	import { patternHardwareChannelIndex } from '../../chips/base/channel-effect-columns';
 	import { pianoEffectGestureFor } from '../../chips/base/piano-effect-gesture';
 	import { listPatternEffectStatusHints } from '../../chips/base/effect-status';
 	import { getEffectFormatCharColors } from '../../chips/base/effect-format-color';
@@ -365,7 +366,15 @@
 		}
 		return max;
 	});
-	const lanes = $derived(chip ? listPianoRollLanes(chip.schema, effectCount) : []);
+	const lanes = $derived.by(() => {
+		if (!chip || !selected) return [];
+		const hardwareChannel = patternHardwareChannelIndex(
+			chip.schema,
+			selected.channelIndex,
+			projectStore.songs[selected.songIndex]?.virtualChannelMap
+		);
+		return listPianoRollLanes(chip.schema, effectCount, hardwareChannel);
+	});
 	const effectHints = $derived(chip ? listPatternEffectStatusHints(chip) : []);
 	const activeLane = $derived(
 		lanes.find((lane) => lane.key === editorStateStore.pianoRollLaneKey) ??

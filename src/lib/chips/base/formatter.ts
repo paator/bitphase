@@ -9,6 +9,8 @@ import { isPrimitive } from '../../utils/type-guards';
 import {
 	getChannelLayout,
 	getEffectColumnCountFromGenericRow,
+	patternHardwareChannelIndex,
+	resolveChannelTemplate,
 	resolveSchemaField
 } from './channel-effect-columns';
 import { anchorsBeforeChannel, usesAnchoredGlobals } from './global-anchors';
@@ -40,7 +42,11 @@ export abstract class BaseFormatter implements PatternFormatter {
 			for (let channelIndex = 0; channelIndex < channels.length; channelIndex++) {
 				const channel = channels[channelIndex];
 				if (anchored) {
-					for (const anchor of anchorsBeforeChannel(schema, channelIndex, virtualChannelMap)) {
+					for (const anchor of anchorsBeforeChannel(
+						schema,
+						channelIndex,
+						virtualChannelMap
+					)) {
 						const value = patternRow[anchor.field];
 						result +=
 							this.formatField(isPrimitive(value) ? value : null, anchor.definition) +
@@ -49,7 +55,8 @@ export abstract class BaseFormatter implements PatternFormatter {
 				}
 				const layout = getChannelLayout(
 					schema,
-					getEffectColumnCountFromGenericRow(channel)
+					getEffectColumnCountFromGenericRow(channel),
+					patternHardwareChannelIndex(schema, channelIndex, virtualChannelMap)
 				);
 				result += this.formatTemplate(layout.template, channel, layout.fields) + ' ';
 			}
@@ -75,15 +82,23 @@ export abstract class BaseFormatter implements PatternFormatter {
 		const anchored = usesAnchoredGlobals(schema);
 
 		if (anchored) {
-			const channelSpaceCount = (schema.template.match(/\s/g) || []).length;
 			let channelIndex = 0;
 			while (partIndex < parts.length) {
-				for (const anchor of anchorsBeforeChannel(schema, channelIndex)) {
+				for (const anchor of anchorsBeforeChannel(
+					schema,
+					channelIndex,
+					this.virtualChannelMap
+				)) {
 					if (partIndex >= parts.length) break;
 					const token = parts[partIndex] || '';
 					partIndex++;
 					patternRow[anchor.field] = this.parseField(token, anchor.definition);
 				}
+				const template = resolveChannelTemplate(
+					schema,
+					patternHardwareChannelIndex(schema, channelIndex, this.virtualChannelMap)
+				);
+				const channelSpaceCount = (template.match(/\s/g) || []).length;
 				const channelParts: string[] = [];
 				for (let i = 0; i <= channelSpaceCount && partIndex < parts.length; i++) {
 					channelParts.push(parts[partIndex] || '');
@@ -91,9 +106,7 @@ export abstract class BaseFormatter implements PatternFormatter {
 				}
 				const channelString = channelParts.join(' ');
 				if (channelString) {
-					channels.push(
-						this.parseTemplate(channelString, schema.template, schema.fields)
-					);
+					channels.push(this.parseTemplate(channelString, template, schema.fields));
 				}
 				channelIndex++;
 			}
@@ -116,8 +129,13 @@ export abstract class BaseFormatter implements PatternFormatter {
 			Object.assign(patternRow, globalMatch);
 		}
 
-		const spaceCount = (schema.template.match(/\s/g) || []).length;
+		let channelIndex = 0;
 		while (partIndex < parts.length) {
+			const template = resolveChannelTemplate(
+				schema,
+				patternHardwareChannelIndex(schema, channelIndex, this.virtualChannelMap)
+			);
+			const spaceCount = (template.match(/\s/g) || []).length;
 			const channelParts: string[] = [];
 			for (let i = 0; i <= spaceCount && partIndex < parts.length; i++) {
 				channelParts.push(parts[partIndex] || '');
@@ -125,13 +143,9 @@ export abstract class BaseFormatter implements PatternFormatter {
 			}
 			const channelString = channelParts.join(' ');
 			if (channelString) {
-				const channelMatch = this.parseTemplate(
-					channelString,
-					schema.template,
-					schema.fields
-				);
-				channels.push(channelMatch);
+				channels.push(this.parseTemplate(channelString, template, schema.fields));
 			}
+			channelIndex++;
 		}
 
 		return { patternRow, channels };
