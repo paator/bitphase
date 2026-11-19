@@ -24,6 +24,13 @@
 		type PatternEditorLanding
 	} from '../../services/pattern/pattern-navigation';
 	import {
+		horizontalEdgeScrollDirection,
+		insetHorizontalViewport,
+		nextAutoScrollLeft,
+		nextHorizontalScrollLeft,
+		type AxisSpan
+	} from '../../services/pattern/pattern-cursor-scroll';
+	import {
 		PatternVisibleRowsService,
 		type VisibleRow,
 		type VisibleRowsCache
@@ -376,6 +383,10 @@
 	let pressOnInactiveEditor = false;
 	let autoScrollInterval: number | null = null;
 	let autoScrollDirection: number = 0;
+	let autoScrollXInterval: number | null = null;
+	let autoScrollXDirection: -1 | 1 = 1;
+	let selectionPointerX = 0;
+	let selectionPointerY = 0;
 	let isEnterKeyHeld = $state(false);
 
 	const rowStringCache = new Cache<string, string>(500);
@@ -675,6 +686,23 @@
 		).selectedColumn;
 	}
 
+	function patternScrollViewport(scroller: HTMLElement): AxisSpan {
+		const rect = scroller.getBoundingClientRect();
+		const left = rect.left + scroller.clientLeft;
+		const right = left + scroller.clientWidth;
+		const obstacles: AxisSpan[] = [];
+		for (const child of scroller.children) {
+			if (!(child instanceof HTMLElement)) continue;
+			const position = getComputedStyle(child).position;
+			if (position !== 'sticky' && position !== 'fixed') continue;
+			const childRect = child.getBoundingClientRect();
+			if (childRect.width <= 0 || childRect.height <= 0) continue;
+			if (childRect.bottom <= rect.top || childRect.top >= rect.bottom) continue;
+			obstacles.push({ left: childRect.left, right: childRect.right });
+		}
+		return insetHorizontalViewport({ left, right }, obstacles);
+	}
+
 	export function scrollCursorIntoView(): void {
 		if (!canvas) return;
 		const scroller = canvas.closest('[data-song-pattern-scroll]');
@@ -691,15 +719,26 @@
 			return;
 		}
 		const canvasRect = canvas.getBoundingClientRect();
-		const scrollerRect = scroller.getBoundingClientRect();
-		const cellLeft = canvasRect.left + cell.x;
-		const cellRight = cellLeft + cell.width;
-		if (cellLeft < scrollerRect.left) {
-			scroller.scrollLeft -= scrollerRect.left - cellLeft;
-		} else if (cellRight > scrollerRect.right) {
-			scroller.scrollLeft += cellRight - scrollerRect.right;
+		const cellLeft = canvasRect.left + canvas.clientLeft + cell.x;
+		const next = nextHorizontalScrollLeft(
+			scroller.scrollLeft,
+			patternScrollViewport(scroller),
+			{ left: cellLeft, right: cellLeft + cell.width }
+		);
+		if (Math.abs(next - scroller.scrollLeft) > 0.5) {
+			scroller.scrollLeft = next;
 		}
 	}
+
+	$effect(() => {
+		if (!isActive) return;
+		void selectedColumn;
+		void canvasWidth;
+		const frame = requestAnimationFrame(() => {
+			untrack(() => scrollCursorIntoView());
+		});
+		return () => cancelAnimationFrame(frame);
+	});
 
 	export function getCanvas(): HTMLCanvasElement | undefined {
 		return canvas;
@@ -893,7 +932,7 @@
 		isSelecting = false;
 		mouseDownCell = null;
 		pressOnInactiveEditor = false;
-		stopAutoScroll();
+		stopSelectionAutoScroll();
 		window.removeEventListener('mousemove', handleGlobalMouseMove);
 		window.removeEventListener('mouseup', handleCanvasMouseUp);
 		scheduleDraw();
@@ -1815,6 +1854,7 @@
 			onSetSelectedRow: setSelectedRow,
 			onSetSelectedColumn: (column: number) => {
 				selectedColumn = column;
+				scrollCursorIntoView();
 			},
 			onSetCurrentPatternOrderIndex: (index: number) => {
 				currentPatternOrderIndex = index;
@@ -2130,6 +2170,7 @@
 		autoScrollDirection = direction;
 		autoScrollInterval = window.setInterval(() => {
 			moveRow(autoScrollDirection);
+			updateSelectionFromPointer(selectionPointerX, selectionPointerY);
 		}, 50);
 	}
 
@@ -2141,7 +2182,73 @@
 		}
 	}
 
+	function scrollSelectionHorizontally(direction: -1 | 1): void {
+		if (!canvas) return;
+		const scroller = canvas.closest('[data-song-pattern-scroll]');
+		if (!(scroller instanceof HTMLElement)) return;
+		const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+		const next = nextAutoScrollLeft(
+			scroller.scrollLeft,
+			maxScroll,
+			direction,
+			Math.max(12, lineHeight)
+		);
+		if (Math.abs(next - scroller.scrollLeft) > 0.5) {
+			scroller.scrollLeft = next;
+		}
+		updateSelectionFromPointer(selectionPointerX, selectionPointerY);
+	}
+
+	function startAutoScrollX(direction: -1 | 1): void {
+		if (autoScrollXInterval !== null) {
+			if (autoScrollXDirection === direction) return;
+			stopAutoScrollX();
+		}
+		autoScrollXDirection = direction;
+		autoScrollXInterval = window.setInterval(() => {
+			scrollSelectionHorizontally(direction);
+		}, 50);
+	}
+
+	function stopAutoScrollX(): void {
+		if (autoScrollXInterval !== null) {
+			clearInterval(autoScrollXInterval);
+			autoScrollXInterval = null;
+		}
+	}
+
+	function stopSelectionAutoScroll(): void {
+		stopAutoScroll();
+		stopAutoScrollX();
+	}
+
+	function updateSelectionFromPointer(clientX: number, clientY: number): void {
+		if (!canvas || !mouseDownCell || !currentPattern || !renderer || !textParser) return;
+		const rect = canvas.getBoundingClientRect();
+		const x = Math.min(Math.max(clientX - rect.left, 0), Math.max(0, rect.width - 1));
+		const y = Math.min(
+			Math.max(clientY - rect.top, lineHeight + 1),
+			Math.max(lineHeight + 1, canvasHeight - 1)
+		);
+		const cell = findCellAtPosition(x, y);
+		if (!cell || cell.orderIndex !== currentPatternOrderIndex) return;
+		if (isSelecting && selectionEndRow === cell.row && selectionEndColumn === cell.column) {
+			return;
+		}
+		if (!isSelecting) {
+			if (cell.row === mouseDownCell.row && cell.column === mouseDownCell.column) return;
+			isSelecting = true;
+			selectionStartRow = mouseDownCell.row;
+			selectionStartColumn = mouseDownCell.column;
+		}
+		selectionEndRow = cell.row;
+		selectionEndColumn = cell.column;
+		draw();
+	}
+
 	function handleGlobalMouseMove(event: MouseEvent): void {
+		selectionPointerX = event.clientX;
+		selectionPointerY = event.clientY;
 		if (!canvas || !isSelecting) return;
 
 		const rect = canvas.getBoundingClientRect();
@@ -2160,6 +2267,16 @@
 		} else {
 			stopAutoScroll();
 		}
+
+		const scroller = canvas.closest('[data-song-pattern-scroll]');
+		if (!(scroller instanceof HTMLElement)) return;
+		const direction = horizontalEdgeScrollDirection(
+			event.clientX,
+			patternScrollViewport(scroller),
+			scrollMargin
+		);
+		if (direction === 0) stopAutoScrollX();
+		else startAutoScrollX(direction);
 	}
 
 	let isHoveringLabel = $state(false);
@@ -2440,7 +2557,7 @@
 	}
 
 	function handleCanvasMouseUp(): void {
-		stopAutoScroll();
+		stopSelectionAutoScroll();
 		window.removeEventListener('mousemove', handleGlobalMouseMove);
 		window.removeEventListener('mouseup', handleCanvasMouseUp);
 		if (mouseDownCell && !isSelecting) {
