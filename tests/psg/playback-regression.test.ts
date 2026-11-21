@@ -5,6 +5,8 @@ import fs from 'fs';
 import { gunzipSync } from 'zlib';
 import { generatePSGBuffer } from '@/lib/services/file/ay/psg-export';
 import { generateTaymFile } from '@/lib/services/file/taym/taym-export';
+import { generateVgmBuffer } from '@/lib/services/file/vgm/vgm-export';
+import { VGM_DUAL_CHIP_CLOCK_BIT, VGM_VERSION_1_71 } from '@/lib/services/file/vgm/vgm-encoder';
 import { readTaym } from '@/lib/services/file/taym/codec';
 import { check } from '@/lib/services/file/taym/validate';
 import { FileImportService } from '@/lib/services/file/project/file-import';
@@ -15,11 +17,18 @@ import AYChipRegisterState from '../../public/ay/ay-chip-register-state.js';
 import TrackerPatternProcessor from '../../public/tracker/tracker-pattern-processor.js';
 import VirtualChannelMixer from '../../public/ay/virtual-channel-mixer.js';
 import { instrumentHasSample, advanceSamplePosition } from '../../public/ay/ay-sample-playback.js';
+import SaaAudioDriver, { resolveSaaHardwareState } from '../../public/saa/saa-audio-driver.js';
+import SaaVirtualChannelMixer from '../../public/saa/saa-virtual-channel-mixer.js';
+import SaaRegisterState from '../../public/saa/saa-register-state.js';
+import SaaState from '../../public/saa/saa-state.js';
+import { saaPeriodFromCode } from '../../public/saa/saa-levels.js';
 import {
 	TIMER_EFFECTS_DEMOS,
+	VGM_DEMOS,
 	aySongIndices,
 	demoStem,
 	isTimerEffectsDemo,
+	isVgmDemo,
 	psgReferenceFilenames
 } from './demo-dump-cases';
 
@@ -39,6 +48,18 @@ const taymProcessorModules = {
 	instrumentHasSample,
 	advanceSamplePosition
 };
+
+const saaProcessorModules = {
+	SaaState,
+	TrackerPatternProcessor,
+	SaaAudioDriver,
+	SaaRegisterState,
+	SaaVirtualChannelMixer,
+	resolveSaaHardwareState,
+	saaPeriodFromCode
+};
+
+const ANGEL_ISLAND_SAA_CLOCK = 7159090;
 
 function listDemoTracks(): string[] {
 	return fs
@@ -73,6 +94,34 @@ async function assertPSGMatchesReference(
 	).toBe(true);
 }
 
+function assertAngelIslandVgm(generated: ArrayBuffer): void {
+	const view = new DataView(generated);
+	const clock = view.getUint32(0xc8, true) >>> 0;
+	expect(view.getUint32(0x08, true)).toBe(VGM_VERSION_1_71);
+	expect(view.getUint32(0x74, true)).toBe(0);
+	expect(view.getUint32(0x84, true)).toBe(0);
+	expect(clock & ~VGM_DUAL_CHIP_CLOCK_BIT).toBe(ANGEL_ISLAND_SAA_CLOCK);
+	expect(clock & VGM_DUAL_CHIP_CLOCK_BIT).toBe(VGM_DUAL_CHIP_CLOCK_BIT);
+	expect(view.getUint32(0x1c, true)).toBeGreaterThan(0);
+	expect(view.getUint32(0x20, true)).toBeGreaterThan(0);
+}
+
+async function assertVgmMatchesReference(
+	project: Project,
+	btpFilename: string,
+	vgmFilename: string
+): Promise<void> {
+	const generated = await generateVgmBuffer(project, { saaModules: saaProcessorModules });
+	if (btpFilename === 'angel_island.btp') {
+		assertAngelIslandVgm(generated);
+	}
+	const expected = readReference(path.resolve(__dirname, '../vgm', vgmFilename), 'VGM');
+	expect(
+		Buffer.from(generated).equals(expected),
+		`Generated VGM (${generated.byteLength} bytes) must match reference (${expected.length} bytes) byte-for-byte`
+	).toBe(true);
+}
+
 async function assertTAYMMatchesReference(project: Project, taymFilename: string): Promise<void> {
 	const generated = await generateTaymFile(project, 0, {
 		modules: taymProcessorModules
@@ -89,7 +138,7 @@ const demoTracks = listDemoTracks();
 describe('demo track reference dumps', () => {
 	it('covers every demo track', () => {
 		expect(demoTracks.length).toBeGreaterThan(0);
-		for (const demo of TIMER_EFFECTS_DEMOS) {
+		for (const demo of [...TIMER_EFFECTS_DEMOS, ...VGM_DEMOS]) {
 			expect(demoTracks).toContain(demo);
 		}
 	});
@@ -101,6 +150,14 @@ describe('demo track reference dumps', () => {
 			it(`${stem}: dynamically generated TAYM matches reference dump`, async () => {
 				const project = await loadDemoProject(btpFilename);
 				await assertTAYMMatchesReference(project, `${stem}.taym`);
+			});
+			continue;
+		}
+
+		if (isVgmDemo(btpFilename)) {
+			it(`${stem}: dynamically generated VGM matches reference dump`, async () => {
+				const project = await loadDemoProject(btpFilename);
+				await assertVgmMatchesReference(project, btpFilename, `${stem}.vgm`);
 			});
 			continue;
 		}

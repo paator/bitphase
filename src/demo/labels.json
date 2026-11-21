@@ -5,5 +5,9 @@
 	"kizuna.btp": { "label": "Pator - Kizuna", "group": "1xAY" },
 	"bitphase_experiences.btp": { "label": "EA - Bitphase Experiences", "group": "1xAY" },
 	"atarized.btp": { "label": "Otomata Labs - Atarized", "group": "AY with timers" },
-	"a_bit_steps.btp": { "label": "Rei8bit - A bit Steps", "group": "AY with timers" }
+	"a_bit_steps.btp": { "label": "Rei8bit - A bit Steps", "group": "AY with timers" },
+	"angel_island.btp": {
+		"label": "Sega Sound Team (conv. by phase-mod) - Angel Island Act 1",
+		"group": "2xSAA"
+	}
 }

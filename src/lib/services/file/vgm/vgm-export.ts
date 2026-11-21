@@ -21,7 +21,11 @@ import {
 } from './vgm-ay-timers';
 import { expandAyFrameSampleWrites } from './vgm-ay-samples';
 import { appendSaaRegisterDiffs, SAA_VGM_REGISTER_COUNT, type SaaCaptureResult } from './vgm-saa';
-import { captureVgmProject, type VgmProjectCapture } from './vgm-shared-capture';
+import {
+	captureVgmProject,
+	type VgmProjectCapture,
+	type VgmProjectCaptureOptions
+} from './vgm-shared-capture';
 
 const MAX_SAME_CHIP = 2;
 
@@ -362,6 +366,37 @@ export function encodeCapturedVgm(
 	});
 }
 
+export async function generateVgmBuffer(
+	project: Project,
+	options?: VgmProjectCaptureOptions
+): Promise<ArrayBuffer> {
+	options?.onProgress?.(0, 'Preparing VGM export...');
+
+	const ayIndices = getSongIndicesByChip(project, 'ay').slice(0, MAX_SAME_CHIP);
+	const nesIndices = getSongIndicesByChip(project, 'nes').slice(0, MAX_SAME_CHIP);
+	const saaIndices = getSongIndicesByChip(project, 'saa').slice(0, MAX_SAME_CHIP);
+
+	if (ayIndices.length === 0 && nesIndices.length === 0 && saaIndices.length === 0) {
+		throw new Error('No AY, NES, or SAA songs to export');
+	}
+	if (
+		getSongIndicesByChip(project, 'ay').length > MAX_SAME_CHIP ||
+		getSongIndicesByChip(project, 'nes').length > MAX_SAME_CHIP ||
+		getSongIndicesByChip(project, 'saa').length > MAX_SAME_CHIP
+	) {
+		throw new Error('VGM supports at most 2 chips of the same type');
+	}
+
+	if (options?.abortSignal?.aborted) {
+		throw new Error('Export cancelled');
+	}
+
+	const captured = await captureVgmProject(project, ayIndices, nesIndices, options, saaIndices);
+
+	options?.onProgress?.(85, 'Encoding VGM...');
+	return encodeCapturedVgm(project, captured, ayIndices);
+}
+
 export async function exportToVGM(
 	project: Project,
 	_songIndex: number = 0,
@@ -369,40 +404,7 @@ export async function exportToVGM(
 	abortSignal?: AbortSignal
 ): Promise<void> {
 	try {
-		onProgress?.(0, 'Preparing VGM export...');
-
-		const ayIndices = getSongIndicesByChip(project, 'ay').slice(0, MAX_SAME_CHIP);
-		const nesIndices = getSongIndicesByChip(project, 'nes').slice(0, MAX_SAME_CHIP);
-		const saaIndices = getSongIndicesByChip(project, 'saa').slice(0, MAX_SAME_CHIP);
-
-		if (ayIndices.length === 0 && nesIndices.length === 0 && saaIndices.length === 0) {
-			throw new Error('No AY, NES, or SAA songs to export');
-		}
-		if (
-			getSongIndicesByChip(project, 'ay').length > MAX_SAME_CHIP ||
-			getSongIndicesByChip(project, 'nes').length > MAX_SAME_CHIP ||
-			getSongIndicesByChip(project, 'saa').length > MAX_SAME_CHIP
-		) {
-			throw new Error('VGM supports at most 2 chips of the same type');
-		}
-
-		if (abortSignal?.aborted) {
-			throw new Error('Export cancelled');
-		}
-
-		const captured = await captureVgmProject(
-			project,
-			ayIndices,
-			nesIndices,
-			{
-				onProgress,
-				abortSignal
-			},
-			saaIndices
-		);
-
-		onProgress?.(85, 'Encoding VGM...');
-		const buffer = encodeCapturedVgm(project, captured, ayIndices);
+		const buffer = await generateVgmBuffer(project, { onProgress, abortSignal });
 
 		if (abortSignal?.aborted) {
 			throw new Error('Export cancelled');

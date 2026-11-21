@@ -2,8 +2,14 @@ import type { Project } from '../../src/lib/models/project';
 
 export const TIMER_EFFECTS_DEMOS = ['a_bit_steps.btp', 'atarized.btp'] as const;
 
+export const VGM_DEMOS = ['angel_island.btp'] as const;
+
 export function isTimerEffectsDemo(btpFilename: string): boolean {
 	return (TIMER_EFFECTS_DEMOS as readonly string[]).includes(btpFilename);
+}
+
+export function isVgmDemo(btpFilename: string): boolean {
+	return (VGM_DEMOS as readonly string[]).includes(btpFilename);
 }
 
 export function demoStem(btpFilename: string): string {
