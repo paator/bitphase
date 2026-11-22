@@ -67,7 +67,14 @@
 		)
 	);
 
-	let selectedTableIndex = $state(0);
+	function initialTableIndex(): number {
+		const index = projectStore.tables.findIndex(
+			(table) => table.id === editorStateStore.currentTable
+		);
+		return index >= 0 ? index : 0;
+	}
+
+	let selectedTableIndex = $state(initialTableIndex());
 	let selectedTableRowIndices = $state<number[]>([]);
 	let tableListScrollRef: HTMLDivElement | null = $state(null);
 

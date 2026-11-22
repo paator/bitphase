@@ -109,7 +109,20 @@
 		)
 	);
 
-	let selectedInstrumentIndex = $state(0);
+	function initialInstrumentIndex(): number {
+		const chipType =
+			selectedChipType ||
+			getOrderedProjectChipTypes(chipProcessors)[0] ||
+			syncChipType ||
+			'ay';
+		const instruments = filterInstrumentsForChip(projectStore.instruments, chipType);
+		const targetId = editorStateStore.getCurrentInstrument(chipType);
+		if (!targetId) return 0;
+		const index = instruments.findIndex((instrument) => instrument.id === targetId);
+		return index >= 0 ? index : 0;
+	}
+
+	let selectedInstrumentIndex = $state(initialInstrumentIndex());
 	let instrumentListScrollRef: HTMLDivElement | null = $state(null);
 
 	$effect(() => {
