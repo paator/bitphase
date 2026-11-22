@@ -87,29 +87,35 @@ class NesAudioDriver {
 	processPatternRow(state, pattern, rowIndex, _patternRow, registerState) {
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const row = pattern.channels[channelIndex].rows[rowIndex];
-			const isMuted = state.channelMuted[channelIndex];
-
-			if (isMuted) {
-				this._silenceChannel(registerState, channelIndex);
-			} else {
-				this._processNote(state, channelIndex, row);
-				this._processInstrument(state, channelIndex, row);
-				if (row.note?.name === NOTE_RELEASE) {
-					releaseChannelInstrument(state, channelIndex);
-				}
-				processNesPulseWidthCycleEffect(state, channelIndex, row);
-				processNesSweepEffect(state, channelIndex, row);
-			}
-			const hardwareType = this._getHardwareChannelType(channelIndex);
-			processNesDeltaCounterEffect(state, channelIndex, row, hardwareType);
-			if (row.note?.name === 1 && hardwareType === NES_DPCM_HARDWARE_CHANNEL) {
-				cutNesDeltaCounter(state, channelIndex);
-			}
-			processNesLengthCounterEffect(state, channelIndex, row, hardwareType);
-			processNesEnvelopeModeEffect(state, channelIndex, row, hardwareType);
-			processNesDpcmPitchEffect(state, channelIndex, row, hardwareType);
-			processNesLinearCounterEffect(state, channelIndex, row, hardwareType);
+			if (row?.holdPlayback) continue;
+			this.applyChannelRow(state, channelIndex, row, registerState);
 		}
+	}
+
+	applyChannelRow(state, channelIndex, row, registerState) {
+		if (!row) return;
+		const isMuted = state.channelMuted[channelIndex];
+
+		if (isMuted) {
+			this._silenceChannel(registerState, channelIndex);
+		} else {
+			this._processNote(state, channelIndex, row);
+			this._processInstrument(state, channelIndex, row);
+			if (row.note?.name === NOTE_RELEASE) {
+				releaseChannelInstrument(state, channelIndex);
+			}
+			processNesPulseWidthCycleEffect(state, channelIndex, row);
+			processNesSweepEffect(state, channelIndex, row);
+		}
+		const hardwareType = this._getHardwareChannelType(channelIndex);
+		processNesDeltaCounterEffect(state, channelIndex, row, hardwareType);
+		if (row.note?.name === 1 && hardwareType === NES_DPCM_HARDWARE_CHANNEL) {
+			cutNesDeltaCounter(state, channelIndex);
+		}
+		processNesLengthCounterEffect(state, channelIndex, row, hardwareType);
+		processNesEnvelopeModeEffect(state, channelIndex, row, hardwareType);
+		processNesDpcmPitchEffect(state, channelIndex, row, hardwareType);
+		processNesLinearCounterEffect(state, channelIndex, row, hardwareType);
 	}
 
 	_silenceChannel(registerState, channelIndex) {

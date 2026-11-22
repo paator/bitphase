@@ -13,9 +13,27 @@ function createMockState() {
 
 function createMockPattern(rowsCount = 1) {
 	const channels = [
-		{ rows: [] as { note: { name: number; octave: number }; effects: (unknown)[]; table?: number }[] },
-		{ rows: [] as { note: { name: number; octave: number }; effects: (unknown)[]; table?: number }[] },
-		{ rows: [] as { note: { name: number; octave: number }; effects: (unknown)[]; table?: number }[] }
+		{
+			rows: [] as {
+				note: { name: number; octave: number };
+				effects: unknown[];
+				table?: number;
+			}[]
+		},
+		{
+			rows: [] as {
+				note: { name: number; octave: number };
+				effects: unknown[];
+				table?: number;
+			}[]
+		},
+		{
+			rows: [] as {
+				note: { name: number; octave: number };
+				effects: unknown[];
+				table?: number;
+			}[]
+		}
 	];
 	for (let r = 0; r < rowsCount; r++) {
 		channels[0].rows.push({ note: { name: 0, octave: 0 }, effects: [null] });
@@ -254,9 +272,7 @@ describe('TrackerPatternProcessor', () => {
 			const pattern = createMockPattern(1);
 			pattern.channels[0].rows[0] = {
 				note: { name: 2, octave: 1 },
-				effects: [
-					{ effect: 'A'.charCodeAt(0), delay: 1, parameter: 0x37 }
-				]
+				effects: [{ effect: 'A'.charCodeAt(0), delay: 1, parameter: 0x37 }]
 			};
 			const registerState = new AYChipRegisterState();
 			proc.parsePatternRow(pattern, 0, registerState);
@@ -555,6 +571,96 @@ describe('TrackerPatternProcessor', () => {
 			proc.processTables();
 			expect(registerState.envelopePeriod).toBe(0x10);
 		});
+
+		it('keeps the previous note sounding until the delayed note starts', () => {
+			const state = createMockState();
+			state.setInstruments([
+				{
+					id: '1',
+					rows: [{ tone: true, volume: 15, noise: false, envelope: false }],
+					loop: 0
+				}
+			]);
+			state.channelInstruments[0] = 0;
+			state.instrumentPositions[0] = 4;
+			state.channelToneAccumulator[0] = 12;
+			state.channelSamplePositions[0] = 3;
+			state.channelPatternEnvelopeShapes[0] = 8;
+			state.channelBaseNotes[0] = noteValue(4, 1);
+			state.channelSoundEnabled[0] = true;
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			const pattern = createMockPattern(1);
+			const registerState = new AYChipRegisterState();
+			registerState.channels[0].tone = 800;
+			registerState.envelopeShape = 8;
+			registerState.envelopePeriod = 0x40;
+			pattern.patternRows[0] = {
+				noiseValue: null,
+				envelopeValue: 0x55,
+				envelopeEffect: null
+			};
+			pattern.channels[0].rows[0] = {
+				note: { name: 3, octave: 1 },
+				instrument: 1,
+				envelopeShape: 12,
+				volume: 10,
+				effects: [{ effect: 7, delay: 0, parameter: 2 }]
+			};
+
+			proc.parsePatternRow(pattern, 0, registerState);
+
+			expect(state.channelBaseNotes[0]).toBe(noteValue(4, 1));
+			expect(state.instrumentPositions[0]).toBe(4);
+			expect(state.channelToneAccumulator[0]).toBe(12);
+			expect(state.channelSamplePositions[0]).toBe(3);
+			expect(state.channelPatternEnvelopeShapes[0]).toBe(8);
+			expect(registerState.channels[0].tone).toBe(800);
+			expect(registerState.envelopeShape).toBe(8);
+			expect(registerState.forceEnvelopeShapeWrite).toBe(false);
+			expect(registerState.envelopePeriod).toBe(0x55);
+			expect(state.channelInstruments[0]).toBe(0);
+			expect(state.channelPatternVolumes[0]).toBe(10);
+
+			proc.processTables();
+			proc.processTables();
+			expect(state.instrumentPositions[0]).toBe(4);
+			expect(registerState.channels[0].tone).toBe(800);
+			expect(registerState.forceEnvelopeShapeWrite).toBe(false);
+
+			proc.processTables();
+			expect(state.channelBaseNotes[0]).toBe(noteValue(3, 1));
+			expect(state.instrumentPositions[0]).toBe(0);
+			expect(state.channelToneAccumulator[0]).toBe(0);
+			expect(state.channelSamplePositions[0]).toBe(0);
+			expect(state.channelPatternEnvelopeShapes[0]).toBe(12);
+			expect(registerState.channels[0].tone).toBe(900);
+			expect(registerState.envelopeShape).toBe(12);
+			expect(registerState.forceEnvelopeShapeWrite).toBe(true);
+			expect(registerState.envelopePeriod).toBe(0x55);
+		});
+
+		it('restarts the instrument immediately when the note is not delayed', () => {
+			const state = createMockState();
+			state.setInstruments([{ id: '1', rows: [{ tone: true, volume: 15 }], loop: 0 }]);
+			state.channelInstruments[0] = 0;
+			state.instrumentPositions[0] = 4;
+			state.channelToneAccumulator[0] = 12;
+			const driver = new AYAudioDriver();
+			const proc = new TrackerPatternProcessor(state, driver, {});
+			const pattern = createMockPattern(1);
+			pattern.channels[0].rows[0] = {
+				note: { name: 3, octave: 1 },
+				instrument: 1,
+				effects: [null]
+			};
+
+			proc.parsePatternRow(pattern, 0, new AYChipRegisterState());
+
+			expect(state.channelBaseNotes[0]).toBe(noteValue(3, 1));
+			expect(state.instrumentPositions[0]).toBe(0);
+			expect(state.channelToneAccumulator[0]).toBe(0);
+		});
 	});
 
 	describe('volume slide', () => {
@@ -576,7 +682,11 @@ describe('TrackerPatternProcessor', () => {
 			const state = createMockState();
 			const proc = new TrackerPatternProcessor(state, new AYAudioDriver(), {});
 			const registerState = new AYChipRegisterState();
-			proc.parsePatternRow(slidePattern({ effect: 8, delay: 0, parameter: 0x03 }), 0, registerState);
+			proc.parsePatternRow(
+				slidePattern({ effect: 8, delay: 0, parameter: 0x03 }),
+				0,
+				registerState
+			);
 			expect(state.channelVolumeSlide[0]).toBe(0x03);
 			proc.processVolumeSlides();
 			expect(state.channelPatternVolumes[0]).toBe(12);
@@ -607,7 +717,11 @@ describe('TrackerPatternProcessor', () => {
 			proc.processVolumeSlides();
 			expect(state.channelPatternVolumes[0]).toBe(15);
 			expect(state.channelVolumeSlide[0]).toBe(0x20);
-			proc.parsePatternRow(slidePattern({ effect: 8, delay: 0, parameter: 0x20 }), 1, registerState);
+			proc.parsePatternRow(
+				slidePattern({ effect: 8, delay: 0, parameter: 0x20 }),
+				1,
+				registerState
+			);
 			expect(state.channelVolumeSlide[0]).toBe(0x20);
 		});
 

@@ -317,26 +317,38 @@ class SaaAudioDriver {
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const row = pattern.channels[channelIndex]?.rows?.[rowIndex];
 			if (!row) continue;
-			processSaaEffects(state, channelIndex, row, this._hardwareIndex(channelIndex));
-			if (state.channelMuted?.[channelIndex]) continue;
-			applyPatternSide(state, channelIndex, 'left', row.left);
-			applyPatternSide(state, channelIndex, 'right', row.right);
-			if (row.note?.name === NOTE_OFF) {
-				state.channelAmplitudeSliding[channelIndex] = 0;
-				resetInstrumentAccumulators(state, channelIndex);
+			if (row.holdPlayback) {
+				if (!state.channelMuted?.[channelIndex]) {
+					applyPatternSide(state, channelIndex, 'left', row.left);
+					applyPatternSide(state, channelIndex, 'right', row.right);
+				}
 				continue;
 			}
-			if (row.note?.name === NOTE_RELEASE) {
-				releaseChannelInstrument(state, channelIndex);
-				continue;
-			}
-			if (row.note && row.note.name !== 0) {
-				state.channelAmplitudeSliding[channelIndex] = 0;
-				resetInstrumentAccumulators(state, channelIndex);
-			}
-			const assigned = assignPatternRowInstrument(state, channelIndex, row);
-			if (assigned.changed) resetInstrumentAccumulators(state, channelIndex);
+			this.applyChannelRow(state, channelIndex, row);
 		}
+	}
+
+	applyChannelRow(state, channelIndex, row) {
+		if (!row) return;
+		processSaaEffects(state, channelIndex, row, this._hardwareIndex(channelIndex));
+		if (state.channelMuted?.[channelIndex]) return;
+		applyPatternSide(state, channelIndex, 'left', row.left);
+		applyPatternSide(state, channelIndex, 'right', row.right);
+		if (row.note?.name === NOTE_OFF) {
+			state.channelAmplitudeSliding[channelIndex] = 0;
+			resetInstrumentAccumulators(state, channelIndex);
+			return;
+		}
+		if (row.note?.name === NOTE_RELEASE) {
+			releaseChannelInstrument(state, channelIndex);
+			return;
+		}
+		if (row.note && row.note.name !== 0) {
+			state.channelAmplitudeSliding[channelIndex] = 0;
+			resetInstrumentAccumulators(state, channelIndex);
+		}
+		const assigned = assignPatternRowInstrument(state, channelIndex, row);
+		if (assigned.changed) resetInstrumentAccumulators(state, channelIndex);
 	}
 
 	processInstruments(state, registerState) {

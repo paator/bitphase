@@ -284,27 +284,40 @@ class AYAudioDriver {
 		for (let channelIndex = 0; channelIndex < pattern.channels.length; channelIndex++) {
 			const channel = pattern.channels[channelIndex];
 			const row = channel.rows[rowIndex];
-			this._storeSourceMask(state, channelIndex, row);
-			const isMuted = state.channelMuted[channelIndex];
-
-			if (isMuted) {
+			if (state.channelMuted[channelIndex]) {
+				this._storeSourceMask(state, channelIndex, row);
 				registerState.channels[channelIndex].volume = 0;
 				registerState.channels[channelIndex].mixer = {
 					tone: false,
 					noise: false,
 					envelope: false
 				};
-			} else {
-				this._processNote(state, channelIndex, row, registerState);
-				this._processInstrument(state, channelIndex, row);
-				if (row.note?.name === NOTE_RELEASE) {
-					releaseChannelInstrument(state, channelIndex);
-				}
-				this._applySamplePosition(state, channelIndex, row);
-				processAyTimerPwmEffect(state, channelIndex, row);
-				this._processEnvelope(state, channelIndex, row, patternRow, registerState);
+				continue;
 			}
+			if (row?.holdPlayback) {
+				this._storeSourceMask(state, channelIndex, row);
+				this._processEnvelope(state, channelIndex, row, patternRow, registerState);
+				continue;
+			}
+			this.applyChannelRow(state, channelIndex, row, registerState, patternRow);
 		}
+	}
+
+	applyChannelRow(state, channelIndex, row, registerState, patternRow = null) {
+		if (!row || state.channelMuted?.[channelIndex]) return;
+		this._storeSourceMask(state, channelIndex, row);
+		this._processNote(state, channelIndex, row, registerState);
+		this._processInstrument(state, channelIndex, row);
+		if (row.note?.name === NOTE_RELEASE) {
+			releaseChannelInstrument(state, channelIndex);
+		}
+		this._applySamplePosition(state, channelIndex, row);
+		processAyTimerPwmEffect(state, channelIndex, row);
+		const envelopeRow = patternRow ?? { envelopeValue: null, envelopeEffect: null };
+		this._processEnvelope(state, channelIndex, row, envelopeRow, registerState, {
+			value: patternRow != null,
+			effects: patternRow != null
+		});
 	}
 
 	_applySamplePosition(state, channelIndex, row) {
@@ -511,7 +524,27 @@ class AYAudioDriver {
 		return !!(effect && effect.effect === EffectAlgorithms.SONG_END);
 	}
 
-	_processEnvelope(state, channelIndex, row, patternRow, registerState) {
+	_envelopeValueNum(patternRow) {
+		if (patternRow?.envelopeValue == null || patternRow.envelopeValue < 0) return null;
+		return Number(patternRow.envelopeValue);
+	}
+
+	_applySharedPatternEnvelope(state, patternRow, registerState) {
+		const envelopeValueNum = this._envelopeValueNum(patternRow);
+		const hasPortamento =
+			patternRow?.envelopeEffect?.effect === EffectAlgorithms.PORTAMENTO &&
+			envelopeValueNum !== null &&
+			envelopeValueNum > 0;
+		if (envelopeValueNum !== null && envelopeValueNum > 0 && !hasPortamento) {
+			state.envelopeBaseValue = envelopeValueNum;
+			this._resetAllEnvelopeEffects(state);
+			registerState.envelopePeriod = envelopeValueNum;
+			return true;
+		}
+		return false;
+	}
+
+	_processEnvelope(state, channelIndex, row, patternRow, registerState, mode) {
 		if (!state.channelEnvelopeEnabled) return;
 		if (state.channelMuted[channelIndex]) return;
 		if (state.channelInstruments[channelIndex] < 0) {
@@ -521,6 +554,14 @@ class AYAudioDriver {
 			return;
 		}
 
+		if (row?.holdPlayback) {
+			this._applySharedPatternEnvelope(state, patternRow, registerState);
+			this._processEnvelopeEffects(state, channelIndex, row, patternRow);
+			return;
+		}
+
+		const applyValue = mode?.value !== false;
+		const applyEffects = mode?.effects !== false;
 		const shapeSet = isPatternEnvelopeShapeSet(row.envelopeShape);
 		const rawShape = typeof row.envelopeShape === 'number' ? row.envelopeShape : 0;
 		if (state.channelPatternEnvelopeShapes) {
@@ -533,21 +574,17 @@ class AYAudioDriver {
 			state,
 			channelIndex
 		);
-		const envelopeValueNum =
-			patternRow.envelopeValue != null && patternRow.envelopeValue >= 0
-				? Number(patternRow.envelopeValue)
-				: null;
+		const envelopeValueNum = this._envelopeValueNum(patternRow);
+		const appliedValue = applyValue
+			? this._applySharedPatternEnvelope(state, patternRow, registerState)
+			: false;
 
-		const hasPortamento =
-			patternRow.envelopeEffect?.effect === EffectAlgorithms.PORTAMENTO &&
-			envelopeValueNum !== null &&
-			envelopeValueNum > 0;
-
-		if (envelopeValueNum !== null && envelopeValueNum > 0 && !hasPortamento) {
-			state.envelopeBaseValue = envelopeValueNum;
-			this._resetAllEnvelopeEffects(state);
-			registerState.envelopePeriod = envelopeValueNum;
-		} else if (shapeSet && (envelopeValueNum === 0 || envelopeValueNum === null)) {
+		if (
+			applyValue &&
+			!appliedValue &&
+			shapeSet &&
+			(envelopeValueNum === 0 || envelopeValueNum === null)
+		) {
 			state.envelopeBaseValue = 0;
 			state.envelopeSlideCurrent = 0;
 			state.envelopeSlideDelta = 0;
@@ -595,7 +632,9 @@ class AYAudioDriver {
 			}
 		}
 
-		this._processEnvelopeEffects(state, channelIndex, row, patternRow);
+		if (applyEffects) {
+			this._processEnvelopeEffects(state, channelIndex, row, patternRow);
+		}
 	}
 
 	_resetAllEnvelopeEffects(state) {

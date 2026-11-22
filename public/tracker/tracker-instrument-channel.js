@@ -56,7 +56,7 @@ export function processChannelOnOffCounters(state, channelCount) {
 	}
 }
 
-export function assignPatternRowInstrument(state, channelIndex, row) {
+export function assignPatternRowInstrument(state, channelIndex, row, options = {}) {
 	if (!state.channelInstruments || !state.instruments || state.channelMuted?.[channelIndex]) {
 		return { changed: false, assigned: false, instrument: null, instrumentIndex: -1 };
 	}
@@ -78,8 +78,10 @@ export function assignPatternRowInstrument(state, channelIndex, row) {
 	}
 
 	state.channelInstruments[channelIndex] = instrumentIndex;
-	state.instrumentPositions[channelIndex] = 0;
-	clearChannelInstrumentRelease(state, channelIndex);
+	if (options.restartPlayback !== false) {
+		state.instrumentPositions[channelIndex] = 0;
+		clearChannelInstrumentRelease(state, channelIndex);
+	}
 	return {
 		changed: true,
 		assigned: true,

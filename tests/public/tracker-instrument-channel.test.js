@@ -24,6 +24,23 @@ describe('tracker-instrument-channel', () => {
 		expect(result.assigned).toBe(true);
 		expect(result.instrumentIndex).toBe(0);
 		expect(state.channelInstruments[0]).toBe(0);
+		expect(state.instrumentPositions[0]).toBe(0);
+	});
+
+	it('keeps playback position when restart is disabled', () => {
+		const playing = {
+			channelInstruments: [-1],
+			instrumentPositions: [6],
+			channelMacroReleased: [true],
+			channelMacroReleaseTick: [4],
+			instruments: [{ id: 1 }],
+			instrumentIdToIndex: new Map([[1, 0]]),
+			channelMuted: [false]
+		};
+		assignPatternRowInstrument(playing, 0, { instrument: 1 }, { restartPlayback: false });
+		expect(playing.channelInstruments[0]).toBe(0);
+		expect(playing.instrumentPositions[0]).toBe(6);
+		expect(playing.channelMacroReleased[0]).toBe(true);
 	});
 
 	it('clears instrument when pattern row instrument is missing', () => {

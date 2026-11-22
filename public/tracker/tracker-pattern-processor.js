@@ -1,5 +1,6 @@
 import EffectAlgorithms from './effect-algorithms.js';
 import {
+	assignPatternRowInstrument,
 	clearChannelInstrumentRelease,
 	NOTE_RELEASE,
 	releaseChannelInstrument
@@ -89,7 +90,9 @@ class TrackerPatternProcessor {
 			channels[channelIndex].rows[rowIndex] = {
 				...row,
 				note: { name: 0, octave: 0 },
-				effects: null
+				instrument: 0,
+				effects: null,
+				holdPlayback: true
 			};
 		}
 		try {
@@ -207,6 +210,7 @@ class TrackerPatternProcessor {
 		this._noteDelayPending[channelIndex] = { pattern, rowIndex, patternRow };
 		const row = pattern.channels[channelIndex]?.rows?.[rowIndex];
 		if (!row) return;
+		assignPatternRowInstrument(this.state, channelIndex, row, { restartPlayback: false });
 		this._processVolume(channelIndex, row);
 	}
 
@@ -230,6 +234,8 @@ class TrackerPatternProcessor {
 		if (row.note?.name === NOTE_RELEASE) {
 			releaseChannelInstrument(this.state, channelIndex);
 		}
+		if (this.state.channelMuted?.[channelIndex]) return;
+		this.chipAudioDriver.applyChannelRow?.(this.state, channelIndex, row, this._registerState);
 	}
 
 	tickNoteDelays() {
