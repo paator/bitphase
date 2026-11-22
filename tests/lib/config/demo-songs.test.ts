@@ -9,7 +9,10 @@ describe('demo song menu', () => {
 		expect(items).toContainEqual(['header', '2xAY']);
 		expect(items).toContainEqual(['normal', 'Ryu Umemoto (conv. by phase-mod) - Marina']);
 		expect(items).toContainEqual(['header', '2xSAA']);
-		expect(items).toContainEqual(['normal', 'Sega Sound Team - Angel Island Act 1']);
+		expect(items).toContainEqual([
+			'normal',
+			'Sega Sound Team (conv. by phase-mod) - Angel Island Act 1'
+		]);
 		expect(items).toContainEqual(['header', 'AY with timers']);
 		expect(items).toContainEqual(['normal', 'Otomata Labs - Atarized']);
 	});
