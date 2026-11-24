@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { InstrumentMacroField } from '@/lib/chips/base/instrument-macros';
+import { clampMacroValue, type InstrumentMacroField } from '@/lib/chips/base/instrument-macros';
+import { SAA_MIXER_MACRO_FIELDS } from '@/lib/chips/saa/mixer-macros';
 import { AY_MIXER_MACRO_FIELDS } from '@/lib/chips/ay/mixer-macros';
 import {
 	applyInstrumentMacroFlagText,
@@ -431,6 +432,25 @@ describe('macro sequence text', () => {
 		expect(instrumentMacroSequenceTextFields([integerField, booleanField])).toEqual([
 			integerField
 		]);
+	});
+
+	it('steps an envelope macro through real shape codes', () => {
+		const shape = SAA_MIXER_MACRO_FIELDS.find((field) => field.id === 'envelopeShape');
+		expect(shape).toBeDefined();
+		if (!shape) return;
+		expect(macroBarNeedsScroll(shape)).toBe(false);
+		expect(integerFromMacroBarNormalized(shape, 0, 0)).toBe(0);
+		expect(integerFromMacroBarNormalized(shape, 1 / 32, 0)).toBe(0x10);
+		expect(integerFromMacroBarNormalized(shape, 4 / 32, 0)).toBe(0x13);
+		expect(integerFromMacroBarNormalized(shape, 5 / 32, 0)).toBe(0x20);
+		expect(integerFromMacroBarNormalized(shape, 1, 0)).toBe(0x83);
+		expect(clampMacroValue(0x1f, shape)).toBe(0);
+		expect(clampMacroValue(4, shape)).toBe(0x30);
+		expect(clampMacroValue(0x32, shape)).toBe(0x32);
+		expect(parseMacroSequenceText('1F', shape, true)).toBeNull();
+		expect(parseMacroSequenceText('10 13 20', shape, true)?.values).toEqual([0x10, 0x13, 0x20]);
+		expect(integerMacroBarStyle(shape, 0x20, 'red')).toContain('0.15625');
+		expect(integerMacroBarStyle(shape, 0x13, 'red')).toContain('0.125');
 	});
 
 	it('leaves macros unchanged when the text matches the current sequence', () => {

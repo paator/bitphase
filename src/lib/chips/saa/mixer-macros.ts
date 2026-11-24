@@ -1,3 +1,8 @@
+import {
+	SAA_ENVELOPE_SHAPE_VALUES,
+	saaMigrateLegacyEnvelope
+} from '../../../../public/saa/saa-levels.js';
+import { saaEnvelopeMacroTooltip } from './envelope';
 import type { InstrumentMacroField } from '../base/instrument-macros';
 
 export const SAA_AMPLITUDE_SLIDE_OFF = 0;
@@ -129,6 +134,9 @@ export const SAA_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		min: 0,
 		max: 0x83,
 		hexDigits: 2,
+		allowedValues: SAA_ENVELOPE_SHAPE_VALUES,
+		normalizeValue: saaMigrateLegacyEnvelope,
+		valueTooltip: (value) => saaEnvelopeMacroTooltip(Number(value)),
 		defaultValue: 0
 	},
 	{

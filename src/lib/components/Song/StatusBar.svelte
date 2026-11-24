@@ -128,8 +128,8 @@
 		}
 
 		if (selectedFieldKey === 'env0' || selectedFieldKey === 'env1') {
-			const group = selectedFieldKey === 'env0' ? 'A–C' : 'D–F';
-			return `Envelope ${group}. 00 is off. Blank keeps the current mode.`;
+			const channel = selectedFieldKey === 'env0' ? 'C' : 'F';
+			return `Envelope ${channel}. 00 is off. Blank keeps the current mode.`;
 		}
 
 		if (selectedFieldKey === 'noiseValue') {

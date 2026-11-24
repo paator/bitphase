@@ -62,9 +62,9 @@ Work in progress. Six channels, **A** through **F**, split into two groups of th
 | Label | Where     | What it is                                      |
 | ----- | --------- | ----------------------------------------------- |
 | N     | before A  | Noise for channels A–C (one hex digit)          |
-| E     | before C  | Envelope shape for A–C (two hex digits)         |
+| E     | before C  | Envelope shape for channel C (two hex digits)   |
 | N     | before D  | Noise for channels D–F                          |
-| E     | before F  | Envelope shape for D–F                          |
+| E     | before F  | Envelope shape for channel F                    |
 
 Each channel is:
 

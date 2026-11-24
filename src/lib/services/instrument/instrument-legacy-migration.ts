@@ -9,7 +9,6 @@ import { AY_TIMER_MACRO_FIELDS } from '../../chips/ay/ay-timer-macros';
 import { normalizeLegacyTimerRow } from '../../chips/ay/instrument';
 import { NES_APU_MACRO_FIELDS } from '../../chips/nes/apu-macros';
 import { SAA_MIXER_MACRO_FIELDS } from '../../chips/saa/mixer-macros';
-import { saaMigrateLegacyEnvelope } from '../../../../public/saa/saa-levels.js';
 import { Instrument } from '../../models/song';
 
 export type LegacyInstrument = Instrument & {
@@ -22,20 +21,6 @@ export type LegacyInstrument = Instrument & {
 	timerPwmSweepMin?: number;
 	timerPwmSweep?: number;
 };
-
-function migrateSaaEnvelopeShapes(macros: InstrumentMacros): InstrumentMacros {
-	const shape = macros.envelopeShape;
-	if (!shape) return macros;
-	return {
-		...macros,
-		envelopeShape: {
-			...shape,
-			values: shape.values.map((value) =>
-				typeof value === 'number' ? saaMigrateLegacyEnvelope(value) : value
-			)
-		}
-	};
-}
 
 function mixerFieldsForChip(chipType: string): readonly InstrumentMacroField[] {
 	if (chipType === 'nes') return NES_APU_MACRO_FIELDS;
@@ -83,7 +68,7 @@ export function migrateLegacyInstrument(instrument: LegacyInstrument): Instrumen
 	delete migrated.timerLoop;
 
 	if (mixerMacros) {
-		migrated.macros = chipType === 'saa' ? migrateSaaEnvelopeShapes(mixerMacros) : mixerMacros;
+		migrated.macros = mixerMacros;
 	}
 
 	if (chipType === 'ay') {

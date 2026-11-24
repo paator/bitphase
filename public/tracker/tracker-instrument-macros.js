@@ -1,3 +1,5 @@
+import { SAA_ENVELOPE_SHAPE_VALUES, saaMigrateLegacyEnvelope } from '../saa/saa-levels.js';
+
 export const INSTRUMENT_MACRO_MAX_LENGTH = 512;
 
 export function clampInstrumentMacroLoop(loop, length) {
@@ -246,7 +248,15 @@ const SAA_MIXER_FIELDS = [
 	{ id: 'noise', kind: 'boolean', defaultValue: false },
 	{ id: 'noiseAdd', kind: 'integer', min: -3, max: 3, defaultValue: 0 },
 	{ id: 'noiseAccumulation', kind: 'boolean', defaultValue: false },
-	{ id: 'envelopeShape', kind: 'integer', min: 0, max: 0x83, defaultValue: 0 },
+	{
+		id: 'envelopeShape',
+		kind: 'integer',
+		min: 0,
+		max: 0x83,
+		defaultValue: 0,
+		allowedValues: SAA_ENVELOPE_SHAPE_VALUES,
+		normalizeValue: saaMigrateLegacyEnvelope
+	},
 	{ id: 'retriggerEnvelope', kind: 'boolean', defaultValue: false }
 ];
 
@@ -294,6 +304,13 @@ function clampFieldValue(value, field) {
 	if (field.id === 'amplitudeSlide') {
 		if (value === AY_AMPLITUDE_SLIDE_UP || value === AY_AMPLITUDE_SLIDE_DOWN) return value;
 		return AY_AMPLITUDE_SLIDE_OFF;
+	}
+	if (typeof field.normalizeValue === 'function') {
+		value = field.normalizeValue(value);
+	}
+	if (Array.isArray(field.allowedValues) && field.allowedValues.length > 0) {
+		const numeric = value | 0;
+		return field.allowedValues.includes(numeric) ? numeric : field.defaultValue;
 	}
 	if (field.kind === 'enum') {
 		return clampInteger(

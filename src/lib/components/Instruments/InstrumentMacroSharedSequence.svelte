@@ -13,6 +13,7 @@
 		type InstrumentMacro,
 		type InstrumentMacroField,
 		type InstrumentMacroValue,
+		type InstrumentMacroValueTooltip,
 		type InstrumentMacros
 	} from '../../chips/base/instrument-macros';
 	import {
@@ -139,6 +140,7 @@
 		label: string;
 		detail: string;
 		accentColor: string;
+		rich: InstrumentMacroValueTooltip | null;
 	} | null>(null);
 	let previousLength: number | null = null;
 	let viewMinOverride = $state<Record<string, number>>({});
@@ -184,7 +186,8 @@
 			y: clientY,
 			label: field.title,
 			detail: '',
-			accentColor: instrumentMacroAccentColor(field.accent)
+			accentColor: instrumentMacroAccentColor(field.accent),
+			rich: null
 		};
 	}
 
@@ -195,12 +198,14 @@
 		clientX: number,
 		clientY: number
 	): void {
+		const rich = field.valueTooltip?.(value) ?? null;
 		hoverTooltip = {
 			x: clientX,
 			y: clientY,
-			label: field.title,
-			detail: `Step ${index}: ${formatInstrumentMacroValue(field, value, asHex)}`,
-			accentColor: instrumentMacroAccentColor(field.accent)
+			label: rich ? `Step ${index} · ${rich.heading}` : field.title,
+			detail: rich ? '' : `Step ${index}: ${formatInstrumentMacroValue(field, value, asHex)}`,
+			accentColor: instrumentMacroAccentColor(field.accent),
+			rich
 		};
 	}
 
@@ -360,7 +365,8 @@
 				y: event.clientY,
 				label: `${label} length`,
 				detail: `${sequenceLength} ${sequenceLength === 1 ? 'step' : 'steps'}`,
-				accentColor
+				accentColor,
+				rich: null
 			};
 			applyLengthFromClientX(event.clientX);
 			return;
@@ -371,7 +377,8 @@
 				y: event.clientY,
 				label: `${label} loop`,
 				detail: `Step ${loopIndex}`,
-				accentColor
+				accentColor,
+				rich: null
 			};
 			applyLoopFromClientX(event.clientX);
 			return;
@@ -382,7 +389,8 @@
 				y: event.clientY,
 				label: `${label} release`,
 				detail: `Step ${releaseIndex}`,
-				accentColor: 'var(--color-pattern-note-off)'
+				accentColor: 'var(--color-pattern-note-off)',
+				rich: null
 			};
 			applyReleaseFromClientX(event.clientX);
 			return;
@@ -646,5 +654,6 @@
 		y={hoverTooltip?.y ?? 0}
 		label={hoverTooltip?.label ?? ''}
 		detail={hoverTooltip?.detail ?? ''}
-		accentColor={hoverTooltip?.accentColor ?? accentColor} />
+		accentColor={hoverTooltip?.accentColor ?? accentColor}
+		rich={hoverTooltip?.rich ?? null} />
 </section>

@@ -636,7 +636,7 @@ describe('SAA tone playback', () => {
 		driver.processInstruments(state, registers);
 		expect(registers.envelope0).toBe(0x96);
 		state.instrumentPositions = [0, 0, 0];
-		state.instruments[0].macros.envelopeShape = { values: [7], loop: 0 };
+		state.instruments[0].macros.envelopeShape = { values: [0x1f], loop: 0 };
 		driver.processInstruments(state, registers);
 		expect(registers.envelope0).toBe(0x96);
 	});

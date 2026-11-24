@@ -594,7 +594,7 @@ describe('FileImportService', () => {
 					id: '01',
 					name: 'lead',
 					chipType: 'saa',
-					macros: { envelopeShape: { values: [4, 0, 1], loop: 0 } }
+					macros: { envelopeShape: { values: [4, 0, 1, 0x1f], loop: 0 } }
 				}
 			]
 		});
@@ -604,6 +604,6 @@ describe('FileImportService', () => {
 		expect(row?.env0).toBe(0x30);
 		expect(row?.env1).toBe(0x32);
 		expect(row?.noise0).toBe(0);
-		expect(project.instruments[0]?.macros?.envelopeShape?.values).toEqual([0x30, 0, 0x32]);
+		expect(project.instruments[0]?.macros?.envelopeShape?.values).toEqual([0x30, 0, 0x32, 0]);
 	});
 });

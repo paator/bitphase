@@ -110,6 +110,9 @@
 	import type { UserScript } from '../../services/user-scripts/types';
 	import { PatternTemplateParser } from '../../services/pattern/editing/pattern-template-parsing';
 	import { ContextMenu } from '../Menu';
+	import InstrumentMacroHoverTooltip from '../Instruments/InstrumentMacroHoverTooltip.svelte';
+	import { saaEnvelopeColumnTooltip } from '../../chips/saa/envelope';
+	import type { InstrumentMacroValueTooltip } from '../../chips/base/instrument-macros';
 	import type { MenuItem } from '../Menu/types';
 	import {
 		ACTION_PLAY_FROM_ROW,
@@ -2280,12 +2283,72 @@
 	}
 
 	let isHoveringLabel = $state(false);
+	let envelopeHover = $state<{
+		x: number;
+		y: number;
+		label: string;
+		rich: InstrumentMacroValueTooltip;
+	} | null>(null);
 
 	function handleMouseLeave(): void {
+		envelopeHover = null;
 		if (canvas) {
 			canvas.style.cursor = 'default';
 			isHoveringLabel = false;
 		}
+	}
+
+	function envelopeCellAt(
+		x: number,
+		y: number
+	): { pattern: Pattern; row: number; fieldKey: 'env0' | 'env1' } | null {
+		if (!canvas || !currentPattern || !renderer || !textParser) return null;
+		if (y <= lineHeight) return null;
+		const visibleRows = getVisibleRows(currentPattern);
+		let closestRow: (typeof visibleRows)[0] | null = null;
+		let minRowDistance = Infinity;
+		for (const row of visibleRows) {
+			if (row.isEmpty || row.rowIndex < 0 || row.patternIndex < 0) continue;
+			const distance = Math.abs(y - (row.displayIndex * lineHeight + lineHeight / 2));
+			if (distance < minRowDistance) {
+				minRowDistance = distance;
+				closestRow = row;
+			}
+		}
+		if (!closestRow) return null;
+		const pattern = patterns.find((item) => item.id === closestRow.patternIndex);
+		if (!pattern) return null;
+		const positions = getCellPositions(
+			getPatternRowData(pattern, closestRow.rowIndex),
+			closestRow.rowIndex
+		);
+		const cell = positions[getColumnAtX(positions, x)];
+		const fieldKey = cell?.fieldKey;
+		if (!cell || (fieldKey !== 'env0' && fieldKey !== 'env1')) return null;
+		if (x < cell.x || x > cell.x + cell.width) return null;
+		return { pattern, row: closestRow.rowIndex, fieldKey };
+	}
+
+	function updateEnvelopeHover(clientX: number, clientY: number, x: number, y: number): void {
+		if (schema.chipType !== 'saa' || mouseDownCell || playbackStore.isPlaying) {
+			envelopeHover = null;
+			return;
+		}
+		const hit = envelopeCellAt(x, y);
+		if (!hit) {
+			envelopeHover = null;
+			return;
+		}
+		const { pattern, row, fieldKey } = hit;
+		const raw = pattern.patternRows[row]?.[fieldKey];
+		const rich = saaEnvelopeColumnTooltip(typeof raw === 'number' ? raw : 0);
+		const channel = fieldKey === 'env0' ? 'C' : 'F';
+		envelopeHover = {
+			x: clientX,
+			y: clientY,
+			label: `Envelope ${channel} · ${rich.heading}`,
+			rich
+		};
 	}
 
 	function handleMouseEnter(event: MouseEvent): void {
@@ -2355,6 +2418,7 @@
 	}
 
 	function handleCanvasMouseDown(event: MouseEvent): void {
+		envelopeHover = null;
 		if (!canvas || !currentPattern || !renderer || !textParser) return;
 		if (event.button === 2) return;
 
@@ -2525,6 +2589,8 @@
 		const rect = canvas.getBoundingClientRect();
 		const x = event.clientX - rect.left;
 		const y = event.clientY - rect.top;
+
+		updateEnvelopeHover(event.clientX, event.clientY, x, y);
 
 		const wasHoveringLabel = isHoveringLabel;
 		isHoveringLabel = y <= lineHeight;
@@ -3838,6 +3904,14 @@
 			class="pointer-events-none absolute left-px z-[1]"
 			style="top: calc({lineHeight}px + 1px); width: {canvasWidth}px; height: {CHANNEL_LEVEL_STRIP_HEIGHT}px;">
 		</canvas>
+
+		<InstrumentMacroHoverTooltip
+			visible={envelopeHover !== null}
+			x={envelopeHover?.x ?? 0}
+			y={envelopeHover?.y ?? 0}
+			label={envelopeHover?.label ?? ''}
+			accentColor="var(--color-pattern-envelope)"
+			rich={envelopeHover?.rich ?? null} />
 
 		<ContextMenu
 			position={contextMenuPosition}

@@ -24,6 +24,24 @@ export type InstrumentMacroEnumOption = {
 	bar?: boolean;
 };
 
+export type InstrumentMacroTooltipSeries = {
+	levels: readonly number[];
+};
+
+export type InstrumentMacroTooltipLegend = {
+	label: string;
+	levels: readonly number[];
+	active: boolean;
+};
+
+export type InstrumentMacroValueTooltip = {
+	heading: string;
+	detail: string;
+	series?: readonly InstrumentMacroTooltipSeries[];
+	legend?: readonly InstrumentMacroTooltipLegend[];
+	hint?: string;
+};
+
 export type InstrumentMacroField = {
 	id: string;
 	label: string;
@@ -35,6 +53,9 @@ export type InstrumentMacroField = {
 	min?: number;
 	max?: number;
 	hexDigits?: number;
+	allowedValues?: readonly number[];
+	normalizeValue?: (value: number) => number;
+	valueTooltip?: (value: InstrumentMacroValue) => InstrumentMacroValueTooltip | null;
 	defaultValue: InstrumentMacroValue;
 	enumValues?: InstrumentMacroEnumOption[];
 	fromRow?: (row: Record<string, unknown>) => InstrumentMacroValue;
@@ -456,7 +477,11 @@ export function clampMacroValue(value: unknown, field: InstrumentMacroField): In
 		return typeof value === 'string' ? value : String(value ?? field.defaultValue);
 	}
 	const parsed = Number(value);
-	const numeric = Number.isFinite(parsed) ? Math.round(parsed) : Number(field.defaultValue);
+	const rounded = Number.isFinite(parsed) ? Math.round(parsed) : Number(field.defaultValue);
+	const numeric = field.normalizeValue ? field.normalizeValue(rounded) : rounded;
+	if (field.allowedValues?.length) {
+		return field.allowedValues.includes(numeric) ? numeric : Number(field.defaultValue);
+	}
 	if (field.kind === 'enum' && field.enumValues?.length) {
 		return field.enumValues.some((option) => option.value === numeric)
 			? numeric
@@ -476,6 +501,11 @@ export function macroValueToNormalized(
 	}
 	if (field.kind === 'waveform') {
 		return 0;
+	}
+	if (field.allowedValues && field.allowedValues.length > 1) {
+		const index = field.allowedValues.indexOf(Number(value));
+		const at = index < 0 ? 0 : index;
+		return at / (field.allowedValues.length - 1);
 	}
 	if (field.kind === 'enum' && field.enumValues?.length) {
 		if (field.min !== undefined && field.max !== undefined && field.max > field.min) {
@@ -501,6 +531,10 @@ export function normalizedToMacroValue(
 	}
 	if (field.kind === 'waveform') {
 		return String(field.defaultValue);
+	}
+	if (field.allowedValues && field.allowedValues.length > 1) {
+		const index = Math.round(clamped * (field.allowedValues.length - 1));
+		return field.allowedValues[index] ?? Number(field.defaultValue);
 	}
 	if (field.kind === 'enum' && field.enumValues?.length) {
 		if (field.min !== undefined && field.max !== undefined && field.max > field.min) {

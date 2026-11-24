@@ -118,7 +118,20 @@ export function formatInstrumentMacroValue(
 	return formatMacroFieldNumber(field, Number(value), asHex);
 }
 
+function macroBarUsesAllowedValues(field: InstrumentMacroField): boolean {
+	return (field.allowedValues?.length ?? 0) > 1;
+}
+
+function macroBarCoordinate(field: InstrumentMacroField, value: InstrumentMacroValue): number {
+	if (!macroBarUsesAllowedValues(field)) return Number(value);
+	const index = field.allowedValues!.indexOf(Number(value));
+	return index < 0 ? 0 : index;
+}
+
 export function macroBarNumericRange(field: InstrumentMacroField): { min: number; max: number } {
+	if (macroBarUsesAllowedValues(field)) {
+		return { min: 0, max: field.allowedValues!.length - 1 };
+	}
 	return {
 		min: field.min ?? 0,
 		max: field.max ?? 1
@@ -179,7 +192,13 @@ export function integerFromMacroBarNormalized(
 ): InstrumentMacroValue {
 	const span = macroBarVisibleSpan(field);
 	const clamped = Math.max(0, Math.min(1, normalized));
-	return clampMacroValue(Math.round(viewMin + clamped * span), field);
+	const coordinate = Math.round(viewMin + clamped * span);
+	if (macroBarUsesAllowedValues(field)) {
+		const steps = field.allowedValues!;
+		const index = Math.max(0, Math.min(steps.length - 1, coordinate));
+		return steps[index]!;
+	}
+	return clampMacroValue(coordinate, field);
 }
 
 export function macroBarZeroNormalized(
@@ -396,7 +415,7 @@ export function macroBarOverflowDirection(
 	viewMin = defaultMacroBarViewMin(field)
 ): MacroBarOverflow {
 	const span = macroBarVisibleSpan(field);
-	const n = Number(value);
+	const n = macroBarCoordinate(field, value);
 	const signed =
 		field.min !== undefined && field.max !== undefined && field.min < 0 && field.max > 0;
 	const valueNorm = (n - viewMin) / span;
@@ -422,7 +441,7 @@ export function integerMacroBarStyle(
 	const signed =
 		field.min !== undefined && field.max !== undefined && field.min < 0 && field.max > 0;
 	const range = `100% - ${MACRO_BAR_INSET * 2}px`;
-	const valueNorm = (Number(value) - viewMin) / span;
+	const valueNorm = (macroBarCoordinate(field, value) - viewMin) / span;
 	if (!signed) {
 		const heightNorm = Math.max(0, Math.min(1, valueNorm));
 		return `bottom: ${MACRO_BAR_INSET}px; left: 2px; right: 2px; height: calc((${range}) * ${heightNorm}); background: ${accent}`;
@@ -573,6 +592,9 @@ function parseMacroSequenceToken(
 		maxDigits: field.hexDigits
 	});
 	if (parsed === null) return null;
+	if (field.allowedValues?.length) {
+		return field.allowedValues.includes(parsed) ? parsed : null;
+	}
 	if (field.kind === 'enum' && field.enumValues?.length) {
 		return field.enumValues.some((option) => option.value === parsed) ? parsed : null;
 	}

@@ -44,6 +44,13 @@ export const SAA_LEGACY_ENVELOPE_BYTES = [
 
 const ENVELOPE_HARDWARE_WAVE = [0, 1, 2, 3, 6, 7, 4, 5, 0];
 
+export const SAA_ENVELOPE_SHAPE_VALUES = [0];
+for (let waveform = 1; waveform <= 8; waveform++) {
+	for (let variant = 0; variant <= 3; variant++) {
+		SAA_ENVELOPE_SHAPE_VALUES.push((waveform << 4) | variant);
+	}
+}
+
 export function saaEnvelopeByteFromCode(code) {
 	const waveform = (code >> 4) & 0xf;
 	const variant = code & 0xf;

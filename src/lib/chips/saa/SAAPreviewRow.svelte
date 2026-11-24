@@ -35,7 +35,7 @@
 	const noiseTitle =
 		'Noise clock for every preview channel: 0 high, 1 mid, 2 low, 3 locked. Blank keeps the current clock.';
 	const envelopeTitle =
-		'Envelope shape, same as the E column. Two hex digits. 00 is off. Blank leaves the current mode. The shape plays on the third channel of each group, clocked by the second channel.';
+		'Envelope shape, same as the E column. Two hex digits. 00 is off. Blank leaves the current mode. Heard on C and F, clocked by B and E.';
 	const clockTitle =
 		'Note on the second channel. It sets how fast the envelope runs. Blank leaves that channel empty, so the envelope stays on its first step. This channel stays silent.';
 
