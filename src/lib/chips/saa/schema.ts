@@ -132,7 +132,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 		env0: {
 			key: 'env0',
 			type: 'hex',
-			length: 1,
+			length: 2,
 			color: 'patternEnvelope',
 			selectable: 'character',
 			allowZeroValue: true,
@@ -143,7 +143,7 @@ export const SAA_CHIP_SCHEMA: ChipSchema = {
 		env1: {
 			key: 'env1',
 			type: 'hex',
-			length: 1,
+			length: 2,
 			color: 'patternEnvelope',
 			selectable: 'character',
 			allowZeroValue: true,

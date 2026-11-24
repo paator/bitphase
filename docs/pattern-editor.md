@@ -62,7 +62,7 @@ Work in progress. Six channels, **A** through **F**, split into two groups of th
 | Label | Where     | What it is                                      |
 | ----- | --------- | ----------------------------------------------- |
 | N     | before A  | Noise for channels A–C (one hex digit)          |
-| E     | before C  | Envelope shape for A–C (one hex digit)          |
+| E     | before C  | Envelope shape for A–C (two hex digits)         |
 | N     | before D  | Noise for channels D–F                          |
 | E     | before F  | Envelope shape for D–F                          |
 
@@ -77,6 +77,7 @@ Each channel is:
 | Table      | `0`-`Z`, or `.`    | Ornament / arpeggio table                                 |
 | Left       | `0`-`F`, or `.`    | Left volume. `.` keeps the previous level                 |
 | Right      | `0`-`F`, or `.`    | Right volume                                              |
+| Envelope   | `00`-`83`, or `..` | Two hex digits. `00` is off. `..` leaves the current mode. The first digit is the waveform: `1` hold, `2`–`3` decay, `4`–`5` attack, `6`–`7` triangle, `8` on but silent. The first of each pair plays once and the second repeats. The second digit starts at `0` for 16 steps: add `1` to flip the right channel, add `2` for 8 steps |
 | Effect     | 4 chars, or `....` | Pattern effect - see [SAA1099 effects](/effects#saa1099) |
 
 Song fields for an SAA song are the chip clock (**SAM Coupé** at 8 MHz, or **CMS / Game Blaster** at 7.159 MHz), the interrupt rate (50 Hz or 60 Hz), and A4 tuning.

@@ -34,6 +34,7 @@ export type InstrumentMacroField = {
 	shareSequence?: boolean;
 	min?: number;
 	max?: number;
+	hexDigits?: number;
 	defaultValue: InstrumentMacroValue;
 	enumValues?: InstrumentMacroEnumOption[];
 	fromRow?: (row: Record<string, unknown>) => InstrumentMacroValue;

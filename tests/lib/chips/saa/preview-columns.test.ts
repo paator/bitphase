@@ -6,6 +6,7 @@ import {
 	applySaaPreviewColumns,
 	filterSaaEnvelopeInput,
 	filterSaaNoiseInput,
+	saaEnvelopeColumnValue,
 	saaPatternColumnValue
 } from '@/lib/chips/saa/preview-columns';
 
@@ -32,7 +33,12 @@ describe('saa preview columns', () => {
 		expect(saaPatternColumnValue('')).toBe(0);
 		expect(saaPatternColumnValue('0')).toBe(-1);
 		expect(saaPatternColumnValue('3')).toBe(3);
-		expect(saaPatternColumnValue('c')).toBe(12);
+		expect(saaEnvelopeColumnValue('')).toBe(0);
+		expect(saaEnvelopeColumnValue('0')).toBe(-1);
+		expect(saaEnvelopeColumnValue('00')).toBe(-1);
+		expect(saaEnvelopeColumnValue('3')).toBe(0x30);
+		expect(saaEnvelopeColumnValue('32')).toBe(0x32);
+		expect(saaEnvelopeColumnValue('c')).toBe(0);
 	});
 
 	it('keeps noise clocks 0-3 and envelope modes 0-C', () => {
@@ -40,9 +46,10 @@ describe('saa preview columns', () => {
 		expect(filterSaaNoiseInput('4', '1')).toBe('1');
 		expect(filterSaaNoiseInput('g', '3')).toBe('3');
 		expect(filterSaaNoiseInput('', '3')).toBe('');
-		expect(filterSaaEnvelopeInput('C', '')).toBe('C');
-		expect(filterSaaEnvelopeInput('d', 'A')).toBe('A');
-		expect(filterSaaEnvelopeInput('', 'A')).toBe('');
+		expect(filterSaaEnvelopeInput('32', '')).toBe('32');
+		expect(filterSaaEnvelopeInput('39', '32')).toBe('32');
+		expect(filterSaaEnvelopeInput('d', '30')).toBe('30');
+		expect(filterSaaEnvelopeInput('', '30')).toBe('');
 	});
 
 	it('writes the same noise and envelope onto both channel groups', () => {
@@ -60,10 +67,10 @@ describe('saa preview columns', () => {
 	it('plays an envelope on the third channel and clocks it from the second', () => {
 		const pattern = previewPattern(['OFF', 'OFF', 'OFF', 'C-4', 'OFF', 'OFF']);
 
-		applySaaPreviewColumns(pattern, { noise: '', envelope: 'A', clockNote: 'G-2' });
+		applySaaPreviewColumns(pattern, { noise: '', envelope: '31', clockNote: 'G-2' });
 
-		expect(pattern.patternRows[0].env0).toBe(10);
-		expect(pattern.patternRows[0].env1).toBe(10);
+		expect(pattern.patternRows[0].env0).toBe(0x31);
+		expect(pattern.patternRows[0].env1).toBe(0x31);
 		for (const channel of [0, 3]) expectNote(pattern, channel, NoteName.Off);
 		for (const channel of [1, 4]) {
 			expectNote(pattern, channel, NoteName.G, 2);

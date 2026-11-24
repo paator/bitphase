@@ -1,6 +1,7 @@
 import { syncSharedEffectColumnLayout } from '../../../chips/base/channel-effect-columns';
 import { applySchemaDefaults } from '../../../chips/base/schema';
 import { resolveSaaTuningTable, SAA_CHIP_SCHEMA, SAA_SAM_CLOCK } from '../../../chips/saa/schema';
+import { saaMigrateLegacyEnvelope } from '../../../../../public/saa/saa-levels.js';
 import { Project, Table } from '../../../models/project';
 import { Effect, EffectType, Instrument, Note, NoteName, Pattern, Song } from '../../../models/song';
 import { numberToInstrumentId } from '../../../utils/instrument-id';
@@ -691,7 +692,8 @@ function buildProject(
 					}
 					if (cell.envelope !== null) {
 						const field = channel < 3 ? 'env0' : 'env1';
-						pattern.patternRows[line][field] = cell.envelope === 0 ? -1 : cell.envelope;
+						pattern.patternRows[line][field] =
+							cell.envelope === 0 ? -1 : saaMigrateLegacyEnvelope(cell.envelope);
 					}
 					if (cell.invert !== null) {
 						pushEffect(pattern, channel, row, new Effect(EffectType.ChipSpecific, 1, cell.invert));

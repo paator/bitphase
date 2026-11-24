@@ -11,6 +11,7 @@
 		resolveSchemaField
 	} from '../../chips/base/channel-effect-columns';
 	import { describePatternEffect, getEffectFromPattern } from '../../chips/base/effect-status';
+	import { describeSaaEnvelope } from '../../chips/saa/envelope';
 	import { createTempoRowClock } from '../../services/playback/tempo-row-frames';
 
 	let {
@@ -127,7 +128,8 @@
 		}
 
 		if (selectedFieldKey === 'env0' || selectedFieldKey === 'env1') {
-			return 'Envelope mode for channels A-C or D-F. Hex 0-C. 0 is off. A blank cell leaves the current mode.';
+			const group = selectedFieldKey === 'env0' ? 'A–C' : 'D–F';
+			return `Envelope ${group}. 00 is off. Blank keeps the current mode.`;
 		}
 
 		if (selectedFieldKey === 'noiseValue') {
@@ -170,6 +172,14 @@
 			selectedChannelIndex
 		);
 		return describePatternEffect(effect, chip) ?? '';
+	});
+
+	const envelopeHint = $derived.by(() => {
+		if (playbackStore.isPlaying) return '';
+		if (!pattern || selectedRow < 0 || selectedRow >= pattern.length) return '';
+		if (selectedFieldKey !== 'env0' && selectedFieldKey !== 'env1') return '';
+		const value = pattern.patternRows[selectedRow]?.[selectedFieldKey];
+		return typeof value === 'number' ? describeSaaEnvelope(value) : 'blank, keeps current';
 	});
 
 	function patternsAtOrderIndex(
@@ -460,9 +470,9 @@
 		<div class="min-w-0 flex-1 truncate">
 			{helpMessage || '=== Ready ==='}
 		</div>
-		{#if effectHint}
+		{#if effectHint || envelopeHint}
 			<div class="shrink-0 text-[var(--color-app-text-secondary)]">
-				{effectHint}
+				{effectHint || envelopeHint}
 			</div>
 		{/if}
 	</div>

@@ -230,7 +230,7 @@ const AY_TIMER_FIELDS = [
 	}
 ];
 
-const SAA_VOLUME_FIELDS = [
+const SAA_MIXER_FIELDS = [
 	{ id: 'left', kind: 'integer', min: 0, max: 15, defaultValue: 15 },
 	{ id: 'right', kind: 'integer', min: 0, max: 15, defaultValue: 15 },
 	{
@@ -246,7 +246,7 @@ const SAA_VOLUME_FIELDS = [
 	{ id: 'noise', kind: 'boolean', defaultValue: false },
 	{ id: 'noiseAdd', kind: 'integer', min: -3, max: 3, defaultValue: 0 },
 	{ id: 'noiseAccumulation', kind: 'boolean', defaultValue: false },
-	{ id: 'envelopeShape', kind: 'integer', min: 0, max: 12, defaultValue: 0 },
+	{ id: 'envelopeShape', kind: 'integer', min: 0, max: 0x83, defaultValue: 0 },
 	{ id: 'retriggerEnvelope', kind: 'boolean', defaultValue: false }
 ];
 
@@ -424,10 +424,10 @@ export function sampleNesApuRow(instrument, tick, releaseTick = INSTRUMENT_MACRO
 	return sampleRow(resolveNesApuMacros(instrument), tick, NES_APU_FIELDS, releaseTick);
 }
 
-export function resolveSaaVolumeMacros(instrument) {
-	return resolveMacros(instrument, SAA_VOLUME_FIELDS);
+export function resolveSaaMixerMacros(instrument) {
+	return resolveMacros(instrument, SAA_MIXER_FIELDS);
 }
 
-export function sampleSaaVolumeRow(instrument, tick, releaseTick = INSTRUMENT_MACRO_NO_RELEASE) {
-	return sampleRow(resolveSaaVolumeMacros(instrument), tick, SAA_VOLUME_FIELDS, releaseTick);
+export function sampleSaaMixerRow(instrument, tick, releaseTick = INSTRUMENT_MACRO_NO_RELEASE) {
+	return sampleRow(resolveSaaMixerMacros(instrument), tick, SAA_MIXER_FIELDS, releaseTick);
 }

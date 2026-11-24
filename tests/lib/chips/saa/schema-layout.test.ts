@@ -40,8 +40,8 @@ describe('SAA pattern layout', () => {
 		const tokens = saaRow().split(/\s+/);
 		expect(tokens[1]).toBe('1');
 		expect(tokens[2]).toBe('C-4');
-		expect(tokens).toContain('4');
-		expect(tokens).toContain('2');
+		expect(tokens).toContain('04');
+		expect(tokens).toContain('02');
 	});
 
 	it('walks columns as noise, A B, envelope, C, noise, D E, envelope, F', () => {
@@ -141,7 +141,7 @@ describe('SAA pattern layout', () => {
 			expect(row.slice(pos, pos + 3)).toBe(notes[index]);
 		});
 		expect(end).toBe(row.length);
-		expect(row.slice(starts[6] - 2, starts[6])).toBe('2 ');
+		expect(row.slice(starts[6] - 3, starts[6])).toBe('02 ');
 	});
 
 	it('parses anchored noise and envelope shapes back onto the pattern row', () => {

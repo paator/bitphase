@@ -6,9 +6,14 @@ import {
 	releaseChannelInstrument
 } from '../tracker/tracker-instrument-channel.js';
 import EffectAlgorithms from '../tracker/effect-algorithms.js';
-import { sampleSaaVolumeRow } from '../tracker/tracker-instrument-macros.js';
+import { sampleSaaMixerRow } from '../tracker/tracker-instrument-macros.js';
 import { SAA_LEVEL_MAX } from './saa-constants.js';
-import { combineSaaLevel, SAA_TONE_CODE_MAX, saaPitchCode } from './saa-levels.js';
+import {
+	combineSaaLevel,
+	SAA_TONE_CODE_MAX,
+	saaEnvelopeByteFromCode,
+	saaPitchCode
+} from './saa-levels.js';
 import {
 	advanceSaaEffectTables,
 	applySaaAutoEnvelopeCommand,
@@ -26,9 +31,6 @@ const MIXER_FOLLOW_INSTRUMENT = 4;
 const ENVELOPE_CLOCK_CHANNELS = [1, 4];
 const ENVELOPE_CHANNEL_0 = 2;
 const ENVELOPE_CHANNEL_1 = 5;
-const ENVELOPE_BYTES = [
-	0x00, 0x96, 0x9e, 0x9a, 0x86, 0x8e, 0x8a, 0x97, 0x9f, 0x9b, 0x87, 0x8f, 0x8b
-];
 
 function silenceChannel(registerState, channelIndex) {
 	const channel = registerState.channels[channelIndex];
@@ -48,15 +50,16 @@ function applyNoiseClock(state, key, raw) {
 	state[key] = raw & 3;
 }
 
+function envelopeByteFromPattern(raw) {
+	if (raw === -1) return 0;
+	return saaEnvelopeByteFromCode(raw | 0);
+}
+
 function applyEnvelopeMode(state, byteKey, raw) {
-	if (raw === -1) {
-		state[byteKey] = ENVELOPE_BYTES[0];
-		return;
-	}
 	if (typeof raw !== 'number' || raw === 0) return;
-	const index = raw & 15;
-	if (index >= ENVELOPE_BYTES.length) return;
-	state[byteKey] = ENVELOPE_BYTES[index];
+	const byte = envelopeByteFromPattern(raw);
+	if (byte == null) return;
+	state[byteKey] = byte;
 }
 
 function envelopeCommandByte(state, hardwareIndex) {
@@ -66,8 +69,7 @@ function envelopeCommandByte(state, hardwareIndex) {
 }
 
 function envelopeByte(state, hardwareIndex, shape) {
-	const index = shape | 0;
-	const override = index > 0 && index < ENVELOPE_BYTES.length ? ENVELOPE_BYTES[index] : null;
+	const override = saaEnvelopeByteFromCode(shape | 0);
 	const commanded = override != null ? override : envelopeCommandByte(state, hardwareIndex);
 	return commanded == null ? 0 : commanded & 0xff;
 }
@@ -376,7 +378,7 @@ class SaaAudioDriver {
 				continue;
 			}
 			const row =
-				sampleSaaVolumeRow(
+				sampleSaaMixerRow(
 					instrument,
 					state.instrumentPositions[channelIndex] | 0,
 					channelInstrumentReleaseTick(state, channelIndex)

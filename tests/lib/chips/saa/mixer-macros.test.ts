@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { combineSaaLevel } from '../../../../public/saa/saa-levels.js';
 import { createDefaultInstrumentMacros } from '@/lib/chips/base/instrument-macros';
-import { SAA_VOLUME_MACRO_FIELDS } from '@/lib/chips/saa/volume-macros';
+import { SAA_MIXER_MACRO_FIELDS } from '@/lib/chips/saa/mixer-macros';
 
-describe('SAA volume macro', () => {
+describe('SAA mixer macro', () => {
 	it('defaults both sides to full and the slide to off', () => {
-		const macros = createDefaultInstrumentMacros(SAA_VOLUME_MACRO_FIELDS);
+		const macros = createDefaultInstrumentMacros(SAA_MIXER_MACRO_FIELDS);
 		expect(macros.left.values).toEqual([15]);
 		expect(macros.right.values).toEqual([15]);
 		expect(macros.amplitudeSlide.values).toEqual([0]);
-		expect(SAA_VOLUME_MACRO_FIELDS.map((field) => field.group)).toEqual([
+		expect(SAA_MIXER_MACRO_FIELDS.map((field) => field.group)).toEqual([
 			'Volume',
 			'Volume',
 			'Volume',

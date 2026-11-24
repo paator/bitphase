@@ -31,11 +31,11 @@
 	let envelope = $state('');
 	let clockNote = $state('');
 
-	const envelopeActive = $derived(envelope !== '' && envelope !== '0');
+	const envelopeActive = $derived(envelope !== '' && envelope !== '0' && envelope !== '00');
 	const noiseTitle =
 		'Noise clock for every preview channel: 0 high, 1 mid, 2 low, 3 locked. Blank keeps the current clock.';
 	const envelopeTitle =
-		'Envelope shape, same as the E column. 1-C play on the third channel of each group, clocked by the second channel. 0 is off. A blank cell leaves the current mode.';
+		'Envelope shape, same as the E column. Two hex digits. 00 is off. Blank leaves the current mode. The shape plays on the third channel of each group, clocked by the second channel.';
 	const clockTitle =
 		'Note on the second channel. It sets how fast the envelope runs. Blank leaves that channel empty, so the envelope stays on its first step. This channel stays silent.';
 
@@ -76,7 +76,7 @@
 	}
 
 	const hexInputClass =
-		'h-7 w-8 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50';
+		'h-7 rounded border border-[var(--color-app-border)] bg-[var(--color-app-surface)] px-1.5 uppercase disabled:cursor-not-allowed disabled:opacity-50';
 </script>
 
 {#snippet columnField(
@@ -84,14 +84,16 @@
 	title: string,
 	value: string,
 	setValue: (next: string) => void,
-	filter: (text: string, previous: string) => string
+	filter: (text: string, previous: string) => string,
+	maxlength = 1,
+	widthClass = 'w-8'
 )}
 	<label class="flex flex-col gap-0.5">
 		<span class="text-[var(--color-app-text-muted)]">{label}</span>
 		<input
 			type="text"
-			class={hexInputClass}
-			maxlength={1}
+			class="{hexInputClass} {widthClass}"
+			{maxlength}
 			{title}
 			aria-label={title}
 			disabled={playground.isDisabled}
@@ -138,7 +140,9 @@
 			envelopeTitle,
 			envelope,
 			(next) => (envelope = next),
-			filterSaaEnvelopeInput
+			filterSaaEnvelopeInput,
+			2,
+			'w-12'
 		)}
 		{#if envelopeActive}
 			<div class="flex flex-col gap-0.5">
@@ -162,7 +166,7 @@
 			<span class="text-[var(--color-app-text-muted)]">Table</span>
 			<input
 				type="text"
-				class={hexInputClass}
+				class="{hexInputClass} w-8"
 				maxlength={1}
 				placeholder="0"
 				disabled={playground.isDisabled}
@@ -174,7 +178,7 @@
 			<span class="text-[var(--color-app-text-muted)]">L</span>
 			<input
 				type="text"
-				class={hexInputClass}
+				class="{hexInputClass} w-8"
 				maxlength={1}
 				placeholder="F"
 				aria-label="Left volume"
@@ -187,7 +191,7 @@
 			<span class="text-[var(--color-app-text-muted)]">R</span>
 			<input
 				type="text"
-				class={hexInputClass}
+				class="{hexInputClass} w-8"
 				maxlength={1}
 				placeholder="F"
 				aria-label="Right volume"

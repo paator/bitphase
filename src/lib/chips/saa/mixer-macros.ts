@@ -4,7 +4,7 @@ export const SAA_AMPLITUDE_SLIDE_OFF = 0;
 export const SAA_AMPLITUDE_SLIDE_UP = 1;
 export const SAA_AMPLITUDE_SLIDE_DOWN = -1;
 
-export const SAA_VOLUME_MACRO_FIELDS: InstrumentMacroField[] = [
+export const SAA_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 	{
 		id: 'left',
 		label: 'Left',
@@ -121,13 +121,14 @@ export const SAA_VOLUME_MACRO_FIELDS: InstrumentMacroField[] = [
 	{
 		id: 'envelopeShape',
 		label: 'Shape',
-		title: 'Envelope shape. 0 uses the E column. 1-C are the same shapes as the E column.',
+		title: 'Same two hex digits as the E column. 00 follows the E column.',
 		kind: 'integer',
 		accent: 'envelope',
 		group: 'Envelope',
 		shareSequence: true,
 		min: 0,
-		max: 12,
+		max: 0x83,
+		hexDigits: 2,
 		defaultValue: 0
 	},
 	{

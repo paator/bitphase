@@ -3,7 +3,6 @@
 		instrumentMacroAccentColor,
 		type InstrumentMacroField
 	} from '../../chips/base/instrument-macros';
-	import { formatRowEditorNumber } from '../../utils/row-editor-numeric';
 	import {
 		MACRO_BAR_SCALE_CENTER_SNAP_PX,
 		MACRO_BAR_SCALE_MIN_THUMB_PX,
@@ -20,6 +19,7 @@
 		macroBarViewMinFromDragDelta,
 		macroBarViewMinFromTrackY,
 		macroBarVisibleSpan,
+		formatMacroFieldNumber,
 		snapMacroBarViewMinCrossingCenter
 	} from './instrument-macro-ui';
 
@@ -180,8 +180,8 @@
 	style:--scale-accent={accent}>
 	<span
 		class="pointer-events-none shrink-0 truncate pt-0.5 text-center font-mono text-[0.6rem] leading-4 tabular-nums text-[var(--color-app-text-muted)]"
-		title="Visible max {formatRowEditorNumber(viewMax, asHex)}"
-		>{formatRowEditorNumber(viewMax, asHex)}</span>
+		title="Visible max {formatMacroFieldNumber(field, viewMax, asHex)}"
+		>{formatMacroFieldNumber(field, viewMax, asHex)}</span>
 	<div
 		bind:this={trackEl}
 		id="{uid}-scale"
@@ -194,7 +194,8 @@
 		aria-valuemin={range.min}
 		aria-valuemax={range.max - span}
 		aria-valuenow={viewMin}
-		aria-valuetext="{formatRowEditorNumber(viewMin, asHex)} to {formatRowEditorNumber(
+		aria-valuetext="{formatMacroFieldNumber(field, viewMin, asHex)} to {formatMacroFieldNumber(
+			field,
 			viewMax,
 			asHex
 		)}"
@@ -257,6 +258,6 @@
 	</div>
 	<span
 		class="pointer-events-none shrink-0 truncate pb-0.5 text-center font-mono text-[0.6rem] leading-4 tabular-nums text-[var(--color-app-text-muted)]"
-		title="Visible min {formatRowEditorNumber(viewMin, asHex)}"
-		>{formatRowEditorNumber(viewMin, asHex)}</span>
+		title="Visible min {formatMacroFieldNumber(field, viewMin, asHex)}"
+		>{formatMacroFieldNumber(field, viewMin, asHex)}</span>
 </div>

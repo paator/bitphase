@@ -149,12 +149,18 @@ describe('SAA tone playback', () => {
 				]
 			},
 			0,
-			{ env0: 1 }
+			{ env0: 0x32 }
 		);
 		const registers = new SaaRegisterState(6);
 		driver.processInstruments(state, registers);
 		expect(state.envelopeCommand0).toBe(0x96);
 		expect(registers.envelope0).toBe(0x96);
+		driver.processPatternRow(state, { channels: [] }, 0, { env0: 0x32 });
+		driver.processInstruments(state, registers);
+		expect(registers.envelope0).toBe(0x96);
+		driver.processPatternRow(state, { channels: [] }, 0, { env0: 0x20 });
+		driver.processInstruments(state, registers);
+		expect(registers.envelope0).toBe(0x84);
 		expect(registers.channels[0].left).toBe(2);
 		expect(registers.channels[0].right).toBe(15);
 		expect(registers.noise0).toBe(3);
@@ -452,7 +458,7 @@ describe('SAA tone playback', () => {
 				]
 			}))
 		});
-		driver.processPatternRow(state, mixer(0), 0, { env0: 1 });
+		driver.processPatternRow(state, mixer(0), 0, { env0: 0x32 });
 		expect(state.channelSourceMask[2]).toBe(0);
 		const registers = new SaaRegisterState(6);
 		driver.processInstruments(state, registers);
@@ -619,7 +625,7 @@ describe('SAA tone playback', () => {
 		state.instrumentPositions = [0, 0, 0];
 		state.channelCurrentNotes = [45, 45, 45];
 		state.instruments[0].macros.amplitudeSlide = { values: [0], loop: 0 };
-		state.instruments[0].macros.envelopeShape = { values: [3], loop: 0 };
+		state.instruments[0].macros.envelopeShape = { values: [0x72], loop: 0 };
 		state.envelopeCommand0 = 0x96;
 		const registers = new SaaRegisterState(6);
 		driver.processInstruments(state, registers);
@@ -627,6 +633,10 @@ describe('SAA tone playback', () => {
 		expect(registers.envelopeRetrigger0).toBe(false);
 		state.instrumentPositions = [0, 0, 0];
 		state.instruments[0].macros.envelopeShape = { values: [0], loop: 0 };
+		driver.processInstruments(state, registers);
+		expect(registers.envelope0).toBe(0x96);
+		state.instrumentPositions = [0, 0, 0];
+		state.instruments[0].macros.envelopeShape = { values: [7], loop: 0 };
 		driver.processInstruments(state, registers);
 		expect(registers.envelope0).toBe(0x96);
 	});
@@ -667,7 +677,7 @@ describe('SAA tone playback', () => {
 			}))
 		};
 		const registers = new SaaRegisterState(6);
-		driver.processPatternRow(state, pattern, 0, { env0: 3 });
+		driver.processPatternRow(state, pattern, 0, { env0: 0x72 });
 		driver.processInstruments(state, registers);
 		expect(state.envelopeCommand0).toBe(0x9a);
 		expect(registers.envelopeRetrigger0).toBe(false);
@@ -677,6 +687,13 @@ describe('SAA tone playback', () => {
 		expect(state.envelopeCommand0).toBe(0x9a);
 		expect(registers.envelopeRetrigger0).toBe(false);
 		expect(registers.envelope0).toBe(0x9a);
+		driver.processPatternRow(state, pattern, 0, { env0: 7 });
+		driver.processInstruments(state, registers);
+		expect(state.envelopeCommand0).toBe(0x9a);
+		expect(registers.envelope0).toBe(0x9a);
+		driver.processPatternRow(state, pattern, 0, { env0: 0x17 });
+		driver.processInstruments(state, registers);
+		expect(state.envelopeCommand0).toBe(0x9a);
 	});
 
 	it('silences channel C when the enabled envelope shape is off', async () => {
@@ -792,7 +809,7 @@ describe('SAA auto-envelope', () => {
 		const state = groupState();
 		const registers = new SaaRegisterState(6);
 
-		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0x11), 0, { env0: 4 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0x11), 0, { env0: 0x30 });
 		driver.processInstruments(state, registers);
 
 		const clock = saaPitchCode(toneTable[40], 0);
@@ -804,7 +821,7 @@ describe('SAA auto-envelope', () => {
 		expect(state.autoEnvelopeSource[0]).toBe(2);
 
 		state.instrumentPositions = Array(6).fill(0);
-		driver.processPatternRow(state, autoEnvelopePattern(6, 0, 0x32), 0, { env0: 4 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 0, 0x32), 0, { env0: 0x30 });
 		driver.processInstruments(state, registers);
 		expect(toneCode(registers.channels[1])).toBe(
 			saaPitchCode(Math.round((toneTable[12] * 3) / 2), 0)
@@ -817,7 +834,7 @@ describe('SAA auto-envelope', () => {
 		const state = groupState();
 		const registers = new SaaRegisterState(6);
 
-		driver.processPatternRow(state, autoEnvelopePattern(6, 5, 0x11), 0, { env1: 6 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 5, 0x11), 0, { env1: 0x70 });
 		driver.processInstruments(state, registers);
 
 		expect(toneCode(registers.channels[4])).toBe(saaPitchCode(toneTable[48], 0));
@@ -831,8 +848,8 @@ describe('SAA auto-envelope', () => {
 		const state = groupState();
 		const registers = new SaaRegisterState(6);
 
-		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0x11), 0, { env0: 4 });
-		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0), 0, { env0: 4 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0x11), 0, { env0: 0x30 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 2, 0), 0, { env0: 0x30 });
 		driver.processInstruments(state, registers);
 
 		expect(state.autoEnvelopeActive[0]).toBe(false);
@@ -890,7 +907,7 @@ describe('SAA auto-envelope', () => {
 			}))
 		});
 
-		driver.processPatternRow(state, tablePattern(2, 1), 0, { env0: 4 });
+		driver.processPatternRow(state, tablePattern(2, 1), 0, { env0: 0x30 });
 		expect(state.autoEnvelopeNumerator[0]).toBe(3);
 		expect(state.autoEnvelopeDenominator[0]).toBe(2);
 		expect(state.autoEnvelopeSource[0]).toBe(2);
@@ -910,12 +927,12 @@ describe('SAA auto-envelope', () => {
 		expect(state.autoEnvelopeDenominator[0]).toBe(1);
 		expect(state.autoEnvelopeSource[0]).toBe(2);
 
-		driver.processPatternRow(state, tablePattern(5, 2), 0, { env1: 6 });
+		driver.processPatternRow(state, tablePattern(5, 2), 0, { env1: 0x70 });
 		expect(state.autoEnvelopeTableIndex[0]).toBe(1);
 		expect(state.autoEnvelopeNumerator[1]).toBe(2);
 		expect(state.autoEnvelopeSource[1]).toBe(5);
 
-		driver.processPatternRow(state, autoEnvelopePattern(6, 0, 0x21), 0, { env0: 4 });
+		driver.processPatternRow(state, autoEnvelopePattern(6, 0, 0x21), 0, { env0: 0x30 });
 		expect(state.autoEnvelopeTableIndex[0]).toBe(-1);
 		expect(state.autoEnvelopeTableIndex[1]).toBe(2);
 		expect(state.autoEnvelopeNumerator[0]).toBe(2);
@@ -983,7 +1000,7 @@ describe('SAA virtual channels', () => {
 		driver.setVirtualChannelMode((index: number) => mixer.getHardwareChannelIndex(index));
 		const notes = [12, 20, -1, 40, 8, 16, 48];
 		const state = columnState(notes);
-		state.instruments[0].macros.envelopeShape = { values: [4], loop: 0 };
+		state.instruments[0].macros.envelopeShape = { values: [0x30], loop: 0 };
 		const registers = new SaaRegisterState(notes.length);
 		driver.processInstruments(state, registers);
 		const hardware = resolveSaaHardwareState(driver, mixer, registers, state);
@@ -1012,7 +1029,7 @@ describe('SAA virtual channels', () => {
 				]
 			}))
 		};
-		driver.processPatternRow(state, pattern, 0, { env0: 4 });
+		driver.processPatternRow(state, pattern, 0, { env0: 0x30 });
 		const registers = new SaaRegisterState(notes.length);
 		driver.processInstruments(state, registers);
 		const hardware = resolveSaaHardwareState(driver, mixer, registers, state);

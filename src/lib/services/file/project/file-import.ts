@@ -35,6 +35,7 @@ import {
 	resolveChannelEffectColumnCount,
 	syncSharedEffectColumnLayout
 } from '../../../chips/base/channel-effect-columns';
+import { saaMigrateLegacyEnvelope } from '../../../../../public/saa/saa-levels.js';
 import {
 	migrateLegacyInstrument,
 	type LegacyInstrument
@@ -229,6 +230,12 @@ function reconstructPatternRow(data: any, schema?: ChipSchema): any {
 			if (data[key] !== undefined) {
 				if (key.toLowerCase().includes('effect') && data[key]) {
 					result[key] = reconstructEffect(data[key]);
+				} else if (
+					schema?.chipType === 'saa' &&
+					(key === 'env0' || key === 'env1') &&
+					typeof data[key] === 'number'
+				) {
+					result[key] = saaMigrateLegacyEnvelope(data[key]);
 				} else {
 					result[key] = data[key];
 				}

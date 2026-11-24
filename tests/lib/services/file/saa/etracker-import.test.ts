@@ -59,7 +59,7 @@ describe('E-Tracker import', () => {
 		expect(row?.note?.name).toBe(NoteName.C);
 		expect(row?.note?.octave).toBe(1);
 		expect(row?.instrument).toBe(1);
-		expect(project.songs[0]?.patterns[0]?.patternRows[0]?.env0).toBe(1);
+		expect(project.songs[0]?.patterns[0]?.patternRows[0]?.env0).toBe(0x32);
 		expect(row?.left).toBe(11);
 		expect(row?.right).toBe(11);
 		expect(row?.effects?.filter((effect) => effect).map((effect) => [effect.effect, effect.delay, effect.parameter])).toEqual([

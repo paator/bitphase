@@ -569,4 +569,41 @@ describe('FileImportService', () => {
 		expect(saved.songs[0]?.schema).toBeUndefined();
 		expect(saved.songs[0]?.tuningTable).toEqual([100]);
 	});
+
+	it('rewrites saved SAA envelope digits into the two-digit shape code', async () => {
+		const json = JSON.stringify({
+			name: 'saa',
+			author: '',
+			songs: [
+				{
+					chipType: 'saa',
+					patterns: [
+						{
+							id: 0,
+							length: 1,
+							channels: [],
+							patternRows: [{ env0: 4, env1: 1, noise0: 0 }]
+						}
+					]
+				}
+			],
+			patternOrder: [0],
+			tables: [],
+			instruments: [
+				{
+					id: '01',
+					name: 'lead',
+					chipType: 'saa',
+					macros: { envelopeShape: { values: [4, 0, 1], loop: 0 } }
+				}
+			]
+		});
+
+		const project = await FileImportService.reconstructFromJsonAsync(json);
+		const row = project.songs[0]?.patterns[0]?.patternRows[0];
+		expect(row?.env0).toBe(0x30);
+		expect(row?.env1).toBe(0x32);
+		expect(row?.noise0).toBe(0);
+		expect(project.instruments[0]?.macros?.envelopeShape?.values).toEqual([0x30, 0, 0x32]);
+	});
 });

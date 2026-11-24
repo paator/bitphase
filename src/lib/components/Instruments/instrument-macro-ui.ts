@@ -85,6 +85,21 @@ export function instrumentMacroEnumIsActive(
 	return Number(value) !== Number(field.defaultValue);
 }
 
+export function macroFieldUsesHex(field: InstrumentMacroField, asHex: boolean): boolean {
+	return asHex || (field.hexDigits ?? 0) > 0;
+}
+
+export function formatMacroFieldNumber(
+	field: InstrumentMacroField,
+	value: number,
+	asHex: boolean
+): string {
+	const hex = macroFieldUsesHex(field, asHex);
+	const text = formatRowEditorNumber(value, hex);
+	if (!hex || !(field.hexDigits && field.hexDigits > 0) || value < 0) return text;
+	return text.padStart(field.hexDigits, '0');
+}
+
 export function formatInstrumentMacroValue(
 	field: InstrumentMacroField,
 	value: InstrumentMacroValue,
@@ -100,7 +115,7 @@ export function formatInstrumentMacroValue(
 		} catch {}
 		return 'Click to edit';
 	}
-	return formatRowEditorNumber(Number(value), asHex);
+	return formatMacroFieldNumber(field, Number(value), asHex);
 }
 
 export function macroBarNumericRange(field: InstrumentMacroField): { min: number; max: number } {
@@ -537,7 +552,7 @@ function formatMacroSequenceToken(
 		const option = field.enumValues.find((item) => item.value === value);
 		if (option?.label) return option.label;
 	}
-	return formatRowEditorNumber(Number(value), asHex);
+	return formatMacroFieldNumber(field, Number(value), asHex);
 }
 
 function parseMacroSequenceToken(
@@ -552,7 +567,11 @@ function parseMacroSequenceToken(
 		);
 		if (labelMatch) return labelMatch.value;
 	}
-	const parsed = parseRowEditorNumericText(token, asHex, { min: field.min, max: field.max });
+	const parsed = parseRowEditorNumericText(token, macroFieldUsesHex(field, asHex), {
+		min: field.min,
+		max: field.max,
+		maxDigits: field.hexDigits
+	});
 	if (parsed === null) return null;
 	if (field.kind === 'enum' && field.enumValues?.length) {
 		return field.enumValues.some((option) => option.value === parsed) ? parsed : null;

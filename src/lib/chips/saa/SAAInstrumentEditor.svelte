@@ -10,7 +10,7 @@
 	import IconCarbonActivity from '~icons/carbon/activity';
 	import InstrumentEditorIdentity from '../../components/Instruments/InstrumentEditorIdentity.svelte';
 	import InstrumentMacrosEditor from '../../components/Instruments/InstrumentMacrosEditor.svelte';
-	import { SAA_VOLUME_MACRO_FIELDS } from './volume-macros';
+	import { SAA_MIXER_MACRO_FIELDS } from './mixer-macros';
 
 	let {
 		instrument,
@@ -43,7 +43,7 @@
 	<InstrumentEditorIdentity {instrument} {onInstrumentChange} />
 	<InstrumentMacrosEditor
 		{instrument}
-		fields={SAA_VOLUME_MACRO_FIELDS}
+		fields={SAA_MIXER_MACRO_FIELDS}
 		{asHex}
 		{isExpanded}
 		{icons}

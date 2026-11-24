@@ -1,3 +1,4 @@
+import { saaEnvelopeByteFromCode } from '../../../../public/saa/saa-levels.js';
 import { Effect, Note, NoteName, type Pattern } from '../../models/song';
 import { parseNoteFromString } from '../../utils/note-utils';
 import { sanitizeHexInput } from '../base/preview-row-utils';
@@ -23,8 +24,24 @@ export function filterSaaNoiseInput(text: string, previous: string): string {
 	return filterColumnInput(text, previous, (parsed) => parsed <= 3);
 }
 
+function envelopeHex(text: string): string {
+	return sanitizeHexInput(text, 2).toUpperCase();
+}
+
+export function isSaaEnvelopeText(hex: string): boolean {
+	if (hex === '0' || hex === '00') return true;
+	const waveform = parseInt(hex.charAt(0), 16);
+	if (waveform < 1 || waveform > 8) return false;
+	if (hex.length === 1) return true;
+	const variant = parseInt(hex.charAt(1), 16);
+	return variant <= 3;
+}
+
 export function filterSaaEnvelopeInput(text: string, previous: string): string {
-	return filterColumnInput(text, previous, (parsed) => parsed <= 12);
+	if (!text) return '';
+	const hex = envelopeHex(text);
+	if (!hex || !isSaaEnvelopeText(hex)) return previous;
+	return hex;
 }
 
 export function saaPatternColumnValue(text: string): number {
@@ -35,13 +52,25 @@ export function saaPatternColumnValue(text: string): number {
 	return parsed === 0 ? -1 : parsed;
 }
 
+export function saaEnvelopeColumnValue(text: string): number {
+	const hex = envelopeHex(text);
+	if (!hex) return 0;
+	if (hex === '0' || hex === '00') return -1;
+	if (hex.length === 1) {
+		const waveform = parseInt(hex, 16);
+		return waveform >= 1 && waveform <= 8 ? waveform << 4 : 0;
+	}
+	const parsed = parseInt(hex, 16);
+	return saaEnvelopeByteFromCode(parsed) == null ? 0 : parsed;
+}
+
 export function applySaaPreviewColumns(
 	pattern: Pattern,
 	columns: { noise: string; envelope: string; clockNote?: string }
 ): void {
 	const row = pattern.patternRows[0];
 	const noise = saaPatternColumnValue(columns.noise);
-	const envelope = saaPatternColumnValue(columns.envelope);
+	const envelope = saaEnvelopeColumnValue(columns.envelope);
 	row.noise0 = noise;
 	row.noise1 = noise;
 	row.env0 = envelope;
