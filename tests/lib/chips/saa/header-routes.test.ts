@@ -170,6 +170,30 @@ describe('saaHeaderRoutes', () => {
 		expect(routes.map((route) => route.label)).toEqual(['high']);
 	});
 
+	it('follows the cursor forward and picks up an edited offset', () => {
+		const offsetInstrument = {
+			id: '01',
+			macros: {
+				noise: { values: [true] },
+				noiseAdd: { values: [0, 2] }
+			}
+		};
+		const song = pattern([
+			{ noise0: -1, instruments: [1], notes: [{ name: 2 }] },
+			{}
+		]);
+		const input = {
+			patterns: [song],
+			patternOrder: [0],
+			orderIndex: 0,
+			instruments: [offsetInstrument]
+		};
+		expect(saaHeaderRoutes({ ...input, row: 0 })[0]?.label).toBe('high');
+		expect(saaHeaderRoutes({ ...input, row: 1 })[0]?.label).toBe('low');
+		offsetInstrument.macros.noiseAdd.values[1] = 1;
+		expect(saaHeaderRoutes({ ...input, row: 1 })[0]?.label).toBe('mid');
+	});
+
 	it('points channel A at the other channels when it clocks their noise', () => {
 		const routes = saaHeaderRoutes({
 			patterns: [

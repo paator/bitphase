@@ -1,5 +1,5 @@
 import { saaEnvelopeByteFromCode } from '../../../../public/saa/saa-levels.js';
-import { sampleSaaMixerRow } from '../../../../public/tracker/tracker-instrument-macros.js';
+import { sampleInstrumentMacroIndex } from '../../../../public/tracker/tracker-instrument-macros.js';
 import type { ChannelHeaderRoute } from '../base/header-route';
 import {
 	getHardwareChannelIndex,
@@ -13,6 +13,8 @@ const MIXER_FOLLOW_INSTRUMENT = 4;
 const NOTE_OFF = 1;
 const NOTE_RELEASE = 14;
 const NOISE_LABELS = ['high', 'mid', 'low'] as const;
+const DEFAULT_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const EMPTY_MAP: Record<number, number> = {};
 
 const GROUPS = [
 	{ driver: 0, clock: 1, voice: 2, noiseKey: 'noise0', envelopeKey: 'env0' },
@@ -51,6 +53,22 @@ export interface SaaHeaderRouteInstrument {
 	};
 }
 
+interface RouteScan {
+	patterns: readonly SaaHeaderRoutePattern[];
+	patternOrder: readonly number[];
+	instruments: readonly SaaHeaderRouteInstrument[] | undefined;
+	map: Record<number, number>;
+	labels: readonly string[];
+	orderIndex: number;
+	row: number;
+	stamp: number;
+	heard: HeardRouting;
+	noiseBase: [number, number];
+	routes: ChannelHeaderRoute[];
+}
+
+let routeScan: RouteScan | null = null;
+
 export function saaHeaderRoutes(input: {
 	patterns: readonly SaaHeaderRoutePattern[];
 	patternOrder: readonly number[];
@@ -60,22 +78,104 @@ export function saaHeaderRoutes(input: {
 	hardwareLabels?: readonly string[];
 	instruments?: readonly SaaHeaderRouteInstrument[];
 }): ChannelHeaderRoute[] {
-	const labels = input.hardwareLabels ?? ['A', 'B', 'C', 'D', 'E', 'F'];
-	const map = input.virtualChannelMap ?? {};
-	const byNumber = new Map<number, SaaHeaderRouteInstrument>();
-	for (const instrument of input.instruments ?? []) {
-		const number = parseInt(instrument.id, 36);
-		if (Number.isFinite(number)) byNumber.set(number, instrument);
+	const labels = input.hardwareLabels ?? DEFAULT_LABELS;
+	const map = input.virtualChannelMap ?? EMPTY_MAP;
+	const orderIndex = Math.max(0, input.orderIndex);
+	const row = Math.max(0, input.row);
+	const stamp = routingStamp(input.patterns, input.patternOrder, orderIndex, row, input.instruments);
+	const cached = routeScan;
+	if (
+		cached &&
+		cached.patterns === input.patterns &&
+		cached.patternOrder === input.patternOrder &&
+		cached.instruments === input.instruments &&
+		cached.map === map &&
+		cached.labels === labels &&
+		cached.orderIndex === orderIndex &&
+		cached.row === row &&
+		cached.stamp === stamp
+	) {
+		return cached.routes;
 	}
-	const heard = hearSaaRouting(
-		input.patterns,
-		input.patternOrder,
-		input.orderIndex,
-		input.row,
-		labels,
+	const byNumber = instrumentsByNumber(input.instruments);
+	const labelList = labels.slice();
+	let heard: HeardRouting;
+	let noiseBase: [number, number];
+	const canContinue =
+		cached &&
+		cached.patterns === input.patterns &&
+		cached.patternOrder === input.patternOrder &&
+		cached.instruments === input.instruments &&
+		cached.map === map &&
+		cached.labels === labels &&
+		cached.orderIndex === orderIndex &&
+		row > cached.row &&
+		routingStamp(input.patterns, input.patternOrder, orderIndex, cached.row, input.instruments) ===
+			cached.stamp;
+	if (canContinue && cached) {
+		heard = cached.heard;
+		noiseBase = cached.noiseBase;
+		hearSaaRouting(
+			input.patterns,
+			input.patternOrder,
+			orderIndex,
+			row,
+			labelList,
+			map,
+			byNumber,
+			heard,
+			noiseBase,
+			orderIndex,
+			cached.row + 1
+		);
+	} else {
+		heard = {
+			channelCount: 0,
+			noiseClock: [0, 0],
+			noiseLock: [false, false],
+			envelopeOn: [false, false],
+			instrument: [],
+			mixer: [],
+			noiseChannel: []
+		};
+		noiseBase = [0, 0];
+		hearSaaRouting(
+			input.patterns,
+			input.patternOrder,
+			orderIndex,
+			row,
+			labelList,
+			map,
+			byNumber,
+			heard,
+			noiseBase,
+			0,
+			0
+		);
+	}
+	const routes = buildHeaderRoutes(heard, labels, map, byNumber);
+	routeScan = {
+		patterns: input.patterns,
+		patternOrder: input.patternOrder,
+		instruments: input.instruments,
 		map,
-		byNumber
-	);
+		labels,
+		orderIndex,
+		row,
+		stamp,
+		heard,
+		noiseBase,
+		routes
+	};
+	return routes;
+}
+
+function buildHeaderRoutes(
+	heard: HeardRouting,
+	labels: readonly string[],
+	map: Record<number, number>,
+	byNumber: Map<number, SaaHeaderRouteInstrument>
+): ChannelHeaderRoute[] {
 	const channelCount = heard.channelCount;
 	const column = (hardware: number) =>
 		logicalColumnForHardwareChannel(hardware, map, labels.length);
@@ -172,22 +272,17 @@ function hearSaaRouting(
 	patternOrder: readonly number[],
 	orderIndex: number,
 	row: number,
-	labels: readonly string[],
+	labels: string[],
 	map: Record<number, number>,
-	instruments: Map<number, SaaHeaderRouteInstrument>
-): HeardRouting {
-	const heard: HeardRouting = {
-		channelCount: 0,
-		noiseClock: [0, 0],
-		noiseLock: [false, false],
-		envelopeOn: [false, false],
-		instrument: [],
-		mixer: [],
-		noiseChannel: []
-	};
-	const noiseBase: [number, number] = [0, 0];
-	const lastOrder = Math.min(Math.max(orderIndex, 0), Math.max(0, patternOrder.length - 1));
-	for (let order = 0; order <= lastOrder && order < patternOrder.length; order++) {
+	instruments: Map<number, SaaHeaderRouteInstrument>,
+	heard: HeardRouting,
+	noiseBase: [number, number],
+	startOrder: number,
+	startRow: number
+): void {
+	const hardware: number[] = [];
+	const lastOrder = Math.min(orderIndex, Math.max(0, patternOrder.length - 1));
+	for (let order = startOrder; order <= lastOrder && order < patternOrder.length; order++) {
 		const pattern = patterns.find((item) => item.id === patternOrder[order]);
 		if (!pattern) continue;
 		heard.channelCount = pattern.channels.length;
@@ -202,11 +297,15 @@ function hearSaaRouting(
 				sounding: false
 			});
 		}
+		while (hardware.length < pattern.channels.length) {
+			hardware.push(getHardwareChannelIndex(hardware.length, labels, map));
+		}
 		const lastRow =
 			order === lastOrder
-				? Math.min(Math.max(row, 0), Math.max(0, pattern.length - 1))
+				? Math.min(row, Math.max(0, pattern.length - 1))
 				: pattern.length - 1;
-		for (let index = 0; index <= lastRow; index++) {
+		const firstRow = order === startOrder ? startRow : 0;
+		for (let index = firstRow; index <= lastRow; index++) {
 			const patternRow = pattern.patternRows[index];
 			applyNoise(noiseBase, 0, patternRow?.noise0);
 			applyNoise(noiseBase, 1, patternRow?.noise1);
@@ -220,17 +319,11 @@ function hearSaaRouting(
 				if (typeof channelRow.instrument === 'number' && channelRow.instrument > 0) {
 					heard.instrument[channel] = channelRow.instrument;
 				}
-				applyChannelEffects(
-					heard,
-					channel,
-					getHardwareChannelIndex(channel, [...labels], map),
-					channelRow.effects
-				);
+				applyChannelEffects(heard, channel, hardware[channel] ?? -1, channelRow.effects);
 			}
-			heard.noiseClock = resolveNoiseClocks(noiseBase, heard, labels, map, instruments);
+			heard.noiseClock = resolveNoiseClocks(noiseBase, heard, hardware, instruments);
 		}
 	}
-	return heard;
 }
 
 function updateNoiseChannel(
@@ -265,8 +358,7 @@ function updateNoiseChannel(
 function resolveNoiseClocks(
 	base: readonly [number, number],
 	heard: HeardRouting,
-	labels: readonly string[],
-	map: Record<number, number>,
+	hardware: readonly number[],
 	instruments: Map<number, SaaHeaderRouteInstrument>
 ): [number, number] {
 	const clock: [number, number] = [base[0] & 3, base[1] & 3];
@@ -275,25 +367,131 @@ function resolveNoiseClocks(
 		if (!play?.sounding || play.instrument == null) continue;
 		const instrument = instruments.get(play.instrument);
 		if (!instrument) continue;
-		const hardware = getHardwareChannelIndex(channel, [...labels], map);
-		if (hardware < 0) {
+		const index = hardware[channel] ?? -1;
+		if (index < 0) {
 			play.position += 1;
 			continue;
 		}
-		const row = sampleSaaMixerRow(instrument, play.position, play.releaseTick) as {
-			noise?: boolean;
-			noiseAdd?: number;
-			noiseAccumulation?: boolean;
-		};
-		const group = hardware < 3 ? 0 : 1;
-		if (row.noise === true || hardware % 3 === 0) {
-			const offset = play.accumulator + (Number(row.noiseAdd) | 0);
-			if (row.noiseAccumulation) play.accumulator = offset & 3;
+		const macros = instrument.macros;
+		const noise = Boolean(noiseMacroValue(macros?.noise, play.position, play.releaseTick, false));
+		const noiseAdd = clampNoiseAdd(
+			noiseMacroValue(macros?.noiseAdd, play.position, play.releaseTick, 0)
+		);
+		const noiseAccumulation = Boolean(
+			noiseMacroValue(macros?.noiseAccumulation, play.position, play.releaseTick, false)
+		);
+		const group = index < 3 ? 0 : 1;
+		if (noise || index % 3 === 0) {
+			const offset = play.accumulator + noiseAdd;
+			if (noiseAccumulation) play.accumulator = offset & 3;
 			clock[group] = (base[group] + offset) & 3;
 		}
 		play.position += 1;
 	}
 	return clock;
+}
+
+function noiseMacroValue(
+	macro: { values?: readonly unknown[]; loop?: number; release?: number } | undefined,
+	tick: number,
+	releaseTick: number,
+	fallback: unknown
+): unknown {
+	const values = macro?.values;
+	const length = values?.length ?? 0;
+	if (!values || length === 0) return fallback;
+	const index = sampleInstrumentMacroIndex(tick, length, macro?.loop ?? 0, macro?.release ?? -1, releaseTick);
+	return values[index] ?? fallback;
+}
+
+function clampNoiseAdd(value: unknown): number {
+	const parsed = Number(value);
+	const numeric = Number.isFinite(parsed) ? Math.round(parsed) : 0;
+	if (numeric < -3) return -3;
+	if (numeric > 3) return 3;
+	return numeric;
+}
+
+function instrumentsByNumber(
+	instruments: readonly SaaHeaderRouteInstrument[] | undefined
+): Map<number, SaaHeaderRouteInstrument> {
+	const byNumber = new Map<number, SaaHeaderRouteInstrument>();
+	for (const instrument of instruments ?? []) {
+		const number = parseInt(instrument.id, 36);
+		if (Number.isFinite(number)) byNumber.set(number, instrument);
+	}
+	return byNumber;
+}
+
+function routingStamp(
+	patterns: readonly SaaHeaderRoutePattern[],
+	patternOrder: readonly number[],
+	orderIndex: number,
+	row: number,
+	instruments: readonly SaaHeaderRouteInstrument[] | undefined
+): number {
+	let hash = 2166136261;
+	const mix = (value: number) => {
+		hash = Math.imul(hash ^ value, 0x5bd1e995);
+	};
+	const lastOrder = Math.min(orderIndex, Math.max(0, patternOrder.length - 1));
+	for (let order = 0; order <= lastOrder && order < patternOrder.length; order++) {
+		const patternId = patternOrder[order] ?? -1;
+		mix(patternId);
+		const pattern = patterns.find((item) => item.id === patternId);
+		if (!pattern) continue;
+		mix(pattern.length);
+		mix(pattern.channels.length);
+		const lastRow =
+			order === lastOrder ? Math.min(row, Math.max(0, pattern.length - 1)) : pattern.length - 1;
+		for (let index = 0; index <= lastRow; index++) {
+			const patternRow = pattern.patternRows[index];
+			mix(typeof patternRow?.noise0 === 'number' ? patternRow.noise0 : 0);
+			mix(typeof patternRow?.noise1 === 'number' ? patternRow.noise1 : 0);
+			mix(typeof patternRow?.env0 === 'number' ? patternRow.env0 : 0);
+			mix(typeof patternRow?.env1 === 'number' ? patternRow.env1 : 0);
+			for (let channel = 0; channel < pattern.channels.length; channel++) {
+				const channelRow = pattern.channels[channel]?.rows[index];
+				mix(channelRow?.note?.name ?? 0);
+				mix(typeof channelRow?.instrument === 'number' ? channelRow.instrument : -2);
+				const effects = channelRow?.effects;
+				mix(effects?.length ?? 0);
+				if (!effects) continue;
+				for (const effect of effects) {
+					if (!effect) {
+						mix(0);
+						continue;
+					}
+					mix(effect.effect ?? 0);
+					mix(effect.delay ?? 0);
+					mix(effect.parameter ?? 0);
+					mix(effect.tableIndex ?? -1);
+				}
+			}
+		}
+	}
+	for (const instrument of instruments ?? []) {
+		mix(parseInt(instrument.id, 36) | 0);
+		mixMacro(mix, instrument.macros?.noise);
+		mixMacro(mix, instrument.macros?.noiseAdd);
+		mixMacro(mix, instrument.macros?.noiseAccumulation);
+	}
+	return hash;
+}
+
+function mixMacro(
+	mix: (value: number) => void,
+	macro: { values?: readonly unknown[]; loop?: number; release?: number } | undefined
+): void {
+	mix(macro?.loop ?? 0);
+	mix(macro?.release ?? -1);
+	const values = macro?.values;
+	mix(values?.length ?? 0);
+	if (!values) return;
+	for (const value of values) {
+		if (typeof value === 'number') mix(value);
+		else mix(value ? 1 : 0);
+	}
 }
 
 function applyNoise(clocks: [number, number], group: number, raw: unknown): void {
