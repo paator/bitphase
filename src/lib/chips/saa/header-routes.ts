@@ -230,7 +230,14 @@ function buildHeaderRoutes(
 			}
 		}
 
-		if (!heard.envelopeOn[group.driver < 3 ? 0 : 1]) continue;
+		const groupIndex = group.driver < 3 ? 0 : 1;
+		if (!heard.envelopeOn[groupIndex]) continue;
+		if (
+			hardwareStopped(heard, group.clock, labels, map) ||
+			hardwareStopped(heard, group.voice, labels, map)
+		) {
+			continue;
+		}
 		const fromIndex = column(group.clock);
 		const toIndex = column(group.voice);
 		if (fromIndex < 0 || toIndex < 0 || fromIndex >= channelCount || toIndex >= channelCount) {
@@ -255,6 +262,7 @@ interface NoiseChannel {
 	accumulator: number;
 	releaseTick: number;
 	sounding: boolean;
+	noteOff: boolean;
 }
 
 interface HeardRouting {
@@ -294,7 +302,8 @@ function hearSaaRouting(
 				position: 0,
 				accumulator: 0,
 				releaseTick: -1,
-				sounding: false
+				sounding: false,
+				noteOff: false
 			});
 		}
 		while (hardware.length < pattern.channels.length) {
@@ -333,6 +342,7 @@ function updateNoiseChannel(
 	const noteName = row.note?.name ?? 0;
 	if (noteName === NOTE_OFF) {
 		play.sounding = false;
+		play.noteOff = true;
 		play.accumulator = 0;
 		play.releaseTick = -1;
 		return;
@@ -343,6 +353,7 @@ function updateNoiseChannel(
 	}
 	if (noteName !== 0) {
 		play.sounding = true;
+		play.noteOff = false;
 		play.accumulator = 0;
 		play.releaseTick = -1;
 		play.position = 0;
@@ -530,6 +541,24 @@ function applyChannelEffects(
 			heard.mixer[channel] = parameter >= MIXER_FOLLOW_INSTRUMENT ? null : parameter;
 		}
 	}
+}
+
+function hardwareStopped(
+	heard: HeardRouting,
+	hardware: number,
+	labels: readonly string[],
+	map: Record<number, number>
+): boolean {
+	const labelList = labels.slice();
+	let noteOff = false;
+	let sounding = false;
+	for (let channel = 0; channel < heard.channelCount; channel++) {
+		if (getHardwareChannelIndex(channel, labelList, map) !== hardware) continue;
+		const play = heard.noiseChannel[channel];
+		if (play?.noteOff) noteOff = true;
+		if (play?.sounding) sounding = true;
+	}
+	return noteOff && !sounding;
 }
 
 function hardwareUsingNoise(

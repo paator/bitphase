@@ -323,6 +323,63 @@ describe('saaHeaderRoutes', () => {
 		expect(routes.find((route) => route.label === 'high')?.lane).toBe(1);
 	});
 
+	it('drops the envelope link when the voice or clock channel is note off', () => {
+		expect(
+			saaHeaderRoutes({
+				patterns: [
+					pattern([
+						{
+							env0: 0x10,
+							notes: [undefined, undefined, { name: 1 }]
+						}
+					])
+				],
+				patternOrder: [0],
+				orderIndex: 0,
+				row: 0
+			})
+		).toEqual([]);
+		expect(
+			saaHeaderRoutes({
+				patterns: [
+					pattern([
+						{
+							env0: 0x10,
+							notes: [undefined, { name: 1 }]
+						}
+					])
+				],
+				patternOrder: [0],
+				orderIndex: 0,
+				row: 0
+			})
+		).toEqual([]);
+	});
+
+	it('restores the envelope link when a note restarts the channel', () => {
+		const routes = saaHeaderRoutes({
+			patterns: [
+				pattern([
+					{ env0: 0x10, notes: [undefined, undefined, { name: 1 }] },
+					{ notes: [undefined, undefined, { name: 2 }] }
+				])
+			],
+			patternOrder: [0],
+			orderIndex: 0,
+			row: 1
+		});
+		expect(routes).toEqual([
+			{
+				fromIndex: 1,
+				toIndices: [2],
+				label: 'env',
+				tone: 'envelope',
+				lane: 0,
+				arrow: true
+			}
+		]);
+	});
+
 	it('drops the envelope link after an off command', () => {
 		expect(
 			saaHeaderRoutes({
