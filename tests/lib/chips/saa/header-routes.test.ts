@@ -48,7 +48,7 @@ describe('saaHeaderRoutes', () => {
 		).toEqual([]);
 	});
 
-	it('marks the shared noise clock on the channels that use it', () => {
+	it('marks each channel that uses a fixed noise clock on its own', () => {
 		const routes = saaHeaderRoutes({
 			patterns: [
 				pattern([
@@ -66,7 +66,15 @@ describe('saaHeaderRoutes', () => {
 		expect(routes).toEqual([
 			{
 				fromIndex: 0,
-				toIndices: [0, 2],
+				toIndices: [],
+				label: 'high',
+				tone: 'noise',
+				lane: 1,
+				arrow: false
+			},
+			{
+				fromIndex: 2,
+				toIndices: [],
 				label: 'high',
 				tone: 'noise',
 				lane: 1,
@@ -98,6 +106,69 @@ describe('saaHeaderRoutes', () => {
 				tone: 'noise',
 				lane: 1,
 				arrow: true
+			}
+		]);
+	});
+
+	it('marks channel A when it clocks the noise and plays it', () => {
+		const routes = saaHeaderRoutes({
+			patterns: [
+				pattern([
+					{
+						noise0: 3,
+						instruments: [1, 1]
+					}
+				])
+			],
+			patternOrder: [0],
+			orderIndex: 0,
+			row: 0,
+			instruments: [noiseInstrument]
+		});
+		expect(routes).toEqual([
+			{
+				fromIndex: 0,
+				toIndices: [1],
+				label: 'noise',
+				tone: 'noise',
+				lane: 1,
+				arrow: true
+			},
+			{
+				fromIndex: 0,
+				toIndices: [],
+				label: 'noise',
+				tone: 'noise',
+				lane: 1,
+				arrow: false
+			}
+		]);
+	});
+
+	it('marks channel A when it is the only channel playing locked noise', () => {
+		expect(
+			saaHeaderRoutes({
+				patterns: [
+					pattern([
+						{
+							noise0: 3,
+							instruments: [1]
+						}
+					])
+				],
+				patternOrder: [0],
+				orderIndex: 0,
+				row: 0,
+				instruments: [noiseInstrument]
+			})
+		).toEqual([
+			{
+				fromIndex: 0,
+				toIndices: [],
+				label: 'noise',
+				tone: 'noise',
+				lane: 1,
+				arrow: false
 			}
 		]);
 	});

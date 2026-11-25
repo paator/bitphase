@@ -842,14 +842,18 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			this.fillArrowHead(x, top, 0, -1, bus.color);
 		}
 		if (!bus.label) return;
-		const textWidth = this.measureText(bus.label);
+		this.drawHeaderLabel(bus.label, (left + right) / 2, floor, bus.color);
+	}
+
+	private drawHeaderLabel(label: string, centerX: number, centerY: number, color: string): void {
+		const textWidth = this.measureText(label);
 		const pillWidth = textWidth + 8;
 		const pillHeight = 11;
-		const pillX = (left + right) / 2 - pillWidth / 2;
-		const pillY = floor - pillHeight / 2;
+		const pillX = centerX - pillWidth / 2;
+		const pillY = centerY - pillHeight / 2;
 		this.fillRect(pillX, pillY, pillWidth, pillHeight, this.patternColors.patternBg);
-		this.strokeRect(pillX, pillY, pillWidth, pillHeight, bus.color, 1);
-		this.fillText(bus.label, pillX + 4, floor, bus.color);
+		this.strokeRect(pillX, pillY, pillWidth, pillHeight, color, 1);
+		this.fillText(label, pillX + 4, centerY, color);
 	}
 
 	private headerRouteColor(tone: ChannelHeaderRoute['tone'], muted: boolean): string {

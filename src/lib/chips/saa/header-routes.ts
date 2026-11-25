@@ -84,6 +84,7 @@ export function saaHeaderRoutes(input: {
 		);
 		if (clock === 3) {
 			const fromIndex = column(group.driver);
+			const driverPlays = users.includes(group.driver);
 			const targets = users
 				.filter((hardware) => hardware !== group.driver)
 				.map(column)
@@ -98,12 +99,22 @@ export function saaHeaderRoutes(input: {
 					arrow: true
 				});
 			}
+			if (driverPlays && fromIndex >= 0 && fromIndex < channelCount) {
+				routes.push({
+					fromIndex,
+					toIndices: [],
+					label: 'noise',
+					tone: 'noise',
+					lane: 1,
+					arrow: false
+				});
+			}
 		} else if (users.length > 0 && clock >= 0 && clock <= 2) {
 			const columns = users.map(column).filter((index) => index >= 0 && index < channelCount);
-			if (columns.length > 0) {
+			for (const index of columns) {
 				routes.push({
-					fromIndex: columns[0]!,
-					toIndices: columns,
+					fromIndex: index,
+					toIndices: [],
 					label: NOISE_LABELS[clock]!,
 					tone: 'noise',
 					lane: 1,

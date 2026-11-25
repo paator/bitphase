@@ -215,7 +215,15 @@ describe('drawChannelLabels header routes', () => {
 				},
 				{
 					fromIndex: 0,
-					toIndices: [0, 2],
+					toIndices: [],
+					label: 'high',
+					tone: 'noise',
+					lane: 1,
+					arrow: false
+				},
+				{
+					fromIndex: 2,
+					toIndices: [],
 					label: 'high',
 					tone: 'noise',
 					lane: 1,
