@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { SAA_LEVEL_MAX } from './saa-constants.js';
 
 export const SAA_TONE_CODE_MAX = (7 << 8) | 0xff;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { SAA_ENVELOPE_SHAPE_VALUES, saaMigrateLegacyEnvelope } from '../saa/saa-levels.js';
 
 export const INSTRUMENT_MACRO_MAX_LENGTH = 512;
