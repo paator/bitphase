@@ -3,6 +3,11 @@ import {
 	saaMigrateLegacyEnvelope
 } from '../../../../public/saa/saa-levels.js';
 import { saaEnvelopeMacroTooltip } from './envelope';
+import {
+	saaNoiseAccumulationTooltip,
+	saaNoiseEnableTooltip,
+	saaNoiseOffsetTooltip
+} from './noise';
 import type { InstrumentMacroField } from '../base/instrument-macros';
 
 export const SAA_AMPLITUDE_SLIDE_OFF = 0;
@@ -99,6 +104,7 @@ export const SAA_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		accent: 'noise',
 		group: 'Waveform',
 		shareSequence: true,
+		valueTooltip: saaNoiseEnableTooltip,
 		defaultValue: false
 	},
 	{
@@ -106,6 +112,7 @@ export const SAA_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		label: 'Offset',
 		title: 'Noise offset. Added to the N column while noise is on. Wraps through 0-3.',
 		kind: 'integer',
+		valueTooltip: saaNoiseOffsetTooltip,
 		accent: 'noise',
 		group: 'Noise parameters',
 		shareSequence: true,
@@ -118,6 +125,7 @@ export const SAA_MIXER_MACRO_FIELDS: InstrumentMacroField[] = [
 		label: 'Accumulation',
 		title: 'Add this step to the running noise offset.',
 		kind: 'boolean',
+		valueTooltip: saaNoiseAccumulationTooltip,
 		accent: 'noise',
 		group: 'Noise parameters',
 		shareSequence: true,

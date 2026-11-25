@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconCarbonMusic from '~icons/carbon/music';
 	import type { InstrumentMacroValueTooltip } from '../../chips/base/instrument-macros';
 
 	let {
@@ -46,7 +47,11 @@
 		<div class="text-[0.65rem] font-medium" style:color={accentColor}>{label}</div>
 		{#if rich}
 			<div class="text-[0.6rem] text-[var(--color-app-text-secondary)]">{rich.detail}</div>
-			{#if rich.series && rich.series.length > 0}
+			{#if rich.icon === 'music'}
+				<div class="mt-1 flex h-8 items-center justify-center" style:color={accentColor}>
+					<IconCarbonMusic class="size-6" />
+				</div>
+			{:else if rich.series && rich.series.length > 0}
 				<svg viewBox="0 0 100 28" class="mt-1 h-8 w-full" aria-hidden="true">
 					<polygon
 						points={fillPoints(rich.series[0]!.levels, 100, 28)}
@@ -68,15 +73,25 @@
 						<div
 							class="flex flex-col items-center gap-px"
 							style:opacity={item.active ? 1 : 0.4}>
-							<svg viewBox="0 0 32 14" class="h-3.5 w-full" aria-hidden="true">
-								<polyline
-									points={points(item.levels, 32, 14)}
-									fill="none"
-									stroke={item.active
+							{#if item.icon === 'music'}
+								<span
+									class="flex h-3.5 w-full items-center justify-center"
+									style:color={item.active
 										? accentColor
-										: 'var(--color-app-text-muted)'}
-									stroke-width="1.5" />
-							</svg>
+										: 'var(--color-app-text-muted)'}>
+									<IconCarbonMusic class="size-3.5" />
+								</span>
+							{:else}
+								<svg viewBox="0 0 32 14" class="h-3.5 w-full" aria-hidden="true">
+									<polyline
+										points={points(item.levels, 32, 14)}
+										fill="none"
+										stroke={item.active
+											? accentColor
+											: 'var(--color-app-text-muted)'}
+										stroke-width="1.5" />
+								</svg>
+							{/if}
 							<span
 								class="font-mono text-[0.55rem] leading-none {item.active
 									? 'font-bold'

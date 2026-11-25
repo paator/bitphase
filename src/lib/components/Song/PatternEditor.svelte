@@ -53,7 +53,7 @@
 		createInstrumentCarryLookup,
 		instrumentColorsById
 	} from '../../ui-rendering/instrument-pattern-colors';
-	import { getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
+	import { columnHoverFieldAtX, getColumnAtX } from '../../ui-rendering/pattern-editor-hit-test';
 	import { Cache } from '../../utils/memoize';
 	import { channelMuteStore } from '../../stores/channel-mute.svelte';
 	import {
@@ -112,6 +112,8 @@
 	import { ContextMenu } from '../Menu';
 	import InstrumentMacroHoverTooltip from '../Instruments/InstrumentMacroHoverTooltip.svelte';
 	import { saaEnvelopeColumnTooltip } from '../../chips/saa/envelope';
+	import { saaNoiseColumnTooltip } from '../../chips/saa/noise';
+	import { saaHeaderRoutes } from '../../chips/saa/header-routes';
 	import type { InstrumentMacroValueTooltip } from '../../chips/base/instrument-macros';
 	import type { MenuItem } from '../Menu/types';
 	import {
@@ -491,6 +493,14 @@
 
 	$effect(() => {
 		instrumentColorFingerprint;
+		untrack(() => scheduleDraw());
+	});
+
+	$effect(() => {
+		if (schema.chipType !== 'saa') return;
+		instruments
+			.map((instrument) => (instrument.macros?.noise?.values ?? []).map(String).join(','))
+			.join('|');
 		untrack(() => scheduleDraw());
 	});
 
@@ -1584,7 +1594,19 @@
 			channelMuted: header.channelMuted,
 			virtualChannelGroups: header.vcGroups,
 			channelRoleMarks: header.channelRoleMarks,
-			effectColumnControlsEnabled: !playbackStore.isPlaying
+			effectColumnControlsEnabled: !playbackStore.isPlaying,
+			headerRoutes:
+				schema.chipType === 'saa'
+					? saaHeaderRoutes({
+							patterns,
+							patternOrder,
+							orderIndex: currentPatternOrderIndex,
+							row: selectedRow,
+							virtualChannelMap: projectStore.songs[songIndex]?.virtualChannelMap,
+							hardwareLabels: schema.channelLabels,
+							instruments
+						})
+					: undefined
 		});
 		drawChannelLevelStripOverlay();
 	}
@@ -2283,25 +2305,30 @@
 	}
 
 	let isHoveringLabel = $state(false);
-	let envelopeHover = $state<{
+	let columnHover = $state<{
 		x: number;
 		y: number;
 		label: string;
+		accentColor: string;
 		rich: InstrumentMacroValueTooltip;
 	} | null>(null);
 
 	function handleMouseLeave(): void {
-		envelopeHover = null;
+		columnHover = null;
 		if (canvas) {
 			canvas.style.cursor = 'default';
 			isHoveringLabel = false;
 		}
 	}
 
-	function envelopeCellAt(
+	function columnCellAt(
 		x: number,
 		y: number
-	): { pattern: Pattern; row: number; fieldKey: 'env0' | 'env1' } | null {
+	): {
+		pattern: Pattern;
+		row: number;
+		fieldKey: 'env0' | 'env1' | 'noise0' | 'noise1';
+	} | null {
 		if (!canvas || !currentPattern || !renderer || !textParser) return null;
 		if (y <= lineHeight) return null;
 		const visibleRows = getVisibleRows(currentPattern);
@@ -2322,31 +2349,44 @@
 			getPatternRowData(pattern, closestRow.rowIndex),
 			closestRow.rowIndex
 		);
-		const cell = positions[getColumnAtX(positions, x)];
-		const fieldKey = cell?.fieldKey;
-		if (!cell || (fieldKey !== 'env0' && fieldKey !== 'env1')) return null;
-		if (x < cell.x || x > cell.x + cell.width) return null;
+		const fieldKey = columnHoverFieldAtX(positions, x, Math.round(lineHeight * 0.4));
+		if (!fieldKey) return null;
 		return { pattern, row: closestRow.rowIndex, fieldKey };
 	}
 
-	function updateEnvelopeHover(clientX: number, clientY: number, x: number, y: number): void {
+	function updateColumnHover(clientX: number, clientY: number, x: number, y: number): void {
 		if (schema.chipType !== 'saa' || mouseDownCell || playbackStore.isPlaying) {
-			envelopeHover = null;
+			columnHover = null;
 			return;
 		}
-		const hit = envelopeCellAt(x, y);
+		const hit = columnCellAt(x, y);
 		if (!hit) {
-			envelopeHover = null;
+			columnHover = null;
 			return;
 		}
 		const { pattern, row, fieldKey } = hit;
 		const raw = pattern.patternRows[row]?.[fieldKey];
-		const rich = saaEnvelopeColumnTooltip(typeof raw === 'number' ? raw : 0);
+		const value = typeof raw === 'number' ? raw : 0;
+		if (fieldKey === 'noise0' || fieldKey === 'noise1') {
+			const driver = fieldKey === 'noise0' ? 'A' : 'D';
+			const group = fieldKey === 'noise0' ? 'A-C' : 'D-F';
+			const rich = saaNoiseColumnTooltip(value, driver);
+			columnHover = {
+				x: clientX,
+				y: clientY,
+				label: `Noise ${group} · ${rich.heading}`,
+				accentColor: 'var(--color-pattern-noise)',
+				rich
+			};
+			return;
+		}
+		const rich = saaEnvelopeColumnTooltip(value);
 		const channel = fieldKey === 'env0' ? 'C' : 'F';
-		envelopeHover = {
+		columnHover = {
 			x: clientX,
 			y: clientY,
 			label: `Envelope ${channel} · ${rich.heading}`,
+			accentColor: 'var(--color-pattern-envelope)',
 			rich
 		};
 	}
@@ -2418,7 +2458,7 @@
 	}
 
 	function handleCanvasMouseDown(event: MouseEvent): void {
-		envelopeHover = null;
+		columnHover = null;
 		if (!canvas || !currentPattern || !renderer || !textParser) return;
 		if (event.button === 2) return;
 
@@ -2590,7 +2630,7 @@
 		const x = event.clientX - rect.left;
 		const y = event.clientY - rect.top;
 
-		updateEnvelopeHover(event.clientX, event.clientY, x, y);
+		updateColumnHover(event.clientX, event.clientY, x, y);
 
 		const wasHoveringLabel = isHoveringLabel;
 		isHoveringLabel = y <= lineHeight;
@@ -3906,12 +3946,12 @@
 		</canvas>
 
 		<InstrumentMacroHoverTooltip
-			visible={envelopeHover !== null}
-			x={envelopeHover?.x ?? 0}
-			y={envelopeHover?.y ?? 0}
-			label={envelopeHover?.label ?? ''}
-			accentColor="var(--color-pattern-envelope)"
-			rich={envelopeHover?.rich ?? null} />
+			visible={columnHover !== null}
+			x={columnHover?.x ?? 0}
+			y={columnHover?.y ?? 0}
+			label={columnHover?.label ?? ''}
+			accentColor={columnHover?.accentColor}
+			rich={columnHover?.rich ?? null} />
 
 		<ContextMenu
 			position={contextMenuPosition}

@@ -28,16 +28,20 @@ export type InstrumentMacroTooltipSeries = {
 	levels: readonly number[];
 };
 
+export type InstrumentMacroTooltipIcon = 'music';
+
 export type InstrumentMacroTooltipLegend = {
 	label: string;
 	levels: readonly number[];
 	active: boolean;
+	icon?: InstrumentMacroTooltipIcon;
 };
 
 export type InstrumentMacroValueTooltip = {
 	heading: string;
 	detail: string;
 	series?: readonly InstrumentMacroTooltipSeries[];
+	icon?: InstrumentMacroTooltipIcon;
 	legend?: readonly InstrumentMacroTooltipLegend[];
 	hint?: string;
 };

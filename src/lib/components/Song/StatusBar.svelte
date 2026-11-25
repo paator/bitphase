@@ -12,6 +12,7 @@
 	} from '../../chips/base/channel-effect-columns';
 	import { describePatternEffect, getEffectFromPattern } from '../../chips/base/effect-status';
 	import { describeSaaEnvelope } from '../../chips/saa/envelope';
+	import { describeSaaNoise } from '../../chips/saa/noise';
 	import { createTempoRowClock } from '../../services/playback/tempo-row-frames';
 
 	let {
@@ -137,7 +138,9 @@
 		}
 
 		if (selectedFieldKey === 'noise0' || selectedFieldKey === 'noise1') {
-			return 'Noise clock for A-C or D-F: 0 high, 1 mid, 2 low, 3 locked to A or D. Blank keeps the current clock.';
+			const group = selectedFieldKey === 'noise0' ? 'A-C' : 'D-F';
+			const driver = selectedFieldKey === 'noise0' ? 'A' : 'D';
+			return `Noise ${group}. 0 high, 1 mid, 2 low, 3 locked to ${driver}. Blank keeps the current clock.`;
 		}
 
 		if (fieldType === 'hex') {
@@ -180,6 +183,15 @@
 		if (selectedFieldKey !== 'env0' && selectedFieldKey !== 'env1') return '';
 		const value = pattern.patternRows[selectedRow]?.[selectedFieldKey];
 		return typeof value === 'number' ? describeSaaEnvelope(value) : 'blank, keeps current';
+	});
+
+	const noiseHint = $derived.by(() => {
+		if (playbackStore.isPlaying) return '';
+		if (!pattern || selectedRow < 0 || selectedRow >= pattern.length) return '';
+		if (selectedFieldKey !== 'noise0' && selectedFieldKey !== 'noise1') return '';
+		const value = pattern.patternRows[selectedRow]?.[selectedFieldKey];
+		const driver = selectedFieldKey === 'noise0' ? 'A' : 'D';
+		return typeof value === 'number' ? describeSaaNoise(value, driver) : 'blank, keeps current';
 	});
 
 	function patternsAtOrderIndex(
@@ -470,9 +482,9 @@
 		<div class="min-w-0 flex-1 truncate">
 			{helpMessage || '=== Ready ==='}
 		</div>
-		{#if effectHint || envelopeHint}
+		{#if effectHint || envelopeHint || noiseHint}
 			<div class="shrink-0 text-[var(--color-app-text-secondary)]">
-				{effectHint || envelopeHint}
+				{effectHint || envelopeHint || noiseHint}
 			</div>
 		{/if}
 	</div>

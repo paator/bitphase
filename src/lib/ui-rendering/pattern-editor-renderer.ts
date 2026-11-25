@@ -12,8 +12,43 @@ import {
 	schemaHasChannelEffects
 } from '../chips/base/channel-effect-columns';
 import { emptyNoteBaselineYOffset, type EmptyNoteAlignment } from './empty-note-alignment';
+import type { ChannelHeaderRoute } from '../chips/base/header-route';
 
 export const CHANNEL_LEVEL_STRIP_HEIGHT = 6;
+
+const HEADER_ARROW_LENGTH = 7;
+const HEADER_BUS_LANE_PITCH = 12;
+const HEADER_ARROW_BAR_GAP = 8;
+
+function headerRouteSideLane(buttonWidth: number): number {
+	const preferred = Math.round(buttonWidth * 0.34);
+	const cap = Math.floor(buttonWidth * 0.32);
+	return Math.max(28, Math.min(preferred, cap, 72));
+}
+
+export function channelLevelBarBox(
+	buttonX: number,
+	buttonWidth: number
+): { x: number; width: number } {
+	const lane = headerRouteSideLane(buttonWidth);
+	const width = Math.max(10, buttonWidth - lane * 2);
+	const used = Math.min(width, buttonWidth);
+	return { x: buttonX + (buttonWidth - used) / 2, width: used };
+}
+
+export function headerRouteDockX(
+	buttonX: number,
+	buttonWidth: number,
+	side: 'left' | 'right'
+): number {
+	const bar = channelLevelBarBox(buttonX, buttonWidth);
+	const wing = HEADER_ARROW_LENGTH / 2;
+	const x =
+		side === 'left'
+			? bar.x - HEADER_ARROW_BAR_GAP - wing
+			: bar.x + bar.width + HEADER_ARROW_BAR_GAP + wing;
+	return Math.round(x);
+}
 
 export function getChannelLevelStripDeviceRect(
 	lineHeight: number,
@@ -68,11 +103,21 @@ export interface ChannelLabelData {
 	channelRoleMarks?: (string | null)[];
 	channelLevels?: number[];
 	effectColumnControlsEnabled?: boolean;
+	headerRoutes?: ChannelHeaderRoute[];
 }
 
 export interface RoleDriveLink {
 	sourceIndex: number;
 	voiceIndex: number;
+}
+
+interface HeaderBus {
+	fromIndex: number;
+	toIndices: number[];
+	lane: number;
+	arrow: boolean;
+	color: string;
+	label?: string;
 }
 
 export function roleDriveLinks(
@@ -198,7 +243,11 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		} else {
 			for (let i = 0; i < data.channelLabels.length && i < channelPositions.length; i++) {
 				this.drawSingleChannelLabel(
-					this.channelHeaderText(this.formatChannelHeaderLabel(data.channelLabels[i]), i, data),
+					this.channelHeaderText(
+						this.formatChannelHeaderLabel(data.channelLabels[i]),
+						i,
+						data
+					),
 					i,
 					channelPositions,
 					separatorMargin,
@@ -213,6 +262,7 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		}
 
 		this.restore();
+		this.drawHeaderBuses(this.collectHeaderBuses(data), channelPositions, separatorMargin);
 	}
 
 	drawChannelLevelStripOnOverlay(
@@ -273,7 +323,9 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 					? virtualLabel.slice(group.hardwareLabel.length)
 					: virtualLabel;
 				suffix = suffix.replace(/^[:\-\s]+/, '');
-				const virtualText = suffix ? `${group.hardwareLabel}:${suffix}` : group.hardwareLabel;
+				const virtualText = suffix
+					? `${group.hardwareLabel}:${suffix}`
+					: group.hardwareLabel;
 				this.drawSingleChannelLabel(
 					this.channelHeaderText(virtualText, vchIdx, data),
 					vchIdx,
@@ -303,12 +355,6 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 			const buttonY = (this.lineHeight - buttonHeight) / 2;
 			this.ctx.strokeRect(groupX, buttonY, groupWidth, buttonHeight);
 			this.restore();
-			this.drawRoleHeaderLinks(
-				roleDriveLinks([group], data.channelRoleMarks),
-				data,
-				channelPositions,
-				separatorMargin
-			);
 		}
 	}
 
@@ -588,16 +634,15 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		level: number,
 		isMuted: boolean
 	): void {
-		const barWidth = Math.max(10, Math.round(buttonWidth * 0.85));
-		const barX = buttonX + (buttonWidth - barWidth) / 2;
+		const bar = channelLevelBarBox(buttonX, buttonWidth);
 		const fillColor = isMuted
 			? this.patternColors.patternEmpty
 			: this.patternColors.patternNote || this.patternColors.patternText;
 		const clamped = Math.min(1, Math.max(0, level));
-		const fillWidth = Math.round(barWidth * clamped);
+		const fillWidth = Math.round(bar.width * clamped);
 		if (fillWidth <= 0) return;
 
-		const fillX = barX + (barWidth - fillWidth) / 2;
+		const fillX = bar.x + (bar.width - fillWidth) / 2;
 		this.fillRectWithAlpha(fillX, barY, fillWidth, barHeight, fillColor, isMuted ? 0.35 : 0.85);
 	}
 
@@ -681,60 +726,146 @@ export class PatternEditorRenderer extends BaseCanvasRenderer {
 		return { x, y, width, height };
 	}
 
-	private drawRoleHeaderLinks(
-		links: RoleDriveLink[],
-		data: ChannelLabelData,
+	private collectHeaderBuses(data: ChannelLabelData): HeaderBus[] {
+		const buses: HeaderBus[] = [];
+		let laneOffset = 0;
+		for (const route of data.headerRoutes ?? []) {
+			const indices = [...new Set([route.fromIndex, ...route.toIndices])];
+			buses.push({
+				fromIndex: route.fromIndex,
+				toIndices: route.toIndices,
+				lane: route.lane,
+				arrow: route.arrow,
+				label: route.label,
+				color: this.headerRouteColor(
+					route.tone,
+					indices.every((index) => data.channelMuted[index])
+				)
+			});
+			laneOffset = Math.max(laneOffset, route.lane + 1);
+		}
+		for (const group of data.virtualChannelGroups ?? []) {
+			const voicesBySource = new Map<number, number[]>();
+			for (const link of roleDriveLinks([group], data.channelRoleMarks)) {
+				const voices = voicesBySource.get(link.sourceIndex) ?? [];
+				voices.push(link.voiceIndex);
+				voicesBySource.set(link.sourceIndex, voices);
+			}
+			let lane = 0;
+			for (const [sourceIndex, voiceIndices] of voicesBySource) {
+				buses.push({
+					fromIndex: sourceIndex,
+					toIndices: voiceIndices,
+					lane: laneOffset + lane,
+					arrow: true,
+					color: this.roleSignalColor(data.channelMuted[sourceIndex] ?? false)
+				});
+				lane += 1;
+			}
+		}
+		return buses;
+	}
+
+	private drawHeaderBuses(
+		buses: HeaderBus[],
 		channelPositions: number[],
 		separatorMargin: number
 	): void {
-		if (links.length === 0) return;
+		if (buses.length === 0) return;
 		this.save();
 		this.ctx.lineCap = 'butt';
 		this.ctx.lineJoin = 'miter';
 		this.ctx.setLineDash([]);
-		for (const link of links) {
-			const source = this.channelHeaderButton(link.sourceIndex, channelPositions, separatorMargin);
-			const voice = this.channelHeaderButton(link.voiceIndex, channelPositions, separatorMargin);
-			if (!source || !voice) continue;
-			this.drawCurvedHeaderArrow(
-				source,
-				voice,
-				this.roleSignalColor(data.channelMuted[link.sourceIndex] ?? false),
-				Math.abs(link.voiceIndex - link.sourceIndex)
-			);
+		const previousFont = this.ctx.font;
+		this.setFont(previousFont.replace(/(\d+(?:\.\d+)?)px/, '9px'));
+		this.setTextBaseline('middle');
+		for (const bus of buses) {
+			this.drawHeaderBus(bus, channelPositions, separatorMargin);
 		}
 		this.restore();
 	}
 
-	private drawCurvedHeaderArrow(
-		source: { x: number; y: number; width: number; height: number },
-		voice: { x: number; y: number; width: number; height: number },
-		color: string,
-		separation: number
+	private drawHeaderBus(
+		bus: HeaderBus,
+		channelPositions: number[],
+		separatorMargin: number
 	): void {
-		const fromX = source.x + source.width / 2;
-		const toX = voice.x + voice.width / 2;
-		const span = Math.abs(toX - fromX);
-		if (span < 4) return;
-		const fromY = this.lineHeight;
-		const floorY = this.lineHeight + CHANNEL_LEVEL_STRIP_HEIGHT + 4 + Math.max(1, separation) * 5;
-		const arrowLength = 7;
-		this.beginPath();
-		this.moveTo(fromX, fromY);
-		this.lineTo(fromX, floorY);
-		this.lineTo(toX, floorY);
-		this.lineTo(toX, fromY + arrowLength);
-		this.stroke(color, 1.5);
-		this.fillArrowHead(toX, fromY, 0, -1, color);
+		const buttons = new Map<number, { x: number; width: number }>();
+		const from = this.channelHeaderButton(bus.fromIndex, channelPositions, separatorMargin);
+		if (!from) return;
+		buttons.set(bus.fromIndex, from);
+		for (const index of bus.toIndices) {
+			if (buttons.has(index)) continue;
+			const button = this.channelHeaderButton(index, channelPositions, separatorMargin);
+			if (!button) return;
+			buttons.set(index, button);
+		}
+		const centerOf = (button: { x: number; width: number }) => button.x + button.width / 2;
+		const entries = [...buttons.entries()];
+		const docks = new Map<number, number>();
+		for (const [index, button] of entries) {
+			const others = entries.filter(([otherIndex]) => otherIndex !== index);
+			const focus = others.length
+				? others.reduce((sum, [, other]) => sum + centerOf(other), 0) / others.length
+				: centerOf(button);
+			docks.set(
+				index,
+				headerRouteDockX(button.x, button.width, focus < centerOf(button) ? 'left' : 'right')
+			);
+		}
+		const arrowXs = bus.arrow
+			? bus.toIndices
+					.filter((index) => index !== bus.fromIndex)
+					.map((index) => docks.get(index))
+					.filter((x): x is number => x !== undefined)
+			: [];
+		const xs = [...new Set(docks.values())];
+		const left = Math.min(...xs);
+		const right = Math.max(...xs);
+		if (right - left < 4 && !bus.label) return;
+		const top = this.lineHeight;
+		const floor = top + CHANNEL_LEVEL_STRIP_HEIGHT + 4 + bus.lane * HEADER_BUS_LANE_PITCH;
+		for (const x of xs) {
+			const landsOnArrow = arrowXs.some((arrowX) => Math.abs(arrowX - x) < 0.5);
+			this.beginPath();
+			this.moveTo(x, landsOnArrow ? top + HEADER_ARROW_LENGTH : top);
+			this.lineTo(x, floor);
+			this.stroke(bus.color, 1.5);
+		}
+		if (right - left >= 4) {
+			this.beginPath();
+			this.moveTo(left, floor);
+			this.lineTo(right, floor);
+			this.stroke(bus.color, 1.5);
+		}
+		for (const x of arrowXs) {
+			this.fillArrowHead(x, top, 0, -1, bus.color);
+		}
+		if (!bus.label) return;
+		const textWidth = this.measureText(bus.label);
+		const pillWidth = textWidth + 8;
+		const pillHeight = 11;
+		const pillX = (left + right) / 2 - pillWidth / 2;
+		const pillY = floor - pillHeight / 2;
+		this.fillRect(pillX, pillY, pillWidth, pillHeight, this.patternColors.patternBg);
+		this.strokeRect(pillX, pillY, pillWidth, pillHeight, bus.color, 1);
+		this.fillText(bus.label, pillX + 4, floor, bus.color);
+	}
+
+	private headerRouteColor(tone: ChannelHeaderRoute['tone'], muted: boolean): string {
+		if (muted) return this.patternColors.patternEmpty;
+		if (tone === 'envelope') {
+			return this.patternColors.patternEnvelope || this.patternColors.patternText;
+		}
+		return this.patternColors.patternNoise || this.patternColors.patternText;
 	}
 
 	private fillArrowHead(x: number, y: number, ux: number, uy: number, color: string): void {
-		const length = 7;
-		const wing = 3.5;
+		const wing = HEADER_ARROW_LENGTH / 2;
 		const px = -uy;
 		const py = ux;
-		const baseX = x - ux * length;
-		const baseY = y - uy * length;
+		const baseX = x - ux * HEADER_ARROW_LENGTH;
+		const baseY = y - uy * HEADER_ARROW_LENGTH;
 		this.beginPath();
 		this.moveTo(x, y);
 		this.lineTo(baseX + px * wing, baseY + py * wing);
