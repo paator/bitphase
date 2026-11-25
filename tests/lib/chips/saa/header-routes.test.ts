@@ -8,6 +8,7 @@ function pattern(
 		env0?: number;
 		env1?: number;
 		instruments?: Array<number | undefined>;
+		notes?: Array<{ name: number } | undefined>;
 		effects?: Array<
 			Array<{ effect: number; delay: number; parameter: number } | null> | undefined
 		>;
@@ -25,6 +26,7 @@ function pattern(
 		})),
 		channels: Array.from({ length: channelCount }, (_, channel) => ({
 			rows: rows.map((row) => ({
+				note: row.notes?.[channel],
 				instrument: row.instruments?.[channel],
 				effects: row.effects?.[channel]
 			}))
@@ -81,6 +83,91 @@ describe('saaHeaderRoutes', () => {
 				arrow: false
 			}
 		]);
+	});
+
+	it('shows the clock after the noise offset is added', () => {
+		const offsetInstrument = {
+			id: '01',
+			macros: {
+				noise: { values: [true] },
+				noiseAdd: { values: [2] }
+			}
+		};
+		const routes = saaHeaderRoutes({
+			patterns: [
+				pattern([
+					{
+						noise0: -1,
+						instruments: [1],
+						notes: [{ name: 2 }]
+					}
+				])
+			],
+			patternOrder: [0],
+			orderIndex: 0,
+			row: 0,
+			instruments: [offsetInstrument]
+		});
+		expect(routes).toEqual([
+			{
+				fromIndex: 0,
+				toIndices: [],
+				label: 'low',
+				tone: 'noise',
+				lane: 1,
+				arrow: false
+			}
+		]);
+	});
+
+	it('uses the noise offset at the macro step reached by the cursor', () => {
+		const offsetInstrument = {
+			id: '01',
+			macros: {
+				noise: { values: [true, true] },
+				noiseAdd: { values: [0, 2] }
+			}
+		};
+		const routes = saaHeaderRoutes({
+			patterns: [
+				pattern([
+					{ noise0: -1, instruments: [1], notes: [{ name: 2 }] },
+					{ notes: [undefined] }
+				])
+			],
+			patternOrder: [0],
+			orderIndex: 0,
+			row: 1,
+			instruments: [offsetInstrument]
+		});
+		expect(routes[0]?.label).toBe('low');
+	});
+
+	it('lets the later channel overwrite an earlier noise offset', () => {
+		const shifting = {
+			id: '01',
+			macros: { noise: { values: [false] }, noiseAdd: { values: [2] } }
+		};
+		const plain = {
+			id: '02',
+			macros: { noise: { values: [true] }, noiseAdd: { values: [0] } }
+		};
+		const routes = saaHeaderRoutes({
+			patterns: [
+				pattern([
+					{
+						noise0: -1,
+						instruments: [1, 2],
+						notes: [{ name: 2 }, { name: 2 }]
+					}
+				])
+			],
+			patternOrder: [0],
+			orderIndex: 0,
+			row: 0,
+			instruments: [shifting, plain]
+		});
+		expect(routes.map((route) => route.label)).toEqual(['high']);
 	});
 
 	it('points channel A at the other channels when it clocks their noise', () => {

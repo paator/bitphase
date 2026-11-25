@@ -1,4 +1,5 @@
 import { saaEnvelopeByteFromCode } from '../../../../public/saa/saa-levels.js';
+import { sampleSaaMixerRow } from '../../../../public/tracker/tracker-instrument-macros.js';
 import type { ChannelHeaderRoute } from '../base/header-route';
 import {
 	getHardwareChannelIndex,
@@ -9,6 +10,8 @@ const CHIP_EFFECT = 'E'.charCodeAt(0);
 const NOISE_LOCK_SUBCOMMAND = 2;
 const MIXER_SUBCOMMAND = 6;
 const MIXER_FOLLOW_INSTRUMENT = 4;
+const NOTE_OFF = 1;
+const NOTE_RELEASE = 14;
 const NOISE_LABELS = ['high', 'mid', 'low'] as const;
 
 const GROUPS = [
@@ -27,6 +30,7 @@ export interface SaaHeaderRoutePattern {
 	}>;
 	channels: ReadonlyArray<{
 		rows: ReadonlyArray<{
+			note?: { name?: number } | null;
 			instrument?: unknown;
 			effects?: ReadonlyArray<{
 				effect?: number;
@@ -41,7 +45,9 @@ export interface SaaHeaderRoutePattern {
 export interface SaaHeaderRouteInstrument {
 	id: string;
 	macros?: {
-		noise?: { values?: readonly unknown[] };
+		noise?: { values?: readonly unknown[]; loop?: number; release?: number };
+		noiseAdd?: { values?: readonly unknown[]; loop?: number; release?: number };
+		noiseAccumulation?: { values?: readonly unknown[]; loop?: number; release?: number };
 	};
 }
 
@@ -67,7 +73,8 @@ export function saaHeaderRoutes(input: {
 		input.orderIndex,
 		input.row,
 		labels,
-		map
+		map,
+		byNumber
 	);
 	const channelCount = heard.channelCount;
 	const column = (hardware: number) =>
@@ -142,6 +149,14 @@ export function saaHeaderRoutes(input: {
 	return routes;
 }
 
+interface NoiseChannel {
+	instrument: number | null;
+	position: number;
+	accumulator: number;
+	releaseTick: number;
+	sounding: boolean;
+}
+
 interface HeardRouting {
 	channelCount: number;
 	noiseClock: [number, number];
@@ -149,6 +164,7 @@ interface HeardRouting {
 	envelopeOn: [boolean, boolean];
 	instrument: Array<number | null>;
 	mixer: Array<number | null>;
+	noiseChannel: NoiseChannel[];
 }
 
 function hearSaaRouting(
@@ -157,7 +173,8 @@ function hearSaaRouting(
 	orderIndex: number,
 	row: number,
 	labels: readonly string[],
-	map: Record<number, number>
+	map: Record<number, number>,
+	instruments: Map<number, SaaHeaderRouteInstrument>
 ): HeardRouting {
 	const heard: HeardRouting = {
 		channelCount: 0,
@@ -165,8 +182,10 @@ function hearSaaRouting(
 		noiseLock: [false, false],
 		envelopeOn: [false, false],
 		instrument: [],
-		mixer: []
+		mixer: [],
+		noiseChannel: []
 	};
+	const noiseBase: [number, number] = [0, 0];
 	const lastOrder = Math.min(Math.max(orderIndex, 0), Math.max(0, patternOrder.length - 1));
 	for (let order = 0; order <= lastOrder && order < patternOrder.length; order++) {
 		const pattern = patterns.find((item) => item.id === patternOrder[order]);
@@ -175,6 +194,13 @@ function hearSaaRouting(
 		while (heard.instrument.length < pattern.channels.length) {
 			heard.instrument.push(null);
 			heard.mixer.push(null);
+			heard.noiseChannel.push({
+				instrument: null,
+				position: 0,
+				accumulator: 0,
+				releaseTick: -1,
+				sounding: false
+			});
 		}
 		const lastRow =
 			order === lastOrder
@@ -182,13 +208,15 @@ function hearSaaRouting(
 				: pattern.length - 1;
 		for (let index = 0; index <= lastRow; index++) {
 			const patternRow = pattern.patternRows[index];
-			applyNoise(heard.noiseClock, 0, patternRow?.noise0);
-			applyNoise(heard.noiseClock, 1, patternRow?.noise1);
+			applyNoise(noiseBase, 0, patternRow?.noise0);
+			applyNoise(noiseBase, 1, patternRow?.noise1);
 			applyEnvelope(heard.envelopeOn, 0, patternRow?.env0);
 			applyEnvelope(heard.envelopeOn, 1, patternRow?.env1);
 			for (let channel = 0; channel < pattern.channels.length; channel++) {
 				const channelRow = pattern.channels[channel]?.rows[index];
 				if (!channelRow) continue;
+				const play = heard.noiseChannel[channel];
+				if (play) updateNoiseChannel(play, channelRow);
 				if (typeof channelRow.instrument === 'number' && channelRow.instrument > 0) {
 					heard.instrument[channel] = channelRow.instrument;
 				}
@@ -199,9 +227,73 @@ function hearSaaRouting(
 					channelRow.effects
 				);
 			}
+			heard.noiseClock = resolveNoiseClocks(noiseBase, heard, labels, map, instruments);
 		}
 	}
 	return heard;
+}
+
+function updateNoiseChannel(
+	play: NoiseChannel,
+	row: SaaHeaderRoutePattern['channels'][number]['rows'][number]
+): void {
+	const noteName = row.note?.name ?? 0;
+	if (noteName === NOTE_OFF) {
+		play.sounding = false;
+		play.accumulator = 0;
+		play.releaseTick = -1;
+		return;
+	}
+	if (noteName === NOTE_RELEASE) {
+		if (play.releaseTick < 0) play.releaseTick = play.position;
+		return;
+	}
+	if (noteName !== 0) {
+		play.sounding = true;
+		play.accumulator = 0;
+		play.releaseTick = -1;
+		play.position = 0;
+	}
+	if (typeof row.instrument === 'number' && row.instrument > 0) {
+		play.instrument = row.instrument;
+		play.position = 0;
+		play.accumulator = 0;
+		play.releaseTick = -1;
+	}
+}
+
+function resolveNoiseClocks(
+	base: readonly [number, number],
+	heard: HeardRouting,
+	labels: readonly string[],
+	map: Record<number, number>,
+	instruments: Map<number, SaaHeaderRouteInstrument>
+): [number, number] {
+	const clock: [number, number] = [base[0] & 3, base[1] & 3];
+	for (let channel = 0; channel < heard.noiseChannel.length; channel++) {
+		const play = heard.noiseChannel[channel];
+		if (!play?.sounding || play.instrument == null) continue;
+		const instrument = instruments.get(play.instrument);
+		if (!instrument) continue;
+		const hardware = getHardwareChannelIndex(channel, [...labels], map);
+		if (hardware < 0) {
+			play.position += 1;
+			continue;
+		}
+		const row = sampleSaaMixerRow(instrument, play.position, play.releaseTick) as {
+			noise?: boolean;
+			noiseAdd?: number;
+			noiseAccumulation?: boolean;
+		};
+		const group = hardware < 3 ? 0 : 1;
+		if (row.noise === true || hardware % 3 === 0) {
+			const offset = play.accumulator + (Number(row.noiseAdd) | 0);
+			if (row.noiseAccumulation) play.accumulator = offset & 3;
+			clock[group] = (base[group] + offset) & 3;
+		}
+		play.position += 1;
+	}
+	return clock;
 }
 
 function applyNoise(clocks: [number, number], group: number, raw: unknown): void {
