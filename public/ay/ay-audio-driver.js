@@ -1018,6 +1018,9 @@ class AYAudioDriver {
 
 	applyInstrumentEnvelopeShape(state, registerState, channelIndex, shape) {
 		if (shape <= 0) {
+			if (this.syncbuzzerHasExplicitShape(state, channelIndex)) {
+				state.channelEnvelopeEnabled[channelIndex] = true;
+			}
 			if (!state.channelEnvelopeShapeOverride?.[channelIndex]) return;
 			state.channelEnvelopeShapeOverride[channelIndex] = false;
 			this.writeEnvelopeShape(
